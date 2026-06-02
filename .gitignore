@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# frontend build
+dist/
+
+# rust / tauri build
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# portable data created at runtime (lives on the USB, never in git)
+**/Euclide-Data/
+
+# python sidecar build artifacts
+sidecar/build/
+sidecar/dist/
+sidecar/.venv/
+__pycache__/
+*.pyc
+
+# os / editor
+.DS_Store
+*.log
+.vscode/
+.idea/

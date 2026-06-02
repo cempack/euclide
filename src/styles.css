@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* light theme - clean paper with clear separation */
+  --eu-bg: 236 237 242;
+  --eu-surface: 250 250 252;
+  --eu-card: 255 255 255;
+  --eu-border: 222 224 232;
+  --eu-text: 28 30 38;
+  --eu-muted: 96 102 116;
+  --eu-accent: 91 123 232;
+  --eu-accent-soft: 230 236 251;
+}
+
+.dark {
+  /* dark theme - deep, restful, slightly blue */
+  --eu-bg: 14 16 22;
+  --eu-surface: 22 25 33;
+  --eu-card: 30 34 45;
+  --eu-border: 46 51 65;
+  --eu-text: 233 236 244;
+  --eu-muted: 150 158 174;
+  --eu-accent: 124 156 245;
+  --eu-accent-soft: 39 47 71;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: rgb(var(--eu-bg));
+  color: rgb(var(--eu-text));
+  font-family: theme("fontFamily.sans");
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+/* On macOS we keep the content readable (mostly opaque) and let only the
+   sidebar/topbar reveal the native vibrancy for a subtle frosted feel. */
+.has-vibrancy body {
+  background-color: rgb(var(--eu-bg) / 0.92);
+}
+.has-vibrancy .eu-sidebar {
+  background-color: rgb(var(--eu-surface) / 0.55) !important;
+}
+.has-vibrancy .eu-topbar {
+  background-color: rgb(var(--eu-bg) / 0.45) !important;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  user-select: text;
+  cursor: auto;
+}
+
+/* draggable window region for the hidden/overlay titlebar */
+.eu-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.eu-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--eu-muted) / 0.32);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--eu-muted) / 0.5);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .eu-card {
+    @apply rounded-2xl bg-eu-card border border-eu-border shadow-card;
+  }
+  .eu-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium
+      transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2
+      focus-visible:ring-eu-accent/50 disabled:opacity-50 disabled:pointer-events-none eu-no-drag;
+  }
+  .eu-btn-primary {
+    @apply eu-btn bg-eu-accent text-white shadow-soft hover:brightness-110;
+  }
+  .eu-btn-ghost {
+    @apply eu-btn text-eu-text hover:bg-eu-accent-soft;
+  }
+  .eu-btn-soft {
+    @apply eu-btn bg-eu-accent-soft text-eu-accent hover:brightness-105;
+  }
+  .eu-input {
+    @apply w-full rounded-xl bg-eu-surface border border-eu-border px-3.5 py-2.5 text-sm text-eu-text
+      placeholder:text-eu-muted/70 focus:outline-none focus:ring-2 focus:ring-eu-accent/40 focus:border-eu-accent/40
+      transition-all;
+  }
+  .eu-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-eu-accent-soft px-3 py-1 text-xs font-medium text-eu-accent;
+  }
+  .eu-title {
+    @apply text-eu-text font-semibold tracking-tight;
+  }
+  .eu-sub {
+    @apply text-eu-muted text-sm;
+  }
+  .eu-kbd {
+    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-md border border-eu-border
+      bg-eu-surface text-[11px] font-medium text-eu-muted;
+  }
+}
