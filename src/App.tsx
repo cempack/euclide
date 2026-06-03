@@ -152,7 +152,7 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
   return (
     <div
       className="eu-topbar h-14 shrink-0 flex items-center eu-drag bg-transparent font-mono overflow-hidden border-b border-hairline"
-      style={{ paddingLeft: 12, paddingRight: (!isMac ? 140 : undefined) }}
+      style={{ paddingLeft: 12 }}
       onMouseDown={startDrag}
       onDoubleClick={(e) => {
         // Double-click titlebar to toggle maximize (Windows/Linux convention)
@@ -295,7 +295,6 @@ function WindowControls() {
       .then(({ getCurrentWindow }) => {
         const w = getCurrentWindow();
         setWin(w);
-        // Track maximized state for the restore/maximize icon toggle
         w.isMaximized().then(setMaximized).catch(() => {});
         w.onResized(() => {
           w.isMaximized().then(setMaximized).catch(() => {});
@@ -304,7 +303,7 @@ function WindowControls() {
       .catch(() => {});
   }, []);
 
-  // On macOS, native traffic lights are provided by titleBarStyle: Overlay — hide custom controls
+  // On macOS, native traffic lights are provided by titleBarStyle: Overlay
   if (isMac || !win) return null;
 
   const handleClose = async (e: React.MouseEvent) => {
@@ -320,57 +319,53 @@ function WindowControls() {
     try { await win.toggleMaximize(); } catch {}
   };
 
-  // Windows / Linux: standard top-right window controls (─  □/❐  ✕)
   return (
     <div
-      className="fixed top-0 right-0 z-[999] flex items-stretch h-[38px] eu-no-drag"
+      className="fixed top-2.5 left-3 z-[999] flex items-center gap-1.5 eu-no-drag"
       style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as any}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {/* Minimize */}
+      {/* Close (red) */}
+      <button
+        onClick={handleClose}
+        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        className="group w-[14px] h-[14px] rounded-full bg-[#ff5f57] hover:bg-[#ff3b30] flex items-center justify-center transition-all eu-no-drag"
+        style={{ WebkitAppRegion: "no-drag" } as any}
+        title="Close"
+      >
+        <svg className="w-[8px] h-[8px] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 8 8">
+          <path d="M1.5 1.5l5 5M6.5 1.5l-5 5" stroke="#4a0002" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+        </svg>
+      </button>
+      {/* Minimize (yellow) */}
       <button
         onClick={handleMinimize}
         onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        className="w-[46px] h-full flex items-center justify-center text-[var(--eu-text)] hover:bg-[rgb(var(--eu-surface-container))] transition-colors eu-no-drag"
+        className="group w-[14px] h-[14px] rounded-full bg-[#ffbd2e] hover:bg-[#e5a800] flex items-center justify-center transition-all eu-no-drag"
         style={{ WebkitAppRegion: "no-drag" } as any}
         title="Minimize"
       >
-        <svg width="12" height="12" viewBox="0 0 12 12">
-          <path d="M2 6h8" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        <svg className="w-[8px] h-[8px] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 8 8">
+          <path d="M1.5 4h5" stroke="#995700" strokeWidth="1.3" strokeLinecap="round" fill="none" />
         </svg>
       </button>
-      {/* Maximize / Restore */}
+      {/* Maximize / Restore (green) */}
       <button
         onClick={handleMaximize}
         onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        className="w-[46px] h-full flex items-center justify-center text-[var(--eu-text)] hover:bg-[rgb(var(--eu-surface-container))] transition-colors eu-no-drag"
+        className="group w-[14px] h-[14px] rounded-full bg-[#28c840] hover:bg-[#1aab2e] flex items-center justify-center transition-all eu-no-drag"
         style={{ WebkitAppRegion: "no-drag" } as any}
         title={maximized ? "Restore" : "Maximize"}
       >
         {maximized ? (
-          /* Restore icon (two overlapping squares) */
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <rect x="3" y="3" width="7" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.1" fill="none" />
-            <path d="M3 7.5V2.5a1 1 0 0 1 1-1h5" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          <svg className="w-[8px] h-[8px] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 8 8">
+            <path d="M5 1.5H2a.5.5 0 0 0-.5.5v3M3 6.5h3a.5.5 0 0 0 .5-.5V3" stroke="#006500" strokeWidth="1.1" strokeLinecap="round" fill="none" />
           </svg>
         ) : (
-          /* Maximize icon (single square) */
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <rect x="2" y="2" width="8" height="8" rx="0.5" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          <svg className="w-[8px] h-[8px] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 8 8">
+            <path d="M1.5 2.5l2.5 -1.5 2.5 1.5v3l-2.5 1.5-2.5-1.5z" stroke="#006500" strokeWidth="1" fill="none" />
           </svg>
         )}
-      </button>
-      {/* Close */}
-      <button
-        onClick={handleClose}
-        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        className="w-[46px] h-full flex items-center justify-center text-[var(--eu-text)] hover:bg-[#c42b1c] hover:text-white transition-colors rounded-none eu-no-drag"
-        style={{ WebkitAppRegion: "no-drag" } as any}
-        title="Close"
-      >
-        <svg width="12" height="12" viewBox="0 0 12 12">
-          <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.2" fill="none" />
-        </svg>
       </button>
     </div>
   );

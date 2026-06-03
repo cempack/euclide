@@ -49,6 +49,15 @@ pub fn run() {
                     // Acrylic provides more blur and "transparent" frosted look than mica.
                     let _ = window_vibrancy::apply_acrylic(&win, None)
                         .or_else(|_| window_vibrancy::apply_mica(&win, None));
+
+                    // Set the window icon for taskbar + Alt-Tab (decorations:false means
+                    // Windows doesn't automatically pick it up from the exe resources).
+                    use tauri::image::Image;
+                    if let Ok(icon) = Image::from_path("icons/icon.ico") {
+                        let _ = win.set_icon(Some(icon));
+                    } else if let Ok(icon) = Image::from_path("icons/32x32.png") {
+                        let _ = win.set_icon(Some(icon));
+                    }
                 }
                 #[cfg(target_os = "linux")]
                 {
