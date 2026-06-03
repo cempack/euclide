@@ -8,8 +8,6 @@ on:
 
 jobs:
   publish-tauri:
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -29,7 +27,7 @@ jobs:
           - platform: 'windows-latest' # Windows - portable (no installer setups, see post-build zip)
             target: 'x86_64-pc-windows-msvc'
             arch: 'x86_64'
-            args: ''
+            args: '--target x86_64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
 
@@ -123,7 +121,7 @@ jobs:
           else
             # Windows: create portable zip with exe + sidecar (no installer)
             mkdir -p Euclide-portable
-            cp "target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "target/${{ matrix.target }}/release/Euclide.exe" Euclide-portable/ 2>/dev/null || true
+            cp "src-tauri/target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/${{ matrix.target }}/release/Euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/Euclide.exe" Euclide-portable/ 2>/dev/null || true
             cp sidecar/dist/euclide-sidecar.exe Euclide-portable/ 2>/dev/null || cp src-tauri/resources/euclide-sidecar.exe Euclide-portable/ 2>/dev/null || true
             echo "Portable Euclide for Windows. Extract the folder and run euclide.exe (or Euclide.exe)." > Euclide-portable/README.txt
             echo "Data folder (Euclide-Data) will be created next to the exe for full portability on USB." >> Euclide-portable/README.txt
@@ -131,9 +129,35 @@ jobs:
           fi
         shell: bash
 
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-${{ matrix.arch }}-${{ matrix.platform }}
+          path: dist-portable/*
+          if-no-files-found: warn
+          retention-days: 7
+
+  release:
+    # Only create the actual GitHub Release (with all platform artifacts) on tag pushes.
+    # The build job above runs for both tags and manual workflow_dispatch (for testing builds).
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: publish-tauri
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all portable artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: portable-*
+          path: dist-portable
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist-portable/ || true
+
       - name: Create GitHub Release and upload portable artifacts
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           tag_name: ${{ github.ref_name }}
           name: 'Euclide ${{ github.ref_name }}'
