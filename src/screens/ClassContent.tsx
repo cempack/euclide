@@ -216,8 +216,8 @@ export default function ClassContent({
         <div className="new-card p-6">
           <EmptyState
             icon={<BookIcon className="w-8 h-8" />}
-            title="Aucun contenu Pronote récent"
-            hint={`Aucun "contenu des cours" trouvé pour ${className} / ${effectiveMatiere}. Vérifiez que le prof est connecté (compte professeur) et a publié des contenus dans le cahier de textes sur Pronote pour cette classe et matière.`}
+            title={get("classContent.noContent", "Aucun contenu Pronote")}
+            hint={get("classContent.noContentHint", "Aucun contenu de cours trouvé pour {class} / {matiere}.").replace("{class}", className).replace("{matiere}", effectiveMatiere)}
           />
         </div>
       ) : (
