@@ -100,6 +100,8 @@ The workflow:
 - Runs `tauri build` (with --bundles limited to app/appimage to avoid setups) + custom post-packaging for portable zips.
 - Creates a draft GitHub Release with the portable artifacts.
 
+For manual "Run workflow" runs (no tag), it will (by default) create or replace a draft release tagged `dev-build` (with name "dev-build (manual)"). This makes the built files immediately available on the Releases page without having to hunt through workflow artifacts or wait for a real tag. You can disable the release creation via the input if you only want the build logs/artifacts. Real versioned releases still come from pushing `v*` tags.
+
 See `.github/workflows/publish.yml` for the matrix and steps (based on official Tauri v2 guide + custom sidecar integration).
 
 To customize release (e.g. auto publish instead of draft), edit the action inputs. Code signing for prod releases is recommended (separate guides for macOS/Windows).
