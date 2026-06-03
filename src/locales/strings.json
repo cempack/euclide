@@ -377,7 +377,7 @@
     "noMatiereError": "Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes.",
     "pronoteError": "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof).",
     "noContent": "Aucun contenu Pronote récent",
-    "noContentHint": "Aucun \"contenu des cours\" trouvé pour {class} / {matiere}. Vérifiez que le prof est connecté (compte professeur) et a publié des contenus dans le cahier de textes sur Pronote pour cette classe et matière.",
+    "noContentHint": "Aucun contenu de cours trouvé pour {class} / {matiere}.",
     "noPronoteContent": "Aucun contenu Pronote trouvé pour cette classe/matière.",
     "groups": "Groupes : {groups}",
     "documents": "Documents joints ({count})",
