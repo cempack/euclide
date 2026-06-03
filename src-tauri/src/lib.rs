@@ -15,6 +15,7 @@ pub fn run() {
             use tauri::Manager;
             app.manage(db::Db(std::sync::Mutex::new(db::open())));
             app.manage(KeepAwake::default());
+            app.manage(sidecar::Sidecar::new(app.handle().clone()));
 
             // Keep screen from locking / sleeping by default ("Ne pas verrouiller l'écran").
             // This matches the teaching use-case. Persisted via settings key "keep_awake" ("1"/"0").
@@ -53,6 +54,21 @@ pub fn run() {
                     let _ = window_vibrancy::apply_blur(&win, None);
                 }
             }
+
+            // Pre-start the Python sidecar *once* at launch and keep the process warm forever.
+            // All Python work (Pronote, scripts, Jedi, PDF index...) now goes through a single
+            // long-lived process using fast stdin/stdout JSON lines. No more per-call spawn,
+            // no repeated PyInstaller extract, imports (pronotepy + jedi + pypdf) happen once.
+            // Result: snappy even on low-end school laptops, always responsive.
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let sc: tauri::State<sidecar::Sidecar> = handle.state();
+                    // ignore error here (first real call will retry if needed)
+                    let _ = sc.start().await;
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

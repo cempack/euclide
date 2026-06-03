@@ -66,7 +66,7 @@ const Sidebar = memo(function Sidebar() {
   const isActive = (kind: TabKind) => tabs.active?.kind === kind;
 
   return (
-    <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono eu-drag ${isMac ? 'pt-14' : 'pt-8'}`}>
+    <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono eu-drag pt-10`}>
       <div className="flex items-center gap-3 px-3 mb-10">
         <img src="/euclide-logo.png" alt="Euclide" className="w-10 h-10 rounded-2xl object-contain" />
         <div className="leading-none">
@@ -138,7 +138,7 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
   return (
     <div
       className="eu-topbar h-14 shrink-0 flex items-center eu-drag bg-transparent font-mono overflow-hidden border-b border-hairline"
-      style={{ paddingLeft: isMac ? 80 : 12 }}
+      style={{ paddingLeft: 12 }}
     >
       {/* Tab strip group (content-sized when few tabs; shrinks + scrolls internally when many).
           The + lives right after the scroller (inside the group, before the big spacer) so it is
@@ -261,6 +261,65 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
     </div>
   );
 });
+
+function WindowControls() {
+  const [win, setWin] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    import("@tauri-apps/api/window")
+      .then(({ getCurrentWindow }) => setWin(getCurrentWindow()))
+      .catch(() => {});
+  }, []);
+
+  if (!win) return null;
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    win.close();
+  };
+  const handleMinimize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    win.minimize();
+  };
+  const handleMaximize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    win.toggleMaximize();
+  };
+
+  return (
+    <div
+      className="fixed top-2.5 left-3 z-[999] flex items-center gap-1.5 eu-no-drag"
+      style={{ WebkitAppRegion: "no-drag" } as any}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {/* Close (red) */}
+      <button
+        onClick={handleClose}
+        className="group w-3.5 h-3.5 rounded-full bg-[#ff5f57] hover:bg-[#ff3b30] flex items-center justify-center transition-all shadow-sm"
+        title="Close"
+      >
+        <XIcon className="w-2 h-2 text-[#5a0000] opacity-0 group-hover:opacity-90 transition-opacity" />
+      </button>
+      {/* Minimize (yellow) */}
+      <button
+        onClick={handleMinimize}
+        className="group w-3.5 h-3.5 rounded-full bg-[#ffbd2e] hover:bg-[#ff9500] flex items-center justify-center transition-all shadow-sm"
+        title="Minimize"
+      >
+        <span className="block w-[9px] h-px bg-[#5a3a00] opacity-0 group-hover:opacity-90 transition-opacity" />
+      </button>
+      {/* Maximize (green) */}
+      <button
+        onClick={handleMaximize}
+        className="group w-3.5 h-3.5 rounded-full bg-[#28c840] hover:bg-[#1aab2e] flex items-center justify-center transition-all shadow-sm"
+        title="Maximize / Restore"
+      >
+        <span className="block w-[7px] h-[7px] border border-[#0a4a12] opacity-0 group-hover:opacity-90 transition-opacity" />
+      </button>
+    </div>
+  );
+}
 
 const MainContent = memo(function MainContent({ info, activeId }: { info: AppInfo | null; activeId: string | null }) {
   return (
@@ -505,6 +564,7 @@ function Shell() {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[rgb(var(--eu-bg))] eu-drag eu-root">
+      <WindowControls />
       <Sidebar />
       <main className="flex-1 h-full flex flex-col min-w-0 bg-[rgb(var(--eu-bg))] eu-main">
         <TopBar onHelp={handleHelp} onSearch={handleSearch} />

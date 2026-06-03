@@ -3,7 +3,7 @@ use crate::keepawake::KeepAwake;
 use base64::Engine;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, State};
@@ -1108,14 +1108,14 @@ fn build_fts_query(query: &str) -> String {
 }
 
 async fn index_pdf(app: &AppHandle, state: &State<'_, Db>, file_id: i64, name: &str, path: &PathBuf) {
-    let text = crate::sidecar::run_async(
+    let text = crate::sidecar::call(
         app,
         "extract_pdf",
         &json!({ "path": path.to_string_lossy() }),
     )
     .await
     .ok()
-    .and_then(|v| v.get("text").and_then(|t| t.as_str().map(String::from)))
+    .and_then(|v: Value| v.get("text").and_then(|t| t.as_str().map(String::from)))
     .unwrap_or_default();
     let conn = state.0.lock().unwrap();
     let _ = conn.execute("DELETE FROM doc_index WHERE file_id=?1", [file_id]);
@@ -1799,7 +1799,7 @@ pub async fn import_python_script(app: AppHandle) -> R<Option<PythonDemo>> {
 
 #[tauri::command]
 pub async fn run_python_demo(app: AppHandle, path: String) -> R<PythonResult> {
-    let v = crate::sidecar::run_async(&app, "run_demo", &json!({ "path": path })).await?;
+    let v = crate::sidecar::call(&app, "run_demo", &json!({ "path": path })).await?;
     Ok(PythonResult {
         ok: v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
         stdout: v.get("stdout").and_then(|x| x.as_str()).unwrap_or("").to_string(),
@@ -1817,7 +1817,7 @@ pub async fn run_python_code(app: AppHandle, code: String) -> R<PythonResult> {
     let _ = fs::create_dir_all(&dir);
     let tmp = dir.join(".scratch.py");
     fs::write(&tmp, code).map_err(e)?;
-    let v = crate::sidecar::run_async(
+    let v = crate::sidecar::call(
         &app,
         "run_demo",
         &json!({ "path": tmp.to_string_lossy().to_string() }),
@@ -1845,7 +1845,7 @@ pub async fn python_complete(
         "column": column,
         "path": filename.unwrap_or_else(|| "<script>.py".to_string()),
     });
-    let v = crate::sidecar::run_async(&app, "python_complete", &payload).await?;
+    let v = crate::sidecar::call(&app, "python_complete", &payload).await?;
     let mut out: Vec<PythonCompletion> = vec![];
     if let Some(arr) = v.get("completions").and_then(|c| c.as_array()) {
         for c in arr {
@@ -2094,7 +2094,7 @@ pub async fn pronote_qr_login(app: AppHandle, state: State<'_, Db>, qr_json: Str
     let qr_value: serde_json::Value =
         serde_json::from_str(&qr_json).unwrap_or(serde_json::Value::String(qr_json.clone()));
 
-    let res = crate::sidecar::run_async(
+    let res = crate::sidecar::call(
         &app,
         "pronote_login",
         &json!({ "qr": qr_value, "pin": pin, "uuid": uuid }),
@@ -2137,7 +2137,7 @@ pub async fn pronote_password_login(
     username: String,
     password: String,
 ) -> R<PronoteStatus> {
-    let res = crate::sidecar::run_async(
+    let res = crate::sidecar::call(
         &app,
         "pronote_password_login",
         &json!({ "url": url, "username": username, "password": password }),
@@ -2186,7 +2186,7 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
         return Err("Pronote n'est pas connecte.".into());
     }
 
-    let res = crate::sidecar::run_async(&app, "pronote_sync", &creds).await?;
+    let res = crate::sidecar::call(&app, "pronote_sync", &creds).await?;
     if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
         let err = res.get("error").and_then(|x| x.as_str()).unwrap_or("synchronisation echouee");
         return Err(err.to_string());
@@ -2290,7 +2290,7 @@ pub async fn pronote_contents(
         return Err("Pronote n'est pas connecte.".into());
     }
 
-    let res = crate::sidecar::run_async(&app, "pronote_contents", &creds).await?;
+    let res = crate::sidecar::call(&app, "pronote_contents", &creds).await?;
     if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
         let err = res
             .get("error")
@@ -2328,7 +2328,7 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
         return Err("Pronote n'est pas connecte.".into());
     }
 
-    let res = crate::sidecar::run_async(&app, "pronote_classes", &creds).await?;
+    let res = crate::sidecar::call(&app, "pronote_classes", &creds).await?;
     if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
         let err = res
             .get("error")

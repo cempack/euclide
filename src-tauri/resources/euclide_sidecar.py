@@ -5,13 +5,22 @@ Owns the fragile/heavy work that is awkward in Rust:
   - Pronote (pronotepy) QR-code and token login + schedule sync
   - PDF text extraction for the document search index
   - Running small Python teaching demos
+  - Jedi-based autocomplete for the code editor
 
-Protocol: invoked as `euclide_sidecar.py <command> <json-payload>`. Prints exactly
-one JSON line to stdout. All errors are reported as JSON, never as a crash, so
-the Rust side can always parse a response.
+Protocol (persistent "warm" mode, default for built apps):
+  The sidecar is kept alive as a long-running process.
+  Send JSON lines on stdin: {"command": "pronote_sync", "payload": {...}}
+  Receive exactly one JSON response line on stdout per command (with trailing \n).
 
-Bundled for distribution with PyInstaller into a single `euclide-sidecar` binary so
-no system Python is required on school machines.
+Legacy one-shot (for manual/debug): `euclide_sidecar <command> <json-payload>`
+  (still supported).
+
+This makes calls snappy: Python runtime + heavy imports (pronotepy, jedi, pypdf)
+are loaded once at startup and stay warm. No repeated process spawn/extract even
+on low-end machines.
+
+Bundled for distribution with PyInstaller --onedir --noconsole into `euclide-sidecar/`
+folder (fast, no console window).
 """
 
 import io
@@ -836,25 +845,67 @@ COMMANDS = {
 }
 
 
-def main():
-    if len(sys.argv) < 2:
-        reply({"ok": False, "error": "Commande manquante."})
-        return
-    command = sys.argv[1]
-    raw = sys.argv[2] if len(sys.argv) > 2 else "{}"
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        payload = {}
+def preload_heavy_modules():
+    """Pre-import heavy deps at sidecar startup so first real call is fast.
+    This is key for "keep warm" + snappy on low-end systems.
+    """
+    for name in ("pronotepy", "jedi", "pypdf"):
+        try:
+            __import__(name)
+        except Exception:
+            pass  # will fail later in the handler with clear error
 
-    handler = COMMANDS.get(command)
-    if handler is None:
-        reply({"ok": False, "error": f"Commande inconnue : {command}"})
-        return
-    try:
-        reply(handler(payload))
-    except Exception as exc:  # noqa: BLE001
-        reply({"ok": False, "error": f"Erreur sidecar : {exc}"})
+
+def server_mode():
+    """Interactive server: read JSON command lines from stdin, write one response line per command.
+    Keeps the Python process alive ("warm") for the lifetime of the app.
+    """
+    preload_heavy_modules()
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+            command = data.get("command") or data.get("cmd", "")
+            payload = data.get("payload", data.get("data", {}))
+            handler = COMMANDS.get(command)
+            if handler is None:
+                resp = {"ok": False, "error": f"Commande inconnue : {command}"}
+            else:
+                resp = handler(payload)
+            sys.stdout.write(json.dumps(resp) + "\n")
+            sys.stdout.flush()
+        except Exception as exc:  # noqa: BLE001
+            sys.stdout.write(json.dumps({"ok": False, "error": f"Erreur sidecar : {exc}"}) + "\n")
+            sys.stdout.flush()
+    # EOF or parent died -> graceful exit
+
+
+def main():
+    # New persistent warm mode (preferred, used by built app):
+    #   sidecar is started once, communicates over stdio JSON lines.
+    # Legacy one-shot (for direct terminal use or during transition):
+    #   sidecar <command> <json-payload-as-string>
+    if len(sys.argv) >= 3:
+        # legacy one-shot
+        command = sys.argv[1]
+        raw = sys.argv[2]
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            payload = {}
+
+        handler = COMMANDS.get(command)
+        if handler is None:
+            reply({"ok": False, "error": f"Commande inconnue : {command}"})
+            return
+        try:
+            reply(handler(payload))
+        except Exception as exc:  # noqa: BLE001
+            reply({"ok": False, "error": f"Erreur sidecar : {exc}"})
+    else:
+        server_mode()
 
 
 if __name__ == "__main__":

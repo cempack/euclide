@@ -13,11 +13,12 @@
     "windows": [
       {
         "title": "Euclide",
-        "width": 1160,
-        "height": 780,
-        "minWidth": 920,
-        "minHeight": 620,
+        "width": 1280,
+        "height": 860,
+        "minWidth": 1000,
+        "minHeight": 680,
         "center": true,
+        "decorations": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "transparent": true

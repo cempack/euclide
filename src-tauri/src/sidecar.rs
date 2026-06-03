@@ -1,73 +1,189 @@
 use std::path::PathBuf;
-use std::process::Command;
+use std::sync::Arc;
+
+use serde_json::Value;
 use tauri::{AppHandle, Manager};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command as TokioCommand};
+use tokio::sync::Mutex;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
-/// Calls the Python sidecar with a command name and a JSON payload, returning
-/// the parsed JSON response. Prefers a bundled PyInstaller binary; in dev it
-/// falls back to running the sidecar script with system Python.
-pub fn run(
-    app: &AppHandle,
-    command: &str,
-    payload: &serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let (program, mut args) = resolve(app)?;
-    args.push(command.to_string());
-    args.push(payload.to_string());
-
-    let mut cmd = Command::new(&program);
-    cmd.args(&args);
-
-    // On Windows, prevent the child (even if console subsystem or python.exe) from
-    // popping a visible cmd window when the main Tauri app (GUI subsystem) spawns it.
-    #[cfg(windows)]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let output = cmd
-        .output()
-        .map_err(|e| format!("Sidecar Python introuvable ({program}) : {e}"))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let line = stdout
-        .lines()
-        .rev()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or("");
-
-    if line.is_empty() {
-        return Err(format!(
-            "Le sidecar n'a rien renvoye. {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    serde_json::from_str(line).map_err(|e| format!("Reponse sidecar invalide : {e} :: {line}"))
+/// Persistent "warm" sidecar manager.
+/// The Python process is started once (at app launch) and kept alive.
+/// Commands are sent over stdin/stdout as JSON lines for very low latency
+/// (no process spawn, no PyInstaller extraction, Python + imports stay hot in RAM).
+/// This makes Pronote, Python scripts, Jedi autocomplete etc. snappy even on low-end hardware.
+pub struct Sidecar {
+    inner: Arc<Mutex<Option<InnerSidecar>>>,
+    handle: AppHandle,
 }
 
-/// Async version of `run` that offloads the blocking `Command::output()` (subprocess +
-/// network for Pronote, PDF parsing, etc.) to a background thread from the async runtime's
-/// blocking pool. This ensures long Pronote loads (or other sidecar work) never freeze
-/// the main UI thread or starve Tauri's command dispatch.
-pub async fn run_async(
-    app: &AppHandle,
-    command: &str,
-    payload: &serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let app = app.clone();
-    let command = command.to_owned();
-    let payload = payload.clone();
-    tauri::async_runtime::spawn_blocking(move || run(&app, &command, &payload))
-        .await
-        .map_err(|join_err| format!("Erreur d'exécution sidecar (spawn_blocking): {join_err}"))?
+struct InnerSidecar {
+    child: Child,
+    stdin: tokio::process::ChildStdin,
+    stdout: BufReader<tokio::process::ChildStdout>,
 }
 
-/// Returns (program, leading_args). For a frozen binary (onefile or onedir) leading_args is empty;
-/// for the dev fallback it is `[script_path]` run through a Python interpreter.
+impl Sidecar {
+    pub fn new(handle: AppHandle) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+            handle,
+        }
+    }
+
+    /// Start (or ensure started) the persistent sidecar process.
+    /// Called eagerly from setup so it's warm before first user action.
+    pub async fn start(&self) -> Result<(), String> {
+        let mut guard = self.inner.lock().await;
+        if guard.is_some() {
+            return Ok(());
+        }
+
+        let (program, leading_args) = resolve(&self.handle)?;
+
+        let mut tcmd = TokioCommand::new(&program);
+        tcmd.args(&leading_args);
+        tcmd.stdin(std::process::Stdio::piped());
+        tcmd.stdout(std::process::Stdio::piped());
+        tcmd.stderr(std::process::Stdio::piped());
+
+        // Still apply no-window on Windows (defense in depth, works for both frozen and dev python).
+        #[cfg(windows)]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            tcmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let mut child = tcmd
+            .spawn()
+            .map_err(|e| format!("Impossible de démarrer le sidecar Python ({program}): {e}"))?;
+
+        // Drain stderr in background so a chatty sidecar doesn't block on full pipe.
+        if let Some(stderr) = child.stderr.take() {
+            tokio::spawn(async move {
+                let mut r = BufReader::new(stderr);
+                let mut l = String::new();
+                loop {
+                    l.clear();
+                    match r.read_line(&mut l).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            let t = l.trim();
+                            if !t.is_empty() {
+                                eprintln!("[sidecar] {}", t);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        let stdin = child.stdin.take().ok_or("sidecar stdin introuvable")?;
+        let stdout = child.stdout.take().ok_or("sidecar stdout introuvable")?;
+        let reader = BufReader::new(stdout);
+
+        *guard = Some(InnerSidecar {
+            child,
+            stdin,
+            stdout: reader,
+        });
+
+        Ok(())
+    }
+
+    /// Send a command to the warm sidecar and get the JSON response.
+    /// Automatically restarts the sidecar on comms error (robust for long sessions / low-end).
+    pub async fn call(&self, command: &str, payload: &Value) -> Result<Value, String> {
+        for attempt in 0..2u32 {
+            // Ensure we have a live process
+            {
+                let g = self.inner.lock().await;
+                if g.is_none() {
+                    drop(g);
+                    if let Err(e) = self.start().await {
+                        return Err(e);
+                    }
+                }
+            }
+
+            let mut guard = self.inner.lock().await;
+            let inner = match guard.as_mut() {
+                Some(i) => i,
+                None => continue,
+            };
+
+            // Protocol: one JSON line request, one JSON line response (with \n)
+            let msg = serde_json::json!({ "command": command, "payload": payload });
+            let line = serde_json::to_string(&msg).map_err(|e| e.to_string())? + "\n";
+
+            if inner.stdin.write_all(line.as_bytes()).await.is_err()
+                || inner.stdin.flush().await.is_err()
+            {
+                *guard = None;
+                if attempt == 0 {
+                    continue;
+                }
+                return Err("sidecar write failed".into());
+            }
+
+            let mut resp_line = String::new();
+            if inner.stdout.read_line(&mut resp_line).await.is_err() {
+                *guard = None;
+                if attempt == 0 {
+                    continue;
+                }
+                return Err("sidecar read failed".into());
+            }
+
+            let trimmed = resp_line.trim();
+            if trimmed.is_empty() {
+                *guard = None;
+                if attempt == 0 {
+                    continue;
+                }
+                return Err("sidecar empty response".into());
+            }
+
+            let val: Value = match serde_json::from_str(trimmed) {
+                Ok(v) => v,
+                Err(e) => return Err(format!("réponse sidecar invalide: {} :: {}", e, trimmed)),
+            };
+
+            if let Some(false) = val.get("ok").and_then(|b| b.as_bool()) {
+                if let Some(err) = val.get("error") {
+                    return Err(err.to_string());
+                }
+            }
+            return Ok(val);
+        }
+        Err("sidecar indisponible après plusieurs tentatives".into())
+    }
+
+    /// Stop the sidecar (called on shutdown if desired).
+    pub async fn stop(&self) {
+        let mut guard = self.inner.lock().await;
+        if let Some(mut inner) = guard.take() {
+            let _ = inner.child.kill().await;
+        }
+    }
+}
+
+/// Public helper so call sites stay almost identical:
+///   crate::sidecar::call(&app, "pronote_sync", &creds).await?
+pub async fn call(
+    app: &AppHandle,
+    command: &str,
+    payload: &Value,
+) -> Result<Value, String> {
+    let state: tauri::State<Sidecar> = app.state();
+    state.call(command, payload).await
+}
+
+/// Returns (program, leading_args) used to *spawn the base process* (no command/payload args anymore).
+/// The persistent sidecar uses a JSON-line protocol over stdin/stdout instead.
 fn resolve(app: &AppHandle) -> Result<(String, Vec<String>), String> {
     // 1. Bundled PyInstaller binary (flat or onedir/) next to the exe or in the resource dir.
     if let Some(bin) = frozen_binary(app) {
