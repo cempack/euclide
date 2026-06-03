@@ -419,11 +419,25 @@ export const api = {
     return invoke<PronoteStatus>("pronote_status").then((data) => { setCached(key, data); return data; });
   },
   pronoteQrLogin: (qrJson: string, pin: string) =>
-    invoke<PronoteStatus>("pronote_qr_login", { qrJson, pin }),
+    invoke<PronoteStatus>("pronote_qr_login", { qrJson, pin }).then((data) => {
+      setCached("pronoteStatus", data);
+      return data;
+    }),
   pronotePasswordLogin: (url: string, username: string, password: string) =>
-    invoke<PronoteStatus>("pronote_password_login", { url, username, password }),
-  pronoteSync: () => invoke<number>("pronote_sync"),
-  pronoteLogout: () => invoke<void>("pronote_logout"),
+    invoke<PronoteStatus>("pronote_password_login", { url, username, password }).then((data) => {
+      setCached("pronoteStatus", data);
+      return data;
+    }),
+  pronoteSync: () =>
+    invoke<number>("pronote_sync").then((data) => {
+      invalidateCache("pronoteStatus");
+      return data;
+    }),
+  pronoteLogout: () =>
+    invoke<void>("pronote_logout").then((data) => {
+      invalidateCache("pronoteStatus");
+      return data;
+    }),
   // pronote_contents: returns sidecar response {ok, contents: [...], matieres: [...], ...}
   // Matches the "Contenu de mes cours" / "Vision élève" style data (chronological lesson contents).
   // All filters optional. className supports class names like "3A". fromDate supports "YYYY-MM-DD" or "DD/MM/YYYY".

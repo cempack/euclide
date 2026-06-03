@@ -638,8 +638,10 @@ function ClassCard({
       {/* Header: class indicator + name + subtle meta + trash */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)] flex items-center justify-center text-sm font-semibold text-primary tracking-tight">
-            {cc.class_name.slice(0,2)}
+          <div className={`w-9 h-9 rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)] flex items-center justify-center font-semibold text-primary tracking-tight ${
+            cc.class_name.length > 2 ? "text-[11px]" : "text-sm"
+          }`}>
+            {cc.class_name.slice(0, 3)}
           </div>
           <div>
             <div className="font-semibold text-primary text-lg leading-none">{cc.class_name}</div>

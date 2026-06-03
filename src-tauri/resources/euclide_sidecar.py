@@ -427,6 +427,11 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
 
     last_w = client.get_week(today + dt.timedelta(days=28))
 
+    first_w = max(0, first_w)
+    last_w = max(0, last_w)
+    if first_w > last_w:
+        first_w = last_w
+
     items = []
     seen = set()
 
