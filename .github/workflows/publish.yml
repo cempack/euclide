@@ -146,8 +146,10 @@ jobs:
     # - Manual "Run workflow" when create_release input is true (uses a "dev-build" tag that gets replaced each time)
     # This ensures the release step never skips when you want the files, and you get them in the Releases page.
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release)
+      always() &&
+      ( (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release) ) &&
+      (needs.publish-tauri.result == 'success' || needs.publish-tauri.result == 'failure')
     needs: publish-tauri
     permissions:
       contents: write
