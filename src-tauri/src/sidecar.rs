@@ -7,8 +7,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command as TokioCommand};
 use tokio::sync::Mutex;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 
 /// Persistent "warm" sidecar manager.
 /// The Python process is started once (at app launch) and kept alive.
