@@ -203,6 +203,76 @@ def _lessons_for_week(client):
     return lessons
 
 
+_cached_client = None
+_cached_url = None
+_cached_username = None
+_cached_password = None
+
+
+def _save_to_cache(client, url, username, password):
+    global _cached_client, _cached_url, _cached_username, _cached_password
+    _cached_client = client
+    _cached_url = url
+    _cached_username = username
+    _cached_password = password
+
+
+def _clear_cache():
+    global _cached_client, _cached_url, _cached_username, _cached_password
+    _cached_client = None
+    _cached_url = None
+    _cached_username = None
+    _cached_password = None
+
+
+def _get_client(payload):
+    global _cached_client, _cached_url, _cached_username, _cached_password
+    import pronotepy
+
+    mode = payload.get("mode") or "qr"
+    url = payload.get("url")
+    username = payload.get("username")
+    password = payload.get("password")
+    uuid = str(payload.get("uuid", ""))
+
+    if not all([url, username, password]):
+        raise ValueError("Identifiants Pronote incomplets.")
+
+    # Check if cached client is valid and matches credentials
+    if (
+        _cached_client is not None
+        and getattr(_cached_client, "logged_in", False)
+        and _cached_url == url
+        and _cached_username == username
+        and _cached_password == password
+    ):
+        return _cached_client
+
+    client = None
+    if mode == "password":
+        client = pronotepy.Client(url, username, password)
+    else:
+        try:
+            client = pronotepy.Client.token_login(url, username, password, uuid)
+        except Exception:  # noqa: BLE001
+            client = None
+
+        # Auto-retry with direct login if token_login failed (token rotation race)
+        if client is None or not getattr(client, "logged_in", False):
+            if mode != "password":
+                try:
+                    client = pronotepy.Client(url, username, password)
+                except Exception as exc:  # noqa: BLE001
+                    _clear_cache()
+                    raise exc
+            if client is None or not getattr(client, "logged_in", False):
+                _clear_cache()
+                raise Exception("Session Pronote expiree.")
+
+    _save_to_cache(client, url, client.username, client.password)
+    return client
+
+
 def pronote_login(payload):
     try:
         import pronotepy
@@ -226,6 +296,9 @@ def pronote_login(payload):
 
     if not getattr(client, "logged_in", False):
         return {"ok": False, "error": "Identifiants invalides."}
+
+    # Save to cache so that the first sync immediately afterwards can reuse it without token_login
+    _save_to_cache(client, client.pronote_url, client.username, client.password)
 
     # username/password are the rotating token credentials for token_login().
     return {
@@ -259,6 +332,9 @@ def pronote_password_login(payload):
     if not getattr(client, "logged_in", False):
         return {"ok": False, "error": "Identifiants invalides."}
 
+    # Save to cache
+    _save_to_cache(client, url, username, password)
+
     return {
         "ok": True,
         "mode": "password",
@@ -275,34 +351,18 @@ def pronote_sync(payload):
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
-    mode = payload.get("mode") or "qr"
-    url = payload.get("url")
-    username = payload.get("username")
-    password = payload.get("password")
-    uuid = str(payload.get("uuid", ""))
-    if not all([url, username, password]):
-        return {"ok": False, "error": "Identifiants Pronote incomplets."}
-
-    client = None
     try:
-        if mode == "password":
-            client = pronotepy.Client(url, username, password)
-        else:
-            client = pronotepy.Client.token_login(url, username, password, uuid)
-    except Exception:  # noqa: BLE001
-        client = None
+        client = _get_client(payload)
+        lessons = _lessons_for_week(client)
+    except Exception as exc:  # noqa: BLE001
+        # Retry once after clearing cache (in case session expired)
+        _clear_cache()
+        try:
+            client = _get_client(payload)
+            lessons = _lessons_for_week(client)
+        except Exception as retry_exc:  # noqa: BLE001
+            return {"ok": False, "error": f"Session Pronote expiree ou erreur : {retry_exc}"}
 
-    # Auto-retry with direct login if token_login failed (token rotation race)
-    if client is None or not getattr(client, "logged_in", False):
-        if mode != "password":
-            try:
-                client = pronotepy.Client(url, username, password)
-            except Exception as exc:  # noqa: BLE001
-                return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
-        if client is None or not getattr(client, "logged_in", False):
-            return {"ok": False, "error": "Session Pronote expiree."}
-
-    lessons = _lessons_for_week(client)
     # In QR mode the token rotates on every login - return the fresh one so it
     # is persisted. In password mode the credentials stay the same.
     return {
@@ -673,32 +733,16 @@ def pronote_contents(payload):
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
-    mode = payload.get("mode") or "qr"
-    url = payload.get("url")
-    username = payload.get("username")
-    password = payload.get("password")
-    uuid = str(payload.get("uuid", ""))
-    if not all([url, username, password]):
-        return {"ok": False, "error": "Identifiants Pronote incomplets."}
-
-    client = None
     try:
-        if mode == "password":
-            client = pronotepy.Client(url, username, password)
-        else:
-            client = pronotepy.Client.token_login(url, username, password, uuid)
+        client = _get_client(payload)
+        # Verify it works
+        _ = client.info
     except Exception:  # noqa: BLE001
-        client = None
-
-    # Auto-retry with direct login if token_login failed (token rotation race)
-    if client is None or not getattr(client, "logged_in", False):
-        if mode != "password":
-            try:
-                client = pronotepy.Client(url, username, password)
-            except Exception as exc:  # noqa: BLE001
-                return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
-        if client is None or not getattr(client, "logged_in", False):
-            return {"ok": False, "error": "Session Pronote expiree."}
+        _clear_cache()
+        try:
+            client = _get_client(payload)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"Session Pronote expiree ou erreur : {exc}"}
 
     # Resolve class filter to a proper Pronote classe object when possible.
     # This is key for teacher accounts that can see multiple classes.
@@ -801,32 +845,16 @@ def pronote_classes(payload):
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
-    mode = payload.get("mode") or "qr"
-    url = payload.get("url")
-    username = payload.get("username")
-    password = payload.get("password")
-    uuid = str(payload.get("uuid", ""))
-    if not all([url, username, password]):
-        return {"ok": False, "error": "Identifiants Pronote incomplets."}
-
-    client = None
     try:
-        if mode == "password":
-            client = pronotepy.Client(url, username, password)
-        else:
-            client = pronotepy.Client.token_login(url, username, password, uuid)
+        client = _get_client(payload)
+        # Verify it works
+        _ = client.info
     except Exception:  # noqa: BLE001
-        client = None
-
-    # Auto-retry with direct login if token_login failed (token rotation race)
-    if client is None or not getattr(client, "logged_in", False):
-        if mode != "password":
-            try:
-                client = pronotepy.Client(url, username, password)
-            except Exception as exc:  # noqa: BLE001
-                return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
-        if client is None or not getattr(client, "logged_in", False):
-            return {"ok": False, "error": "Session Pronote expiree."}
+        _clear_cache()
+        try:
+            client = _get_client(payload)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"Session Pronote expiree ou erreur : {exc}"}
 
     classes_raw = (
         client.parametres_utilisateur.get("dataSec", {})
