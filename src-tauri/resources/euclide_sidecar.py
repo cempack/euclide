@@ -474,101 +474,99 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
 
     for e in lst:
         conts = (e.get("listeContenus") or {}).get("V") or []
-                if not conts:
-                    continue
-                c = conts[0]
-                mat = (e.get("Matiere") or {}).get("V") or {}
-                subject = mat.get("L") or ""
-                groups = [
-                    (g or {}).get("L", "")
-                    for g in ((e.get("listeGroupes") or {}).get("V") or [])
-                ]
-                profs = [
-                    (p or {}).get("L", "")
-                    for p in ((e.get("listeProfesseurs") or {}).get("V") or [])
-                ]
-                title = c.get("L") or ""
-                raw_desc = ((c.get("descriptif") or {}).get("V") or "")
-                # basic html strip for readability (keeps the text content)
-                desc = unescape(re.sub(r"<[^>]+>", " ", raw_desc)).strip()
-                desc = re.sub(r"\s+", " ", desc).strip()
-                cat_obj = (c.get("categorie") or {}).get("V") or {}
-                category = cat_obj.get("L") or ""
-                date_str = (e.get("Date") or {}).get("V") or ""
-                end_str = (e.get("DateFin") or {}).get("V") or ""
-
-                # parse times
-                start_time = ""
-                end_time = ""
-                try:
-                    if date_str:
-                        dtm = dt.datetime.strptime(date_str.split(".")[0], "%d/%m/%Y %H:%M:%S")
-                        start_time = dtm.strftime("%H:%M")
-                    if end_str:
-                        dtm2 = dt.datetime.strptime(end_str.split(".")[0], "%d/%m/%Y %H:%M:%S")
-                        end_time = dtm2.strftime("%H:%M")
-                except Exception:  # noqa: BLE001
-                    pass
-
-                lesson_n = ((e.get("cours") or {}).get("V") or {}).get("N") or ""
-                key = (date_str, subject, title)
-                if key in seen:
-                    continue
-                seen.add(key)
-
-                # Parse attached documents / pièces jointes (ListePieceJointe on the contenu)
-                documents = []
-                try:
-                    pj_list = (c.get("ListePieceJointe") or {}).get("V") or []
-                    for pj in pj_list:
-                        try:
-                            if Attachment:
-                                att = Attachment(client, pj)
-                                documents.append({
-                                    "name": att.name,
-                                    "id": att.id,
-                                    "type": att.type,  # 0 = link, 1 = file
-                                    "url": att.url,
-                                    "estUnLienInterne": pj.get("estUnLienInterne", False),
-                                })
-                            else:
-                                documents.append({
-                                    "name": pj.get("L", ""),
-                                    "id": pj.get("N", ""),
-                                    "type": pj.get("G", 1),
-                                    "url": "",
-                                    "estUnLienInterne": pj.get("estUnLienInterne", False),
-                                })
-                        except Exception:  # noqa: BLE001
-                            documents.append({
-                                "name": pj.get("L", ""),
-                                "id": pj.get("N", ""),
-                                "type": pj.get("G", 1),
-                                "url": "",
-                                "estUnLienInterne": pj.get("estUnLienInterne", False),
-                            })
-                except Exception:  # noqa: BLE001
-                    pass
-
-                items.append(
-                    {
-                        "date": date_str,
-                        "end": end_str,
-                        "date_label": _french_date_label(date_str),
-                        "start_time": start_time,
-                        "end_time": end_time,
-                        "subject": subject,
-                        "groups": ", ".join([g for g in groups if g]),
-                        "teachers": ", ".join([p for p in profs if p]),
-                        "title": title,
-                        "description": desc,
-                        "category": category,
-                        "lesson_id": lesson_n,
-                        "documents": documents,
-                    }
-                )
-        except Exception:  # noqa: BLE001
+        if not conts:
             continue
+        c = conts[0]
+        mat = (e.get("Matiere") or {}).get("V") or {}
+        subject = mat.get("L") or ""
+        groups = [
+            (g or {}).get("L", "")
+            for g in ((e.get("listeGroupes") or {}).get("V") or [])
+        ]
+        profs = [
+            (p or {}).get("L", "")
+            for p in ((e.get("listeProfesseurs") or {}).get("V") or [])
+        ]
+        title = c.get("L") or ""
+        raw_desc = ((c.get("descriptif") or {}).get("V") or "")
+        # basic html strip for readability (keeps the text content)
+        desc = unescape(re.sub(r"<[^>]+>", " ", raw_desc)).strip()
+        desc = re.sub(r"\s+", " ", desc).strip()
+        cat_obj = (c.get("categorie") or {}).get("V") or {}
+        category = cat_obj.get("L") or ""
+        date_str = (e.get("Date") or {}).get("V") or ""
+        end_str = (e.get("DateFin") or {}).get("V") or ""
+
+        # parse times
+        start_time = ""
+        end_time = ""
+        try:
+            if date_str:
+                dtm = dt.datetime.strptime(date_str.split(".")[0], "%d/%m/%Y %H:%M:%S")
+                start_time = dtm.strftime("%H:%M")
+            if end_str:
+                dtm2 = dt.datetime.strptime(end_str.split(".")[0], "%d/%m/%Y %H:%M:%S")
+                end_time = dtm2.strftime("%H:%M")
+        except Exception:  # noqa: BLE001
+            pass
+
+        lesson_n = ((e.get("cours") or {}).get("V") or {}).get("N") or ""
+        key = (date_str, subject, title)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        # Parse attached documents / pièces jointes (ListePieceJointe on the contenu)
+        documents = []
+        try:
+            pj_list = (c.get("ListePieceJointe") or {}).get("V") or []
+            for pj in pj_list:
+                try:
+                    if Attachment:
+                        att = Attachment(client, pj)
+                        documents.append({
+                            "name": att.name,
+                            "id": att.id,
+                            "type": att.type,  # 0 = link, 1 = file
+                            "url": att.url,
+                            "estUnLienInterne": pj.get("estUnLienInterne", False),
+                        })
+                    else:
+                        documents.append({
+                            "name": pj.get("L", ""),
+                            "id": pj.get("N", ""),
+                            "type": pj.get("G", 1),
+                            "url": "",
+                            "estUnLienInterne": pj.get("estUnLienInterne", False),
+                        })
+                except Exception:  # noqa: BLE001
+                    documents.append({
+                        "name": pj.get("L", ""),
+                        "id": pj.get("N", ""),
+                        "type": pj.get("G", 1),
+                        "url": "",
+                        "estUnLienInterne": pj.get("estUnLienInterne", False),
+                    })
+        except Exception:  # noqa: BLE001
+            pass
+
+        items.append(
+            {
+                "date": date_str,
+                "end": end_str,
+                "date_label": _french_date_label(date_str),
+                "start_time": start_time,
+                "end_time": end_time,
+                "subject": subject,
+                "groups": ", ".join([g for g in groups if g]),
+                "teachers": ", ".join([p for p in profs if p]),
+                "title": title,
+                "description": desc,
+                "category": category,
+                "lesson_id": lesson_n,
+                "documents": documents,
+            }
+        )
 
     # newest first
     items.sort(key=lambda x: x.get("date") or "", reverse=True)
