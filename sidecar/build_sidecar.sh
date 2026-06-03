@@ -36,6 +36,12 @@ python -m PyInstaller \
   --specpath "$BUILD_DIR" \
   "$SCRIPT"
 
+if [ ! -d "$OUT/euclide-sidecar" ]; then
+  echo "ERROR: PyInstaller did not produce the expected onedir bundle at $OUT/euclide-sidecar"
+  ls -la "$OUT" || true
+  exit 1
+fi
+
 deactivate || true
 
 echo ""

@@ -20,6 +20,12 @@ python -m PyInstaller `
   --specpath (Join-Path $here "build") `
   $script
 
+if (-not (Test-Path "$out\euclide-sidecar")) {
+  Write-Error "ERROR: PyInstaller did not produce the expected onedir bundle at $out\euclide-sidecar"
+  Get-ChildItem $out | Format-Table
+  exit 1
+}
+
 Write-Host ""
-Write-Host "Sidecar built: $out\euclide-sidecar.exe"
-Write-Host "Copy it next to the Euclide executable (or in app resources) before distribution."
+Write-Host "Sidecar built: $out\euclide-sidecar (dir)"
+Write-Host "Copy the euclide-sidecar dir next to the Euclide executable (or in app resources) before distribution."

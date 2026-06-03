@@ -76,13 +76,23 @@ jobs:
           rm -rf src-tauri/resources/euclide-sidecar src-tauri/resources/euclide-sidecar.exe 2>/dev/null || true
           # Copy the onedir bundle (euclide-sidecar/ dir containing the launcher + support files).
           # This layout gives much faster startup than --onefile (no repeated temp extraction).
-          cp -rf sidecar/dist/euclide-sidecar src-tauri/resources/ 2>/dev/null || true
+          cp -rf sidecar/dist/euclide-sidecar src-tauri/resources/
           # Ensure the launcher inside the onedir bundle is executable (important on macOS/Linux after bundle copy)
           if [ "${{ runner.os }}" != "Windows" ]; then
             chmod +x src-tauri/resources/euclide-sidecar/euclide-sidecar 2>/dev/null || true
           fi
           # Remove the .py source from the bundle (binary takes precedence at runtime; .py stays in git for dev)
           rm -f src-tauri/resources/euclide_sidecar.py || true
+
+          # Fail fast with debug info if the sidecar bundle wasn't copied (prevents cryptic "glob pattern resources/*" error later)
+          if [ ! -d "src-tauri/resources/euclide-sidecar" ]; then
+            echo "::error::Sidecar onedir bundle not found at src-tauri/resources/euclide-sidecar after copy step."
+            echo "Contents of sidecar/dist/:"
+            ls -la sidecar/dist/ || true
+            echo "Contents of src-tauri/resources/:"
+            ls -la src-tauri/resources/ || true
+            exit 1
+          fi
         shell: bash
 
       - name: install Rust stable
