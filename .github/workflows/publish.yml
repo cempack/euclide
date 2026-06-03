@@ -1,0 +1,95 @@
+name: 'publish'
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-13' # Intel Macs (x86_64)
+            args: '--target x86_64-apple-darwin'
+          - platform: 'macos-latest' # Apple Silicon (aarch64)
+            args: '--target aarch64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            python3-dev python3-pip build-essential pkg-config
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: install frontend dependencies
+        run: npm ci
+
+      - name: setup python for sidecar
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: build sidecar binary (non-Windows)
+        if: matrix.platform != 'windows-latest'
+        run: |
+          chmod +x sidecar/build_sidecar.sh
+          sidecar/build_sidecar.sh
+
+      - name: build sidecar binary (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          .\sidecar\build_sidecar.ps1
+
+      - name: copy sidecar binary into tauri resources
+        run: |
+          mkdir -p src-tauri/resources
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp -f sidecar/dist/euclide-sidecar.exe src-tauri/resources/ 2>/dev/null || true
+          else
+            cp -f sidecar/dist/euclide-sidecar src-tauri/resources/ 2>/dev/null || true
+          fi
+          # Remove the .py source from the bundle (binary takes precedence at runtime; .py stays in git for dev)
+          rm -f src-tauri/resources/euclide_sidecar.py || true
+        shell: bash
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ (matrix.platform == 'macos-latest' || matrix.platform == 'macos-13') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'Euclide v__VERSION__'
+          releaseBody: 'Download the installer or bundle for your platform below. See the assets to install Euclide.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
