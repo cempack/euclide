@@ -156,6 +156,12 @@ jobs:
       - name: List artifacts
         run: ls -la dist-portable/ || true
 
+      - name: Delete existing release (if any) for this tag to allow replace/re-release with same tag
+        run: |
+          gh release delete "${{ github.ref_name }}" --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release and upload portable artifacts
         uses: softprops/action-gh-release@v2
         with:
@@ -164,6 +170,7 @@ jobs:
           body: 'Download the standard portable app for your platform below (no installers/setups). All builds are fully portable (USB-friendly).'
           draft: true
           prerelease: false
+          overwrite_files: true
           files: dist-portable/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
