@@ -1,60 +1,40 @@
-// French is the only shipped locale, but strings live here so Euclide can be
-// translated later without hunting through components.
+// All user-facing messages live in src/locales/fr.json so you can customize
+// EVERYTHING in one place without touching components.
+// (French only for now — easy to add more locales later.)
 
-export const fr = {
-  appName: "Euclide",
-  tagline: "Le bureau d'enseignement de Monsieur Madrias",
-  madeBy: "Concu avec soin par Elliot Moreau",
+import fr from "../locales/fr.json";
 
-  nav: {
-    dashboard: "Tableau de bord",
-    courses: "Cours",
-    documents: "Documents",
-    tools: "Outils",
-    recap: "Recap",
-    settings: "Reglages",
-  },
+// Simple template formatter: fmt("Bonjour {name}", { name: "Elliot" }) => "Bonjour Elliot"
+export function fmt(template: string, vars: Record<string, string | number> = {}): string {
+  return Object.keys(vars).reduce((str, key) => {
+    const re = new RegExp(`\\{${key}\\}`, "g");
+    return str.replace(re, String(vars[key]));
+  }, template);
+}
 
-  greetingMorning: "Bonjour Monsieur Madrias",
-  greetingAfternoon: "Bon apres-midi Monsieur Madrias",
-  greetingEvening: "Bonsoir Monsieur Madrias",
+export const t = fr as any; // runtime object from JSON (all strings + arrays)
+export type Strings = typeof t;
 
-  todayClasses: "Les cours d'aujourd'hui",
-  noClassesToday: "Aucun cours prevu aujourd'hui. Profitez du calme.",
-  reminders: "Rappels",
-  noReminders: "Rien a retenir pour le moment.",
-  recentFiles: "Fichiers recents",
-  noRecentFiles: "Aucun fichier recent.",
-  quickActions: "Actions rapides",
+/**
+ * Safe deep getter for i18n strings/arrays/objects.
+ * Never throws; returns fallback (or key) if missing.
+ * Logs warning in dev for missing keys (helps catch JSON drift after centralization).
+ */
+export function get(path: string, fallback: any = ""): any {
+  if (!path) return fallback;
+  const parts = path.split(".");
+  let cur: any = t;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== "object" || !(p in cur)) {
+      if (typeof console !== "undefined" && (import.meta as any)?.env?.DEV) {
+        console.warn(`[i18n] missing key "${path}" in src/locales/fr.json — using fallback`);
+      }
+      return fallback;
+    }
+    cur = cur[p];
+  }
+  return cur ?? fallback;
+}
 
-  newCourse: "Nouveau cours",
-  newReminder: "Nouveau rappel",
-  newNote: "Nouvelle note",
-  newLink: "Nouveau lien",
-  importFiles: "Importer des fichiers",
-  search: "Rechercher",
-  searchDocs: "Rechercher un document...",
-  whiteboard: "Tableau blanc",
-  pythonDemos: "Scripts Python",
-  quickLinks: "Liens rapides",
-  keepAwake: "Garder l'ecran allume",
-  keepAwakeOn: "Euclide empeche la mise en veille",
-  keepAwakeOff: "Veille normale",
-
-  save: "Enregistrer",
-  cancel: "Annuler",
-  delete: "Supprimer",
-  open: "Ouvrir",
-  add: "Ajouter",
-  close: "Fermer",
-  done: "Termine",
-  run: "Lancer",
-  connect: "Connecter",
-
-  pronoteTitle: "Connexion Pronote",
-  pronoteHelp:
-    "Comme votre etablissement utilise un ENT, la connexion se fait par QR code, sans saisir de mot de passe.",
-};
-
-export type Strings = typeof fr;
-export const t = fr;
+// Back-compat alias if some code prefers tt()
+export const tt = get;

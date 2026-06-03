@@ -31,7 +31,28 @@ pub struct Course {
     emoji: String,
     color: String,
     description: String,
+    matiere: String, // "Mathématiques" | "NSI" etc. - used to map to Pronote subject for cahier de textes contents
     created_at: String,
+}
+
+/// Attachment of a course to a Pronote class/group. Stores per-class progress (last document)
+/// and professor notes specific to how far that class has gone in the course.
+#[derive(Serialize, Deserialize)]
+pub struct CourseClass {
+    #[serde(default)]
+    id: i64,
+    course_id: i64,
+    class_name: String,
+    #[serde(default)]
+    last_file_id: Option<i64>,
+    #[serde(default)]
+    last_file_name: Option<String>,
+    #[serde(default)]
+    last_file_kind: Option<String>,
+    #[serde(default)]
+    progress_updated_at: String,
+    #[serde(default)]
+    notes: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -96,15 +117,6 @@ fn default_source() -> String {
 }
 
 #[derive(Serialize)]
-pub struct SearchHit {
-    doc_id: i64,
-    name: String,
-    rel_path: String,
-    course_id: Option<i64>,
-    snippet: String,
-}
-
-#[derive(Serialize)]
 pub struct PronoteStatus {
     connected: bool,
     account_name: Option<String>,
@@ -144,6 +156,12 @@ pub struct TopCourse {
 }
 
 #[derive(Serialize)]
+pub struct TopItem {
+    name: String,
+    count: i64,
+}
+
+#[derive(Serialize)]
 pub struct RecapData {
     period_label: String,
     files_opened: i64,
@@ -152,6 +170,9 @@ pub struct RecapData {
     reminders_done: i64,
     active_minutes: i64,
     top_courses: Vec<TopCourse>,
+    top_documents: Vec<TopItem>,
+    top_tools: Vec<TopItem>,
+    time_by_area: Vec<TopItem>,
     highlights: Vec<String>,
 }
 
@@ -177,7 +198,7 @@ pub fn get_app_info() -> AppInfo {
 pub fn list_courses(state: State<Db>) -> R<Vec<Course>> {
     let conn = state.0.lock().unwrap();
     let mut stmt = conn
-        .prepare("SELECT id, name, emoji, color, description, created_at FROM courses ORDER BY name")
+        .prepare("SELECT id, name, emoji, color, description, matiere, created_at FROM courses ORDER BY name")
         .map_err(e)?;
     let rows = stmt
         .query_map([], |r| {
@@ -187,7 +208,8 @@ pub fn list_courses(state: State<Db>) -> R<Vec<Course>> {
                 emoji: r.get(2)?,
                 color: r.get(3)?,
                 description: r.get(4)?,
-                created_at: r.get(5)?,
+                matiere: r.get(5)?,
+                created_at: r.get(6)?,
             })
         })
         .map_err(e)?;
@@ -201,17 +223,18 @@ pub fn create_course(
     emoji: String,
     color: String,
     description: String,
+    matiere: String, // "Mathématiques" or "NSI"
 ) -> R<Course> {
     let conn = state.0.lock().unwrap();
     conn.execute(
-        "INSERT INTO courses (name, emoji, color, description) VALUES (?1, ?2, ?3, ?4)",
-        params![name, emoji, color, description],
+        "INSERT INTO courses (name, emoji, color, description, matiere) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![name, emoji, color, description, matiere],
     )
     .map_err(e)?;
     let id = conn.last_insert_rowid();
     let _ = fs::create_dir_all(crate::paths::courses_dir().join(id.to_string()));
     conn.query_row(
-        "SELECT id, name, emoji, color, description, created_at FROM courses WHERE id = ?1",
+        "SELECT id, name, emoji, color, description, matiere, created_at FROM courses WHERE id = ?1",
         [id],
         |r| {
             Ok(Course {
@@ -220,7 +243,8 @@ pub fn create_course(
                 emoji: r.get(2)?,
                 color: r.get(3)?,
                 description: r.get(4)?,
-                created_at: r.get(5)?,
+                matiere: r.get(5)?,
+                created_at: r.get(6)?,
             })
         },
     )
@@ -231,8 +255,8 @@ pub fn create_course(
 pub fn update_course(state: State<Db>, course: Course) -> R<()> {
     let conn = state.0.lock().unwrap();
     conn.execute(
-        "UPDATE courses SET name=?1, emoji=?2, color=?3, description=?4 WHERE id=?5",
-        params![course.name, course.emoji, course.color, course.description, course.id],
+        "UPDATE courses SET name=?1, emoji=?2, color=?3, description=?4, matiere=?5 WHERE id=?6",
+        params![course.name, course.emoji, course.color, course.description, course.matiere, course.id],
     )
     .map_err(e)?;
     Ok(())
@@ -243,6 +267,117 @@ pub fn delete_course(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
     conn.execute("DELETE FROM courses WHERE id=?1", [id]).map_err(e)?;
     let _ = fs::remove_dir_all(crate::paths::courses_dir().join(id.to_string()));
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Course classes (attachments, per-class progress & teacher notes)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn list_course_classes(state: State<Db>, course_id: i64) -> R<Vec<CourseClass>> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT cc.id, cc.course_id, cc.class_name, cc.last_file_id, \
+                    f.name, f.kind, cc.progress_updated_at, cc.notes \
+             FROM course_classes cc \
+             LEFT JOIN files f ON f.id = cc.last_file_id \
+             WHERE cc.course_id = ?1 \
+             ORDER BY cc.class_name",
+        )
+        .map_err(e)?;
+    let rows = stmt
+        .query_map([course_id], |r| {
+            Ok(CourseClass {
+                id: r.get(0)?,
+                course_id: r.get(1)?,
+                class_name: r.get(2)?,
+                last_file_id: r.get(3)?,
+                last_file_name: r.get(4)?,
+                last_file_kind: r.get(5)?,
+                progress_updated_at: r.get(6)?,
+                notes: r.get(7)?,
+            })
+        })
+        .map_err(e)?;
+    rows.collect::<Result<_, _>>().map_err(e)
+}
+
+#[tauri::command]
+pub fn attach_class_to_course(state: State<Db>, course_id: i64, class_name: String) -> R<CourseClass> {
+    let conn = state.0.lock().unwrap();
+    let class_name = class_name.trim().to_string();
+    if class_name.is_empty() {
+        return Err("Nom de classe vide".into());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO course_classes (course_id, class_name) VALUES (?1, ?2)",
+        params![course_id, class_name],
+    )
+    .map_err(e)?;
+    // Return the (possibly just created) row with join for last file info
+    conn.query_row(
+        "SELECT cc.id, cc.course_id, cc.class_name, cc.last_file_id, \
+                f.name, f.kind, cc.progress_updated_at, cc.notes \
+         FROM course_classes cc \
+         LEFT JOIN files f ON f.id = cc.last_file_id \
+         WHERE cc.course_id = ?1 AND cc.class_name = ?2",
+        params![course_id, class_name],
+        |r| {
+            Ok(CourseClass {
+                id: r.get(0)?,
+                course_id: r.get(1)?,
+                class_name: r.get(2)?,
+                last_file_id: r.get(3)?,
+                last_file_name: r.get(4)?,
+                last_file_kind: r.get(5)?,
+                progress_updated_at: r.get(6)?,
+                notes: r.get(7)?,
+            })
+        },
+    )
+    .map_err(e)
+}
+
+#[tauri::command]
+pub fn detach_course_class(state: State<Db>, id: i64) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM course_classes WHERE id=?1", [id]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_course_class_progress(
+    state: State<Db>,
+    course_id: i64,
+    class_name: String,
+    file_id: Option<i64>,
+) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "UPDATE course_classes \
+         SET last_file_id = ?1, progress_updated_at = datetime('now') \
+         WHERE course_id = ?2 AND class_name = ?3",
+        params![file_id, course_id, class_name],
+    )
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_course_class_notes(
+    state: State<Db>,
+    course_id: i64,
+    class_name: String,
+    notes: String,
+) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "UPDATE course_classes SET notes = ?1 WHERE course_id = ?2 AND class_name = ?3",
+        params![notes, course_id, class_name],
+    )
+    .map_err(e)?;
     Ok(())
 }
 
@@ -535,11 +670,48 @@ pub fn file_path(state: State<Db>, id: i64) -> R<String> {
 }
 
 #[tauri::command]
-pub fn open_file(app: AppHandle, state: State<Db>, id: i64) -> R<()> {
+pub fn open_file(app: AppHandle, state: State<Db>, id: i64, with_app: Option<String>) -> R<()> {
     let path = file_path(state, id)?;
-    app.opener().open_path(path, None::<&str>).map_err(e)?;
+    app.opener().open_path(path, with_app).map_err(e)?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn reveal_file(app: AppHandle, state: State<Db>, id: i64) -> R<()> {
+    let path = file_path(state, id)?;
+    app.opener().reveal_item_in_dir(path).map_err(e)?;
+    Ok(())
+}
+
+#[derive(Serialize)]
+pub struct Opener {
+    name: String,
+    app: Option<String>,
+    is_reveal: bool,
+}
+
+#[tauri::command]
+pub fn list_openers(_state: State<Db>, _id: i64) -> R<Vec<Opener>> {
+    Ok(vec![
+        Opener {
+            name: "Navigateur par défaut".to_string(),
+            app: None,
+            is_reveal: false,
+        },
+        Opener {
+            name: "Application par défaut".to_string(),
+            app: None,
+            is_reveal: false,
+        },
+        Opener {
+            name: "Afficher dans le dossier".to_string(),
+            app: None,
+            is_reveal: true,
+        },
+    ])
+}
+
+
 
 #[tauri::command]
 pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
@@ -556,119 +728,107 @@ pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn search_documents(state: State<Db>, query: String) -> R<Vec<SearchHit>> {
-    let fts = build_fts_query(&query);
-    if fts.is_empty() {
-        return Ok(vec![]);
-    }
-    let conn = state.0.lock().unwrap();
-    let mut stmt = conn
-        .prepare(
-            "SELECT d.file_id, f.name, f.rel_path, f.course_id, \
-                    snippet(doc_index, 1, '<mark>', '</mark>', '…', 12) \
-             FROM doc_index d JOIN files f ON f.id = d.file_id \
-             WHERE doc_index MATCH ?1 ORDER BY rank LIMIT 40",
-        )
-        .map_err(e)?;
-    let rows = stmt
-        .query_map([fts], |r| {
-            Ok(SearchHit {
-                doc_id: r.get(0)?,
-                name: r.get(1)?,
-                rel_path: r.get(2)?,
-                course_id: r.get(3)?,
-                snippet: r.get(4)?,
-            })
-        })
-        .map_err(e)?;
-    rows.collect::<Result<_, _>>().map_err(e)
-}
-
 /// One-shot search across courses, files (by name + PDF content) and notes.
+/// Uses fuzzy name matching (typos + partial) + FTS for PDF content.
 #[tauri::command]
 pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
-    let q = query.trim().to_lowercase();
+    let q = query.trim();
     if q.len() < 2 {
         return Ok(vec![]);
     }
-    let like = format!("%{q}%");
     let conn = state.0.lock().unwrap();
-    let mut results: Vec<SearchResult> = vec![];
+    let mut scored: Vec<(f32, SearchResult)> = vec![];
 
-    // Courses
-    let mut stmt = conn
-        .prepare("SELECT id, name, emoji FROM courses WHERE LOWER(name) LIKE ?1 LIMIT 6")
-        .map_err(e)?;
-    let rows = stmt
-        .query_map([&like], |r| {
-            Ok(SearchResult {
-                kind: "course".into(),
-                id: r.get(0)?,
-                title: r.get(1)?,
-                subtitle: r.get::<_, String>(2)?,
-                snippet: String::new(),
-                course_id: Some(r.get(0)?),
-                file_kind: String::new(),
-            })
-        })
-        .map_err(e)?;
-    for row in rows.flatten() {
-        results.push(row);
+    // Courses (fuzzy on name)
+    if let Ok(mut stmt) = conn.prepare("SELECT id, name, emoji FROM courses LIMIT 100") {
+        if let Ok(rows) = stmt.query_map([], |r| {
+            let id: i64 = r.get(0)?;
+            let name: String = r.get(1)?;
+            let emoji: String = r.get(2)?;
+            let s = match_score(&name, q);
+            if s > 5.0 {
+                Ok(Some((s, SearchResult {
+                    kind: "course".into(),
+                    id,
+                    title: name,
+                    subtitle: emoji,
+                    snippet: String::new(),
+                    course_id: Some(id),
+                    file_kind: String::new(),
+                })))
+            } else {
+                Ok(None)
+            }
+        }) {
+            for r in rows.flatten().flatten() {
+                scored.push(r);
+            }
+        }
     }
 
-    // Files by name
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, name, kind, course_id FROM files WHERE LOWER(name) LIKE ?1 \
-             ORDER BY added_at DESC LIMIT 12",
-        )
-        .map_err(e)?;
-    let rows = stmt
-        .query_map([&like], |r| {
-            Ok(SearchResult {
-                kind: "file".into(),
-                id: r.get(0)?,
-                title: r.get(1)?,
-                subtitle: "document".into(),
-                snippet: String::new(),
-                course_id: r.get(3)?,
-                file_kind: r.get::<_, String>(2)?,
-            })
-        })
-        .map_err(e)?;
-    for row in rows.flatten() {
-        results.push(row);
+    // Files by name (fuzzy)
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT id, name, kind, course_id FROM files ORDER BY added_at DESC LIMIT 200",
+    ) {
+        if let Ok(rows) = stmt.query_map([], |r| {
+            let id: i64 = r.get(0)?;
+            let name: String = r.get(1)?;
+            let kind: String = r.get(2)?;
+            let course_id: Option<i64> = r.get(3)?;
+            let s = match_score(&name, q);
+            if s > 5.0 {
+                Ok(Some((s, SearchResult {
+                    kind: "file".into(),
+                    id,
+                    title: name,
+                    subtitle: "document".into(),
+                    snippet: String::new(),
+                    course_id,
+                    file_kind: kind,
+                })))
+            } else {
+                Ok(None)
+            }
+        }) {
+            for r in rows.flatten().flatten() {
+                scored.push(r);
+            }
+        }
     }
 
-    // Notes by title / body
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, title, body, course_id FROM notes \
-             WHERE LOWER(title) LIKE ?1 OR LOWER(body) LIKE ?1 ORDER BY updated_at DESC LIMIT 10",
-        )
-        .map_err(e)?;
-    let rows = stmt
-        .query_map([&like], |r| {
+    // Notes by title/body (fuzzy)
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT id, title, body, course_id FROM notes ORDER BY updated_at DESC LIMIT 100",
+    ) {
+        if let Ok(rows) = stmt.query_map([], |r| {
+            let id: i64 = r.get(0)?;
+            let title: String = r.get(1)?;
             let body: String = r.get(2)?;
-            let snippet: String = body.chars().take(120).collect();
-            Ok(SearchResult {
-                kind: "note".into(),
-                id: r.get(0)?,
-                title: r.get(1)?,
-                subtitle: "note".into(),
-                snippet,
-                course_id: r.get(3)?,
-                file_kind: String::new(),
-            })
-        })
-        .map_err(e)?;
-    for row in rows.flatten() {
-        results.push(row);
+            let course_id: Option<i64> = r.get(3)?;
+            let s = match_score(&title, q).max(match_score(&body, q));
+            if s > 5.0 {
+                let snippet: String = body.chars().take(120).collect();
+                Ok(Some((s, SearchResult {
+                    kind: "note".into(),
+                    id,
+                    title: if title.is_empty() { "Note".into() } else { title },
+                    subtitle: "note".into(),
+                    snippet,
+                    course_id,
+                    file_kind: String::new(),
+                })))
+            } else {
+                Ok(None)
+            }
+        }) {
+            for r in rows.flatten().flatten() {
+                scored.push(r);
+            }
+        }
     }
 
-    // PDF content via FTS
-    let fts = build_fts_query(&query);
+    // PDF content via FTS (still precise for inside docs)
+    let fts = build_fts_query(q);
     if !fts.is_empty() {
         if let Ok(mut stmt) = conn.prepare(
             "SELECT f.id, f.name, f.kind, f.course_id, snippet(doc_index, 1, '', '', '…', 8) \
@@ -676,26 +836,111 @@ pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
              WHERE doc_index MATCH ?1 LIMIT 8",
         ) {
             if let Ok(rows) = stmt.query_map([&fts], |r| {
-                Ok(SearchResult {
+                let id: i64 = r.get(0)?;
+                let name: String = r.get(1)?;
+                let kind: String = r.get(2)?;
+                let course_id: Option<i64> = r.get(3)?;
+                let snip: String = r.get(4)?;
+                // give content matches a solid but not top score unless name also good
+                let name_s = match_score(&name, q);
+                let s = if name_s > 0.0 { name_s } else { 52.0 };
+                Ok(Some((s, SearchResult {
                     kind: "file".into(),
-                    id: r.get(0)?,
-                    title: r.get(1)?,
+                    id,
+                    title: name,
                     subtitle: "contenu".into(),
-                    snippet: r.get::<_, String>(4)?,
-                    course_id: r.get(3)?,
-                    file_kind: r.get::<_, String>(2)?,
-                })
+                    snippet: snip,
+                    course_id,
+                    file_kind: kind,
+                })))
             }) {
-                for row in rows.flatten() {
-                    if !results.iter().any(|x| x.kind == "file" && x.id == row.id) {
-                        results.push(row);
-                    }
+                for r in rows.flatten().flatten() {
+                    // dedup later
+                    scored.push(r);
                 }
             }
         }
     }
 
+    // rank by score desc, dedup files, cap results
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let mut results: Vec<SearchResult> = vec![];
+    let mut seen_file: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    for (_s, r) in scored {
+        if r.kind == "file" {
+            if seen_file.contains(&r.id) {
+                continue;
+            }
+            seen_file.insert(r.id);
+        }
+        results.push(r);
+        if results.len() >= 20 {
+            break;
+        }
+    }
+
     Ok(results)
+}
+
+// --- fuzzy helpers for name search (typo tolerant + partial matches) ---
+fn normalize(s: &str) -> String {
+    s.to_lowercase()
+        .chars()
+        .filter_map(|c| match c {
+            'é' | 'è' | 'ê' | 'ë' => Some('e'),
+            'à' | 'â' | 'ä' => Some('a'),
+            'î' | 'ï' => Some('i'),
+            'ô' | 'ö' => Some('o'),
+            'ù' | 'û' | 'ü' => Some('u'),
+            'ç' => Some('c'),
+            c if c.is_alphanumeric() || c.is_whitespace() => Some(c),
+            _ => None,
+        })
+        .collect()
+}
+
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let len_a = a.len();
+    let len_b = b.len();
+    if len_a == 0 { return len_b; }
+    if len_b == 0 { return len_a; }
+    let mut prev: Vec<usize> = (0..=len_b).collect();
+    let mut curr = vec![0usize; len_b + 1];
+    for i in 1..=len_a {
+        curr[0] = i;
+        for j in 1..=len_b {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            curr[j] = prev[j].min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[len_b]
+}
+
+fn match_score(text: &str, query: &str) -> f32 {
+    let t = normalize(text);
+    let q = normalize(query);
+    if q.is_empty() { return 0.0; }
+    if t == q { return 100.0; }
+    if t.starts_with(&q) { return 95.0; }
+    if t.contains(&q) { return 80.0; }
+    // small edit distance tolerates typos (replace/insert/delete)
+    let d = levenshtein(&t, &q);
+    if d <= 1 { return 85.0; }
+    if d <= 2 && q.len() >= 4 { return 72.0; }
+    // subsequence (good for partial typing "docu" in "document-foo.pdf")
+    let mut qi = 0usize;
+    let qchars: Vec<char> = q.chars().collect();
+    for tc in t.chars() {
+        if qi < qchars.len() && tc == qchars[qi] {
+            qi += 1;
+        }
+    }
+    if qi == qchars.len() { return 62.0; }
+    if qi >= qchars.len().saturating_mul(2) / 3 && qi >= 2 { return 45.0; }
+    0.0
 }
 
 fn build_fts_query(query: &str) -> String {
@@ -825,6 +1070,18 @@ pub fn toggle_reminder(state: State<Db>, id: i64, done: bool) -> R<()> {
 pub fn delete_reminder(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
     conn.execute("DELETE FROM reminders WHERE id=?1", [id]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cleanup_old_usage_data(state: State<Db>) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    // 30 days retention policy
+    conn.execute(
+        "DELETE FROM usage_events WHERE created_at < datetime('now', '-30 days')",
+        [],
+    )
+    .map_err(e)?;
     Ok(())
 }
 
@@ -1222,14 +1479,13 @@ pub fn run_python_code(app: AppHandle, code: String) -> R<PythonResult> {
 
 #[tauri::command]
 pub fn set_keep_awake(ka: State<KeepAwake>, on: bool) -> bool {
-    crate::keepawake::set(on);
-    *ka.0.lock().unwrap() = on;
+    crate::keepawake::set(&ka, on);
     on
 }
 
 #[tauri::command]
 pub fn keep_awake_status(ka: State<KeepAwake>) -> bool {
-    *ka.0.lock().unwrap()
+    crate::keepawake::is_on(&ka)
 }
 
 // ---------------------------------------------------------------------------
@@ -1291,6 +1547,12 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
     };
     let conn = state.0.lock().unwrap();
 
+    // Enforce 30 days data retention (prune on every recap load; cheap for this volume)
+    let _ = conn.execute(
+        "DELETE FROM usage_events WHERE created_at < datetime('now', '-30 days')",
+        [],
+    );
+
     let count = |kind: &str| -> i64 {
         conn.query_row(
             &format!("SELECT COUNT(*) FROM usage_events WHERE kind=?1 AND {clause}"),
@@ -1308,8 +1570,7 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
     let active_minutes: i64 = conn
         .query_row(
             &format!(
-                "SELECT COUNT(DISTINCT strftime('%Y-%m-%d %H:%M', created_at)) \
-                 FROM usage_events WHERE {clause}"
+                "SELECT COUNT(*) FROM usage_events WHERE kind='active_tick' AND {clause}"
             ),
             [],
             |r| r.get(0),
@@ -1318,11 +1579,12 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
 
     let mut top_courses = vec![];
     {
+        // Time per course (from active ticks while viewing that course's content)
         let mut stmt = conn
             .prepare(&format!(
                 "SELECT c.name, c.emoji, COUNT(*) as n FROM usage_events u \
                  JOIN courses c ON c.id = u.course_id \
-                 WHERE u.course_id IS NOT NULL AND {clause} \
+                 WHERE u.course_id IS NOT NULL AND u.kind='active_tick' AND {clause} \
                  GROUP BY u.course_id ORDER BY n DESC LIMIT 4"
             ))
             .map_err(e)?;
@@ -1340,6 +1602,73 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
         }
     }
 
+    let mut top_documents = vec![];
+    {
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT label, COUNT(*) as n FROM usage_events \
+                 WHERE kind='file_open' AND label IS NOT NULL AND {clause} \
+                 GROUP BY label ORDER BY n DESC LIMIT 4"
+            ))
+            .map_err(e)?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(TopItem {
+                    name: r.get(0)?,
+                    count: r.get(1)?,
+                })
+            })
+            .map_err(e)?;
+        for row in rows {
+            top_documents.push(row.map_err(e)?);
+        }
+    }
+
+    let mut top_tools = vec![];
+    {
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT label, COUNT(*) as n FROM usage_events \
+                 WHERE kind='demo_run' AND label IS NOT NULL AND {clause} \
+                 GROUP BY label ORDER BY n DESC LIMIT 4"
+            ))
+            .map_err(e)?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(TopItem {
+                    name: r.get(0)?,
+                    count: r.get(1)?,
+                })
+            })
+            .map_err(e)?;
+        for row in rows {
+            top_tools.push(row.map_err(e)?);
+        }
+    }
+
+    // Real time spent: active_tick events (logged periodically while app is visible)
+    let mut time_by_area = vec![];
+    {
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT COALESCE(label, 'app'), COUNT(*) as n FROM usage_events \
+                 WHERE kind='active_tick' AND {clause} \
+                 GROUP BY label ORDER BY n DESC LIMIT 6"
+            ))
+            .map_err(e)?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(TopItem {
+                    name: r.get(0)?,
+                    count: r.get(1)?,
+                })
+            })
+            .map_err(e)?;
+        for row in rows {
+            time_by_area.push(row.map_err(e)?);
+        }
+    }
+
     let mut highlights = vec![];
     if files_opened > 0 {
         highlights.push(format!("Vous avez ouvert {files_opened} fichier(s)."));
@@ -1349,6 +1678,12 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
     }
     if let Some(top) = top_courses.first() {
         highlights.push(format!("Cours le plus actif : {} {}.", top.emoji, top.name));
+    }
+    if let Some(top) = top_documents.first() {
+        highlights.push(format!("Document le plus consulté : {}.", top.name));
+    }
+    if let Some(top) = top_tools.first() {
+        highlights.push(format!("Outil le plus utilisé : {}.", top.name));
     }
     if reminders_done > 0 {
         highlights.push(format!("{reminders_done} rappel(s) accompli(s). Bravo !"));
@@ -1365,6 +1700,9 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
         reminders_done,
         active_minutes,
         top_courses,
+        top_documents,
+        top_tools,
+        time_by_area,
         highlights,
     })
 }
@@ -1564,15 +1902,18 @@ pub fn pronote_logout(state: State<Db>) -> R<()> {
 }
 
 /// Fetches "le contenu des cours" (lesson contents from cahier de textes) via the sidecar.
-/// Filters by optional subject and class/group name if provided. Always returns fresh
-/// credentials in the response so callers can persist rotated tokens (QR mode).
-/// "Just make it available" - the frontend binding + Rust wrapper; usage TBD.
+/// See the Python sidecar (pronote_contents + _lesson_contents) for full details.
+/// - subject: optional subject filter (partial match)
+/// - class_name: optional class / group name (will try to scope the query on multi-class accounts)
+/// - from_date: optional start date (YYYY-MM-DD or DD/MM/YYYY) for the "depuis" filter
+/// Always returns fresh credentials (for token rotation) + a `matieres` summary for sidebars.
 #[tauri::command]
 pub fn pronote_contents(
     app: AppHandle,
     state: State<Db>,
     subject: Option<String>,
     class_name: Option<String>,
+    from_date: Option<String>,
 ) -> R<serde_json::Value> {
     let creds = {
         let conn = state.0.lock().unwrap();
@@ -1584,6 +1925,9 @@ pub fn pronote_contents(
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
             "subject": subject,
             "class": class_name,
+            "from_date": from_date,
+            // also accept the camelCase key that the TS side may send for deserialization
+            "fromDate": from_date,
         })
     };
     if creds.get("url").map(|v| v.is_null()).unwrap_or(true) {
@@ -1600,6 +1944,44 @@ pub fn pronote_contents(
     }
 
     // Persist rotated token (QR) for future calls, like sync does.
+    let conn = state.0.lock().unwrap();
+    for key in ["username", "password"] {
+        if let Some(v) = res.get(key).and_then(|x| x.as_str()) {
+            set_setting_raw(&conn, &format!("pronote_{key}"), v);
+        }
+    }
+
+    Ok(res)
+}
+
+/// Returns the list of classes/groups available for the connected prof account
+/// (from Pronote listeClasses). Used to populate class dropdowns instead of free text.
+#[tauri::command]
+pub fn pronote_classes(app: AppHandle, state: State<Db>) -> R<serde_json::Value> {
+    let creds = {
+        let conn = state.0.lock().unwrap();
+        json!({
+            "mode": get_setting_raw(&conn, "pronote_mode").unwrap_or_else(|| "qr".into()),
+            "url": get_setting_raw(&conn, "pronote_url"),
+            "username": get_setting_raw(&conn, "pronote_username"),
+            "password": get_setting_raw(&conn, "pronote_password"),
+            "uuid": get_setting_raw(&conn, "pronote_uuid"),
+        })
+    };
+    if creds.get("url").map(|v| v.is_null()).unwrap_or(true) {
+        return Err("Pronote n'est pas connecte.".into());
+    }
+
+    let res = crate::sidecar::run(&app, "pronote_classes", &creds)?;
+    if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
+        let err = res
+            .get("error")
+            .and_then(|x| x.as_str())
+            .unwrap_or("recuperation des classes echouee");
+        return Err(err.to_string());
+    }
+
+    // Persist rotated token
     let conn = state.0.lock().unwrap();
     for key in ["username", "password"] {
         if let Some(v) = res.get(key).and_then(|x| x.as_str()) {

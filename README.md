@@ -71,13 +71,37 @@ EUCLIDE_PYTHON="$(pwd)/sidecar/.venv/bin/python" npm run app
 
 ## Sidecar Python
 
-En développement, Euclide utilise le Python du système. Pour la distribution, on fige le sidecar en un seul binaire (aucun Python requis sur les PC de l'école) :
+En développement, Euclide utilise le Python du système (ou un venv pointé via `EUCLIDE_PYTHON`). Pour la distribution, on fige le sidecar en un seul binaire (aucun Python requis sur les PC de l'école) :
 
 ```bash
+# macOS / Linux
 bash sidecar/build_sidecar.sh
+
+# Windows (PowerShell)
+.\sidecar\build_sidecar.ps1
 ```
 
-Le binaire `euclide-sidecar` produit doit être placé à côté de l'exécutable Euclide (ou dans les ressources de l'app). Euclide le détecte automatiquement ; sinon il retombe sur le Python du système.
+Le binaire (`euclide-sidecar` ou `.exe`) produit doit être placé à côté de l'exécutable Euclide (ou dans les ressources de l'app avant `npm run app:build`). Euclide le détecte automatiquement ; sinon il retombe sur le Python du système (python / python3). 
+
+Le sidecar Python (pronotepy + pypdf) est multi-plateforme ; le binaire PyInstaller doit être produit **sur la plateforme cible**.
+
+## CI / GitHub Actions (builds for macOS, Windows, Linux)
+
+Push a tag `vX.Y.Z` (or use "Run workflow" in Actions) to automatically build on GitHub-hosted runners:
+
+- macOS Intel (via macos-13) → x86_64 .dmg etc.
+- macOS Apple Silicon (macos-latest) → aarch64
+- Linux (ubuntu-22.04) → .AppImage, .deb, .rpm
+- Windows → .exe / nsis installer
+
+The workflow:
+- Builds the platform-specific Python sidecar binary (via PyInstaller) and bundles it.
+- Runs `tauri build` for the native targets using official `tauri-apps/tauri-action`.
+- Creates a draft GitHub Release with all artifacts.
+
+See `.github/workflows/publish.yml` for the matrix and steps (based on official Tauri v2 guide + custom sidecar integration).
+
+To customize release (e.g. auto publish instead of draft), edit the action inputs. Code signing for prod releases is recommended (separate guides for macOS/Windows).
 
 ## Connexion Pronote (par QR code)
 
@@ -92,12 +116,14 @@ L'établissement utilise un ENT : on ne tape donc jamais le mot de passe. On pas
 
 Techniquement, le sidecar appelle `pronotepy.Client.qrcode_login(qr, pin, uuid)` puis `token_login(...)` lors des sessions suivantes, avec un `uuid` stable. Le mode « identifiants directs » utilise simplement `pronotepy.Client(url, identifiant, mot_de_passe)` (testé avec le compte de démonstration Index Éducation, espace professeur).
 
-## Utilisation depuis une clé USB (Windows)
+## Utilisation depuis une clé USB (Windows / Linux)
 
-1. Construire l'app (`npm run app:build`) et le sidecar (`sidecar/build_sidecar.sh`).
-2. Copier l'exécutable `Euclide.exe`, le binaire `euclide-sidecar.exe` (à côté) sur la clé.
+1. Construire l'app (`npm run app:build`) et le sidecar (`.sh` sur mac/linux ou `.ps1` sur Windows).
+2. Copier l'exécutable (`Euclide` ou `Euclide.exe`), le binaire sidecar correspondant (à côté) sur la clé.
 3. Au premier lancement, Euclide crée le dossier `Euclide-Data/` à côté de l'exécutable.
-4. Le runtime **WebView2** est requis (présent par défaut sur Windows 10/11) ; le programme d'installation embarque sinon le *bootstrapper*.
+4. Sur Windows : WebView2 requis (bootstrapper embarqué si besoin). Sur Linux : dépendances gtk/webkit typiques pour Tauri (la plupart des distros desktop les ont).
+
+Le mode « garder l'écran allumé » (caffeinate) fonctionne nativement sur Windows, macOS et Linux.
 
 > Astuce : un exécutable non signé lancé depuis une clé peut être signalé par l'antivirus. La signature de code est une amélioration prévue.
 

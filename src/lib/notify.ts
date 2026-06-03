@@ -20,13 +20,28 @@ export async function notifyPendingReminders() {
     const pending = reminders.filter((r) => !r.done);
     if (pending.length === 0) return;
 
-    sendNotification({
-      title: "Euclide",
-      body:
-        pending.length === 1
-          ? `Un rappel : ${pending[0].title}`
-          : `${pending.length} rappels vous attendent aujourd'hui.`,
+    // Only gently notify for due today/over or all if none dated? Keep simple + calm.
+    const dueSoon = pending.filter((r) => {
+      if (!r.due_at) return false;
+      const d = new Date(r.due_at.replace(" ", "T"));
+      if (Number.isNaN(d.getTime())) return false;
+      const dayDiff = Math.floor((d.getTime() - Date.now()) / (1000 * 3600 * 24));
+      return dayDiff <= 1;
     });
+    const toNotify = dueSoon.length > 0 ? dueSoon : pending.slice(0, 3);
+
+    const fun = [
+      "Rappel du jour",
+      "À ne pas oublier",
+      "Petit pense-bête",
+      "Mission classe",
+    ];
+    const titlePick = fun[Math.floor(Math.random() * fun.length)];
+    const body =
+      toNotify.length === 1
+        ? toNotify[0].title
+        : `${toNotify.length} rappels en attente (${pending.length} au total).`;
+    sendNotification({ title: titlePick, body });
   } catch {
     // notifications are a nicety, never block the app
   }

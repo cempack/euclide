@@ -13,14 +13,11 @@ const THEME_KEY = "eu.theme";
 const ACCENT_KEY = "eu.accent";
 
 export const ACCENT_PRESETS: { name: string; hex: string }[] = [
-  { name: "Bleu", hex: "#5B7BE8" },
-  { name: "Indigo", hex: "#6C5CE7" },
-  { name: "Sauge", hex: "#4FA38A" },
-  { name: "Ambre", hex: "#E0954B" },
-  { name: "Corail", hex: "#E8896B" },
-  { name: "Rose", hex: "#E2689B" },
-  { name: "Prune", hex: "#9B5DE5" },
-  { name: "Ardoise", hex: "#64748B" },
+  { name: "TUI Blue", hex: "#007aff" },
+  { name: "Ink", hex: "#050404" },
+  { name: "Terminal Green", hex: "#30d158" },
+  { name: "TUI Red", hex: "#ff3b30" },
+  { name: "Ash", hex: "#9a9898" },
 ];
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -43,9 +40,9 @@ function applyVars(theme: Theme, accentHex: string) {
   root.classList.toggle("dark", theme === "dark");
   const accent = hexToRgb(accentHex);
   root.style.setProperty("--eu-accent", accent.join(" "));
-  // derive a soft tint that fits the active theme
+  // soft tint tuned for terminal grayscale (less aggressive mix)
   const soft =
-    theme === "dark" ? mix([26, 29, 38], accent, 0.28) : mix([255, 255, 255], accent, 0.16);
+    theme === "dark" ? mix([47, 49, 49], accent, 0.35) : mix([250, 249, 249], accent, 0.12);
   root.style.setProperty("--eu-accent-soft", soft);
 }
 
@@ -71,7 +68,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const [accent, setAccentState] = useState<string>(
-    () => localStorage.getItem(ACCENT_KEY) || ACCENT_PRESETS[0].hex
+    () => localStorage.getItem(ACCENT_KEY) || "#007aff" // TUI blue default for new terminal theme
   );
 
   useEffect(() => {
@@ -83,7 +80,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Translucent vibrancy material is reliable on macOS; opt in there so other
   // platforms keep a guaranteed-solid background.
   useEffect(() => {
-    const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
+    const isMac = typeof navigator !== "undefined" &&
+      /Macintosh|Mac OS X|Mac|iPod|iPhone|iPad/.test(navigator.userAgent || navigator.platform || "");
     document.documentElement.classList.toggle("has-vibrancy", isMac);
   }, []);
 

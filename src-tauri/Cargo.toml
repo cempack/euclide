@@ -24,9 +24,7 @@ chrono = "0.4"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 window-vibrancy = "0.6"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_System_Power", "Win32_Foundation"] }
+keepawake = "0.6"
 
 [profile.release]
 opt-level = "s"

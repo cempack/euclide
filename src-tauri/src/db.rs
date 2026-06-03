@@ -6,6 +6,8 @@ pub struct Db(pub Mutex<Connection>);
 pub fn open() -> Connection {
     let conn = Connection::open(crate::paths::db_path()).expect("ouverture base impossible");
     conn.execute_batch(SCHEMA).expect("init schema");
+    // Migration for existing DBs: add matiere column to courses (for subject filtering with Pronote)
+    let _ = conn.execute("ALTER TABLE courses ADD COLUMN matiere TEXT NOT NULL DEFAULT ''", []);
     seed_python_demos();
     conn
 }
@@ -20,7 +22,21 @@ CREATE TABLE IF NOT EXISTS courses (
     emoji       TEXT NOT NULL DEFAULT '📘',
     color       TEXT NOT NULL DEFAULT '#5B7BE8',
     description TEXT NOT NULL DEFAULT '',
+    matiere     TEXT NOT NULL DEFAULT '',  -- e.g. "Mathématiques" or "NSI" (for Pronote subject filtering)
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Course classes: each course can be attached to one or more classes/groups.
+-- Names must match exactly the class names used on Pronote (e.g. "3D", "1S1").
+-- Per class: progress (last document worked on), and teacher notes specific to that class.
+CREATE TABLE IF NOT EXISTS course_classes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id           INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    class_name          TEXT NOT NULL,
+    last_file_id        INTEGER REFERENCES files(id) ON DELETE SET NULL,
+    progress_updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    notes               TEXT NOT NULL DEFAULT '',
+    UNIQUE(course_id, class_name)
 );
 
 CREATE TABLE IF NOT EXISTS notes (

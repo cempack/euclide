@@ -1,46 +1,27 @@
 import { useEffect, useState } from "react";
 import { api, type PythonDemo, type PythonResult, type QuickLink } from "../lib/api";
-import { useTabs } from "../lib/tabs";
-import { t } from "../lib/i18n";
+import { t, fmt } from "../lib/i18n";
 import { EmptyState, Modal, SectionHeader, useToast } from "../components/ui";
 import CodeEditor from "../components/CodeEditor";
 import {
   CodeIcon,
   CoffeeIcon,
   LinkIcon,
-  PenIcon,
   PlayIcon,
   PlusIcon,
   TrashIcon,
 } from "../components/icons";
+import { Favicon } from "../components/Favicon";
 
 export default function Tools() {
-  const tabs = useTabs();
-
   return (
     <div className="flex flex-col gap-8">
       <header>
-        <h1 className="text-2xl font-display tracking-tight text-eu-text">{t.nav.tools}</h1>
-        <p className="eu-sub mt-1">Tout ce qui rend la classe plus fluide.</p>
+        <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.tools}</h1>
+        <p className="text-body-mute text-sm mt-1">Tout ce qui rend la classe plus fluide.</p>
       </header>
 
       <KeepAwakeCard />
-
-      <section>
-        <SectionHeader title={t.whiteboard} />
-        <button
-          onClick={() => tabs.open({ kind: "whiteboard", title: "Nouveau tableau", params: { isNew: true } })}
-          className="eu-card w-full p-6 flex items-center gap-4 hover:shadow-glow transition-all text-left"
-        >
-          <span className="grid place-items-center w-14 h-14 rounded-[12px] bg-[#fff8e0] text-[#fa520f]">
-            <PenIcon className="w-7 h-7" />
-          </span>
-          <div>
-            <p className="font-semibold text-eu-text">Ouvrir le tableau blanc</p>
-            <p className="eu-sub">Simple et rapide, et vos tableaux restent modifiables.</p>
-          </div>
-        </button>
-      </section>
 
       <PythonCard />
       <LinksCard />
@@ -59,32 +40,30 @@ function KeepAwakeCard() {
   const toggle = async () => {
     const next = await api.setKeepAwake(!on);
     setOn(next);
-    toast(next ? t.keepAwakeOn : t.keepAwakeOff, next ? "success" : "info");
+    toast(next ? t.tools?.keepAwakeOn || "L'écran reste allumé" : t.tools?.keepAwakeOff || "Verrouillage écran normal", next ? "success" : "info");
   };
 
   return (
     <section>
-      <SectionHeader title={t.keepAwake} />
+      <SectionHeader title={t.tools?.keepAwake || "Ne pas verrouiller l'écran"} />
       <button
         onClick={toggle}
-        className={`eu-card w-full p-5 flex items-center gap-4 text-left transition-all ${
-          on ? "shadow-glow" : "hover:shadow-glow"
-        }`}
+        className={`new-card w-full p-5 flex items-center gap-4 text-left transition-all duration-150 hover:border-accent-sunset/40`}
       >
         <span
           className={`grid place-items-center w-12 h-12 rounded-[12px] transition-colors ${
-            on ? "bg-[#fa520f] text-white" : "bg-[#fff8e0] text-[#fa520f]"
+            on ? "bg-accent-sunset text-primary" : "bg-surface-container text-accent-sunset"
           }`}
         >
           <CoffeeIcon className="w-6 h-6" />
         </span>
         <div className="flex-1">
-          <p className="font-semibold text-eu-text">{on ? t.keepAwakeOn : t.keepAwakeOff}</p>
-          <p className="eu-sub">L'ecran ne se verrouille pas pendant le cours.</p>
+          <p className="font-semibold text-primary">{on ? (t.tools?.keepAwakeOn || "L'écran reste allumé") : (t.tools?.keepAwakeOff || "Verrouillage écran normal")}</p>
+          <p className="text-body-mute text-sm">L'écran ne se verrouille pas pendant le cours.</p>
         </div>
         <span
           className={`relative w-12 h-7 rounded-full transition-colors ${
-            on ? "bg-[#fa520f]" : "bg-[#ededed]"
+            on ? "bg-accent-sunset" : "bg-surface-container"
           }`}
         >
           <span
@@ -98,14 +77,7 @@ function KeepAwakeCard() {
   );
 }
 
-const STARTER_CODE = `# Nouveau script Python
-# Tout ce qui est affiche avec print() apparaitra ci-dessous.
-
-print("Bonjour la classe !")
-
-for i in range(1, 6):
-    print(i, "x 7 =", i * 7)
-`;
+const STARTER_CODE = (t.tools?.starterCode as string) || `# Nouveau script Python\n# ...`;
 
 function PythonCard() {
   const toast = useToast();
@@ -140,19 +112,19 @@ function PythonCard() {
   };
 
   const create = async () => {
-    const name = window.prompt("Nom du script :", "Mon script");
+    const name = window.prompt(t.tools?.newScriptPrompt || "Nom du script :", t.tools?.defaultScriptName || "Mon script");
     if (!name) return;
     const d = await api.createScript(name, STARTER_CODE);
     await refresh(d.path);
     setResult(null);
-    toast("Script cree", "success");
+    toast(t.tools?.toastScriptCreated || "Script créé", "success");
   };
 
   const importScript = async () => {
     const d = await api.importScript();
     if (d) {
       await refresh(d.path);
-      toast(`Importe : ${d.name}`, "success");
+      toast(fmt(t.tools?.toastImported || "Importé : {name}", { name: d.name }), "success");
     }
   };
 
@@ -161,7 +133,7 @@ function PythonCard() {
     await api.saveScript(selected.path, code);
     setDirty(false);
     setDemos((prev) => prev.map((d) => (d.path === selected.path ? { ...d, code } : d)));
-    toast("Script enregistre", "success");
+    toast(t.tools?.toastScriptSaved || "Script enregistré", "success");
   };
 
   const run = async () => {
@@ -170,9 +142,9 @@ function PythonCard() {
     try {
       const res = selected && !dirty ? await api.runDemo(selected.path) : await api.runCode(code);
       setResult(res);
-      if (!res.ok) toast("Le script a renvoye une erreur", "error");
+      if (!res.ok) toast(t.tools?.toastScriptError || "Le script a renvoyé une erreur", "error");
     } catch {
-      toast("Impossible de lancer le script", "error");
+      toast(t.tools?.toastScriptRunError || "Impossible de lancer le script", "error");
     } finally {
       setRunning(false);
     }
@@ -180,7 +152,7 @@ function PythonCard() {
 
   const remove = async () => {
     if (!selected) return;
-    if (!confirm(`Supprimer le script "${selected.name}" ?`)) return;
+    if (!confirm(fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: selected.name }))) return;
     await api.deleteScript(selected.path);
     setSelected(null);
     setCode("");
@@ -191,23 +163,23 @@ function PythonCard() {
   return (
     <section>
       <SectionHeader
-        title={t.pythonDemos}
+        title={t.tools?.pythonDemos || "Scripts Python"}
         action={
           <div className="flex gap-2">
-            <button onClick={importScript} className="eu-btn-ghost py-1.5 px-2.5 text-xs text-eu-muted">
+            <button onClick={importScript} className="new-btn-ghost py-1.5 px-2.5 text-xs">
               Importer
             </button>
-            <button onClick={create} className="eu-btn-soft py-1.5 px-2.5 text-xs">
+            <button onClick={create} className="new-btn-ghost py-1.5 px-2.5 text-xs">
               <PlusIcon className="w-4 h-4" /> Nouveau script
             </button>
           </div>
         }
       />
-      <div className="eu-card p-0 overflow-hidden grid grid-cols-1 md:grid-cols-[200px_1fr]">
+      <div className="new-card p-0 overflow-hidden grid grid-cols-1 md:grid-cols-[200px_1fr]">
         {/* script list */}
-        <div className="border-b md:border-b-0 md:border-r border-[#ededed] p-2 max-h-[420px] overflow-y-auto">
+        <div className="border-b md:border-b-0 md:border-r border-hairline p-2 max-h-[420px] overflow-y-auto bg-surface">
           {demos.length === 0 ? (
-            <p className="eu-sub p-3 text-[13px]">Aucun script pour l'instant. Creez-en un !</p>
+            <p className="text-body-mute p-3 text-[13px]">{t.tools?.noScripts || "Aucun script pour l'instant. Créez-en un !"}</p>
           ) : (
             demos.map((d) => (
               <button
@@ -215,8 +187,8 @@ function PythonCard() {
                 onClick={() => select(d)}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
                   selected?.path === d.path
-                    ? "bg-[#fff8e0] text-[#fa520f]"
-                    : "text-eu-text hover:bg-eu-cream-light"
+                    ? "bg-surface-container text-accent-sunset"
+                    : "text-on-surface hover:bg-surface-container"
                 }`}
               >
                 <CodeIcon className="w-4 h-4 shrink-0" />
@@ -227,24 +199,24 @@ function PythonCard() {
         </div>
 
         {/* editor */}
-        <div className="p-4 flex flex-col gap-3 min-w-0">
+        <div className="p-4 flex flex-col gap-3 min-w-0 bg-surface">
           {selected ? (
             <>
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-eu-text flex-1 truncate">{selected.name}</p>
-                <button onClick={remove} className="eu-btn-ghost text-eu-muted py-1.5 px-2">
+                <p className="font-semibold text-on-surface flex-1 truncate">{selected.name}</p>
+                <button onClick={remove} className="new-btn-ghost py-1.5 px-2">
                   <TrashIcon className="w-4 h-4" />
                 </button>
-                <button onClick={save} disabled={!dirty} className="eu-btn-ghost text-eu-muted py-1.5">
-                  {dirty ? "Enregistrer *" : "Enregistre"}
+                <button onClick={save} disabled={!dirty} className="new-btn-ghost py-1.5">
+                  {dirty ? (t.tools?.saveDirtyBtn || "Enregistrer *") : (t.tools?.saveBtn || "Enregistrer")}
                 </button>
-                <button onClick={run} disabled={running} className="eu-btn-primary py-1.5">
+                <button onClick={run} disabled={running} className="new-btn-primary py-1.5">
                   {running ? (
-                    <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                   ) : (
                     <PlayIcon className="w-4 h-4" />
                   )}
-                  Executer
+                  {t.tools?.execute || "Exécuter"}
                 </button>
               </div>
               <CodeEditor
@@ -257,11 +229,11 @@ function PythonCard() {
               {result && (
                 <pre
                   className={`selectable max-h-52 overflow-auto rounded-lg border p-3 text-[12.5px] leading-relaxed font-mono whitespace-pre-wrap ${
-                    result.ok ? "bg-[#fafafa] border-[#ededed]" : "bg-red-500/5 border-red-500/30"
+                    result.ok ? "bg-surface border-hairline" : "bg-red-500/10 border-red-500/30 text-red-400"
                   }`}
                 >
-                  {result.stdout || <span className="text-eu-muted">(aucune sortie)</span>}
-                  {result.stderr && <span className="text-red-500">{"\n" + result.stderr}</span>}
+                  {result.stdout || <span className="text-body-mute">{t.tools?.noOutput || "(aucune sortie)"}</span>}
+                  {result.stderr && <span className="text-red-400">{"\n" + result.stderr}</span>}
                 </pre>
               )}
             </>
@@ -269,8 +241,8 @@ function PythonCard() {
             <div className="py-10">
               <EmptyState
                 icon={<CodeIcon className="w-8 h-8" />}
-                title="Vos scripts Python"
-                hint="Creez ou importez un script, modifiez-le et lancez-le en un clic."
+                title={t.tools?.yourScripts || "Vos scripts Python"}
+                hint={t.tools?.createHint || "Créez ou importez un script, modifiez-le et lancez-le en un clic."}
               />
             </div>
           )}
@@ -295,45 +267,47 @@ function LinksCard() {
   const add = async () => {
     if (!label.trim() || !url.trim()) return;
     const normalized = url.startsWith("http") ? url : `https://${url}`;
-    await api.createLink(label.trim(), normalized, "🔗");
+    await api.createLink(label.trim(), normalized, ""); // icon stored for legacy; UI always loads real favicon from site or falls back to default SVG icon (never emoji)
     setLabel("");
     setUrl("");
     setOpen(false);
-    toast("Lien ajoute", "success");
+    toast(t.common?.success ? (t.common.success + " — lien") : "Lien ajouté", "success");
+    window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
     refresh();
   };
 
   return (
     <section>
       <SectionHeader
-        title={t.quickLinks}
+        title={t.tools?.quickLinks || "Liens rapides"}
         action={
-          <button onClick={() => setOpen(true)} className="eu-btn-soft py-1.5 px-2.5 text-xs">
-            <PlusIcon className="w-4 h-4" /> {t.add}
+          <button onClick={() => setOpen(true)} className="new-btn-ghost py-1.5 px-2.5 text-xs">
+            <PlusIcon className="w-4 h-4" /> {t.common?.add || "Ajouter"}
           </button>
         }
       />
       {links.length === 0 ? (
-        <div className="eu-card p-5">
-          <EmptyState icon={<LinkIcon className="w-8 h-8" />} title="Aucun lien rapide" />
+        <div className="new-card p-5">
+          <EmptyState icon={<LinkIcon className="w-8 h-8" />} title={t.tools?.noQuickLinks || "Aucun lien rapide"} />
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {links.map((l) => (
-            <div key={l.id} className="eu-card p-4 flex items-center gap-3 group">
+            <div key={l.id} className="new-card p-4 flex items-center gap-3 group">
               <button onClick={() => api.openUrl(l.url)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                <span className="text-xl">{l.icon}</span>
+                <Favicon url={l.url} className="w-5 h-5" />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-eu-text truncate">{l.label}</p>
-                  <p className="text-[11px] text-eu-muted truncate">{l.url}</p>
+                  <p className="text-sm font-medium text-primary truncate">{l.label}</p>
+                  <p className="text-[11px] text-body-mute truncate">{l.url}</p>
                 </div>
               </button>
               <button
                 onClick={async () => {
                   await api.deleteLink(l.id);
+                  window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
                   refresh();
                 }}
-                className="opacity-0 group-hover:opacity-100 text-eu-muted hover:text-red-500 transition-all"
+                className="opacity-0 group-hover:opacity-100 text-body-mute hover:text-red-500 transition-all duration-150"
               >
                 <TrashIcon className="w-4 h-4" />
               </button>
@@ -342,28 +316,28 @@ function LinksCard() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t.newLink}>
+      <Modal open={open} onClose={() => setOpen(false)} title={t.common?.newLink || "Nouveau lien"}>
         <div className="flex flex-col gap-3">
           <input
             autoFocus
-            className="eu-input"
-            placeholder="Nom (ex : Manuel en ligne)"
+            className="new-input"
+            placeholder={t.tools?.linkNamePlaceholder || "Nom (ex : Manuel en ligne)"}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
           <input
-            className="eu-input"
-            placeholder="Adresse (ex : eduscol.education.fr)"
+            className="new-input"
+            placeholder={t.tools?.linkUrlPlaceholder || "Adresse (ex : eduscol.education.fr)"}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
           />
           <div className="flex justify-end gap-2 mt-1">
-            <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
-              {t.cancel}
+            <button className="new-btn-ghost" onClick={() => setOpen(false)}>
+              {t.common?.cancel || "Annuler"}
             </button>
-            <button className="eu-btn-primary" onClick={add}>
-              {t.add}
+            <button className="new-btn-primary" onClick={add}>
+              {t.common?.add || "Ajouter"}
             </button>
           </div>
         </div>

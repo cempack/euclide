@@ -3,27 +3,43 @@
 @tailwind utilities;
 
 :root {
-  /* light theme - clean paper with clear separation */
-  --eu-bg: 236 237 242;
-  --eu-surface: 250 250 252;
+  /* OpenCode Terminal-Aesthetic light (ink on warm cream paper) - from Stitch design-system.md */
+  --eu-bg: 250 249 249;
+  --eu-surface: 250 249 249;
   --eu-card: 255 255 255;
-  --eu-border: 222 224 232;
-  --eu-text: 28 30 38;
-  --eu-muted: 96 102 116;
-  --eu-accent: 91 123 232;
-  --eu-accent-soft: 230 236 251;
+  --eu-border: 15 0 0 / 0.12; /* hairline */
+  --eu-text: 26 28 28; /* on-surface */
+  --eu-muted: 100 98 98; /* mute / ash */
+  --eu-accent: 0 122 255; /* tui-accent */
+  --eu-accent-soft: 230 240 255;
+  --eu-hairline: 15 0 0 / 0.12;
+  --eu-hairline-strong: 100 98 98;
+  --eu-primary: 5 4 4;
+  --eu-primary-container: 32 29 29;
+  --eu-surface-soft: 248 247 247;
+  --eu-surface-container: 238 232 232;
+  --eu-tui-success: 48 209 88;
+  --eu-tui-danger: 255 59 48;
 }
 
 .dark {
-  /* dark theme - deep, restful, slightly blue */
-  --eu-bg: 14 16 22;
-  --eu-surface: 22 25 33;
-  --eu-card: 30 34 45;
-  --eu-border: 46 51 65;
-  --eu-text: 233 236 244;
-  --eu-muted: 150 158 174;
-  --eu-accent: 124 156 245;
-  --eu-accent-soft: 39 47 71;
+  /* Inverted terminal dark for dark mode - high contrast, still flat, using inverse tokens */
+  --eu-bg: 47 49 49;
+  --eu-surface: 47 49 49;
+  --eu-card: 63 65 65;
+  --eu-border: 208 196 195 / 0.4;
+  --eu-text: 241 240 240;
+  --eu-muted: 154 152 152;
+  --eu-accent: 64 156 255;
+  --eu-accent-soft: 30 45 70;
+  --eu-hairline: 255 255 255 / 0.12;
+  --eu-hairline-strong: 154 152 152;
+  --eu-primary: 232 225 224;
+  --eu-primary-container: 32 29 29;
+  --eu-surface-soft: 55 57 57;
+  --eu-surface-container: 70 72 72;
+  --eu-tui-success: 48 209 88;
+  --eu-tui-danger: 255 105 97;
 }
 
 * {
@@ -57,6 +73,15 @@ body {
 }
 .has-vibrancy .eu-topbar {
   background-color: rgb(var(--eu-bg) / 0.45) !important;
+}
+
+/* Hide scrollbar on the tab strip for a clean, modern tab bar look (still fully scrollable with trackpad/mouse) */
+.eu-topbar .overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+.eu-topbar .overflow-x-auto {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 input,
@@ -96,39 +121,100 @@ textarea,
 }
 
 @layer components {
+  /* Terminal / brutalist flat aesthetic - sharp containers, 4px interactive affordance, hairlines, mono rhythm */
   .eu-card {
-    @apply rounded-2xl bg-eu-card border border-eu-border shadow-card;
+    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp, no shadow */
   }
   .eu-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium
-      transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2
-      focus-visible:ring-eu-accent/50 disabled:opacity-50 disabled:pointer-events-none eu-no-drag;
+    @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium font-mono
+      transition-all duration-100 active:scale-[0.985] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--eu-accent)] disabled:opacity-50 disabled:pointer-events-none eu-no-drag;
   }
   .eu-btn-primary {
-    @apply eu-btn bg-eu-accent text-white shadow-soft hover:brightness-110;
+    @apply eu-btn bg-[var(--eu-primary)] text-white border border-[var(--eu-primary)] hover:brightness-95;
   }
   .eu-btn-ghost {
-    @apply eu-btn text-eu-text hover:bg-eu-accent-soft;
+    @apply eu-btn text-[var(--eu-text)] hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)];
   }
   .eu-btn-soft {
-    @apply eu-btn bg-eu-accent-soft text-eu-accent hover:brightness-105;
+    @apply eu-btn bg-[var(--eu-accent-soft)] text-[var(--eu-accent)] border border-[var(--eu-accent)]/30 hover:brightness-105;
   }
   .eu-input {
-    @apply w-full rounded-xl bg-eu-surface border border-eu-border px-3.5 py-2.5 text-sm text-eu-text
-      placeholder:text-eu-muted/70 focus:outline-none focus:ring-2 focus:ring-eu-accent/40 focus:border-eu-accent/40
+    @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
+      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--eu-accent)] focus:border-[var(--eu-accent)]
       transition-all;
   }
   .eu-chip {
-    @apply inline-flex items-center gap-1.5 rounded-full bg-eu-accent-soft px-3 py-1 text-xs font-medium text-eu-accent;
+    @apply inline-flex items-center gap-1.5 rounded px-2.5 py-0.5 text-xs font-medium font-mono border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)];
   }
   .eu-title {
-    @apply text-eu-text font-semibold tracking-tight;
+    @apply text-[var(--eu-text)] font-semibold tracking-tight font-mono;
   }
   .eu-sub {
-    @apply text-eu-muted text-sm;
+    @apply text-[var(--eu-muted)] text-sm font-mono;
   }
   .eu-kbd {
-    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-md border border-eu-border
-      bg-eu-surface text-[11px] font-medium text-eu-muted;
+    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded border border-[rgba(15,0,0,0.12)]
+      bg-[var(--eu-surface)] text-[11px] font-medium font-mono text-[var(--eu-muted)];
+  }
+
+  /* "new-*" styles updated for OpenCode Terminal-Aesthetic (flat, hairline, mono, [brackets] affordance in content) */
+  .new-card {
+    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp containers */
+  }
+  .stat-card {
+    @apply rounded-none bg-[#f1eeee] border border-[rgba(15,0,0,0.12)] p-6 flex gap-4 items-center; /* mock-style soft tint */
+  }
+  .new-btn {
+    @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
+      border border-[rgba(15,0,0,0.12)] bg-[#f1eeee] text-primary hover:bg-[var(--eu-surface-soft)]
+      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--eu-accent)];
+  }
+  .new-btn-primary {
+    @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
+      bg-primary text-white border border-primary hover:brightness-95 active:scale-[0.985]
+      transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40;
+  }
+  .new-btn-ghost {
+    @apply inline-flex items-center gap-2 rounded px-3 py-1 text-sm font-medium font-mono
+      text-primary hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)]
+      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--eu-accent)];
+  }
+  .new-input {
+    @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
+      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--eu-accent)] focus:border-[var(--eu-accent)]
+      transition-all;
+  }
+  .new-segment {
+    @apply inline-flex rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface)] p-1;
+  }
+  .new-segment .active {
+    @apply bg-primary text-white border-primary;
+  }
+
+  /* Terminal chrome helpers for dashboard/widgets */
+  .terminal-header {
+    @apply px-4 py-3 border-b border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)] flex items-center justify-between font-mono text-sm;
+  }
+  .terminal-card {
+    @apply border border-[rgba(15,0,0,0.12)] rounded-none flex flex-col bg-white;
   }
 }
+
+/* Simple fade for list items / entrances - GPU friendly, no JS cost */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fadeIn 0.16s ease-out forwards;
+}
+
+/* Hide scrollbar on scrollable toolbar containers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

@@ -1,6 +1,11 @@
-export const isMac = /Macintosh|Mac OS X/.test(
-  typeof navigator !== "undefined" ? navigator.userAgent : ""
-);
+export const isMac = typeof navigator !== "undefined" &&
+  /Macintosh|Mac OS X|Mac|iPod|iPhone|iPad/.test(navigator.userAgent || navigator.platform || "");
+
+export const isWindows = typeof navigator !== "undefined" &&
+  /Windows|Win32|Win64|WOW64/.test(navigator.userAgent || navigator.platform || "");
+
+export const isLinux = typeof navigator !== "undefined" &&
+  /Linux|X11/.test(navigator.userAgent || navigator.platform || "") && !isMac && !isWindows;
 
 export const MOD = isMac ? "⌘" : "Ctrl";
 

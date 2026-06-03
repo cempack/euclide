@@ -244,22 +244,73 @@ def pronote_sync(payload):
     }
 
 
-def _lesson_contents(client, days_back: int = 90):
-    """Fetch 'contenu des cours' (lesson contents) from the cahier de textes over a recent period.
-    Returns list of dicts with subject, groups, title, description, etc.
-    Filtering by class/subject is done by caller if desired.
+def _french_date_label(date_str: str) -> str:
+    """Turn '01/05/2025 09:00:00' into 'Vendredi 01 mai' style label."""
+    import datetime as dt
+    jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+    mois = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
+    try:
+        core = (date_str or "").split()[0]
+        d = dt.datetime.strptime(core, "%d/%m/%Y").date()
+        return f"{jours[d.weekday()]} {d.day:02d} {mois[d.month-1]}"
+    except Exception:  # noqa: BLE001
+        return date_str or ""
+
+
+def _lesson_contents(client, days_back: int = 120, classe: dict | None = None, date_debut: str | None = None):
+    """Fetch 'contenu des cours' (lesson contents) from the cahier de textes.
+    Supports optional `classe` dict ({"N": "...", "G": 1}) to scope to a specific class
+    (important for teacher / multi-class accounts). For professeur accounts the request
+    uses `ressource` (and `classe`) + estCours/avecCoursAnnules to emulate "Contenu de mes
+    cours" / "Vision élève" per-class view.
+    `date_debut` limits the range (e.g. "2025-04-27" or "27/04/2025").
+    Returns richer items with date_label, start_time, end_time etc.
+    Also includes `documents` (attached files / pièces jointes / links) when present
+    in the ListePieceJointe of the contenu.
     """
     import datetime as dt
+    import re
+    from html import unescape
+
+    # For constructing proper attachment URLs (files + links)
+    try:
+        from pronotepy.dataClasses import Attachment
+    except Exception:  # noqa: BLE001
+        Attachment = None
 
     today = dt.date.today()
-    from_d = today - dt.timedelta(days=days_back)
-    first_w = client.get_week(from_d)
-    last_w = client.get_week(today + dt.timedelta(days=7))
+
+    # Determine week range
+    if date_debut:
+        try:
+            s = str(date_debut).strip()
+            if "-" in s and len(s) >= 10:
+                d0 = dt.datetime.strptime(s[:10], "%Y-%m-%d").date()
+            else:
+                core = s.split()[0] if " " in s else s
+                d0 = dt.datetime.strptime(core, "%d/%m/%Y").date()
+            first_w = client.get_week(d0)
+        except Exception:  # noqa: BLE001
+            first_w = client.get_week(today - dt.timedelta(days=days_back))
+    else:
+        first_w = client.get_week(today - dt.timedelta(days=days_back))
+
+    last_w = client.get_week(today + dt.timedelta(days=28))
+
     items = []
     seen = set()
     for w in range(first_w, last_w + 1):
         try:
             data = {"domaine": {"_T": 8, "V": f"[{w}..{w}]"}}
+            if classe:
+                # For professeur accounts, to fetch "Contenu de mes cours" / vision for a specific class,
+                # the working payload uses "ressource": the classe dict (not "classe").
+                # Both are set for broader compatibility across instances.
+                data["ressource"] = classe
+                data["classe"] = classe
+                # Additional fields sometimes used in professeur view for "contenu de mes cours" / vision classe
+                data["estCours"] = True
+                data["avecCoursAnnules"] = True
             resp = client.post("PageCahierDeTexte", 89, data)
             lst = (
                 resp.get("dataSec", {})
@@ -283,20 +334,75 @@ def _lesson_contents(client, days_back: int = 90):
                     for p in ((e.get("listeProfesseurs") or {}).get("V") or [])
                 ]
                 title = c.get("L") or ""
-                desc = ((c.get("descriptif") or {}).get("V") or "").strip()
+                raw_desc = ((c.get("descriptif") or {}).get("V") or "")
+                # basic html strip for readability (keeps the text content)
+                desc = unescape(re.sub(r"<[^>]+>", " ", raw_desc)).strip()
+                desc = re.sub(r"\s+", " ", desc).strip()
                 cat_obj = (c.get("categorie") or {}).get("V") or {}
                 category = cat_obj.get("L") or ""
                 date_str = (e.get("Date") or {}).get("V") or ""
                 end_str = (e.get("DateFin") or {}).get("V") or ""
+
+                # parse times
+                start_time = ""
+                end_time = ""
+                try:
+                    if date_str:
+                        dtm = dt.datetime.strptime(date_str.split(".")[0], "%d/%m/%Y %H:%M:%S")
+                        start_time = dtm.strftime("%H:%M")
+                    if end_str:
+                        dtm2 = dt.datetime.strptime(end_str.split(".")[0], "%d/%m/%Y %H:%M:%S")
+                        end_time = dtm2.strftime("%H:%M")
+                except Exception:  # noqa: BLE001
+                    pass
+
                 lesson_n = ((e.get("cours") or {}).get("V") or {}).get("N") or ""
                 key = (date_str, subject, title)
                 if key in seen:
                     continue
                 seen.add(key)
+
+                # Parse attached documents / pièces jointes (ListePieceJointe on the contenu)
+                documents = []
+                try:
+                    pj_list = (c.get("ListePieceJointe") or {}).get("V") or []
+                    for pj in pj_list:
+                        try:
+                            if Attachment:
+                                att = Attachment(client, pj)
+                                documents.append({
+                                    "name": att.name,
+                                    "id": att.id,
+                                    "type": att.type,  # 0 = link, 1 = file
+                                    "url": att.url,
+                                    "estUnLienInterne": pj.get("estUnLienInterne", False),
+                                })
+                            else:
+                                documents.append({
+                                    "name": pj.get("L", ""),
+                                    "id": pj.get("N", ""),
+                                    "type": pj.get("G", 1),
+                                    "url": "",
+                                    "estUnLienInterne": pj.get("estUnLienInterne", False),
+                                })
+                        except Exception:  # noqa: BLE001
+                            documents.append({
+                                "name": pj.get("L", ""),
+                                "id": pj.get("N", ""),
+                                "type": pj.get("G", 1),
+                                "url": "",
+                                "estUnLienInterne": pj.get("estUnLienInterne", False),
+                            })
+                except Exception:  # noqa: BLE001
+                    pass
+
                 items.append(
                     {
                         "date": date_str,
                         "end": end_str,
+                        "date_label": _french_date_label(date_str),
+                        "start_time": start_time,
+                        "end_time": end_time,
                         "subject": subject,
                         "groups": ", ".join([g for g in groups if g]),
                         "teachers": ", ".join([p for p in profs if p]),
@@ -304,6 +410,7 @@ def _lesson_contents(client, days_back: int = 90):
                         "description": desc,
                         "category": category,
                         "lesson_id": lesson_n,
+                        "documents": documents,
                     }
                 )
         except Exception:  # noqa: BLE001
@@ -314,8 +421,183 @@ def _lesson_contents(client, days_back: int = 90):
     return items
 
 
+def _contents_via_lessons(client, days_back: int = 120, class_name: str | None = None):
+    """Alternative way to collect contents: get recent lessons and call .content on each.
+    This can surface per-lesson contenus even if the bulk cahier list is empty or not scoped.
+    Useful for some teacher accounts (professeur view).
+    If class_name is given, we fetch raw EDT to only consider lessons for that class (G=1 in ListeContenus).
+    """
+    import datetime as dt
+    import json as json_mod
+
+    today = dt.date.today()
+    from_d = today - dt.timedelta(days=days_back)
+    items = []
+    seen = set()
+
+    c_low = class_name.lower().strip() if class_name else None
+
+    try:
+        # Get raw EDT to be able to filter by class (G=1) for professeur view
+        # where parsed group_names (G=2) may not have the main class.
+        start = client.start_day
+        pu = client.parametres_utilisateur.get("dataSec", {}).get("data", {})
+        user = pu.get("ressource", {})
+        for w_offset in range(0, 20):  # limit weeks
+            d = start + dt.timedelta(weeks=w_offset)
+            if d < from_d:
+                continue
+            week = client.get_week(d)
+            data = {
+                "ressource": user,
+                "NumeroSemaine": week,
+                "numeroSemaine": week,
+                "avecCoursAnnules": True,
+            }
+            resp = client.post("PageEmploiDuTemps", 16, data)
+            l_list = resp.get("dataSec", {}).get("data", {}).get("ListeCours", [])
+            for raw in l_list:
+                # Check if matches class
+                if c_low:
+                    matches_class = False
+                    for it in raw.get("ListeContenus", {}).get("V", []):
+                        if it.get("G") == 1 and c_low in (it.get("L") or "").lower():
+                            matches_class = True
+                            break
+                    if not matches_class:
+                        continue
+                # Now try to get a live Lesson for .content (or parse minimal)
+                # For simplicity, use client.lessons around the date and match by N
+                try:
+                    date_val = raw.get("DateDuCours")
+                    if isinstance(date_val, dict):
+                        date_val = date_val.get("V")
+                    if date_val:
+                        # parse rough date
+                        day = dt.datetime.strptime(date_val.split()[0], "%d/%m/%Y").date()
+                        ls = client.lessons(day, day)
+                        for les in ls:
+                            if getattr(les, "id", None) == raw.get("N"):
+                                cont = les.content
+                                if cont:
+                                    subject = getattr(getattr(les, "subject", None), "name", "") or ""
+                                    groups = getattr(les, "group_names", []) or []
+                                    teachers = getattr(les, "teacher_names", []) or []
+                                    date_str = les.start.strftime("%d/%m/%Y %H:%M:%S") if les.start else ""
+                                    end_str = les.end.strftime("%d/%m/%Y %H:%M:%S") if les.end else ""
+                                    key = (date_str, subject, cont.title)
+                                    if key in seen:
+                                        continue
+                                    seen.add(key)
+                                    # documents from LessonContent.files (if .content succeeded)
+                                    documents = []
+                                    try:
+                                        for f in getattr(cont, "files", []) or []:
+                                            documents.append({
+                                                "name": getattr(f, "name", ""),
+                                                "id": getattr(f, "id", ""),
+                                                "type": getattr(f, "type", 0),
+                                                "url": getattr(f, "url", ""),
+                                            })
+                                    except Exception:  # noqa: BLE001
+                                        pass
+
+                                    items.append(
+                                        {
+                                            "date": date_str,
+                                            "end": end_str,
+                                            "date_label": _french_date_label(date_str),
+                                            "start_time": les.start.strftime("%H:%M") if les.start else "",
+                                            "end_time": les.end.strftime("%H:%M") if les.end else "",
+                                            "subject": subject,
+                                            "groups": ", ".join([g for g in groups if g]),
+                                            "teachers": ", ".join([t for t in teachers if t]),
+                                            "title": cont.title or "",
+                                            "description": (cont.description or "").strip(),
+                                            "category": getattr(cont, "category", "") or "",
+                                            "lesson_id": getattr(les, "id", ""),
+                                            "documents": documents,
+                                        }
+                                    )
+                                break
+                except Exception:
+                    continue
+    except Exception:  # noqa: BLE001
+        # fallback to simple lessons() without class filter
+        try:
+            lessons = client.lessons(from_d, today + dt.timedelta(days=14))
+            for les in lessons:
+                try:
+                    cont = les.content
+                    if not cont:
+                        continue
+                    subject = getattr(getattr(les, "subject", None), "name", "") or ""
+                    groups = getattr(les, "group_names", []) or []
+                    teachers = getattr(les, "teacher_names", []) or []
+                    date_str = les.start.strftime("%d/%m/%Y %H:%M:%S") if les.start else ""
+                    end_str = les.end.strftime("%d/%m/%Y %H:%M:%S") if les.end else ""
+                    key = (date_str, subject, cont.title)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    # documents from LessonContent.files
+                    documents = []
+                    try:
+                        for f in getattr(cont, "files", []) or []:
+                            documents.append({
+                                "name": getattr(f, "name", ""),
+                                "id": getattr(f, "id", ""),
+                                "type": getattr(f, "type", 0),
+                                "url": getattr(f, "url", ""),
+                            })
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                    items.append(
+                        {
+                            "date": date_str,
+                            "end": end_str,
+                            "date_label": _french_date_label(date_str),
+                            "start_time": les.start.strftime("%H:%M") if les.start else "",
+                            "end_time": les.end.strftime("%H:%M") if les.end else "",
+                            "subject": subject,
+                            "groups": ", ".join([g for g in groups if g]),
+                            "teachers": ", ".join([t for t in teachers if t]),
+                            "title": cont.title or "",
+                            "description": (cont.description or "").strip(),
+                            "category": getattr(cont, "category", "") or "",
+                            "lesson_id": getattr(les, "id", ""),
+                            "documents": documents,
+                        }
+                    )
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+    items.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return items
+
+
 def pronote_contents(payload):
-    """Get lesson contents (le contenu des cours), optionally filtered by subject and class/group."""
+    """Get lesson contents (le contenu des cours) for the logged-in account.
+    Supports filtering by:
+      - subject (partial match)
+      - class / classe / group (name match against the account's listeClasses, or against
+        the groups reported on the entries). On teacher accounts (professeur view) this will
+        try to scope the PageCahierDeTexte request to the chosen class using "ressource"
+        (and "classe") param + estCours/avecCoursAnnules to match the "Contenu de mes cours"
+        / vision classe UI. Falls back to client-side filtering (only when no server scope)
+        and also tries per-lesson .content collection.
+      - from_date / date_debut (YYYY-MM-DD or DD/MM/YYYY) to only fetch recent contents.
+    Also returns a `matieres` array (name + count) suitable for a sidebar like the one in
+    Pronote's "Contenu de mes cours" / "Vision élève" view (as in the screenshot).
+    Each content item now also includes a `documents` list (attached files + links from
+    ListePieceJointe) with name, id, type (0=link/1=file), url (ready to download or open),
+    etc.
+    Use with professor credentials + class="3D" (or "3A") should return the contents for that
+    class when published/available in your Pronote instance.
+    """
     try:
         import pronotepy
     except ImportError:
@@ -340,16 +622,49 @@ def pronote_contents(payload):
     if not getattr(client, "logged_in", False):
         return {"ok": False, "error": "Session Pronote expiree."}
 
+    # Resolve class filter to a proper Pronote classe object when possible.
+    # This is key for teacher accounts that can see multiple classes.
+    classes_raw = (
+        client.parametres_utilisateur.get("dataSec", {})
+        .get("data", {})
+        .get("listeClasses", {})
+        .get("V", [])
+    )
+    class_map = {}
+    for c in classes_raw:
+        name = (c.get("L") or "").strip()
+        if name:
+            class_map[name.upper()] = {"N": c.get("N"), "G": 1}
+
     subject = payload.get("subject")
     class_filter = payload.get("class") or payload.get("classe") or payload.get("group")
+    from_date = payload.get("from_date") or payload.get("date_debut") or payload.get("depuis")
 
-    all_contents = _lesson_contents(client)
+    classe_dict = None
+    if class_filter:
+        key = str(class_filter).strip().upper()
+        if key in class_map:
+            classe_dict = class_map[key]
+        else:
+            # fuzzy: contains match
+            for k, v in class_map.items():
+                if key in k or k in key:
+                    classe_dict = v
+                    break
+
+    all_contents = _lesson_contents(
+        client,
+        classe=classe_dict,
+        date_debut=from_date,
+    )
 
     filtered = all_contents
     if subject:
         s_low = str(subject).lower().strip()
         filtered = [c for c in filtered if s_low in c.get("subject", "").lower()]
-    if class_filter:
+    if class_filter and not classe_dict:
+        # fallback: still filter client-side on the groups/subject strings we got back
+        # (only when we could not scope server-side via classe_dict / ressource)
         c_low = str(class_filter).lower().strip()
         filtered = [
             c
@@ -357,12 +672,98 @@ def pronote_contents(payload):
             if c_low in c.get("groups", "").lower() or c_low in c.get("subject", "").lower()
         ]
 
-    # Return fresh token so caller can persist (like sync)
+    # Also try the per-lesson .content path (helps on some teacher accounts / views
+    # where the bulk ListeCahierDeTextes is empty but individual lessons have contenus).
+    via_lessons = _contents_via_lessons(client, class_name=class_filter)
+    seen_keys = {(i.get("date"), i.get("title")) for i in filtered}
+    for v in via_lessons:
+        k = (v.get("date"), v.get("title"))
+        if k not in seen_keys:
+            filtered.append(v)
+            seen_keys.add(k)
+
+    # Re-apply class filter to the merged list (important for via_lessons items)
+    # but only when no server-side classe scoping was used; otherwise the items are
+    # already class-specific (groups may be empty as class is implicit in request scope)
+    if class_filter and not classe_dict:
+        c_low = str(class_filter).lower().strip()
+        filtered = [
+            c
+            for c in filtered
+            if c_low in c.get("groups", "").lower() or c_low in c.get("subject", "").lower()
+        ]
+
+    # Build matieres summary (name + count) for a left sidebar, like Pronote's UI
+    from collections import Counter
+    counts = Counter(c.get("subject", "") for c in filtered if c.get("subject"))
+    matieres = [
+        {"name": name, "count": cnt}
+        for name, cnt in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        if name
+    ]
+
+    # Return fresh token so caller can persist (like sync) + extra context
     return {
         "ok": True,
         "username": client.username,
         "password": client.password,
+        "account_name": _account_name(client),
         "contents": filtered,
+        "matieres": matieres,
+        "classe_used": classe_dict,
+    }
+
+
+def pronote_classes(payload):
+    """Return the list of classes (listeClasses) for the logged-in prof/teacher account.
+    Used to populate dropdowns instead of free-text class names.
+    """
+    try:
+        import pronotepy
+    except ImportError:
+        return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
+
+    mode = payload.get("mode") or "qr"
+    url = payload.get("url")
+    username = payload.get("username")
+    password = payload.get("password")
+    uuid = str(payload.get("uuid", ""))
+    if not all([url, username, password]):
+        return {"ok": False, "error": "Identifiants Pronote incomplets."}
+
+    try:
+        if mode == "password":
+            client = pronotepy.Client(url, username, password)
+        else:
+            client = pronotepy.Client.token_login(url, username, password, uuid)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+
+    if not getattr(client, "logged_in", False):
+        return {"ok": False, "error": "Session Pronote expiree."}
+
+    classes_raw = (
+        client.parametres_utilisateur.get("dataSec", {})
+        .get("data", {})
+        .get("listeClasses", {})
+        .get("V", [])
+    )
+    classes = []
+    for c in classes_raw:
+        name = (c.get("L") or "").strip()
+        if name:
+            classes.append({
+                "name": name,
+                "N": c.get("N"),
+                "G": c.get("G", 1),
+            })
+
+    return {
+        "ok": True,
+        "classes": classes,
+        "account_name": _account_name(client),
+        "username": client.username,
+        "password": client.password,
     }
 
 
@@ -375,6 +776,7 @@ COMMANDS = {
     "pronote_password_login": pronote_password_login,
     "pronote_sync": pronote_sync,
     "pronote_contents": pronote_contents,
+    "pronote_classes": pronote_classes,
 }
 
 

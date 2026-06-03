@@ -26,6 +26,28 @@ interface Action {
 
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+function scoreMatch(text: string, q: string): number {
+  const t = norm(text);
+  const qq = norm(q);
+  if (!qq) return 0;
+  if (t === qq) return 100;
+  if (t.startsWith(qq)) return 90;
+  if (t.includes(qq)) return 75;
+  // subsequence match (handles partial typing + some typos/gaps)
+  let ti = 0;
+  let qi = 0;
+  while (ti < t.length && qi < qq.length) {
+    if (t[ti] === qq[qi]) {
+      qi++;
+    }
+    ti++;
+  }
+  if (qi === qq.length) return 65;
+  // very loose partial
+  if (qi >= Math.max(2, Math.floor(qq.length * 0.6))) return 40;
+  return 0;
+}
+
 export default function CommandPalette({
   open,
   onClose,
@@ -69,7 +91,7 @@ export default function CommandPalette({
       { id: "courses", label: "Cours", icon: <BookIcon className="w-4 h-4" />, run: go("courses") },
       { id: "docs", label: "Documents", icon: <DocIcon className="w-4 h-4" />, run: go("documents") },
       { id: "tools", label: "Outils & scripts", icon: <ToolIcon className="w-4 h-4" />, run: go("tools") },
-      { id: "recap", label: "Recap", icon: <SparkleIcon className="w-4 h-4" />, run: go("recap") },
+      { id: "recap", label: "Bilan", icon: <SparkleIcon className="w-4 h-4" />, run: go("recap") },
       {
         id: "board",
         label: "Nouveau tableau blanc",
@@ -134,9 +156,19 @@ export default function CommandPalette({
 
   const filtered = useMemo(() => {
     if (!query.trim()) return baseActions.slice(0, 8);
-    const q = norm(query);
-    const acts = baseActions.filter((a) => norm(a.label).includes(q) || (a.hint && norm(a.hint).includes(q)));
-    return [...acts, ...resultActions].slice(0, 16);
+    // score + rank base actions + backend results for better precision + typo tolerance
+    const scored: { a: Action; s: number }[] = [];
+    for (const a of baseActions) {
+      const s = Math.max(scoreMatch(a.label, query), a.hint ? scoreMatch(a.hint, query) : 0);
+      if (s > 0) scored.push({ a, s });
+    }
+    for (const r of resultActions) {
+      // backend results (now fuzzy on names) get a base score so they rank well
+      const s = Math.max(scoreMatch(r.label, query), r.hint ? scoreMatch(r.hint, query) : 0) || 55;
+      scored.push({ a: r, s });
+    }
+    scored.sort((x, y) => y.s - x.s);
+    return scored.slice(0, 16).map((x) => x.a);
   }, [baseActions, resultActions, query]);
 
   useEffect(() => setSel(0), [query, results]);
@@ -159,53 +191,55 @@ export default function CommandPalette({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[70] flex items-start justify-center pt-[14vh] px-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+        <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[14vh] px-6">
           <motion.div
-            className="relative w-full max-w-xl eu-card overflow-hidden"
-            initial={{ opacity: 0, scale: 0.97, y: -8 }}
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+            onClick={onClose}
+          />
+          <motion.div
+            className="relative w-full max-w-xl new-card overflow-hidden border-hairline"
+            initial={{ opacity: 0, scale: 0.97, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            exit={{ opacity: 0, scale: 0.985 }}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
           >
-            <div className="flex items-center gap-3 px-4 border-b border-eu-border">
-              <SearchIcon className="w-5 h-5 text-eu-muted shrink-0" />
+            <div className="flex items-center gap-3 px-4 border-b border-hairline">
+              <SearchIcon className="w-5 h-5 text-body-mute shrink-0" />
               <input
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKey}
                 placeholder="Rechercher partout : cours, documents, notes, actions..."
-                className="flex-1 bg-transparent py-3.5 text-[15px] outline-none placeholder:text-[#a8a8a8]"
+                className="flex-1 bg-transparent py-3.5 text-[15px] outline-none placeholder:text-body-mute"
               />
             </div>
             <div className="max-h-[46vh] overflow-y-auto p-2">
               {filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center eu-sub">Aucun resultat</p>
+                <p className="px-3 py-6 text-center text-body-mute">Aucun résultat</p>
               ) : (
                 filtered.map((a, i) => (
                   <button
                     key={a.id}
                     onClick={a.run}
                     onMouseEnter={() => setSel(i)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                      i === sel ? "bg-[#fff8e0] text-[#fa520f]" : "text-eu-text hover:bg-[#fffaeb]"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-100 active:bg-surface-container ${
+                      i === sel ? "bg-surface-container text-accent-sunset" : "text-on-surface hover:bg-surface-container/60"
                     }`}
                   >
-                    <span className={i === sel ? "text-eu-accent" : "text-eu-muted"}>{a.icon}</span>
+                    <span className={i === sel ? "text-accent-sunset" : "text-body-mute"}>{a.icon}</span>
                     <span className="flex-1 truncate text-sm font-medium">{a.label}</span>
-                    {a.hint && <span className="text-[11px] text-[#6a6a6a] shrink-0">{a.hint}</span>}
+                    {a.hint && <span className="text-[11px] text-body-mute shrink-0">{a.hint}</span>}
                   </button>
                 ))
               )}
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

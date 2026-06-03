@@ -26,6 +26,7 @@ export const BookIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z" />
     <path d="M18 19H6a2 2 0 0 0-2 2" />
+    <path d="M8 7h8M8 11h8M8 15h8" />
   </svg>
 );
 
@@ -146,6 +147,15 @@ export const FileIcon = (p: IconProps) => (
   </svg>
 );
 
+export const RefreshIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 2v6h6" />
+    <path d="M21 12A9 9 0 0 0 6 5.3L3 8" />
+    <path d="M21 22v-6h-6" />
+    <path d="M3 12a9 9 0 0 0 15 6.7l3-2.7" />
+  </svg>
+);
+
 export const CheckIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="m5 13 4 4L19 7" />
@@ -194,6 +204,13 @@ export const HelpIcon = (p: IconProps) => (
   </svg>
 );
 
+export const UserIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M5 20c0-3.5 3.5-6.5 7-6.5s7 3 7 6.5" />
+  </svg>
+);
+
 export const HighlightIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M4 20h16" />
@@ -219,5 +236,40 @@ export const UndoIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M9 7 4 12l5 5" />
     <path d="M4 12h11a5 5 0 0 1 0 10h-3" />
+  </svg>
+);
+
+export const PointerIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 3 10.5 20.5 12 12 20.5 10.5 3 3z" />
+  </svg>
+);
+
+export const FolderIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>
+);
+
+export const GlobeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10" />
+  </svg>
+);
+
+export const EyeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+export const ImageIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <path d="M21 15l-5-5L5 21" />
   </svg>
 );

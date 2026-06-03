@@ -1,10 +1,12 @@
-import { t } from "./i18n";
+import { t, get } from "./i18n";
 
-export function greeting(date = new Date()): string {
-  const h = date.getHours();
-  if (h < 12) return t.greetingMorning;
-  if (h < 18) return t.greetingAfternoon;
-  return t.greetingEvening;
+export function greeting(_date = new Date()): string {
+  // All messages live in ONE place: src/locales/fr.json (edit the "greetings" array there)
+  const pool: string[] = (t && t.greetings && Array.isArray(t.greetings) && t.greetings.length > 0)
+    ? t.greetings
+    : (get("greetings", ["Bonjour Monsieur Madrias"]) as string[]);
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx];
 }
 
 const DAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -42,7 +44,12 @@ export function humanSize(bytes: number): string {
 }
 
 export function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
+  if (!iso) return "";
+  // SQLite datetime('now') returns 'YYYY-MM-DD HH:MM:SS' in UTC.
+  // JS `new Date('2025-01-01 12:00')` treats as LOCAL => off-by-hours bug.
+  // Normalize to ISO with Z (UTC).
+  const normalized = iso.includes("T") ? iso : iso.replace(" ", "T") + "Z";
+  const then = new Date(normalized).getTime();
   if (Number.isNaN(then)) return "";
   const diff = Date.now() - then;
   const min = Math.round(diff / 60000);
@@ -52,24 +59,99 @@ export function relativeTime(iso: string): string {
   if (h < 24) return `il y a ${h} h`;
   const d = Math.round(h / 24);
   if (d < 30) return `il y a ${d} j`;
-  return new Date(iso).toLocaleDateString("fr-FR");
+  return new Date(normalized).toLocaleDateString("fr-FR");
 }
 
-export function fileKindEmoji(kind: string): string {
+export function fileKindLabel(kind: string): string {
   switch (kind) {
     case "pdf":
-      return "📄";
+      return "PDF";
     case "image":
-      return "🖼️";
+      return "IMG";
     case "whiteboard":
-      return "🖊️";
+      return "TAB";
     case "doc":
-      return "📝";
+      return "DOC";
     case "sheet":
-      return "📊";
+      return "XLS";
     case "slides":
-      return "📽️";
+      return "PPT";
     default:
-      return "📁";
+      return "FILE";
+  }
+}
+
+// Legacy emoji version removed per redesign (no emojis in UI)
+export const fileKindEmoji = (_kind: string) => "";
+
+function parseMinutes(hm: string): number {
+  const [h, m] = (hm || "00:00").split(":").map((x) => parseInt(x, 10) || 0);
+  return h * 60 + m;
+}
+
+/** Status for a schedule entry relative to now. */
+export type ClassStatus = "past" | "current" | "next" | "upcoming";
+
+export function getClassStatus(
+  entry: { start_time: string; end_time: string },
+  now: Date = new Date()
+): ClassStatus {
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const s = parseMinutes(entry.start_time);
+  const e = parseMinutes(entry.end_time);
+  if (cur >= s && cur < e) return "current";
+  if (cur < s) return "upcoming";
+  return "past";
+}
+
+/** Returns the first upcoming (or current) class index, for highlighting "next". */
+export function findNextClassIndex(classes: Array<{ start_time: string; end_time: string }>): number {
+  const now = new Date();
+  let nextIdx = -1;
+  let soonest = Infinity;
+  classes.forEach((c, i) => {
+    const s = parseMinutes(c.start_time);
+    const cur = now.getHours() * 60 + now.getMinutes();
+    if (cur < s && s < soonest) {
+      soonest = s;
+      nextIdx = i;
+    }
+  });
+  // if no upcoming, perhaps the current one as "active"
+  if (nextIdx === -1) {
+    const curIdx = classes.findIndex((c) => getClassStatus(c, now) === "current");
+    if (curIdx >= 0) nextIdx = curIdx;
+  }
+  return nextIdx;
+}
+
+/** Human label for how far a class is (for upcoming). */
+export function minutesUntil(start_time: string, now: Date = new Date()): number | null {
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const s = parseMinutes(start_time);
+  const d = s - cur;
+  return d > 0 ? d : null;
+}
+
+export function formatDueLabel(dueIso: string | null | undefined): { text: string; tone: "default" | "soon" | "over" } {
+  if (!dueIso) return { text: "", tone: "default" };
+  const d = new Date(dueIso.replace(" ", "T") + (dueIso.includes("T") ? "" : "Z"));
+  if (Number.isNaN(d.getTime())) return { text: "", tone: "default" };
+  const now = new Date();
+  const dayDiff = Math.floor((d.getTime() - now.getTime()) / (1000 * 3600 * 24));
+  if (dayDiff < 0) return { text: "en retard", tone: "over" };
+  if (dayDiff === 0) return { text: "aujourd'hui", tone: "soon" };
+  if (dayDiff === 1) return { text: "demain", tone: "soon" };
+  if (dayDiff < 7) return { text: `dans ${dayDiff}j`, tone: "default" };
+  return { text: d.toLocaleDateString("fr-FR", { month: "short", day: "numeric" }), tone: "default" };
+}
+
+export function getFaviconUrl(url: string): string | null {
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    // Google's public favicon service (works for most domains, cached, no CORS issues for <img>)
+    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=64`;
+  } catch {
+    return null;
   }
 }
