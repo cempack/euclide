@@ -165,9 +165,22 @@ jobs:
       - name: List artifacts
         run: ls -la dist-portable/ || true
 
+      - name: Determine release tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && echo "${{ github.ref }}" | grep -q '^refs/tags/'; then
+            RELEASE_TAG="${{ github.ref_name }}"
+            RELEASE_NAME="${{ github.ref_name }}"
+            echo "Real tag push: will create/update release for $RELEASE_TAG"
+          else
+            RELEASE_TAG="dev-build"
+            RELEASE_NAME="dev-build (manual)"
+            echo "Manual/dispatch run: will create/update dev-build release (replaces previous)"
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+
       - name: Delete existing release (if any) for this tag to allow replace/re-release with same tag
         run: |
-          RELEASE_TAG="${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && github.ref_name || 'dev-build' }}"
           gh release delete "$RELEASE_TAG" --yes || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -175,8 +188,8 @@ jobs:
       - name: Create GitHub Release and upload portable artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && github.ref_name || 'dev-build' }}
-          name: 'Euclide ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && github.ref_name || 'dev-build (manual)' }}'
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: 'Euclide ${{ env.RELEASE_NAME }}'
           body: 'Download the standard portable app for your platform below (no installers/setups). All builds are fully portable (USB-friendly). For manual runs this is the "dev-build" tag (replaced each time).'
           draft: true
           prerelease: ${{ github.event_name == 'workflow_dispatch' }}
