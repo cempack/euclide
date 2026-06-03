@@ -34,6 +34,24 @@ pub fn run() {
 
             // A more native feel: translucent window material behind the UI.
             if let Some(win) = app.get_webview_window("main") {
+                // Adjust size dynamically to screen/monitor resolution for a perfect aspect ratio.
+                if let Ok(Some(monitor)) = win.current_monitor() {
+                    let size = monitor.size();
+                    let scale_factor = monitor.scale_factor();
+                    let monitor_width = (size.width as f64) / scale_factor;
+                    let monitor_height = (size.height as f64) / scale_factor;
+
+                    // Goal: 80% of screen width and height, clamped to safe desktop boundaries.
+                    let target_width = (monitor_width * 0.8).clamp(1000.0, 1280.0);
+                    let target_height = (monitor_height * 0.8).clamp(680.0, 840.0);
+
+                    let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                        width: target_width,
+                        height: target_height,
+                    }));
+                    let _ = win.center();
+                }
+
                 #[cfg(target_os = "macos")]
                 {
                     // Use UnderWindowBackground for a more uniform frosted glass effect across the whole window.

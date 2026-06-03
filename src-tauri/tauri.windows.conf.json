@@ -3,8 +3,8 @@
     "windows": [
       {
         "decorations": false,
-        "width": 1360,
-        "height": 900,
+        "width": 1080,
+        "height": 720,
         "minWidth": 1000,
         "minHeight": 680,
         "center": true
