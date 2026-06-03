@@ -15,12 +15,20 @@ jobs:
       matrix:
         include:
           - platform: 'macos-13' # Intel Macs (x86_64) - standard .app (no dmg setup)
+            target: 'x86_64-apple-darwin'
+            arch: 'x86_64'
             args: '--target x86_64-apple-darwin --bundles app'
           - platform: 'macos-latest' # Apple Silicon (aarch64) - standard .app (no dmg setup)
+            target: 'aarch64-apple-darwin'
+            arch: 'aarch64'
             args: '--target aarch64-apple-darwin --bundles app'
           - platform: 'ubuntu-22.04' # Linux - portable AppImage (no deb/rpm setups)
+            target: 'x86_64-unknown-linux-gnu'
+            arch: 'x86_64'
             args: '--bundles appimage'
           - platform: 'windows-latest' # Windows - portable (no installer setups, see post-build zip)
+            target: 'x86_64-pc-windows-msvc'
+            arch: 'x86_64'
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -83,16 +91,9 @@ jobs:
         with:
           workspaces: 'src-tauri -> target'
 
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: v__VERSION__
-          releaseName: 'Euclide v__VERSION__'
-          releaseBody: 'Download the standard portable app for your platform below (no installers/setups). Extract or mount and run directly. Fully portable - ideal for USB drive. See the assets below.'
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+      # Build manually so we can control bundling (no setups on Windows, only portable/standard apps)
+      - name: Build Tauri application
+        run: npx tauri build ${{ matrix.args }}
 
       # Post-build: create portable/standard app packages (zips for easy download, no "setup" installers)
       # These are the "standard apps" that are portable (run from any folder/USB without installation).
@@ -101,17 +102,28 @@ jobs:
           mkdir -p dist-portable
           if [ "${{ runner.os }}" = "macOS" ]; then
             # macOS: zip the .app bundle (standard portable app)
-            cd src-tauri/target/release/bundle/macos
-            ARCH=$([ "${{ matrix.platform }}" = "macos-13" ] && echo "x86_64" || echo "aarch64")
-            zip -r -y ../../../dist-portable/Euclide-macos-${ARCH}-portable.zip Euclide.app
-            cd -
+            BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+            if [ -d "$BUNDLE_DIR" ]; then
+              cd "$BUNDLE_DIR"
+              # From macos/ inside target/<triple>/release/bundle/macos :
+              # 6 levels up reaches repo root where dist-portable lives
+              zip -r -y ../../../../../../dist-portable/Euclide-macos-${{ matrix.arch }}-portable.zip Euclide.app
+              cd -
+            else
+              echo "Warning: macOS bundle dir not found at $BUNDLE_DIR"
+            fi
           elif [ "${{ runner.os }}" = "Linux" ]; then
             # Linux: the AppImage is already the standard portable app (single file)
-            cp src-tauri/target/release/bundle/appimage/*.AppImage dist-portable/Euclide-linux-portable.AppImage 2>/dev/null || true
+            APPIMAGE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/appimage"
+            if [ -d "$APPIMAGE_DIR" ]; then
+              cp "$APPIMAGE_DIR"/*.AppImage dist-portable/Euclide-linux-portable.AppImage 2>/dev/null || true
+            else
+              echo "Warning: Linux appimage dir not found at $APPIMAGE_DIR"
+            fi
           else
             # Windows: create portable zip with exe + sidecar (no installer)
             mkdir -p Euclide-portable
-            cp target/release/euclide.exe Euclide-portable/ 2>/dev/null || cp target/release/Euclide.exe Euclide-portable/ 2>/dev/null || true
+            cp "target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "target/${{ matrix.target }}/release/Euclide.exe" Euclide-portable/ 2>/dev/null || true
             cp sidecar/dist/euclide-sidecar.exe Euclide-portable/ 2>/dev/null || cp src-tauri/resources/euclide-sidecar.exe Euclide-portable/ 2>/dev/null || true
             echo "Portable Euclide for Windows. Extract the folder and run euclide.exe (or Euclide.exe)." > Euclide-portable/README.txt
             echo "Data folder (Euclide-Data) will be created next to the exe for full portability on USB." >> Euclide-portable/README.txt
@@ -119,12 +131,15 @@ jobs:
           fi
         shell: bash
 
-      - name: Upload portable artifacts to release (for tag builds)
+      - name: Create GitHub Release and upload portable artifacts
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          for f in dist-portable/*; do
-            [ -f "$f" ] && gh release upload ${{ github.ref_name }} "$f" --repo ${{ github.repository }} --clobber || true
-          done
-        shell: bash
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: 'Euclide ${{ github.ref_name }}'
+          body: 'Download the standard portable app for your platform below (no installers/setups). All builds are fully portable (USB-friendly).'
+          draft: true
+          prerelease: false
+          files: dist-portable/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
