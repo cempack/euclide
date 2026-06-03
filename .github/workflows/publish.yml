@@ -25,7 +25,7 @@ jobs:
           - platform: 'ubuntu-22.04' # Linux - portable AppImage (no deb/rpm setups)
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
-            args: '--bundles appimage'
+            args: '--target x86_64-unknown-linux-gnu --bundles appimage'
           - platform: 'windows-latest' # Windows - portable (no installer setups, see post-build zip)
             target: 'x86_64-pc-windows-msvc'
             arch: 'x86_64'
@@ -120,10 +120,14 @@ jobs:
           elif [ "${{ runner.os }}" = "Linux" ]; then
             # Linux: the AppImage is already the standard portable app (single file)
             APPIMAGE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/appimage"
+            if [ ! -d "$APPIMAGE_DIR" ]; then
+              # Fallback if --target not used in build (native build puts it directly under target/release)
+              APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
+            fi
             if [ -d "$APPIMAGE_DIR" ]; then
               cp "$APPIMAGE_DIR"/*.AppImage dist-portable/Euclide-linux-portable.AppImage 2>/dev/null || true
             else
-              echo "Warning: Linux appimage dir not found at $APPIMAGE_DIR"
+              echo "Warning: Linux appimage dir not found at $APPIMAGE_DIR or fallback"
             fi
           else
             # Windows: create portable zip with exe + sidecar/ onedir bundle (no installer)
