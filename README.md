@@ -89,7 +89,6 @@ Le sidecar Python (pronotepy + pypdf) est multi-plateforme ; le binaire PyInstal
 
 Push a tag `vX.Y.Z` (or use "Run workflow" in Actions) to automatically build on GitHub-hosted runners:
 
-- macOS Intel (macos-13) → x86_64 portable .app (zipped)
 - macOS Apple Silicon (macos-latest) → aarch64 portable .app (zipped)
 - Linux (ubuntu-22.04) → portable AppImage (standard portable app)
 - Windows → portable zip (euclide.exe + sidecar.exe + README; no installers/setups)

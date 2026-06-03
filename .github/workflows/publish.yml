@@ -12,10 +12,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-13' # Intel Macs (x86_64) - standard .app (no dmg setup)
-            target: 'x86_64-apple-darwin'
-            arch: 'x86_64'
-            args: '--target x86_64-apple-darwin --bundles app'
           - platform: 'macos-latest' # Apple Silicon (aarch64) - standard .app (no dmg setup)
             target: 'aarch64-apple-darwin'
             arch: 'aarch64'
@@ -82,7 +78,7 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ (matrix.platform == 'macos-latest' || matrix.platform == 'macos-13') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -95,11 +91,12 @@ jobs:
 
       # Post-build: create portable/standard app packages (zips for easy download, no "setup" installers)
       # These are the "standard apps" that are portable (run from any folder/USB without installation).
+      # Only Apple Silicon macOS is built (remove non-ARM macOS).
       - name: Package portable/standard apps
         run: |
           mkdir -p dist-portable
           if [ "${{ runner.os }}" = "macOS" ]; then
-            # macOS: zip the .app bundle (standard portable app)
+            # macOS (Apple Silicon / aarch64 only): zip the .app bundle (standard portable app)
             BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/macos"
             if [ -d "$BUNDLE_DIR" ]; then
               cd "$BUNDLE_DIR"
