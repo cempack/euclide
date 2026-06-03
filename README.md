@@ -71,7 +71,7 @@ EUCLIDE_PYTHON="$(pwd)/sidecar/.venv/bin/python" npm run app
 
 ## Sidecar Python
 
-En développement, Euclide utilise le Python du système (ou un venv pointé via `EUCLIDE_PYTHON`). Pour la distribution, on fige le sidecar en un seul binaire (aucun Python requis sur les PC de l'école) :
+En développement, Euclide utilise le Python du système (ou un venv pointé via `EUCLIDE_PYTHON`). Pour la distribution, on fige le sidecar en un bundle onedir (dossier `euclide-sidecar/`) pour un démarrage rapide sans extraction répétée à chaque appel Python (Pronote, scripts, etc.). Aucun Python système requis sur les PC de l'école.
 
 ```bash
 # macOS / Linux
@@ -81,7 +81,7 @@ bash sidecar/build_sidecar.sh
 .\sidecar\build_sidecar.ps1
 ```
 
-Le binaire (`euclide-sidecar` ou `.exe`) produit doit être placé à côté de l'exécutable Euclide (ou dans les ressources de l'app avant `npm run app:build`). Euclide le détecte automatiquement ; sinon il retombe sur le Python du système (python / python3). 
+Le dossier `euclide-sidecar/` (ou l'ancien binaire plat) produit doit être placé à côté de l'exécutable Euclide (ou dans les ressources de l'app avant `npm run app:build`). Euclide le détecte automatiquement (cherche le launcher à l'intérieur du dossier onedir pour un démarrage rapide) ; sinon il retombe sur le Python du système (python / python3). 
 
 Le sidecar Python (pronotepy + pypdf) est multi-plateforme ; le binaire PyInstaller doit être produit **sur la plateforme cible**.
 
@@ -91,12 +91,12 @@ Push a tag `vX.Y.Z` (or use "Run workflow" in Actions) to automatically build on
 
 - macOS Apple Silicon (macos-latest) → aarch64 portable .app (zipped)
 - Linux (ubuntu-22.04) → portable AppImage (standard portable app)
-- Windows → portable zip (euclide.exe + sidecar.exe + README; no installers/setups)
+- Windows → portable zip (euclide.exe + euclide-sidecar/ onedir folder + README; no installers/setups)
 
 All builds are "standard apps" (not "setups"/installers) and fully portable (extract/run from USB or any folder; data goes in Euclide-Data/ next to the executable).
 
 The workflow:
-- Builds the platform-specific Python sidecar binary (via PyInstaller) and bundles it.
+- Builds the platform-specific Python sidecar as onedir bundle (via PyInstaller --onedir --noconsole for no console window + fast startup) and bundles the folder.
 - Runs `tauri build` (with --bundles limited to app/appimage to avoid setups) + custom post-packaging for portable zips.
 - Creates a draft GitHub Release with the portable artifacts.
 

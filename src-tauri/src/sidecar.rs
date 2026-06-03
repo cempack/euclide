@@ -2,6 +2,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use tauri::{AppHandle, Manager};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 /// Calls the Python sidecar with a command name and a JSON payload, returning
 /// the parsed JSON response. Prefers a bundled PyInstaller binary; in dev it
 /// falls back to running the sidecar script with system Python.
@@ -14,8 +17,18 @@ pub fn run(
     args.push(command.to_string());
     args.push(payload.to_string());
 
-    let output = Command::new(&program)
-        .args(&args)
+    let mut cmd = Command::new(&program);
+    cmd.args(&args);
+
+    // On Windows, prevent the child (even if console subsystem or python.exe) from
+    // popping a visible cmd window when the main Tauri app (GUI subsystem) spawns it.
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd
         .output()
         .map_err(|e| format!("Sidecar Python introuvable ({program}) : {e}"))?;
 
@@ -53,10 +66,10 @@ pub async fn run_async(
         .map_err(|join_err| format!("Erreur d'exécution sidecar (spawn_blocking): {join_err}"))?
 }
 
-/// Returns (program, leading_args). For a frozen binary leading_args is empty;
+/// Returns (program, leading_args). For a frozen binary (onefile or onedir) leading_args is empty;
 /// for the dev fallback it is `[script_path]` run through a Python interpreter.
 fn resolve(app: &AppHandle) -> Result<(String, Vec<String>), String> {
-    // 1. Bundled PyInstaller binary next to the exe or in the resource dir.
+    // 1. Bundled PyInstaller binary (flat or onedir/) next to the exe or in the resource dir.
     if let Some(bin) = frozen_binary(app) {
         return Ok((bin.to_string_lossy().to_string(), vec![]));
     }
@@ -102,13 +115,21 @@ fn dev_python(script: &PathBuf) -> String {
 
 fn frozen_binary(app: &AppHandle) -> Option<PathBuf> {
     let name = if cfg!(windows) { "euclide-sidecar.exe" } else { "euclide-sidecar" };
+    let onedir = "euclide-sidecar"; // layout from `pyinstaller --onedir --name euclide-sidecar`
     let mut candidates: Vec<PathBuf> = vec![];
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
+            // onedir layout first (recommended: fast startup, no repeated extraction)
+            candidates.push(dir.join(onedir).join(name));
+            // legacy flat file (next to main exe)
             candidates.push(dir.join(name));
         }
     }
     if let Ok(res) = app.path().resource_dir() {
+        // onedir inside the bundle resources first
+        candidates.push(res.join(onedir).join(name));
+        candidates.push(res.join("resources").join(onedir).join(name));
+        // flat in resources root or resources/resources/
         candidates.push(res.join(name));
         candidates.push(res.join("resources").join(name));
     }

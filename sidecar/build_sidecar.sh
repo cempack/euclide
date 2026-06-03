@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Builds the Euclide Python sidecar into a single standalone executable so school
-# machines never need a system Python install.
+# Builds the Euclide Python sidecar as a onedir bundle (fast startup, no per-run extract)
+# so school machines never need a system Python install.
 #
-# Output: a `euclide-sidecar` (or `euclide-sidecar.exe` on Windows) binary that is placed
+# Output: a `euclide-sidecar/` directory (containing the launcher + libs) that is placed
 # next to the Tauri executable / inside the app resources at bundle time.
+# --noconsole prevents terminal windows on Windows/mac when spawned from the GUI.
 #
 # Uses a temporary venv to avoid polluting system Python (important on macOS with Homebrew).
 set -euo pipefail
@@ -27,7 +28,8 @@ python -m pip install -r "$HERE/requirements.txt" pyinstaller
 
 echo "Running PyInstaller..."
 python -m PyInstaller \
-  --onefile \
+  --onedir \
+  --noconsole \
   --name euclide-sidecar \
   --distpath "$OUT" \
   --workpath "$BUILD_DIR" \
@@ -37,6 +39,6 @@ python -m PyInstaller \
 deactivate || true
 
 echo ""
-echo "Sidecar construit : $OUT/euclide-sidecar"
-echo "Copiez-le a cote de l'executable Euclide (ou dans les ressources) avant la distribution."
+echo "Sidecar construit : $OUT/euclide-sidecar/ (dossier)"
+echo "Copiez le dossier euclide-sidecar a cote de l'executable Euclide (ou dans les ressources) avant la distribution."
 echo "Le binaire est pour la plateforme courante (macOS dans ce cas)."

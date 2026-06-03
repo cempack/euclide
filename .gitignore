@@ -18,9 +18,10 @@ sidecar/.venv/
 __pycache__/
 *.pyc
 
-# do not commit platform-specific sidecar binaries (built in CI per platform, copied to resources during build)
+# do not commit platform-specific sidecar binaries / onedir bundles (built in CI per platform, copied to resources during build)
 src-tauri/resources/euclide-sidecar
 src-tauri/resources/euclide-sidecar.exe
+src-tauri/resources/euclide-sidecar/
 
 # os / editor
 .DS_Store

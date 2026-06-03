@@ -1,6 +1,7 @@
-# Builds the Euclide Python sidecar into a single standalone executable (Windows).
-# Requires Python + pip. Output placed in sidecar/dist/euclide-sidecar.exe
-# Then copy next to Euclide.exe (or into resources before tauri build).
+# Builds the Euclide Python sidecar into a onedir bundle (Windows) for fast startup.
+# Output: sidecar/dist/euclide-sidecar/ (dir containing euclide-sidecar.exe + support files)
+# Use --noconsole so no cmd window pops when spawned from the GUI app.
+# Then copy the euclide-sidecar/ dir next to Euclide.exe (or into resources).
 $ErrorActionPreference = "Stop"
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -11,7 +12,8 @@ python -m pip install --upgrade pip
 python -m pip install -r (Join-Path $here "requirements.txt") pyinstaller
 
 python -m PyInstaller `
-  --onefile `
+  --onedir `
+  --noconsole `
   --name euclide-sidecar `
   --distpath $out `
   --workpath (Join-Path $here "build") `

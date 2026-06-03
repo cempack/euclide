@@ -72,10 +72,14 @@ jobs:
       - name: copy sidecar binary into tauri resources
         run: |
           mkdir -p src-tauri/resources
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            cp -f sidecar/dist/euclide-sidecar.exe src-tauri/resources/ 2>/dev/null || true
-          else
-            cp -f sidecar/dist/euclide-sidecar src-tauri/resources/ 2>/dev/null || true
+          # Remove any legacy flat sidecar or conflicting name first (can't have file and dir of same name)
+          rm -rf src-tauri/resources/euclide-sidecar src-tauri/resources/euclide-sidecar.exe 2>/dev/null || true
+          # Copy the onedir bundle (euclide-sidecar/ dir containing the launcher + support files).
+          # This layout gives much faster startup than --onefile (no repeated temp extraction).
+          cp -rf sidecar/dist/euclide-sidecar src-tauri/resources/ 2>/dev/null || true
+          # Ensure the launcher inside the onedir bundle is executable (important on macOS/Linux after bundle copy)
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod +x src-tauri/resources/euclide-sidecar/euclide-sidecar 2>/dev/null || true
           fi
           # Remove the .py source from the bundle (binary takes precedence at runtime; .py stays in git for dev)
           rm -f src-tauri/resources/euclide_sidecar.py || true
@@ -122,11 +126,13 @@ jobs:
               echo "Warning: Linux appimage dir not found at $APPIMAGE_DIR"
             fi
           else
-            # Windows: create portable zip with exe + sidecar (no installer)
+            # Windows: create portable zip with exe + sidecar/ onedir bundle (no installer)
             mkdir -p Euclide-portable
             cp "src-tauri/target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/${{ matrix.target }}/release/Euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/Euclide.exe" Euclide-portable/ 2>/dev/null || true
-            cp sidecar/dist/euclide-sidecar.exe Euclide-portable/ 2>/dev/null || cp src-tauri/resources/euclide-sidecar.exe Euclide-portable/ 2>/dev/null || true
+            # Copy the whole onedir folder (euclide-sidecar/ with .exe + support files for fast startup, no console)
+            cp -r sidecar/dist/euclide-sidecar Euclide-portable/ 2>/dev/null || cp -r src-tauri/resources/euclide-sidecar Euclide-portable/ 2>/dev/null || true
             echo "Portable Euclide for Windows. Extract the folder and run euclide.exe (or Euclide.exe)." > Euclide-portable/README.txt
+            echo "The euclide-sidecar/ folder next to the exe is the Python sidecar (required; do not delete)." >> Euclide-portable/README.txt
             echo "Data folder (Euclide-Data) will be created next to the exe for full portability on USB." >> Euclide-portable/README.txt
             powershell -Command "Compress-Archive -Path 'Euclide-portable/*' -DestinationPath 'dist-portable/Euclide-windows-portable.zip' -Force"
           fi
