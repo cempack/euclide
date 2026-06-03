@@ -1,11 +1,15 @@
 import { t, get } from "./i18n";
 
-export function greeting(_date = new Date()): string {
-  // All messages live in ONE place: src/locales/fr.json (edit the "greetings" array there)
+export function greeting(date = new Date()): string {
+  // All messages live in ONE place: src/locales/strings.json (edit the "greetings" array there).
+  // Picks a stable greeting for the day (different days get different ones from the pool).
   const pool: string[] = (t && t.greetings && Array.isArray(t.greetings) && t.greetings.length > 0)
     ? t.greetings
     : (get("greetings", ["Bonjour Monsieur Madrias"]) as string[]);
-  const idx = Math.floor(Math.random() * pool.length);
+  if (pool.length === 0) return "Bonjour";
+  // Deterministic index based on date so it doesn't change on re-renders or within the day.
+  const seed = date.getDate() + (date.getMonth() * 31) + (date.getFullYear() % 100 * 400);
+  const idx = seed % pool.length;
   return pool[idx];
 }
 
@@ -62,12 +66,14 @@ export function relativeTime(iso: string): string {
   return new Date(normalized).toLocaleDateString("fr-FR");
 }
 
+// Text label (e.g. "PDF", "TAB") – fine for meta text; not used as visual icon glyph.
 export function fileKindLabel(kind: string): string {
   switch (kind) {
     case "pdf":
       return "PDF";
     case "image":
       return "IMG";
+    case "board":
     case "whiteboard":
       return "TAB";
     case "doc":
@@ -81,8 +87,11 @@ export function fileKindLabel(kind: string): string {
   }
 }
 
-// Legacy emoji version removed per redesign (no emojis in UI)
-export const fileKindEmoji = (_kind: string) => "";
+// Returns a kind key for compatibility. Visual icons are now provided by
+// the FileKindIcon component in components/icons.tsx (proper SVGs, no emojis).
+export function fileKindIcon(kind: string): string {
+  return kind || "file";
+}
 
 function parseMinutes(hm: string): number {
   const [h, m] = (hm || "00:00").split(":").map((x) => parseInt(x, 10) || 0);

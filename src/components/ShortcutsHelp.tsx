@@ -1,9 +1,10 @@
 import { Modal } from "./ui";
 import { SHORTCUTS } from "../lib/shortcuts";
+import { get } from "../lib/i18n";
 
 export default function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Raccourcis clavier" width="max-w-lg">
+    <Modal open={open} onClose={onClose} title={get("app.shortcutsTitle", "Raccourcis")} width="max-w-lg">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {SHORTCUTS.map((group) => (
           <div key={group.group}>
@@ -26,7 +27,7 @@ export default function ShortcutsHelp({ open, onClose }: { open: boolean; onClos
         ))}
       </div>
       <p className="text-body-mute mt-5 text-center text-[12px]">
-        Astuce : ouvrez la palette avec la touche de commande puis tapez ce que vous cherchez.
+        {get("shortcuts.tip", "Ouvrez la palette (⌘K) et tapez.")}
       </p>
     </Modal>
   );

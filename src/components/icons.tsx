@@ -211,20 +211,6 @@ export const UserIcon = (p: IconProps) => (
   </svg>
 );
 
-export const HighlightIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M4 20h16" />
-    <path d="M6 16l8-8 4 4-8 8H6z" />
-    <path d="M12 6l4 4" />
-  </svg>
-);
-
-export const TextIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M5 6h14M12 6v13M9 19h6" />
-  </svg>
-);
-
 export const DownloadIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M12 4v11M8 11l4 4 4-4" />
@@ -242,12 +228,6 @@ export const UndoIcon = (p: IconProps) => (
 export const PointerIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M3 3 10.5 20.5 12 12 20.5 10.5 3 3z" />
-  </svg>
-);
-
-export const FolderIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
   </svg>
 );
 
@@ -273,3 +253,89 @@ export const ImageIcon = (p: IconProps) => (
     <path d="M21 15l-5-5L5 21" />
   </svg>
 );
+
+export const CalendarIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  </svg>
+);
+
+export const CheckCircleIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+export const ScheduleIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 6v6l4 2" />
+  </svg>
+);
+
+export const FolderIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>
+);
+
+export const GridIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+
+export const DescriptionIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M14 3v5h5" />
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+  </svg>
+);
+
+// Whiteboard tool icons (simple, recognizable, consistent stroke style, no emojis)
+export const EraserIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="4" y="9" width="12" height="8" rx="1" />
+    <path d="M16 9 L20 5" />
+  </svg>
+);
+
+export const LineIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 19 L19 5" />
+  </svg>
+);
+
+export const RectIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="5" y="6" width="14" height="12" rx="2" />
+  </svg>
+);
+
+export const EllipseIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <ellipse cx="12" cy="12" rx="8" ry="5.5" />
+  </svg>
+);
+
+export const TextIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M7 7 h10" />
+    <path d="M12 7 v10" />
+  </svg>
+);
+
+// Mapper for file kind icons in lists (Documents, Dashboard recents, etc.)
+// Uses existing custom icons for consistency; no emojis, no material.
+export function FileKindIcon({ kind, className = "w-5 h-5" }: { kind: string; className?: string }) {
+  const cn = className;
+  if (kind === "image") return <ImageIcon className={cn} />;
+  if (kind === "board" || kind === "whiteboard") return <PenIcon className={cn} />;
+  // pdf, doc, sheet, slides, generic file, etc.
+  return <DocIcon className={cn} />;
+}

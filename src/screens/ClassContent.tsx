@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useTabs } from "../lib/tabs";
-import { api } from "../lib/api";
+import { api, isTauri } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
+import { get } from "../lib/i18n";
 import { ArrowRightIcon, BookIcon, DocIcon, RefreshIcon } from "../components/icons";
 
 interface ContentItem {
@@ -19,9 +20,7 @@ interface ContentItem {
   documents?: Array<{ name: string; id?: string; type?: number; url?: string; estUnLienInterne?: boolean }>;
 }
 
-// Module-level TTL cache for Pronote lesson contents per (course, class, matiere) key.
-// Makes opening "contenu du cours" instant on repeat visits (within TTL) and avoids
-// repeated expensive sidecar + full Pronote login + fetch.
+// TTL cache for Pronote lesson contents (per course/class/matiere) to avoid repeated sidecar fetches.
 const contentCache = new Map<string, { data: ContentItem[]; ts: number }>();
 const CONTENT_CACHE_TTL = 10 * 60 * 1000;
 
@@ -46,6 +45,7 @@ export default function ClassContent({
 
   const subjectForPronote = (m: string) => {
     const lower = (m || "").toLowerCase();
+    if (lower.includes("experte")) return "MATHÉMATIQUES EXPERTES";
     if (lower.includes("math")) return "MATHÉMATIQUES";
     if (lower.includes("nsi") || lower.includes("informatique") || lower.includes("numérique")) return "INFORM";  // robust substring for "NUMERIQUE SC.INFORM." etc.
     return m || ""; // fallback, partial match will try
@@ -70,7 +70,7 @@ export default function ClassContent({
 
     const noMatiere = !c?.matiere && !matiere;
     if (noMatiere) {
-      setError("Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques ou NSI.");
+      setError("Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes.");
       setContents([]);
       setLoading(false);
       setIsRefreshing(false);
@@ -103,8 +103,7 @@ export default function ClassContent({
       const subject = subjectForPronote(effectiveMatiere);
 
       // Do not pass fromDate here: let the sidecar use its default (120 days back relative to the
-      // Pronote client's internal "today"/calendar). This ensures we hit recent data both for real
-      // Pronote instances (current school dates) and for the demo creds (whose seeded data lives
+      // Pronote "today"/calendar). Ensures recent data for real + demo instances.
       // in 2025-2026 periods relative to the demo's "now"). The returned list is already newest-first.
       const res = await api.pronoteContents(subject, className);
       if (!res?.ok) {
@@ -113,15 +112,14 @@ export default function ClassContent({
       let items: ContentItem[] = res.contents || [];
       // Ensure sorted newest first (already done in sidecar but defensive)
       items = [...items].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-      // Cap to a reasonable number of most recent entries (the sidecar already limits the
-      // window relative to Pronote's calendar; "7 derniers" spirit is the newest ones).
+      // Cap to recent entries.
       items = items.slice(0, 30);
       setContents(items);
       const rt = new Date();
       setLastRefresh(rt);
       contentCache.set(cacheKey, { data: items, ts: rt.getTime() });
       if (items.length === 0) {
-        toast("Aucun contenu Pronote trouvé pour cette classe/matière.", "success");
+        toast(get("classContent.noPronoteContent", "Aucun contenu Pronote trouvé pour cette classe/matière."), "success");
       }
     } catch (e: any) {
       setError(e?.message || "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof).");
@@ -146,9 +144,9 @@ export default function ClassContent({
   const copyUrl = (url?: string) => {
     if (!url) return;
     navigator.clipboard?.writeText(url).then(() => {
-      toast("Lien copié dans le presse-papiers", "success");
+      toast(get("classContent.linkCopied", "Lien copié dans le presse-papiers"), "success");
     }).catch(() => {
-      toast("Lien: " + url, "success");
+      toast(get("classContent.linkFallback", "Lien : {url}").replace("{url}", url), "success");
     });
   };
 
@@ -173,13 +171,13 @@ export default function ClassContent({
         }}
         className="text-mute flex items-center gap-1.5 hover:text-primary transition-colors w-fit"
       >
-        <ArrowRightIcon className="w-4 h-4 rotate-180" /> Retour au cours
+        <ArrowRightIcon className="w-4 h-4 rotate-180" /> {get("classContent.back", "Retour au cours")}
       </button>
 
       <header className="flex items-center justify-between">
         <div>
           <h1 className="font-display-sm text-display-sm tracking-tight text-primary">
-            Contenu du cours — {className}
+            {get("classContent.title", "Contenu — {class}").replace("{class}", className)}
           </h1>
         </div>
         <button
@@ -280,7 +278,24 @@ export default function ClassContent({
                             className="flex items-center gap-1.5 text-xs bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)] rounded px-2 py-1 max-w-full"
                           >
                             <DocIcon className="w-3.5 h-3.5 text-mute shrink-0" />
-                            <span className="truncate font-medium max-w-[220px]">{d.name}</span>
+                            {d.url ? (
+                              <button
+                                onClick={() => {
+                                  if (!d.url) return;
+                                  api.openUrl(d.url).catch(() => {});
+                                  if (!isTauri()) {
+                                    // fallback to open in browser when running in plain Vite dev (no Tauri)
+                                    window.open(d.url, '_blank');
+                                  }
+                                }}
+                                className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-primary focus:outline-none"
+                                title="Ouvrir dans le navigateur"
+                              >
+                                {d.name}
+                              </button>
+                            ) : (
+                              <span className="truncate font-medium max-w-[220px]">{d.name}</span>
+                            )}
                             {d.url && (
                               <button
                                 onClick={() => copyUrl(d.url)}

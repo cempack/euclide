@@ -25,6 +25,7 @@ import {
   Pencil,
   Ruler,
 } from "lucide-react";
+import { CheckCircleIcon, XIcon } from "./icons";
 
 // ---------------------------------------------------------------------------
 // ErrorBoundary — critical for Tauri transparent/vibrancy windows.
@@ -94,7 +95,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: R
                 {err?.stack || ""}
               </pre>
               <div style={{ marginTop: 12, fontSize: 11, opacity: 0.6 }}>
-                Check console (or window.__EUCLIDE_LAST_ERROR__) for full details. Fix the key/path in src/locales/fr.json or the access site.
+                Check console (or window.__EUCLIDE_LAST_ERROR__) for full details. Fix the key/path in src/locales/strings.json or the access site.
               </div>
             </div>
           </div>
@@ -174,29 +175,46 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
 
+  const dismiss = useCallback((id: number) => {
+    setToasts((t) => t.filter((x) => x.id !== id));
+  }, []);
+
   return (
     <ToastCtx.Provider value={push}>
       {children}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center">
         <AnimatePresence>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: 10, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 6, scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 420, damping: 28 }}
-              className={`new-card px-4 py-2.5 text-sm ${
-                toast.tone === "error"
-                  ? "text-tui-danger border-l-2 border-tui-danger"
-                  : toast.tone === "success"
-                  ? "text-tui-success border-l-2 border-tui-success"
-                  : "text-on-surface"
-              }`}
-            >
-              {toast.message}
-            </motion.div>
-          ))}
+          {toasts.map((toast) => {
+            const toneClass =
+              toast.tone === "error"
+                ? "text-tui-danger border-l-2 border-tui-danger"
+                : toast.tone === "success"
+                ? "text-tui-success border-l-2 border-tui-success"
+                : "text-on-surface";
+            const Icon =
+              toast.tone === "success" ? (
+                <CheckCircleIcon className="w-4 h-4 mt-0.5 shrink-0" />
+              ) : toast.tone === "error" ? (
+                <XIcon className="w-4 h-4 mt-0.5 shrink-0" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-current mt-1.5 shrink-0 opacity-60" />
+              );
+            return (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                onClick={() => dismiss(toast.id)}
+                className={`new-card px-3 py-2 text-sm flex items-start gap-2 cursor-pointer max-w-[min(92vw,380px)] ${toneClass}`}
+                title="Cliquer pour fermer"
+              >
+                {Icon}
+                <span className="break-words">{toast.message}</span>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </ToastCtx.Provider>
@@ -284,12 +302,9 @@ export const COURSE_ICONS: Array<{ key: string; label: string; Icon: React.Compo
   { key: "dumbbell", label: "EPS / Sport", Icon: Dumbbell },
 ];
 
-// Legacy (kept for compat)
-export const COURSE_EMOJIS: string[] = [];
-
 // ---------------------------------------------------------------------------
 /** Nice reusable loading indicator with smooth animation.
- *  Use everywhere we wait for data (courses, cours detail, contenu, recap, etc).
+ *  Use everywhere we wait for data (courses, cours detail, contenu, etc).
  *  Prevents "freeze" feel by being lightweight + lets parent keep interactive chrome (tabs, sidebar, drag).
  */
 export function Loading({ label = "Chargement…", size = "default" }: { label?: string; size?: "default" | "small" }) {

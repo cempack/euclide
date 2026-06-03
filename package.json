@@ -16,7 +16,6 @@
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
-    "@tauri-apps/plugin-notification": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.5",
     "framer-motion": "^11.15.0",
     "jspdf": "^2.5.2",

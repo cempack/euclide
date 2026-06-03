@@ -10,8 +10,6 @@
   --eu-border: 15 0 0 / 0.12; /* hairline */
   --eu-text: 26 28 28; /* on-surface */
   --eu-muted: 100 98 98; /* mute / ash */
-  --eu-accent: 0 122 255; /* tui-accent */
-  --eu-accent-soft: 230 240 255;
   --eu-hairline: 15 0 0 / 0.12;
   --eu-hairline-strong: 100 98 98;
   --eu-primary: 5 4 4;
@@ -22,25 +20,6 @@
   --eu-tui-danger: 255 59 48;
 }
 
-.dark {
-  /* Inverted terminal dark for dark mode - high contrast, still flat, using inverse tokens */
-  --eu-bg: 47 49 49;
-  --eu-surface: 47 49 49;
-  --eu-card: 63 65 65;
-  --eu-border: 208 196 195 / 0.4;
-  --eu-text: 241 240 240;
-  --eu-muted: 154 152 152;
-  --eu-accent: 64 156 255;
-  --eu-accent-soft: 30 45 70;
-  --eu-hairline: 255 255 255 / 0.12;
-  --eu-hairline-strong: 154 152 152;
-  --eu-primary: 232 225 224;
-  --eu-primary-container: 32 29 29;
-  --eu-surface-soft: 55 57 57;
-  --eu-surface-container: 70 72 72;
-  --eu-tui-success: 48 209 88;
-  --eu-tui-danger: 255 105 97;
-}
 
 * {
   -webkit-font-smoothing: antialiased;
@@ -65,14 +44,35 @@ body {
 
 /* On macOS we keep the content readable (mostly opaque) and let only the
    sidebar/topbar reveal the native vibrancy for a subtle frosted feel. */
-.has-vibrancy body {
-  background-color: rgb(var(--eu-bg) / 0.92);
+.has-vibrancy html,
+.has-vibrancy body,
+.has-vibrancy #root {
+  background: transparent !important;
+}
+.has-vibrancy .eu-root {
+  background-color: rgb(var(--eu-bg) / 0.65) !important;
+}
+.has-vibrancy .eu-root {
+  background-color: rgb(var(--eu-bg) / 0.55) !important;
 }
 .has-vibrancy .eu-sidebar {
-  background-color: rgb(var(--eu-surface) / 0.55) !important;
+  background-color: rgb(var(--eu-surface) / 0.4) !important;
 }
 .has-vibrancy .eu-topbar {
-  background-color: rgb(var(--eu-bg) / 0.45) !important;
+  background-color: rgb(var(--eu-bg) / 0.3) !important;
+}
+.has-vibrancy main,
+.has-vibrancy .eu-main,
+.has-vibrancy .flex-1.min-h-0 {
+  background-color: rgb(var(--eu-bg) / 0.65) !important;
+}
+.has-vibrancy .eu-card,
+.has-vibrancy .new-card,
+.has-vibrancy .stat-card {
+  background-color: rgb(var(--eu-card) / 0.5) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
 }
 
 /* Hide scrollbar on the tab strip for a clean, modern tab bar look (still fully scrollable with trackpad/mouse) */
@@ -90,6 +90,8 @@ textarea,
 .selectable {
   user-select: text;
   cursor: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 /* draggable window region for the hidden/overlay titlebar */
@@ -123,11 +125,11 @@ textarea,
 @layer components {
   /* Terminal / brutalist flat aesthetic - sharp containers, 4px interactive affordance, hairlines, mono rhythm */
   .eu-card {
-    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp, no shadow */
+    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none eu-no-drag; /* sharp, no shadow */
   }
   .eu-btn {
     @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium font-mono
-      transition-all duration-100 active:scale-[0.985] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--eu-accent)] disabled:opacity-50 disabled:pointer-events-none eu-no-drag;
+      transition-all duration-100 active:scale-[0.985] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)] disabled:opacity-50 disabled:pointer-events-none eu-no-drag;
   }
   .eu-btn-primary {
     @apply eu-btn bg-[var(--eu-primary)] text-white border border-[var(--eu-primary)] hover:brightness-95;
@@ -136,11 +138,11 @@ textarea,
     @apply eu-btn text-[var(--eu-text)] hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)];
   }
   .eu-btn-soft {
-    @apply eu-btn bg-[var(--eu-accent-soft)] text-[var(--eu-accent)] border border-[var(--eu-accent)]/30 hover:brightness-105;
+    @apply eu-btn bg-[rgb(230,240,255)] text-[rgb(0,122,255)] border border-[rgb(0,122,255)]/30 hover:brightness-105;
   }
   .eu-input {
     @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
-      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--eu-accent)] focus:border-[var(--eu-accent)]
+      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[rgb(0,122,255)] focus:border-[rgb(0,122,255)]
       transition-all;
   }
   .eu-chip {
@@ -157,17 +159,17 @@ textarea,
       bg-[var(--eu-surface)] text-[11px] font-medium font-mono text-[var(--eu-muted)];
   }
 
-  /* "new-*" styles updated for OpenCode Terminal-Aesthetic (flat, hairline, mono, [brackets] affordance in content) */
+  /* "new-*" styles for the terminal aesthetic (flat, hairline, mono). Fixed light + fixed accent. */
   .new-card {
     @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp containers */
   }
   .stat-card {
-    @apply rounded-none bg-[#f1eeee] border border-[rgba(15,0,0,0.12)] p-6 flex gap-4 items-center; /* mock-style soft tint */
+    @apply rounded-none bg-[#f1eeee] border border-[rgba(15,0,0,0.12)] p-6 flex gap-4 items-center eu-no-drag; /* mock-style soft tint */
   }
   .new-btn {
     @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
       border border-[rgba(15,0,0,0.12)] bg-[#f1eeee] text-primary hover:bg-[var(--eu-surface-soft)]
-      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--eu-accent)];
+      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
   }
   .new-btn-primary {
     @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
@@ -177,18 +179,21 @@ textarea,
   .new-btn-ghost {
     @apply inline-flex items-center gap-2 rounded px-3 py-1 text-sm font-medium font-mono
       text-primary hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)]
-      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--eu-accent)];
+      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
   }
   .new-input {
     @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
-      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--eu-accent)] focus:border-[var(--eu-accent)]
-      transition-all;
+      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[rgb(0,122,255)] focus:border-[rgb(0,122,255)]
+      transition-all eu-no-drag;
   }
   .new-segment {
     @apply inline-flex rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface)] p-1;
   }
   .new-segment .active {
     @apply bg-primary text-white border-primary;
+  }
+  .new-chip {
+    @apply inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium font-mono border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)];
   }
 
   /* Terminal chrome helpers for dashboard/widgets */
@@ -216,5 +221,178 @@ textarea,
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Python IDE-like styling */
+.python-ide-frame {
+  border: 1px solid rgba(15, 0, 0, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--eu-surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.python-explorer {
+  width: 205px;
+  border-right: 1px solid rgba(15, 0, 0, 0.12);
+  background: var(--eu-surface);
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.python-explorer-header {
+  padding: 4px 10px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--eu-muted);
+  border-bottom: 1px solid rgba(15, 0, 0, 0.12);
+  font-family: ui-monospace, monospace;
+}
+
+.python-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  margin: 1px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+  position: relative;
+}
+
+.python-file-row:hover {
+  background: var(--eu-surface-soft);
+}
+
+.python-file-row.selected {
+  background: var(--eu-surface-container);
+  color: var(--eu-accent);
+}
+
+.python-file-row .accent {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--eu-accent);
+  border-radius: 0 2px 2px 0;
+}
+
+.python-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(15, 0, 0, 0.12);
+  background: var(--eu-surface);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.python-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  background: var(--eu-bg);
+  border: 1px solid rgba(15, 0, 0, 0.12);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  position: relative;
+}
+
+.python-tab.dirty .dot {
+  color: #f59e0b;
+}
+
+.python-terminal {
+  height: 168px;
+  min-height: 120px;
+  background: #0f0f0f;
+  color: #d1d5db;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.python-terminal-header {
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  padding: 3px 10px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: ui-monospace, monospace;
+}
+
+.python-terminal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+.python-terminal-body .ok { color: #a3e635; }
+.python-terminal-body .err { color: #f87171; }
+
+/* Python syntax coloring for the CodeEditor overlay (pre + transparent textarea) */
+/* NOTE: no font-weight changes on tokens — varying weight shifts char widths and breaks overlay alignment with textarea */
+.tok-keyword { color: #6f42c1; }
+.tok-builtin { color: #005cc5; }
+.tok-string { color: #22863a; }
+.tok-comment { color: #6a737d; font-style: italic; }
+.tok-number { color: #e36209; }
+.tok-plain { color: inherit; }
+
+@media (prefers-color-scheme: dark) {
+  .tok-keyword { color: #c792ea; }
+  .tok-builtin { color: #82aaff; }
+  .tok-string { color: #c3e88d; }
+  .tok-comment { color: #546e7a; }
+  .tok-number { color: #f78c6c; }
+}
+
+/* Force identical text metrics for the syntax overlay (pre under transparent textarea) to prevent visual shift/ghosting */
+.code-editor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  font-feature-settings: "liga" 0, "clig" 0, "calt" 0; /* disable ligatures that can alter widths */
+}
+.code-editor pre,
+.code-editor textarea {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  font-feature-settings: inherit !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.code-editor .gutter-line {
+  line-height: 1.55;
+  height: 1.55em;
+}
+
+/* Selection tint must be visible while textarea text stays transparent so the colored pre shows */
+.relative textarea::selection {
+  background: rgba(91, 123, 232, 0.30);
+  color: transparent;
+}
+.relative textarea::-moz-selection {
+  background: rgba(91, 123, 232, 0.30);
+  color: transparent;
 }
 

@@ -1,3 +1,4 @@
 # Euclide sidecar dependencies
 pronotepy>=2.13.0
 pypdf>=4.0.0
+jedi>=0.19.1

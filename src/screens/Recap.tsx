@@ -58,7 +58,7 @@ export default function Recap() {
     app: { label: "Application", icon: <ClockIcon className="w-4 h-4" /> },
   };
 
-  const timeByArea = (data?.time_by_area || []).map((a) => {
+  const timeByArea = (data?.time_by_area || []).map((a: any) => {
     const meta = AREA_META[a.name] || { label: a.name, icon: <ClockIcon className="w-4 h-4" /> };
     return {
       key: a.name,
@@ -67,10 +67,10 @@ export default function Recap() {
       icon: meta.icon,
     };
   });
-  const totalAreaMinutes = timeByArea.reduce((sum, a) => sum + a.minutes, 0) || 1;
+  const totalAreaMinutes = timeByArea.reduce((sum: number, a: { minutes: number }) => sum + a.minutes, 0) || 1;
   const maxAreaMin = timeByArea[0]?.minutes || 1;
 
-  // Build highlights client-side so all text comes from the central JSON (src/locales/fr.json)
+  // Build highlights client-side so all text comes from the central JSON (src/locales/strings.json)
   const highlights: string[] = [];
   if (data) {
     if (data.files_opened > 0) {
@@ -147,7 +147,7 @@ export default function Recap() {
                 <span className="text-[10px] text-body-mute">{t.recap?.timeByAreaHint || "basé sur le temps d'utilisation"}</span>
               </div>
               <div className="flex flex-col gap-2">
-                {timeByArea.map((a, i) => {
+                {timeByArea.map((a: any, i: number) => {
                   const pct = Math.round((a.minutes / maxAreaMin) * 100);
                   const h = Math.floor(a.minutes / 60);
                   const m = a.minutes % 60;
@@ -183,7 +183,7 @@ export default function Recap() {
                   key={s.label}
                   className="new-card p-4 transition-transform hover:-translate-y-px"
                 >
-                  <span className="grid place-items-center w-8 h-8 rounded-lg bg-surface-container text-accent-sunset mb-2">
+                  <span className="grid place-items-center w-8 h-8 rounded-lg bg-surface-container text-tui-accent mb-2">
                     {s.icon}
                   </span>
                   <p className="font-display-sm text-2xl text-primary tabular-nums">{s.value}</p>
@@ -200,7 +200,7 @@ export default function Recap() {
                 <span className="text-[10px] text-body-mute">{t.recap?.basedOnActivity || "basé sur l'activité"}</span>
               </div>
               <div className="flex flex-col gap-3">
-                {data.top_courses.map((c, _i) => {
+                {data.top_courses.map((c: any, _i: number) => {
                   const max = data.top_courses[0].count || 1;
                   return (
                     <div key={c.name} className="flex items-center gap-3">
@@ -212,7 +212,7 @@ export default function Recap() {
                         </div>
                         <div className="mt-1 h-2 rounded-full bg-surface-container overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-accent-sunset transition-[width] duration-300 ease-out"
+                            className="h-full rounded-full bg-tui-accent transition-[width] duration-300 ease-out"
                             style={{ width: `${(c.count / max) * 100}%` }}
                           />
                         </div>
@@ -232,11 +232,11 @@ export default function Recap() {
                 <span className="text-[10px] text-body-mute">{t.recap?.basedOnActivity || "basé sur l'activité"}</span>
               </div>
               <div className="flex flex-col gap-3">
-                {data.top_documents.map((d, _i) => {
+                {data.top_documents.map((d: any, _i: number) => {
                   const max = data.top_documents[0].count || 1;
                   return (
                     <div key={d.name} className="flex items-center gap-3">
-                      <span className="text-xl w-7 shrink-0">📄</span>
+                      <DocIcon className="w-5 h-5 shrink-0 text-mute" />
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between text-sm">
                           <span className="text-primary font-medium truncate">{d.name}</span>
@@ -244,7 +244,7 @@ export default function Recap() {
                         </div>
                         <div className="mt-1 h-2 rounded-full bg-surface-container overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-accent-sunset transition-[width] duration-300 ease-out"
+                            className="h-full rounded-full bg-tui-accent transition-[width] duration-300 ease-out"
                             style={{ width: `${(d.count / max) * 100}%` }}
                           />
                         </div>
@@ -264,11 +264,11 @@ export default function Recap() {
                 <span className="text-[10px] text-body-mute">{t.recap?.basedOnActivity || "basé sur l'activité"}</span>
               </div>
               <div className="flex flex-col gap-3">
-                {data.top_tools.map((tool, i) => {
+                {data.top_tools.map((tool: any, i: number) => {
                   const max = data.top_tools[0].count || 1;
                   return (
                     <div key={tool.name} className="flex items-center gap-3">
-                      <span className="text-xl w-7 shrink-0">🛠️</span>
+                      <ToolIcon className="w-5 h-5 shrink-0 text-mute" />
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between text-sm">
                           <span className="text-primary font-medium truncate">{tool.name}</span>
@@ -276,7 +276,7 @@ export default function Recap() {
                         </div>
                         <div className="mt-1 h-2 rounded-full bg-surface-container overflow-hidden">
                           <motion.div
-                            className="h-full rounded-full bg-accent-sunset"
+                            className="h-full rounded-full bg-tui-accent"
                             initial={{ width: 0 }}
                             animate={{ width: `${(tool.count / max) * 100}%` }}
                             transition={{ delay: 0.05 + i * 0.03, duration: 0.35, ease: "easeOut" }}
@@ -299,7 +299,7 @@ export default function Recap() {
                   className="new-card p-4 flex items-center gap-3 text-sm opacity-0 animate-fade-in"
                   style={{ animationDelay: `${80 + i * 20}ms` }}
                 >
-                  <span className="text-lg">✨</span>
+                  <SparkleIcon className="w-5 h-5 text-tui-accent shrink-0" />
                   <p className="text-primary">{h}</p>
                 </div>
               ))}

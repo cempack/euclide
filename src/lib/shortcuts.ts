@@ -1,3 +1,5 @@
+import { get } from "./i18n";
+
 export const isMac = typeof navigator !== "undefined" &&
   /Macintosh|Mac OS X|Mac|iPod|iPhone|iPad/.test(navigator.userAgent || navigator.platform || "");
 
@@ -18,21 +20,22 @@ export const SHORTCUTS: { group: string; items: ShortcutDoc[] }[] = [
   {
     group: "Navigation",
     items: [
-      { keys: [MOD, "K"], label: "Palette de commandes" },
-      { keys: [MOD, "T"], label: "Nouvel onglet" },
-      { keys: [MOD, "W"], label: "Fermer l'onglet" },
-      { keys: [MOD, "1 … 9"], label: "Aller a l'onglet" },
+      { keys: [MOD, "K"], label: get("app.searchTitle", "Rechercher").replace(" ({mod}K)", "") || "Palette" },
+      { keys: [MOD, "T"], label: get("app.newTab", "Nouvel onglet") },
+      { keys: [MOD, "W"], label: "Fermer onglet" },
+      { keys: [MOD, "1…9"], label: "Aller à l'onglet" },
       { keys: ["Ctrl", "Tab"], label: "Onglet suivant" },
-      { keys: [MOD, "D"], label: "Tableau de bord" },
+      { keys: [MOD, "D"], label: get("nav.dashboard", "Tableau de bord") },
     ],
   },
   {
     group: "Actions",
     items: [
-      { keys: [MOD, "F"], label: "Rechercher un document" },
-      { keys: [MOD, "B"], label: "Nouveau tableau blanc" },
-      { keys: [MOD, ","], label: "Reglages" },
-      { keys: [MOD, "/"], label: "Afficher les raccourcis" },
+      { keys: [MOD, "F"], label: get("nav.documents", "Documents") },
+      { keys: [MOD, "B"], label: get("nav.whiteboard", "Tableau blanc") },
+      { keys: [MOD, "N"], label: get("common.newNote", "Nouvelle note") },
+      { keys: [MOD, ","], label: get("nav.settings", "Réglages") },
+      { keys: [MOD, "/"], label: get("app.shortcutsTitle", "Raccourcis") },
     ],
   },
 ];

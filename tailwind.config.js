@@ -63,13 +63,12 @@ export default {
         "on-error": "#ffffff",
         "error-container": "#ffdad6",
         "on-error-container": "#93000a",
+        // Dynamic via theme.tsx + --eu-accent (set by accent picker + applyVars)
         "tui-accent": "#007aff",
         "tui-danger": "#ff3b30",
         "tui-success": "#30d158",
         // legacy / transition aliases (map old warm paper names to closest new equivalents)
         "body-mute": "#646262",
-        "accent-sunset": "#007aff", // repurposed to tui blue for new aesthetic
-        "accent-sunset-soft": "#e6f0ff",
         canvas: "#faf9f9",
         "canvas-soft": "#f8f7f7",
         // eu legacy for any remaining hardcoded

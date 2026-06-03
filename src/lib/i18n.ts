@@ -1,8 +1,7 @@
-// All user-facing messages live in src/locales/fr.json so you can customize
-// EVERYTHING in one place without touching components.
-// (French only for now — easy to add more locales later.)
+// All user-facing messages live in src/locales/strings.json.
+// Single language (concise French). Edit here, no code changes needed.
 
-import fr from "../locales/fr.json";
+import strings from "../locales/strings.json";
 
 // Simple template formatter: fmt("Bonjour {name}", { name: "Elliot" }) => "Bonjour Elliot"
 export function fmt(template: string, vars: Record<string, string | number> = {}): string {
@@ -12,7 +11,7 @@ export function fmt(template: string, vars: Record<string, string | number> = {}
   }, template);
 }
 
-export const t = fr as any; // runtime object from JSON (all strings + arrays)
+export const t = strings as any; // runtime object from JSON (all strings + arrays)
 export type Strings = typeof t;
 
 /**
@@ -27,7 +26,7 @@ export function get(path: string, fallback: any = ""): any {
   for (const p of parts) {
     if (cur == null || typeof cur !== "object" || !(p in cur)) {
       if (typeof console !== "undefined" && (import.meta as any)?.env?.DEV) {
-        console.warn(`[i18n] missing key "${path}" in src/locales/fr.json — using fallback`);
+        console.warn(`[i18n] missing key "${path}" in src/locales/strings.json — using fallback`);
       }
       return fallback;
     }

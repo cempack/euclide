@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, memo } from "react";
 import { motion } from "framer-motion";
 import { useTabs } from "../lib/tabs";
 import { api, type Course } from "../lib/api";
-import { t } from "../lib/i18n";
+import { t, get } from "../lib/i18n";
 import {
   COURSE_COLORS,
   COURSE_ICONS,
@@ -13,6 +13,55 @@ import {
 } from "../components/ui";
 import { ArrowRightIcon, BookIcon, PenIcon, PlusIcon } from "../components/icons";
 
+// Hoisted MemoCourseCard at module scope so memo() is stable across renders of Courses (for snappier list)
+const MemoCourseCard = memo(function MemoCourseCard({ c, onOpen, onEdit }: { c: Course; onOpen: (c: Course) => void; onEdit: (c: Course) => void }) {
+  const IconComp = useMemo(() => {
+    const found = COURSE_ICONS.find((i) => i.key === (c.emoji || "book"));
+    return found ? found.Icon : BookIcon;
+  }, [c.emoji]);
+
+  return (
+    <motion.button
+      key={c.id}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={() => onOpen(c)}
+      className="new-card p-5 text-left group hover:border-tui-accent/40 hover:-translate-y-0.5 active:scale-[0.995] active:border-tui-accent/30 transition-all duration-150"
+    >
+      <div className="flex items-start justify-between">
+        <span
+          className="grid place-items-center w-10 h-10 rounded-none border border-[rgba(15,0,0,0.12)]"
+          style={{ background: `${c.color}22`, color: c.color }}
+        >
+          <IconComp className="w-5 h-5" strokeWidth={1.8} />
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(c);
+            }}
+            className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 text-mute hover:text-primary transition-all"
+            title="Modifier le cours"
+          >
+            <PenIcon className="w-3.5 h-3.5" />
+          </button>
+          <ArrowRightIcon className="w-5 h-5 text-body-mute opacity-40 group-hover:text-tui-accent group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-150" />
+        </div>
+      </div>
+      <h3 className="mt-4 font-semibold text-primary">{c.name}</h3>
+      {c.matiere && (
+        <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface/80">{c.matiere}</span>
+      )}
+      {c.description && (
+        <p className="text-body-mute text-sm mt-1 line-clamp-2">{c.description}</p>
+      )}
+      <div className="mt-3 h-1 rounded-full" style={{ background: c.color }} />
+    </motion.button>
+  );
+});
+
 export default function Courses() {
   const tabs = useTabs();
   const toast = useToast();
@@ -22,7 +71,7 @@ export default function Courses() {
   const [name, setName] = useState("");
   const [color, setColor] = useState(COURSE_COLORS[0]);
   const [desc, setDesc] = useState("");
-  const [matiere, setMatiere] = useState<"Mathématiques" | "NSI">("Mathématiques");
+  const [matiere, setMatiere] = useState<"Mathématiques" | "NSI" | "Maths expertes">("Mathématiques");
   const [iconKey, setIconKey] = useState("book");
 
   // Edit state for popup
@@ -31,7 +80,7 @@ export default function Courses() {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState(COURSE_COLORS[0]);
   const [editDesc, setEditDesc] = useState("");
-  const [editMatiere, setEditMatiere] = useState<"Mathématiques" | "NSI">("Mathématiques");
+  const [editMatiere, setEditMatiere] = useState<"Mathématiques" | "NSI" | "Maths expertes">("Mathématiques");
   const [editIconKey, setEditIconKey] = useState("book");
 
   const refresh = () => {
@@ -46,6 +95,7 @@ export default function Courses() {
     if (!name.trim()) return;
     await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    window.dispatchEvent(new CustomEvent("eu:course-changed"));
     toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
     setName("");
     setDesc("");
@@ -78,6 +128,7 @@ export default function Courses() {
       matiere: editMatiere,
     });
     window.dispatchEvent(new CustomEvent("eu:library-changed")); // ensure fresh lists everywhere (triggers cache invalidation + listeners)
+    window.dispatchEvent(new CustomEvent("eu:course-changed"));
     toast("Cours modifié", "success");
     setEditOpen(false);
     // reset edit
@@ -98,56 +149,7 @@ export default function Courses() {
     setEditIconKey("book");
   };
 
-  // Memoized card to avoid re-renders of static cards when list parent updates (e.g. other state)
-  const MemoCourseCard = memo(function MemoCourseCard({ c, onOpen, onEdit }: { c: Course; onOpen: (c: Course) => void; onEdit: (c: Course) => void }) {
-    const IconComp = useMemo(() => {
-      const found = COURSE_ICONS.find((i) => i.key === (c.emoji || "book"));
-      return found ? found.Icon : BookIcon;
-    }, [c.emoji]);
-
-    return (
-      <motion.button
-        key={c.id}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18 }}
-        onClick={() => onOpen(c)}
-        className="new-card p-5 text-left group hover:border-accent-sunset/40 hover:-translate-y-0.5 active:scale-[0.995] active:border-accent-sunset/30 transition-all duration-150"
-      >
-        <div className="flex items-start justify-between">
-          <span
-            className="grid place-items-center w-10 h-10 rounded-none border border-[rgba(15,0,0,0.12)]"
-            style={{ background: `${c.color}22`, color: c.color }}
-          >
-            <IconComp className="w-5 h-5" strokeWidth={1.8} />
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(c);
-              }}
-              className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 text-mute hover:text-primary transition-all"
-              title="Modifier le cours"
-            >
-              <PenIcon className="w-3.5 h-3.5" />
-            </button>
-            <ArrowRightIcon className="w-5 h-5 text-body-mute opacity-40 group-hover:text-accent-sunset group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-150" />
-          </div>
-        </div>
-        <h3 className="mt-4 font-semibold text-primary">{c.name}</h3>
-        {c.matiere && (
-          <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface/80">{c.matiere}</span>
-        )}
-        {c.description && (
-          <p className="text-body-mute text-sm mt-1 line-clamp-2">{c.description}</p>
-        )}
-        <div className="mt-3 h-1 rounded-full" style={{ background: c.color }} />
-      </motion.button>
-    );
-  });
-
-  // Stable callbacks for memo cards
+  // Stable callbacks for memo cards (MemoCourseCard hoisted at module top)
   const handleOpenCourse = useCallback((c: Course) => {
     tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } });
   }, [tabs]);
@@ -161,7 +163,7 @@ export default function Courses() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.courses}</h1>
-          <p className="text-body-mute text-sm mt-1">Cours (matières) avec casier de documents + classes attachées (noms Pronote exacts) + progression et notes prof par classe.</p>
+          <p className="text-body-mute text-sm mt-1">{get("documents.subtitle", "Documents et notes.")}</p>
         </div>
         <button onClick={() => { setIconKey("book"); setOpen(true); }} className="new-btn-primary">
           <PlusIcon className="w-4 h-4" /> {t.common?.newCourse || "Nouveau cours"}
@@ -217,6 +219,12 @@ export default function Courses() {
             >
               NSI
             </button>
+            <button
+              onClick={() => setMatiere("Maths expertes")}
+              className={`px-2.5 py-0.5 rounded transition-colors ${matiere === "Maths expertes" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
+            >
+              Maths expertes
+            </button>
           </div>
           <div>
             <p className="text-body-mute text-sm mb-2">Couleur</p>
@@ -226,7 +234,7 @@ export default function Courses() {
                   key={col}
                   onClick={() => setColor(col)}
                   className={`w-8 h-8 rounded-full transition-transform border border-hairline ${
-                    color === col ? "ring-2 ring-offset-2 ring-accent-sunset ring-offset-surface scale-110" : ""
+                    color === col ? "ring-2 ring-offset-2 ring-tui-accent ring-offset-surface scale-110" : ""
                   }`}
                   style={{ background: col }}
                 />
@@ -242,7 +250,7 @@ export default function Courses() {
                   onClick={() => setIconKey(key)}
                   title={label}
                   className={`w-9 h-9 rounded border flex items-center justify-center transition ${
-                    iconKey === key ? "ring-2 ring-accent-sunset bg-surface" : "border-hairline hover:bg-surface-container/50"
+                    iconKey === key ? "ring-2 ring-tui-accent bg-surface" : "border-hairline hover:bg-surface-container/50"
                   }`}
                 >
                   <Icon className="w-5 h-5" strokeWidth={1.8} />
@@ -252,7 +260,7 @@ export default function Courses() {
           </div>
           <div className="flex justify-end gap-2 mt-1">
             <button className="new-btn-ghost" onClick={() => setOpen(false)}>
-              {t.common?.cancel || "Annuler"}
+              {t.common?.cancel || get("common.cancel", "Annuler")}
             </button>
             <button className="new-btn-primary" onClick={create}>
               {t.common?.add || "Ajouter"}
@@ -290,6 +298,12 @@ export default function Courses() {
             >
               NSI
             </button>
+            <button
+              onClick={() => setEditMatiere("Maths expertes")}
+              className={`px-2.5 py-0.5 rounded transition-colors ${editMatiere === "Maths expertes" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
+            >
+              Maths expertes
+            </button>
           </div>
           <div>
             <p className="text-body-mute text-sm mb-2">Couleur</p>
@@ -299,7 +313,7 @@ export default function Courses() {
                   key={col}
                   onClick={() => setEditColor(col)}
                   className={`w-8 h-8 rounded-full transition-transform border border-hairline ${
-                    editColor === col ? "ring-2 ring-offset-2 ring-accent-sunset ring-offset-surface scale-110" : ""
+                    editColor === col ? "ring-2 ring-offset-2 ring-tui-accent ring-offset-surface scale-110" : ""
                   }`}
                   style={{ background: col }}
                 />
@@ -315,7 +329,7 @@ export default function Courses() {
                   onClick={() => setEditIconKey(key)}
                   title={label}
                   className={`w-9 h-9 rounded border flex items-center justify-center transition ${
-                    editIconKey === key ? "ring-2 ring-accent-sunset bg-surface" : "border-hairline hover:bg-surface-container/50"
+                    editIconKey === key ? "ring-2 ring-tui-accent bg-surface" : "border-hairline hover:bg-surface-container/50"
                   }`}
                 >
                   <Icon className="w-5 h-5" strokeWidth={1.8} />

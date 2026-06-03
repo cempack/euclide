@@ -17,12 +17,13 @@ export type TabKind =
   | "class-content"
   | "documents"
   | "tools"
-  | "recap"
+  | "python"
   | "settings"
   | "whiteboard"
   | "pdf"
   | "reminders"
-  | "help";
+  | "help"
+  | "note";
 
 export interface TabParams {
   courseId?: number;
@@ -32,6 +33,7 @@ export interface TabParams {
   isNew?: boolean;
   className?: string;
   matiere?: string;
+  noteId?: number;
 }
 
 export interface Tab {
@@ -53,7 +55,7 @@ const SINGLETONS: TabKind[] = [
   "courses",
   "documents",
   "tools",
-  "recap",
+  "python",
   "settings",
   "reminders",
   "help",
@@ -66,15 +68,16 @@ const DEFAULT_TITLES: Record<TabKind, string> = {
   dashboard: "Tableau de bord",
   courses: "Cours",
   course: "Cours",
-  "class-content": "Contenu de classe",
+  "class-content": "Contenu",
   documents: "Documents",
   tools: "Outils",
-  recap: "Bilan",
-  settings: "Reglages",
-  whiteboard: "Tableau blanc",
+  python: "Python",
+  settings: "Réglages",
+  whiteboard: "Tableau",
   pdf: "Document",
   reminders: "Rappels",
   help: "Raccourcis",
+  note: "Note",
 };
 
 function keyOf(spec: OpenSpec): string {
@@ -85,6 +88,8 @@ function keyOf(spec: OpenSpec): string {
   if (spec.kind === "pdf") return `pdf:${p.fileId}`;
   if (spec.kind === "whiteboard")
     return p.fileId ? `whiteboard:${p.fileId}` : `whiteboard:new:${Math.random().toString(36).slice(2)}`;
+  if (spec.kind === "note")
+    return p.noteId ? `note:${p.noteId}` : `note:new:${Math.random().toString(36).slice(2)}`;
   return `${spec.kind}:${Math.random().toString(36).slice(2)}`;
 }
 
@@ -95,7 +100,7 @@ type TabsCtx = {
   open: (spec: OpenSpec) => string;
   close: (id: string) => void;
   setActive: (id: string) => void;
-  rename: (id: string, title: string) => void;
+  rename: (id: string, title: string, paramsPatch?: Partial<TabParams>) => void;
   next: () => void;
   prev: () => void;
   focusIndex: (i: number) => void;
@@ -106,7 +111,7 @@ type TabsCtx = {
 const Ctx = createContext<TabsCtx | null>(null);
 export const useTabs = () => {
   const c = useContext(Ctx);
-  if (!c) throw new Error("useTabs hors TabsProvider");
+  if (!c) throw new Error("useTabs: no provider");
   return c;
 };
 
@@ -163,10 +168,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           );
         }
 
-        // New tab (e.g. a fresh whiteboard, another PDF, a specific course tab, etc.).
-        // Enforce maxTabs (if >0) by evicting the oldest non-active tab if we're at the limit.
-        // This keeps the + button (and any other open() call) always functional without
-        // letting the tab strip get too cluttered. If maxTabs==0, unlimited tabs allowed.
+        // New tab. Enforce maxTabs (if >0) by evicting oldest non-active (keeps + button functional).
         let nextTabs = prev;
         if (maxTabs > 0 && prev.length >= maxTabs) {
           const curActive = activeIdRef.current;
@@ -174,7 +176,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           if (evictIdx !== -1) {
             nextTabs = prev.filter((_, i) => i !== evictIdx);
           } else {
-            // Fallback (shouldn't normally happen): drop the oldest
+            // Fallback: drop oldest
             nextTabs = prev.slice(0, maxTabs - 1);
           }
         }
@@ -182,7 +184,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       });
 
       if (!spec.background) {
-        // only change active if it's actually different (prevents "load again" on current tab)
+        // only change active if different (prevents reload on current)
         setActiveId((cur) => (cur === id ? cur : id));
       }
       return id;
@@ -195,10 +197,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     setMaxTabs(val);
     api.setSetting("max_tabs", String(val)).catch(() => {});
 
-    // When the limit is reduced (via Settings), immediately evict excess tabs
-    // (oldest non-active first, same policy as on open()). This ensures the
-    // tab bar respects the new lower limit right away instead of only on
-    // future opens.
+    // If limit reduced, evict excess tabs immediately (oldest non-active first).
     if (val > 0) {
       setTabs((prev) => {
         if (prev.length <= val) return prev;
@@ -239,8 +238,17 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const rename = useCallback((id: string, title: string) => {
-    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
+  const rename = useCallback((id: string, title: string, paramsPatch?: Partial<TabParams>) => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        return {
+          ...t,
+          title,
+          params: paramsPatch ? { ...t.params, ...paramsPatch } : t.params,
+        };
+      })
+    );
   }, []);
 
   const focusIndex = useCallback(

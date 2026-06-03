@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import { api, type PythonDemo, type PythonResult, type QuickLink } from "../lib/api";
-import { t, fmt } from "../lib/i18n";
+import { api, type QuickLink } from "../lib/api";
+import { t } from "../lib/i18n";
 import { EmptyState, Modal, SectionHeader, useToast } from "../components/ui";
-import CodeEditor from "../components/CodeEditor";
 import {
-  CodeIcon,
   CoffeeIcon,
   LinkIcon,
-  PlayIcon,
   PlusIcon,
   TrashIcon,
 } from "../components/icons";
@@ -23,7 +20,6 @@ export default function Tools() {
 
       <KeepAwakeCard />
 
-      <PythonCard />
       <LinksCard />
     </div>
   );
@@ -31,7 +27,7 @@ export default function Tools() {
 
 function KeepAwakeCard() {
   const toast = useToast();
-  const [on, setOn] = useState(false);
+  const [on, setOn] = useState(true); // default on (matches backend startup default)
 
   useEffect(() => {
     api.keepAwakeStatus().then(setOn).catch(() => {});
@@ -48,11 +44,11 @@ function KeepAwakeCard() {
       <SectionHeader title={t.tools?.keepAwake || "Ne pas verrouiller l'écran"} />
       <button
         onClick={toggle}
-        className={`new-card w-full p-5 flex items-center gap-4 text-left transition-all duration-150 hover:border-accent-sunset/40`}
+        className={`new-card w-full p-5 flex items-center gap-4 text-left transition-all duration-150 hover:border-tui-accent/40`}
       >
         <span
           className={`grid place-items-center w-12 h-12 rounded-[12px] transition-colors ${
-            on ? "bg-accent-sunset text-primary" : "bg-surface-container text-accent-sunset"
+            on ? "bg-tui-accent text-primary" : "bg-surface-container text-tui-accent"
           }`}
         >
           <CoffeeIcon className="w-6 h-6" />
@@ -63,7 +59,7 @@ function KeepAwakeCard() {
         </div>
         <span
           className={`relative w-12 h-7 rounded-full transition-colors ${
-            on ? "bg-accent-sunset" : "bg-surface-container"
+            on ? "bg-tui-accent" : "bg-surface-container"
           }`}
         >
           <span
@@ -73,181 +69,6 @@ function KeepAwakeCard() {
           />
         </span>
       </button>
-    </section>
-  );
-}
-
-const STARTER_CODE = (t.tools?.starterCode as string) || `# Nouveau script Python\n# ...`;
-
-function PythonCard() {
-  const toast = useToast();
-  const [demos, setDemos] = useState<PythonDemo[]>([]);
-  const [selected, setSelected] = useState<PythonDemo | null>(null);
-  const [code, setCode] = useState("");
-  const [dirty, setDirty] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<PythonResult | null>(null);
-
-  const refresh = async (selectPath?: string) => {
-    const list = await api.listDemos().catch(() => [] as PythonDemo[]);
-    setDemos(list);
-    if (selectPath) {
-      const found = list.find((d) => d.path === selectPath);
-      if (found) {
-        setSelected(found);
-        setCode(found.code);
-        setDirty(false);
-      }
-    }
-  };
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  const select = (d: PythonDemo) => {
-    setSelected(d);
-    setCode(d.code);
-    setDirty(false);
-    setResult(null);
-  };
-
-  const create = async () => {
-    const name = window.prompt(t.tools?.newScriptPrompt || "Nom du script :", t.tools?.defaultScriptName || "Mon script");
-    if (!name) return;
-    const d = await api.createScript(name, STARTER_CODE);
-    await refresh(d.path);
-    setResult(null);
-    toast(t.tools?.toastScriptCreated || "Script créé", "success");
-  };
-
-  const importScript = async () => {
-    const d = await api.importScript();
-    if (d) {
-      await refresh(d.path);
-      toast(fmt(t.tools?.toastImported || "Importé : {name}", { name: d.name }), "success");
-    }
-  };
-
-  const save = async () => {
-    if (!selected) return;
-    await api.saveScript(selected.path, code);
-    setDirty(false);
-    setDemos((prev) => prev.map((d) => (d.path === selected.path ? { ...d, code } : d)));
-    toast(t.tools?.toastScriptSaved || "Script enregistré", "success");
-  };
-
-  const run = async () => {
-    setRunning(true);
-    api.logEvent("demo_run", selected?.name ?? "scratch", null);
-    try {
-      const res = selected && !dirty ? await api.runDemo(selected.path) : await api.runCode(code);
-      setResult(res);
-      if (!res.ok) toast(t.tools?.toastScriptError || "Le script a renvoyé une erreur", "error");
-    } catch {
-      toast(t.tools?.toastScriptRunError || "Impossible de lancer le script", "error");
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  const remove = async () => {
-    if (!selected) return;
-    if (!confirm(fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: selected.name }))) return;
-    await api.deleteScript(selected.path);
-    setSelected(null);
-    setCode("");
-    setResult(null);
-    refresh();
-  };
-
-  return (
-    <section>
-      <SectionHeader
-        title={t.tools?.pythonDemos || "Scripts Python"}
-        action={
-          <div className="flex gap-2">
-            <button onClick={importScript} className="new-btn-ghost py-1.5 px-2.5 text-xs">
-              Importer
-            </button>
-            <button onClick={create} className="new-btn-ghost py-1.5 px-2.5 text-xs">
-              <PlusIcon className="w-4 h-4" /> Nouveau script
-            </button>
-          </div>
-        }
-      />
-      <div className="new-card p-0 overflow-hidden grid grid-cols-1 md:grid-cols-[200px_1fr]">
-        {/* script list */}
-        <div className="border-b md:border-b-0 md:border-r border-hairline p-2 max-h-[420px] overflow-y-auto bg-surface">
-          {demos.length === 0 ? (
-            <p className="text-body-mute p-3 text-[13px]">{t.tools?.noScripts || "Aucun script pour l'instant. Créez-en un !"}</p>
-          ) : (
-            demos.map((d) => (
-              <button
-                key={d.path}
-                onClick={() => select(d)}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
-                  selected?.path === d.path
-                    ? "bg-surface-container text-accent-sunset"
-                    : "text-on-surface hover:bg-surface-container"
-                }`}
-              >
-                <CodeIcon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{d.name}</span>
-              </button>
-            ))
-          )}
-        </div>
-
-        {/* editor */}
-        <div className="p-4 flex flex-col gap-3 min-w-0 bg-surface">
-          {selected ? (
-            <>
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-on-surface flex-1 truncate">{selected.name}</p>
-                <button onClick={remove} className="new-btn-ghost py-1.5 px-2">
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-                <button onClick={save} disabled={!dirty} className="new-btn-ghost py-1.5">
-                  {dirty ? (t.tools?.saveDirtyBtn || "Enregistrer *") : (t.tools?.saveBtn || "Enregistrer")}
-                </button>
-                <button onClick={run} disabled={running} className="new-btn-primary py-1.5">
-                  {running ? (
-                    <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                  ) : (
-                    <PlayIcon className="w-4 h-4" />
-                  )}
-                  {t.tools?.execute || "Exécuter"}
-                </button>
-              </div>
-              <CodeEditor
-                value={code}
-                onChange={(v) => {
-                  setCode(v);
-                  setDirty(true);
-                }}
-              />
-              {result && (
-                <pre
-                  className={`selectable max-h-52 overflow-auto rounded-lg border p-3 text-[12.5px] leading-relaxed font-mono whitespace-pre-wrap ${
-                    result.ok ? "bg-surface border-hairline" : "bg-red-500/10 border-red-500/30 text-red-400"
-                  }`}
-                >
-                  {result.stdout || <span className="text-body-mute">{t.tools?.noOutput || "(aucune sortie)"}</span>}
-                  {result.stderr && <span className="text-red-400">{"\n" + result.stderr}</span>}
-                </pre>
-              )}
-            </>
-          ) : (
-            <div className="py-10">
-              <EmptyState
-                icon={<CodeIcon className="w-8 h-8" />}
-                title={t.tools?.yourScripts || "Vos scripts Python"}
-                hint={t.tools?.createHint || "Créez ou importez un script, modifiez-le et lancez-le en un clic."}
-              />
-            </div>
-          )}
-        </div>
-      </div>
     </section>
   );
 }
@@ -267,7 +88,7 @@ function LinksCard() {
   const add = async () => {
     if (!label.trim() || !url.trim()) return;
     const normalized = url.startsWith("http") ? url : `https://${url}`;
-    await api.createLink(label.trim(), normalized, ""); // icon stored for legacy; UI always loads real favicon from site or falls back to default SVG icon (never emoji)
+    await api.createLink(label.trim(), normalized, ""); // icon field legacy; UI uses real favicon or default
     setLabel("");
     setUrl("");
     setOpen(false);

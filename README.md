@@ -30,10 +30,10 @@ Tout est **local** : aucune donnée ne quitte la clé.
 | --- | --- |
 | Coquille | Tauri 2 (Rust) → exécutable portable |
 | Interface | React + TypeScript + Vite + Tailwind (thème inspiré de libadwaita / macOS) |
-| Données | SQLite (`Euclide-Data/euclide.db`) + dossier `Euclide-Data/` à côté de l'exécutable |
+| Données | SQLite + fichiers dans un dossier racine configurable (via Réglages). Par défaut : `Euclide-Data/` à côté de l'exécutable. Pointeur stocké dans `euclide-data.json` (portable). |
 | Tâches lourdes | Sidecar Python (Pronote via `pronotepy`, extraction PDF, démos) |
 
-Le dossier **`Euclide-Data/`** est créé automatiquement à côté de l'exécutable. C'est lui qui rend Euclide portable : la clé USB transporte toute la base, les cours, les documents et les tableaux blancs.
+Le dossier de données (par défaut `Euclide-Data/`) est créé automatiquement. **Depuis Réglages → Dossier de stockage** vous pouvez pointer sur n'importe quel dossier (idéal sur une clé USB). Le choix est stocké dans `euclide-data.json` à côté de l'exécutable pour rester 100 % portable. La clé USB peut ainsi transporter l'exécutable + le sidecar + le pointeur config.
 
 ```
 Euclide-Data/

@@ -8,6 +8,15 @@ pub fn open() -> Connection {
     conn.execute_batch(SCHEMA).expect("init schema");
     // Migration for existing DBs: add matiere column to courses (for subject filtering with Pronote)
     let _ = conn.execute("ALTER TABLE courses ADD COLUMN matiere TEXT NOT NULL DEFAULT ''", []);
+
+    // Performance PRAGMAs (WAL already in SCHEMA; these are safe to re-apply).
+    // synchronous=NORMAL is good balance with WAL; busy_timeout helps under contention; temp_store in mem.
+    let _ = conn.execute_batch(r#"
+PRAGMA synchronous = NORMAL;
+PRAGMA busy_timeout = 5000;
+PRAGMA temp_store = MEMORY;
+"#);
+
     seed_python_demos();
     conn
 }
@@ -102,6 +111,25 @@ CREATE VIRTUAL TABLE IF NOT EXISTS doc_index USING fts5(
     file_id UNINDEXED,
     tokenize = 'unicode61 remove_diacritics 2'
 );
+
+-- Performance indexes for common hot paths (list by course, recents, recap aggregates on usage_events, etc.).
+-- Added for "snappier" app (faster queries under global lock; safe for existing DBs).
+CREATE INDEX IF NOT EXISTS idx_files_course_id ON files(course_id);
+CREATE INDEX IF NOT EXISTS idx_files_added_at ON files(added_at);
+CREATE INDEX IF NOT EXISTS idx_files_course_added ON files(course_id, added_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_usage_events_created_at ON usage_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_events_kind ON usage_events(kind);
+CREATE INDEX IF NOT EXISTS idx_usage_events_kind_created ON usage_events(kind, created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_events_course_kind_created ON usage_events(course_id, kind, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_course_classes_course_id ON course_classes(course_id);
+
+CREATE INDEX IF NOT EXISTS idx_notes_course_id ON notes(course_id);
+CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_day_start ON schedule(day_of_week, start_time);
+CREATE INDEX IF NOT EXISTS idx_schedule_source ON schedule(source);
 "#;
 
 /// Drop a couple of friendly starter demos so the Tools screen isn't empty.

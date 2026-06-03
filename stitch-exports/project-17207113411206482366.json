@@ -1,0 +1,221 @@
+{
+  "name": "projects/17207113411206482366",
+  "title": "Design System Redesign",
+  "visibility": "PRIVATE",
+  "createTime": "2026-06-03T06:35:37.677195Z",
+  "updateTime": "2026-06-03T08:14:38.524945Z",
+  "projectType": "TEXT_TO_UI_PRO",
+  "thumbnailScreenshot": {
+    "name": "projects/17207113411206482366/files/c589ed9ba4824589bbf28f42873ea944",
+    "downloadUrl": "https://lh3.googleusercontent.com/aida/AP1WRLsm9Xcp54m9--EX4siVZWVzAeZThggSgQ13CyYYjDv6TxCamXItgO8XMr9_86LZJtLjkdvQDaplJPIVQjjF34fprHM7GNYYbmEQ4xiUsz3mrwTmdbdWWt-drJoEiMwk3cWDKWmJzJxLw_1pTGJEZIiornmwMkP7Xqv7aPER4E-0CDs8U_TM5DS3rLK6jJVyMlb5jxaTTQoEgYNCuQpQY5ISj_yhhCDyVQNK9FLRXkXMROB4lc1_uNaKIR0"
+  },
+  "origin": "STITCH",
+  "deviceType": "DESKTOP",
+  "designTheme": {
+    "colorMode": "LIGHT",
+    "customColor": "#201d1d",
+    "namedColors": {
+      "ash": "#9a9898",
+      "background": "#faf9f9",
+      "error": "#ba1a1a",
+      "error_container": "#ffdad6",
+      "hairline": "rgba(15,0,0,0.12)",
+      "hairline-strong": "#646262",
+      "ink-deep": "#0f0000",
+      "inverse_on_surface": "#f1f0f0",
+      "inverse_primary": "#ccc5c4",
+      "inverse_surface": "#2f3131",
+      "mute": "#646262",
+      "on_background": "#1a1c1c",
+      "on_error": "#ffffff",
+      "on_error_container": "#93000a",
+      "on_primary": "#ffffff",
+      "on_primary_container": "#8a8484",
+      "on_primary_fixed": "#1e1b1b",
+      "on_primary_fixed_variant": "#4a4646",
+      "on_secondary": "#ffffff",
+      "on_secondary_container": "#636263",
+      "on_secondary_fixed": "#1b1b1c",
+      "on_secondary_fixed_variant": "#474647",
+      "on_surface": "#1a1c1c",
+      "on_surface_variant": "#4d4545",
+      "on_tertiary": "#ffffff",
+      "on_tertiary_container": "#8a8484",
+      "on_tertiary_fixed": "#1e1b1b",
+      "on_tertiary_fixed_variant": "#4a4646",
+      "outline": "#7f7575",
+      "outline_variant": "#d0c4c3",
+      "primary": "#050404",
+      "primary_container": "#201d1d",
+      "primary_fixed": "#e8e1e0",
+      "primary_fixed_dim": "#ccc5c4",
+      "secondary": "#5f5e5e",
+      "secondary_container": "#e2dfdf",
+      "secondary_fixed": "#e5e2e2",
+      "secondary_fixed_dim": "#c8c6c6",
+      "surface": "#faf9f9",
+      "surface-soft": "#f8f7f7",
+      "surface_bright": "#faf9f9",
+      "surface_container": "#eeeeee",
+      "surface_container_high": "#e9e8e8",
+      "surface_container_highest": "#e3e2e2",
+      "surface_container_low": "#f4f3f3",
+      "surface_container_lowest": "#ffffff",
+      "surface_dim": "#dadada",
+      "surface_tint": "#625d5d",
+      "surface_variant": "#e3e2e2",
+      "tertiary": "#050404",
+      "tertiary_container": "#201d1d",
+      "tertiary_fixed": "#e9e1e0",
+      "tertiary_fixed_dim": "#ccc5c4",
+      "tui-accent": "#007aff",
+      "tui-danger": "#ff3b30",
+      "tui-success": "#30d158"
+    },
+    "designMd": "---\nname: OpenCode Terminal-Aesthetic\ncolors:\n  surface: '#faf9f9'\n  surface-dim: '#dadada'\n  surface-bright: '#faf9f9'\n  surface-container-lowest: '#ffffff'\n  surface-container-low: '#f4f3f3'\n  surface-container: '#eeeeee'\n  surface-container-high: '#e9e8e8'\n  surface-container-highest: '#e3e2e2'\n  on-surface: '#1a1c1c'\n  on-surface-variant: '#4d4545'\n  inverse-surface: '#2f3131'\n  inverse-on-surface: '#f1f0f0'\n  outline: '#7f7575'\n  outline-variant: '#d0c4c3'\n  surface-tint: '#625d5d'\n  primary: '#050404'\n  on-primary: '#ffffff'\n  primary-container: '#201d1d'\n  on-primary-container: '#8a8484'\n  inverse-primary: '#ccc5c4'\n  secondary: '#5f5e5e'\n  on-secondary: '#ffffff'\n  secondary-container: '#e2dfdf'\n  on-secondary-container: '#636263'\n  tertiary: '#050404'\n  on-tertiary: '#ffffff'\n  tertiary-container: '#201d1d'\n  on-tertiary-container: '#8a8484'\n  error: '#ba1a1a'\n  on-error: '#ffffff'\n  error-container: '#ffdad6'\n  on-error-container: '#93000a'\n  primary-fixed: '#e8e1e0'\n  primary-fixed-dim: '#ccc5c4'\n  on-primary-fixed: '#1e1b1b'\n  on-primary-fixed-variant: '#4a4646'\n  secondary-fixed: '#e5e2e2'\n  secondary-fixed-dim: '#c8c6c6'\n  on-secondary-fixed: '#1b1b1c'\n  on-secondary-fixed-variant: '#474647'\n  tertiary-fixed: '#e9e1e0'\n  tertiary-fixed-dim: '#ccc5c4'\n  on-tertiary-fixed: '#1e1b1b'\n  on-tertiary-fixed-variant: '#4a4646'\n  background: '#faf9f9'\n  on-background: '#1a1c1c'\n  surface-variant: '#e3e2e2'\n  ink-deep: '#0f0000'\n  surface-soft: '#f8f7f7'\n  hairline: rgba(15,0,0,0.12)\n  hairline-strong: '#646262'\n  mute: '#646262'\n  ash: '#9a9898'\n  tui-accent: '#007aff'\n  tui-danger: '#ff3b30'\n  tui-success: '#30d158'\ntypography:\n  display-xl:\n    fontFamily: IBM Plex Mono\n    fontSize: 38px\n    fontWeight: '700'\n    lineHeight: '1.5'\n  display-xl-mobile:\n    fontFamily: IBM Plex Mono\n    fontSize: 28px\n    fontWeight: '700'\n    lineHeight: '1.5'\n  heading-md:\n    fontFamily: IBM Plex Mono\n    fontSize: 16px\n    fontWeight: '700'\n    lineHeight: '1.5'\n  body-md:\n    fontFamily: IBM Plex Mono\n    fontSize: 16px\n    fontWeight: '400'\n    lineHeight: '1.5'\n  body-strong:\n    fontFamily: IBM Plex Mono\n    fontSize: 16px\n    fontWeight: '500'\n    lineHeight: '1.5'\n  body-tight:\n    fontFamily: IBM Plex Mono\n    fontSize: 16px\n    fontWeight: '500'\n    lineHeight: '1.0'\n  button-md:\n    fontFamily: IBM Plex Mono\n    fontSize: 16px\n    fontWeight: '500'\n    lineHeight: '2.0'\n  caption-md:\n    fontFamily: IBM Plex Mono\n    fontSize: 14px\n    fontWeight: '400'\n    lineHeight: '2.0'\nspacing:\n  xxs: 1px\n  xs: 4px\n  sm: 8px\n  lg: 16px\n  xl: 24px\n  section-desktop: 96px\n  section-tablet: 64px\n  section-mobile: 48px\n---\n\n## Brand & Style\n\nThe design system is built on the philosophy of **Typographic Absolutism** and **Technical Austerity**. It mimics the high-utility, no-nonsense environment of a developer's terminal or a meticulously formatted `README.md` file. The aesthetic is \"Low-Fi Pro\"\u2014it signals transparency, precision, and a deep focus on technical execution over marketing veneer.\n\nThe visual style is a hybrid of **Minimalism** and **Brutalism**. It rejects modern trends like shadows, gradients, and soft blurs in favor of a flat, grid-aligned, and ink-on-paper feel. By utilizing a warm cream canvas instead of a sterile digital white, the system evokes the quality of high-end printed technical documentation.\n\n**Key Principles:**\n- **Monospaced Utility:** Every character and layout decision must respect the rhythm of a monospaced font.\n- **Flat Hierarchy:** Depth is communicated through color inversion and typographic scale rather than Z-axis effects.\n- **Interactive Affordance:** A strict distinction is made between static containers (sharp 0px) and interactive elements (soft 4px).\n\n## Colors\n\nThe palette is optimized for legibility and \"ink-on-paper\" warmth. The **Primary (Ink)** color is used for all essential information, while the **Neutral (Canvas)** provides a soft, non-glaring background.\n\n- **Canvas & Surface:** Use the neutral `#fdfcfc` for the main background. Use `surface-soft` for subtle sectioning and `secondary` for elevated surfaces like code snippets or disabled states.\n- **Ink & Text:** The primary `#201d1d` is the default for headlines and body. Use `mute` and `ash` for metadata and secondary hierarchies.\n- **TUI (Terminal User Interface) Palette:** Semantic colors (accent, danger, success) are reserved strictly for technical mockups, status indicators, and command-line simulations. They should not be used for general marketing decorations.\n- **Borders:** Use the `hairline` token for subtle structural separation and `hairline-strong` for defined tab strips or header boundaries.\n\n## Typography\n\nThis system uses monospaced typography exclusively. There are no exceptions for sans-serif or serif fonts. The rhythm is governed by the consistent character width inherent to the font choice.\n\n- **Primary Font:** IBM Plex Mono (as the primary fallback for Berkeley Mono).\n- **Scale:** The typography is built on a 16px base. Hierarchy is achieved through weight (400 to 700) and line height rather than excessive size variations.\n- **Vertical Air:** Buttons and captions utilize a generous 2.0 line height to ensure legibility and create \"visual breathing room\" within the dense monospaced layout.\n- **Brackets:** Section headers and status markers often use bracketed notation (e.g., `[SECTION NAME]`) to reinforce the terminal aesthetic.\n\n## Layout & Spacing\n\nThe layout follows a strict 8px base grid, emphasizing vertical rhythm and systematic alignment.\n\n- **Grid Strategy:** Use a fixed-width central column (Max 960px) for standard content to mimic the readable width of a document. For hero sections and technical displays, allow the frame to expand to 1100px.\n- **Section Spacing:** A universal vertical rhythm is applied between major page sections. This scales down from 96px on desktop to 48px on mobile to maintain appropriate density.\n- **Alignment:** All elements should align to the left \"margin\" of the content column. Centered text is discouraged unless used for specific high-impact hero statements.\n\n## Elevation & Depth\n\nThis system is strictly flat. Visual depth is never achieved through shadows or Z-space blurs.\n\n- **Tonal Layers:** Depth is created by \"inverting\" or \"stacking\" surfaces. A darker surface (`surface-dark`) represents a focused technical area, such as a terminal mockup, within the light canvas.\n- **Hairlines:** Use 1px hairlines to separate content modules. These should be subtle and utilize the translucent `hairline` token.\n- **Focus States:** Interaction focus is indicated by a 1px solid border using the `ink` color. Do not use outer glows or \"ring\" effects.\n\n## Shapes\n\nThe shape language is strictly geometric and reinforces the \"interactive vs. static\" rule.\n\n- **Sharp (0px):** All layout-level containers, sections, cards, and navigation bars must have sharp corners. This maintains the rigid, grid-like feel of a text editor.\n- **Interactive (4px):** All touchable or clickable elements\u2014buttons, input fields, tags, and code snippets\u2014receive a 4px corner radius. This provides a subtle \"affordance\" hint that these items are distinct from the background.\n- **Exceptions:** Avatar images are the only elements allowed to use a fully rounded (9999px) shape.\n\n## Components\n\nComponents are designed to look like text-based UI elements evolved for the web.\n\n- **Buttons:** Solid primary fill (`ink`) with canvas-colored text. They use a 4px radius and 2.0 line height for vertical presence. Secondary buttons use a simple 1px hairline border.\n- **Interactive Markers (ASCII):** Use character-based signals for UI state. \n    - `[+]` Expand / Add\n    - `[-]` Collapse / Remove\n    - `[x]` Close / Delete\n    - `\u2192` Link / Action\n- **Input Fields:** Flat background (`surface-soft`) with a 4px radius and a 1px hairline border. On focus, the border becomes solid `ink`.\n- **Chips & Tags:** Small 4px rounded containers with `caption-md` typography.\n- **Lists:** Use `body-md` with custom ASCII bullets. Feature lists use `[+]` as the bullet point.\n- **Cards:** No shadows. Cards are defined by either a 1px hairline border or a subtle tonal shift to `secondary` or `surface-soft`. Corners must be 0px sharp.\n- **Terminal Mockup:** A specific component using `--colors-surface-dark` background, monospaced text in `tui-accent` or `tui-success`, and sharp corners.",
+    "colorVariant": "FIDELITY",
+    "overridePrimaryColor": "#201d1d",
+    "overrideSecondaryColor": "#f1eeee",
+    "overrideTertiaryColor": "#302c2c",
+    "overrideNeutralColor": "#fdfcfc",
+    "spacingScale": 2,
+    "typography": {
+      "body-md": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "lineHeight": "1.5"
+      },
+      "body-strong": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "lineHeight": "1.5"
+      },
+      "body-tight": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "lineHeight": "1.0"
+      },
+      "button-md": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "lineHeight": "2.0"
+      },
+      "caption-md": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "2.0"
+      },
+      "display-xl": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "38px",
+        "fontWeight": "700",
+        "lineHeight": "1.5"
+      },
+      "display-xl-mobile": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "28px",
+        "fontWeight": "700",
+        "lineHeight": "1.5"
+      },
+      "heading-md": {
+        "fontFamily": "IBM Plex Mono",
+        "fontSize": "16px",
+        "fontWeight": "700",
+        "lineHeight": "1.5"
+      }
+    },
+    "spacing": {
+      "lg": "16px",
+      "section-desktop": "96px",
+      "section-mobile": "48px",
+      "section-tablet": "64px",
+      "sm": "8px",
+      "xl": "24px",
+      "xs": "4px",
+      "xxs": "1px"
+    },
+    "headlineFontFamily": "ibmPlexMono",
+    "bodyFontFamily": "ibmPlexMono",
+    "labelFontFamily": "ibmPlexMono"
+  },
+  "screenInstances": [
+    {
+      "id": "0a4705f830814a56b222de5306238cc8",
+      "sourceScreen": "projects/17207113411206482366/screens/0a4705f830814a56b222de5306238cc8",
+      "x": 1024,
+      "y": 2024,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "id": "2ddcc972416f4659bca8974e6dd67e9c",
+      "sourceScreen": "projects/17207113411206482366/screens/2ddcc972416f4659bca8974e6dd67e9c",
+      "x": 3712,
+      "y": 2024,
+      "width": 1280,
+      "height": 1024,
+      "hidden": true
+    },
+    {
+      "id": "394fb9bc-36ba-433d-80a0-feac913b4cde",
+      "sourceScreen": "projects/17207113411206482366/screens/3874206676000628635",
+      "width": 512,
+      "height": 429,
+      "type": "SCREEN_INSTANCE"
+    },
+    {
+      "id": "5ee8699a2b99435d9fb635e5b28a417b",
+      "sourceScreen": "projects/17207113411206482366/screens/5ee8699a2b99435d9fb635e5b28a417b",
+      "x": 2368,
+      "y": 2024,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "id": "925d0aac64ee43afbcd5989f5f9e8b9e",
+      "sourceScreen": "projects/17207113411206482366/screens/925d0aac64ee43afbcd5989f5f9e8b9e",
+      "x": 3788,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "id": "assets-1c38a6e2e8c14184a09bd75eb66dbf80-1780468586453",
+      "x": 1420,
+      "width": 960,
+      "height": 540,
+      "sourceAsset": "assets/1c38a6e2e8c14184a09bd75eb66dbf80",
+      "type": "DESIGN_SYSTEM_INSTANCE"
+    },
+    {
+      "id": "b21f87fdf81d4ae5b58978f2b27824f1",
+      "sourceScreen": "projects/17207113411206482366/screens/b21f87fdf81d4ae5b58978f2b27824f1",
+      "x": 2444,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "id": "b38ae0b487c347aa870c57bfd93c726d",
+      "sourceScreen": "projects/17207113411206482366/screens/b38ae0b487c347aa870c57bfd93c726d",
+      "x": 1024,
+      "y": 3304,
+      "width": 1280,
+      "height": 1024
+    },
+    {
+      "id": "c73403f1-3e92-4e38-83d3-b048641ccc7e",
+      "sourceScreen": "projects/17207113411206482366/screens/15334662262280451015",
+      "x": 576,
+      "width": 780,
+      "height": 1768,
+      "type": "SCREEN_INSTANCE"
+    }
+  ],
+  "metadata": {
+    "userRole": "OWNER"
+  }
+}

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, type SearchResult } from "../lib/api";
 import { useTabs } from "../lib/tabs";
+import { get } from "../lib/i18n";
 
 import {
+  BellIcon,
   BookIcon,
   DocIcon,
   GearIcon,
@@ -12,8 +14,8 @@ import {
   NoteIcon,
   PenIcon,
   SearchIcon,
-  SparkleIcon,
   ToolIcon,
+  CodeIcon,
 } from "./icons";
 
 interface Action {
@@ -87,22 +89,30 @@ export default function CommandPalette({
       onClose();
     };
     return [
-      { id: "dash", label: "Tableau de bord", icon: <HomeIcon className="w-4 h-4" />, run: go("dashboard") },
-      { id: "courses", label: "Cours", icon: <BookIcon className="w-4 h-4" />, run: go("courses") },
-      { id: "docs", label: "Documents", icon: <DocIcon className="w-4 h-4" />, run: go("documents") },
-      { id: "tools", label: "Outils & scripts", icon: <ToolIcon className="w-4 h-4" />, run: go("tools") },
-      { id: "recap", label: "Bilan", icon: <SparkleIcon className="w-4 h-4" />, run: go("recap") },
+      { id: "dash", label: get("nav.dashboard", "Tableau de bord"), icon: <HomeIcon className="w-4 h-4" />, run: go("dashboard") },
+      { id: "courses", label: get("nav.courses", "Cours"), icon: <BookIcon className="w-4 h-4" />, run: go("courses") },
+      { id: "docs", label: get("nav.documents", "Documents"), icon: <DocIcon className="w-4 h-4" />, run: go("documents") },
+      { id: "tools", label: get("nav.tools", "Outils"), icon: <ToolIcon className="w-4 h-4" />, run: go("tools") },
+      { id: "python", label: get("nav.python", "Python"), icon: <CodeIcon className="w-4 h-4" />, run: go("python") },
+      { id: "reminders", label: get("nav.reminders", "Rappels"), icon: <BellIcon className="w-4 h-4" />, run: go("reminders") },
       {
         id: "board",
-        label: "Nouveau tableau blanc",
-        hint: "creer",
+        label: get("nav.whiteboard", "Tableau blanc"),
+        hint: "nouveau",
         icon: <PenIcon className="w-4 h-4" />,
-        run: go("whiteboard", "Nouveau tableau", { isNew: true }),
+        run: go("whiteboard", get("app.tabWhiteboard", "Tableau"), { isNew: true }),
       },
-      { id: "settings", label: "Reglages", icon: <GearIcon className="w-4 h-4" />, run: go("settings") },
+      {
+        id: "note",
+        label: get("common.newNote", "Nouvelle note"),
+        hint: "nouveau",
+        icon: <NoteIcon className="w-4 h-4" />,
+        run: go("note", get("common.newNote", "Nouvelle note"), { isNew: true }),
+      },
+      { id: "settings", label: get("nav.settings", "Réglages"), icon: <GearIcon className="w-4 h-4" />, run: go("settings") },
       {
         id: "help",
-        label: "Raccourcis clavier",
+        label: get("app.shortcutsTitle", "Raccourcis"),
         icon: <SearchIcon className="w-4 h-4" />,
         run: () => {
           onHelp();
@@ -129,7 +139,7 @@ export default function CommandPalette({
       if (r.kind === "note")
         return {
           id: `n${r.id}`,
-          label: r.title || "Note",
+          label: r.title || get("notes.newTitle", "Note"),
           hint: "note",
           icon: <NoteIcon className="w-4 h-4" />,
           run: () => {
@@ -214,13 +224,13 @@ export default function CommandPalette({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKey}
-                placeholder="Rechercher partout : cours, documents, notes, actions..."
+                placeholder={get("documents.searchPlaceholder", "Rechercher...") + " (cours, docs, notes)"}
                 className="flex-1 bg-transparent py-3.5 text-[15px] outline-none placeholder:text-body-mute"
               />
             </div>
             <div className="max-h-[46vh] overflow-y-auto p-2">
               {filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-body-mute">Aucun résultat</p>
+                <p className="px-3 py-6 text-center text-body-mute">{get("documents.nothingHere", "Aucun résultat")}</p>
               ) : (
                 filtered.map((a, i) => (
                   <button
@@ -228,10 +238,10 @@ export default function CommandPalette({
                     onClick={a.run}
                     onMouseEnter={() => setSel(i)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-100 active:bg-surface-container ${
-                      i === sel ? "bg-surface-container text-accent-sunset" : "text-on-surface hover:bg-surface-container/60"
+                      i === sel ? "bg-surface-container text-tui-accent" : "text-on-surface hover:bg-surface-container/60"
                     }`}
                   >
-                    <span className={i === sel ? "text-accent-sunset" : "text-body-mute"}>{a.icon}</span>
+                    <span className={i === sel ? "text-tui-accent" : "text-body-mute"}>{a.icon}</span>
                     <span className="flex-1 truncate text-sm font-medium">{a.label}</span>
                     {a.hint && <span className="text-[11px] text-body-mute shrink-0">{a.hint}</span>}
                   </button>

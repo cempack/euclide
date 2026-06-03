@@ -56,6 +56,59 @@ def run_demo(payload):
 
 
 # ---------------------------------------------------------------------------
+# Intelligent Python autocomplete via Jedi (used by the CodeEditor in the UI).
+# This gives real context-aware suggestions: stdlib, locals, attributes, signatures,
+# docstrings, etc. Requires `jedi` in the sidecar environment (see requirements.txt).
+# Lines/columns are 1-based (Jedi convention).
+# ---------------------------------------------------------------------------
+
+def python_complete(payload):
+    code = payload.get("code") or ""
+    try:
+        line = int(payload.get("line") or 1)
+        column = int(payload.get("column") or 1)
+    except Exception:
+        line, column = 1, 1
+    path = payload.get("path") or "<script>.py"
+
+    try:
+        import jedi  # type: ignore
+
+        script = jedi.Script(code=code, path=path)
+        comps = script.complete(line=line, column=column)
+        out = []
+        for c in comps[:25]:  # keep popup snappy
+            item = {
+                "name": c.name,
+                "complete": getattr(c, "complete", None),
+                "type": getattr(c, "type", None),
+                "doc": "",
+            }
+            # docstring (truncated for UI)
+            try:
+                ds = c.docstring()
+                if ds:
+                    item["doc"] = ds[:400]
+            except Exception:
+                pass
+            # signature for callables
+            try:
+                sigs = c.get_signatures()
+                if sigs:
+                    item["signature"] = sigs[0].to_string()
+            except Exception:
+                pass
+            out.append(item)
+        return {"ok": True, "completions": out}
+    except ImportError:
+        # Jedi not installed in this sidecar env — graceful fallback (local keywords still work in UI)
+        return {"ok": False, "error": "jedi_not_installed", "completions": []}
+    except Exception as exc:  # noqa: BLE001
+        # e.g. parse error in the snippet; don't crash the sidecar
+        return {"ok": False, "error": str(exc), "completions": []}
+
+
+# ---------------------------------------------------------------------------
 # PDF extraction
 # ---------------------------------------------------------------------------
 
@@ -751,7 +804,9 @@ def pronote_classes(payload):
     classes = []
     for c in classes_raw:
         name = (c.get("L") or "").strip()
-        if name:
+        # Only main class labels (e.g. "3C", "4A"). Skip subgroup/GR entries like "4ITAGR.1", "3ESPGR.2"
+        # which Pronote puts in listeClasses but are not the primary classes for progression tracking.
+        if name and "." not in name:
             classes.append({
                 "name": name,
                 "N": c.get("N"),
@@ -772,6 +827,7 @@ def pronote_classes(payload):
 COMMANDS = {
     "run_demo": run_demo,
     "extract_pdf": extract_pdf,
+    "python_complete": python_complete,
     "pronote_login": pronote_login,
     "pronote_password_login": pronote_password_login,
     "pronote_sync": pronote_sync,

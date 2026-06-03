@@ -9,11 +9,12 @@ import {
   type QuickLink,
   type Reminder,
   type ScheduleEntry,
+  type RecapData,
 } from "../lib/api";
-import { t } from "../lib/i18n";
-import { getClassStatus, findNextClassIndex, minutesUntil, formatDueLabel, relativeTime } from "../lib/format";
+import { t, get, fmt } from "../lib/i18n";
+import { getClassStatus, findNextClassIndex, minutesUntil, formatDueLabel, relativeTime, greeting } from "../lib/format";
 import { COURSE_ICONS, useToast } from "../components/ui";
-import { BookIcon } from "../components/icons";
+import { BookIcon, NoteIcon, CalendarIcon, ScheduleIcon, DescriptionIcon, TrashIcon, CheckIcon, FileKindIcon } from "../components/icons";
 import { Favicon } from "../components/Favicon";
 
 
@@ -28,6 +29,8 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [recentFiles, setRecentFiles] = useState<FileItem[]>([]);
   const [pronoteStatus, setPronoteStatus] = useState<any>(null);
+  const [keepAwakeOn, setKeepAwakeOn] = useState(true); // default on (backend now starts with screen keep-awake enabled)
+  const [recap, setRecap] = useState<RecapData | null>(null);
 
 
 
@@ -49,6 +52,8 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
     api.listLinks().then(setLinks).catch(() => {});
     api.recentFiles(5).then(setRecentFiles).catch(() => {});
     api.pronoteStatus().then(setPronoteStatus).catch(() => {});
+    api.keepAwakeStatus().then((s) => setKeepAwakeOn(!!s)).catch(() => {});
+    api.getRecap("today").then(setRecap).catch(() => {});
   };
 
   useEffect(() => {
@@ -106,10 +111,20 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const syncPronote = async () => {
     try {
       await api.pronoteSync();
-      toast("Synchronisation Pronote effectuée", "success");
+      toast(get("settings.toastSyncCount", "{count} cours").replace("{count}", "OK"), "success");
       refresh();
     } catch {
-      toast("Sync Pronote impossible (vérifiez la connexion)", "error");
+      toast(get("settings.toastSyncFail", "Sync impossible"), "error");
+    }
+  };
+
+  const toggleKeepAwake = async () => {
+    try {
+      const next = !!(await api.setKeepAwake(!keepAwakeOn));
+      setKeepAwakeOn(next);
+      toast(next ? (t.tools?.keepAwakeOn || "L'écran reste allumé") : (t.tools?.keepAwakeOff || "Verrouillage écran normal"), next ? "success" : "info");
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
     }
   };
 
@@ -141,7 +156,8 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
             <div className="flex items-baseline gap-2 text-[13px]">
               <span className="font-mono text-[#666] w-[78px] shrink-0 tabular-nums">{c.start_time}–{c.end_time}</span>
               <span className="font-medium text-[#222] truncate">{c.subject}</span>
-              {c.room && <span className="ml-auto text-[10px] px-1.5 py-px rounded bg-white border border-[#e5e5e5] text-[#666] tabular-nums">{c.room}</span>}
+              {c.room && <span className="text-[10px] px-1.5 py-px rounded bg-white border border-[#e5e5e5] text-[#666] tabular-nums">{c.room}</span>}
+              {status === "past" && <span className="ml-auto text-[9px] px-1.5 py-px rounded border border-[#e5e5e5] text-[#888] tabular-nums">passé</span>}
             </div>
 
             <div className="mt-0.5 text-[10px] font-mono flex items-center gap-2">
@@ -154,7 +170,6 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
               )}
               {isNext && <span className="text-[#c2410c] font-medium">{mins ? `DANS ${mins} MIN` : "PROCHAIN"}</span>}
               {status === "upcoming" && !isNext && <span className="text-[#888]">à venir</span>}
-              {status === "past" && <span className="text-[#888]">passé</span>}
             </div>
 
             {isCurrent && (
@@ -166,27 +181,26 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
         </div>
       );
     });
-  }, [classes]);
+  }, [classes, nowTick]); // include nowTick so progress bars and "dans X min" update live every 30s without full component churn (the items JSX recomputes cheaply)
 
   return (
     <div className="max-w-[960px] mx-auto flex flex-col gap-8 pb-12 font-mono">
       {/* Hero title — matches the provided mock exactly ("Une nouvelle page, un nouveau cours.") */}
       <div className="pt-2">
         <h1 className="font-display-xl text-[42px] leading-[1.05] tracking-[-1.2px] text-primary">
-          Une nouvelle page, un nouveau cours.
+          {greeting()} — tableau de bord.
         </h1>
-        <p className="text-mute text-sm mt-1 font-mono">Bonjour — voici votre tableau de bord Euclide.</p>
       </div>
 
       {/* Stats row — inspired by the mock (light cards, icon circles, big nums, small caps labels).
-          These are simple inventory overviews (not the activity recap counts — those live only in the Bilan tab). */}
+          These are simple inventory overviews. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div
           onClick={() => tabs.open({ kind: "courses" })}
           className="bg-[#f4f4f4] border border-[#e8e8e8] rounded-2xl p-5 flex items-center gap-4 cursor-pointer active:scale-[0.985] transition-all hover:border-[#d0d0d0]"
         >
           <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center text-[#666] ring-1 ring-inset ring-[#e8e8e8]">
-            <span className="material-symbols-outlined text-[26px]">menu_book</span>
+            <BookIcon className="w-6 h-6" />
           </div>
           <div>
             <div className="text-[34px] font-semibold tabular-nums tracking-[-1px] text-[#1f1f1f] leading-none">{courses.length}</div>
@@ -199,7 +213,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
           className="bg-[#f4f4f4] border border-[#e8e8e8] rounded-2xl p-5 flex items-center gap-4 cursor-pointer active:scale-[0.985] transition-all hover:border-[#d0d0d0]"
         >
           <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center text-[#666] ring-1 ring-inset ring-[#e8e8e8]">
-            <span className="material-symbols-outlined text-[26px]">description</span>
+            <DescriptionIcon className="w-6 h-6" />
           </div>
           <div>
             <div className="text-[34px] font-semibold tabular-nums tracking-[-1px] text-[#1f1f1f] leading-none">{docCount}</div>
@@ -212,7 +226,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
           className="bg-[#f4f4f4] border border-[#e8e8e8] rounded-2xl p-5 flex items-center gap-4 cursor-pointer active:scale-[0.985] transition-all hover:border-[#d0d0d0]"
         >
           <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center text-[#666] ring-1 ring-inset ring-[#e8e8e8]">
-            <span className="material-symbols-outlined text-[26px]">note</span>
+            <NoteIcon className="w-6 h-6" />
           </div>
           <div>
             <div className="text-[34px] font-semibold tabular-nums tracking-[-1px] text-[#1f1f1f] leading-none">{notes.length}</div>
@@ -221,9 +235,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
         </div>
       </div>
 
-      {/* ACTIONS RAPIDES — exactly as mock + current, with bracket affordance */}
       <section>
-        <div className="uppercase tracking-[1.5px] text-[11px] text-[#666] mb-2 font-mono">ACTIONS RAPIDES</div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => tabs.open({ kind: "courses" })} className="new-btn shrink-0">
             <span className="text-secondary">[+]</span> {t.common?.newCourse || "Nouveau cours"}
@@ -234,46 +246,66 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
           <button onClick={() => tabs.open({ kind: "reminders" })} className="new-btn shrink-0">
             <span className="text-secondary">[+]</span> {t.common?.newReminder || "Nouveau rappel"}
           </button>
+          <button onClick={() => tabs.open({ kind: "note", title: t.common?.newNote || "Nouvelle note", params: { isNew: true } })} className="new-btn shrink-0">
+            <span className="text-secondary">[+]</span> {t.common?.newNote || "Nouvelle note"}
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const added = await api.importFiles(null);
+                const count = Array.isArray(added) ? added.length : 0;
+                toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
+                window.dispatchEvent(new CustomEvent("eu:library-changed"));
+              } catch {
+                toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+              }
+            }}
+            className="new-btn shrink-0"
+          >
+            <span className="text-secondary">[+]</span> {t.common?.importFiles || "Importer des fichiers"}
+          </button>
+          <button onClick={() => tabs.open({ kind: "python" })} className="new-btn shrink-0">
+            <span className="text-secondary">[+]</span> Python
+          </button>
         </div>
       </section>
 
       {/* Main two widgets — schedule + rappels (core daily use, matching the mock structure & empty states) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Les cours d'aujourd'hui — rich status, progress, live tick (kept from previous, styled clean) */}
-        <div className="new-card overflow-hidden flex flex-col">
+        <div className="bg-white border border-[#e8e8e8] rounded-2xl overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-hairline bg-surface-soft flex items-center justify-between text-sm">
             <div className="font-medium text-primary">Les cours d'aujourd'hui</div>
             <div className="text-[10px] px-2 py-0.5 rounded border border-hairline text-mute tabular-nums flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px]">schedule</span> {classes.length}
+              <ScheduleIcon className="w-3.5 h-3.5" /> {classes.length}
             </div>
           </div>
 
           {classes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center bg-surface-soft">
-              <span className="material-symbols-outlined text-[42px] text-ash mb-3">calendar_today</span>
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-surface-soft">
+              <CalendarIcon className="w-9 h-9 text-ash mb-3" />
               <p className="text-mute text-sm">{t.dashboard?.noClassesToday || "Aucun cours prévu aujourd'hui. Profitez du calme."}</p>
             </div>
           ) : (
-            <div className="p-2 text-sm bg-white">
+            <div className="flex-1 p-2 text-sm bg-[rgb(var(--eu-card))]">
               {scheduleItems}
             </div>
           )}
         </div>
 
         {/* Rappels — clean list + empty state matching mock */}
-        <div className="new-card overflow-hidden flex flex-col">
+        <div className="bg-white border border-[#e8e8e8] rounded-2xl overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-hairline bg-surface-soft flex items-center justify-between text-sm">
             <div className="font-medium text-primary">Rappels</div>
             <button onClick={() => tabs.open({ kind: "reminders" })} className="w-6 h-6 rounded border border-hairline flex items-center justify-center text-mute hover:text-primary hover:bg-surface-soft active:bg-surface-container text-xs">+</button>
           </div>
 
           {pending.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center bg-surface-soft">
-              <span className="material-symbols-outlined text-[42px] text-ash mb-3">notifications_off</span>
-              <p className="text-mute text-sm">{t.dashboard?.noReminders || "Rien à retenir pour le moment."}</p>
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-surface-soft">
+              <p className="text-mute text-sm">{t.dashboard?.noReminders || "Aucun rappel."}</p>
             </div>
           ) : (
-            <ul className="p-2 text-sm bg-white">
+            <ul className="flex-1 p-2 text-sm bg-[rgb(var(--eu-card))]">
               {pending.slice(0, 6).map((r, i) => {
                 const due = formatDueLabel(r.due_at);
                 const isOver = due.tone === "over";
@@ -281,7 +313,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
                 return (
                   <li key={i} className="group flex items-center gap-2 px-3 py-2 rounded hover:bg-surface-soft border border-transparent hover:border-hairline">
                     <button onClick={() => toggle(r)} className="text-emerald-600 hover:scale-110 active:scale-95 transition-transform shrink-0">
-                      <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                      <CheckIcon className="w-4 h-4" />
                     </button>
                     <span className="truncate flex-1 text-primary">{r.title}</span>
                     {due.text && (
@@ -289,8 +321,8 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
                         {due.text}
                       </span>
                     )}
-                    <button onClick={(e) => deleteReminder(r.id, e)} className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 active:text-red-600 transition-all" title="Supprimer">
-                      <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <button onClick={(e) => deleteReminder(r.id, e)} className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 active:text-red-600 transition-all" title={get("common.delete", "Supprimer")}>
+                      <TrashIcon className="w-3.5 h-3.5" />
                     </button>
                   </li>
                 );
@@ -300,13 +332,13 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
         </div>
       </div>
 
-      {/* Additional widgets — "everything the app does" surfaced on the dashboard (without duplicating Bilan/Recap activity counts & tops) */}
+      {/* Additional widgets — "everything the app does" surfaced on the dashboard. Quick links now own category. Added recap activity + keep-awake from tools + python entry point. */}
       <div>
-        <div className="uppercase tracking-[1.5px] text-[11px] text-[#666] mb-2 font-mono">L'APPLICATION EN UN COUP D'ŒIL</div>
+        <div className="uppercase tracking-[1.5px] text-[11px] text-[#666] mb-2 font-mono">{get("dashboard.quickLinks", "Liens")}</div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Mes cours widget */}
-          <div className="new-card p-4 bg-white">
+          <div className="bg-white border border-[#e8e8e8] rounded-2xl p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium text-primary">Mes cours</div>
               <button onClick={() => tabs.open({ kind: "courses" })} className="text-[10px] text-[#666] hover:text-primary">voir tout →</button>
@@ -319,7 +351,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
                   <button
                     key={c.id}
                     onClick={() => tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } })}
-                    className="text-left px-3 py-1 rounded-lg border border-[#e5e5e5] hover:border-[#ccc] active:scale-[0.985] transition text-sm flex items-center gap-2"
+                    className="text-left px-3 py-1 rounded-lg border border-[#e5e5e5] hover:border-[#ccc] active:scale-[0.985] transition text-sm flex items-center gap-2 max-w-[170px]"
                     style={{ background: `${c.color}15` }}
                   >
                     <span className="inline-block w-2 h-2 rounded-full" style={{ background: c.color }} />
@@ -328,8 +360,8 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
                       const IconComp = found ? found.Icon : BookIcon;
                       return <IconComp className="w-3.5 h-3.5 text-[#444]" strokeWidth={1.8} />;
                     })()}
-                    <span className="truncate max-w-[110px] text-[#222]">{c.name}</span>
-                    {c.matiere && <span className="text-[9px] px-1 rounded bg-white/70 text-[#666]">{c.matiere.slice(0,4)}</span>}
+                    <span className="truncate flex-1 min-w-0 text-[#222]">{c.name}</span>
+                    {c.matiere && <span className="text-[9px] px-1 rounded bg-white/70 text-[#666] flex-shrink-0">{c.matiere === 'Mathématiques' ? 'Math' : c.matiere === 'Maths expertes' ? 'Maths+' : c.matiere.slice(0,4)}</span>}
                   </button>
                 ))}
                 {courses.length > 6 && (
@@ -340,7 +372,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
           </div>
 
           {/* Fichiers récents — surfaces the document library + PDF/whiteboard viewers */}
-          <div className="new-card p-4 bg-white">
+          <div className="bg-white border border-[#e8e8e8] rounded-2xl p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium text-primary">Récents</div>
               <button onClick={() => tabs.open({ kind: "documents" })} className="text-[10px] text-[#666] hover:text-primary">bibliothèque →</button>
@@ -348,28 +380,54 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
             {recentFiles.length === 0 ? (
               <div className="text-xs text-[#777] py-3">Importez des PDF, images ou tableaux. Ils apparaîtront ici.</div>
             ) : (
-              <div className="space-y-1 text-sm">
+              <div className="space-y-0.5 text-sm">
                 {recentFiles.map((f: FileItem) => (
                   <button
                     key={f.id}
                     onClick={() => openRecent(f)}
-                    className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-[#f8fafc] active:bg-[#f1f5f9] text-[#222]"
+                    className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-[#f8fafc] active:bg-[#f1f5f9] text-[#222] group"
+                    title={f.name}
                   >
-                    <span className="text-[13px] text-[#888] w-8 shrink-0">{(f.kind || "file").toUpperCase()}</span>
-                    <span className="truncate flex-1">{f.name}</span>
-                    <span className="text-[10px] text-[#999] tabular-nums shrink-0">{relativeTime(f.added_at)}</span>
+                    <FileKindIcon kind={f.kind} className="w-4 h-4 text-[#888]" />
+                    <span className="truncate flex-1 text-[13px]">{f.name}</span>
+                    <span className="text-[9px] text-[#999] tabular-nums shrink-0 opacity-80 group-hover:opacity-100">{relativeTime(f.added_at)}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Outils & Pronote — quick access + user quick links (favicons loaded from sites, default non-emoji icon) */}
-          <div className="new-card p-4 bg-white">
+          {/* Liens rapides — now its own category (extracted from Outils, dedicated card) */}
+          <div className="bg-white border border-[#e8e8e8] rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium text-primary">Liens rapides</div>
+              <button onClick={() => tabs.open({ kind: "tools" })} className="text-[10px] text-[#666] hover:text-primary">gérer →</button>
+            </div>
+            {links.length === 0 ? (
+              <div className="text-xs text-[#777] py-3">Ajoutez des liens (sites, manuels, ENT…) depuis Outils pour un accès direct.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-1 text-sm">
+                {links.slice(0, 6).map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => api.openUrl(l.url)}
+                    className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-[#f8fafc] active:bg-[#f1f5f9] text-[#222]"
+                  >
+                    <Favicon url={l.url} className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{l.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Outils & Pronote — quick access, pronote status, keep-awake toggle + activity recap from everywhere */}
+          <div className="bg-white border border-[#e8e8e8] rounded-2xl p-4">
             <div className="text-sm font-medium text-primary mb-2">Outils &amp; Pronote</div>
 
             <div className="flex flex-wrap gap-2 text-sm">
               <button onClick={() => tabs.open({ kind: "tools" })} className="px-3 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985]">Ouvrir Outils</button>
+              <button onClick={() => tabs.open({ kind: "python" })} className="px-3 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985]">Python</button>
               <button onClick={() => tabs.open({ kind: "whiteboard", params: { isNew: true } })} className="px-3 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985]">Nouveau tableau</button>
             </div>
 
@@ -387,25 +445,26 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
               </div>
             )}
 
-            {/* The quick links ("these") shown directly here on dashboard too, using real site favicons via Favicon or clean LinkIcon default — never emoji */}
-            {links.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-[#f0f0f0]">
-                <div className="text-[10px] uppercase tracking-[1px] text-[#666] mb-1.5 font-mono">Liens rapides</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {links.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => api.openUrl(l.url)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985] text-left min-w-0"
-                    >
-                      <Favicon url={l.url} className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate text-[12px] font-medium text-[#222]">{l.label}</span>
-                    </button>
-                  ))}
-                </div>
+            {/* Keep awake toggle (from Tools) */}
+            <div className="mt-2 pt-2 border-t border-[#f0f0f0] flex items-center justify-between text-xs">
+              <span className="text-mute">Veille écran</span>
+              <button
+                onClick={toggleKeepAwake}
+                className={`px-2 py-0.5 rounded border text-[10px] transition ${keepAwakeOn ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#e5e5e5] hover:bg-[#f8fafc]"}`}
+              >
+                {keepAwakeOn ? "Désactivée" : "Auto"}
+              </button>
+            </div>
+
+            {/* Mini activity recap pulled from Recap (everywhere usage) */}
+            {recap && (
+              <div className="mt-2 pt-2 border-t border-[#f0f0f0] text-[10px] text-[#666] flex flex-wrap gap-x-3 gap-y-0.5">
+                <span>{recap.files_opened || 0} fichiers</span>
+                <span>{recap.notes_written || 0} notes</span>
+                <span>{recap.reminders_done || 0} rappels</span>
+                <span>{recap.demos_run || 0} scripts</span>
               </div>
             )}
-
           </div>
         </div>
 

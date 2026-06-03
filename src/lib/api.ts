@@ -27,14 +27,39 @@ export function invalidateCache(keyPrefix?: string) {
 if (typeof window !== "undefined") {
   const onChange = (e: Event) => {
     const type = (e as CustomEvent).type;
-    if (type.includes("library") || type.includes("course") || type.includes("reminder") || type.includes("schedule")) {
+    if (type.includes("course")) {
+      invalidateCache("listCourses");
+      invalidateCache("listCourseClasses");
+    }
+    if (type.includes("library") || type.includes("file") || type.includes("note")) {
+      invalidateCache("listFiles");
+      invalidateCache("recentFiles");
+      invalidateCache("allNotes");
+      invalidateCache("listNotes");
+    }
+    if (type.includes("reminder")) {
+      invalidateCache("listReminders");
+    }
+    if (type.includes("schedule")) {
+      invalidateCache("listSchedule");
+      invalidateCache("getTodayClasses");
+    }
+    if (type.includes("link")) {
+      invalidateCache("listLinks");
+    }
+    if (type.includes("demo")) {
+      invalidateCache("listDemos");
+    }
+    // Fallback: if unknown or "library" broad, full clear for safety on some events
+    if (type.includes("library-changed") || type.includes("full-invalidate")) {
       invalidateCache();
     }
   };
   window.addEventListener("eu:library-changed", onChange);
-  window.addEventListener("eu:course-changed", onChange); // if added
+  window.addEventListener("eu:course-changed", onChange);
   window.addEventListener("eu:reminders-changed", onChange);
   window.addEventListener("eu:schedule-changed", onChange);
+  window.addEventListener("eu:quicklinks-changed", onChange);
 }
 
 export const isTauri = (): boolean =>
@@ -59,9 +84,7 @@ function fallback<T>(cmd: string): T {
   return null as unknown as T;
 }
 
-// ---------------------------------------------------------------------------
-// Data model (mirrors the Rust structs)
-// ---------------------------------------------------------------------------
+// Data model (mirrors Rust structs)
 
 export interface AppInfo {
   teacher_name: string;
@@ -76,7 +99,7 @@ export interface Course {
   emoji: string;
   color: string;
   description: string;
-  matiere: string; // "Mathématiques" | "NSI" — used to filter Pronote cahier contents by subject
+  matiere: string; // "Mathématiques" | "NSI" | "Maths expertes" — used to filter Pronote cahier contents by subject (see subjectForPronote)
   created_at: string;
 }
 
@@ -107,6 +130,30 @@ export interface FileItem {
   kind: string;
   size: number;
   added_at: string;
+}
+
+export interface TopCourse {
+  name: string;
+  emoji: string;
+  count: number;
+}
+
+export interface TopItem {
+  name: string;
+  count: number;
+}
+
+export interface RecapData {
+  period_label?: string;
+  files_opened: number;
+  notes_written: number;
+  demos_run: number;
+  reminders_done: number;
+  active_minutes: number;
+  top_courses: TopCourse[];
+  top_documents: TopItem[];
+  top_tools: TopItem[];
+  time_by_area: TopItem[];
 }
 
 export interface Reminder {
@@ -163,26 +210,22 @@ export interface PythonResult {
   stderr: string;
 }
 
-export interface RecapData {
-  period_label: string;
-  files_opened: number;
-  notes_written: number;
-  demos_run: number;
-  reminders_done: number;
-  active_minutes: number;
-  top_courses: { name: string; emoji: string; count: number }[];
-  top_documents: { name: string; count: number }[];
-  top_tools: { name: string; count: number }[];
-  time_by_area: { name: string; count: number }[];
-  highlights: string[];
+export interface PythonCompletion {
+  name: string;
+  complete?: string;
+  type?: string;
+  signature?: string;
+  doc?: string;
 }
 
-// ---------------------------------------------------------------------------
 // Commands
-// ---------------------------------------------------------------------------
 
 export const api = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
+
+  // Storage / data root (USB portable)
+  chooseDataDir: () => invoke<string | null>("choose_data_dir"),
+  resetDataDir: () => invoke<void>("reset_data_dir"),
 
   // Courses
   listCourses: () => {
@@ -192,12 +235,31 @@ export const api = {
     return invoke<Course[]>("list_courses").then((data) => { setCached(key, data); return data; });
   },
   createCourse: (name: string, emoji: string, color: string, description: string, matiere: string) =>
-    invoke<Course>("create_course", { name, emoji, color, description, matiere }),
-  updateCourse: (course: Course) => invoke<void>("update_course", { course }),
+    invoke<Course>("create_course", { name, emoji, color, description, matiere }).then((c) => {
+      // optimistic patch for list cache
+      const key = "listCourses";
+      const cached = getCached<Course[]>(key);
+      if (cached) setCached(key, [...cached, c]);
+      return c;
+    }),
+  updateCourse: (course: Course) => invoke<void>("update_course", { course }).then(() => {
+    // optimistic patch
+    const key = "listCourses";
+    const cached = getCached<Course[]>(key);
+    if (cached) {
+      setCached(key, cached.map((c) => (c.id === course.id ? { ...c, ...course } : c)));
+    }
+    return;
+  }),
   deleteCourse: (id: number) => invoke<void>("delete_course", { id }),
 
   // Course classes: casier is the course's files; per attached class (exact Pronote name) we track progress + prof notes
-  listCourseClasses: (courseId: number) => invoke<CourseClass[]>("list_course_classes", { courseId }),
+  listCourseClasses: (courseId: number) => {
+    const key = `listCourseClasses:${courseId}`;
+    const cached = getCached<CourseClass[]>(key);
+    if (cached) return Promise.resolve(cached);
+    return invoke<CourseClass[]>("list_course_classes", { courseId }).then((data) => { setCached(key, data); return data; });
+  },
   attachClassToCourse: (courseId: number, className: string) =>
     invoke<CourseClass>("attach_class_to_course", { courseId, className }),
   detachCourseClass: (id: number) => invoke<void>("detach_course_class", { id }),
@@ -207,7 +269,12 @@ export const api = {
     invoke<void>("update_course_class_notes", { courseId, className, notes }),
 
   // Notes
-  listNotes: (courseId: number | null) => invoke<Note[]>("list_notes", { courseId }),
+  listNotes: (courseId: number | null) => {
+    const key = `listNotes:${courseId ?? "all"}`;
+    const cached = getCached<Note[]>(key);
+    if (cached) return Promise.resolve(cached);
+    return invoke<Note[]>("list_notes", { courseId }).then((data) => { setCached(key, data); return data; });
+  },
   allNotes: () => {
     const key = "allNotes";
     const cached = getCached<Note[]>(key);
@@ -216,6 +283,7 @@ export const api = {
   },
   saveNote: (note: Partial<Note>) => invoke<Note>("save_note", { note }),
   deleteNote: (id: number) => invoke<void>("delete_note", { id }),
+  renameNote: (id: number, title: string) => invoke<Note>("rename_note", { id, newTitle: title }),
 
   // Files & documents
   listFiles: (courseId: number | null) => {
@@ -238,6 +306,7 @@ export const api = {
   listOpeners: (id: number) => invoke<Opener[]>("list_openers", { id }),
   filePath: (id: number) => invoke<string>("file_path", { id }),
   deleteFile: (id: number) => invoke<void>("delete_file", { id }),
+  renameFile: (id: number, name: string) => invoke<FileItem>("rename_file", { id, newName: name }),
   globalSearch: (query: string) => invoke<SearchResult[]>("global_search", { query }),
   reindexDocuments: () => invoke<number>("reindex_documents"),
 
@@ -272,7 +341,12 @@ export const api = {
     if (cached) return Promise.resolve(cached);
     return invoke<ScheduleEntry[]>("list_schedule").then((data) => { setCached(key, data); return data; });
   },
-  getTodayClasses: () => invoke<ScheduleEntry[]>("get_today_classes"),
+  getTodayClasses: () => {
+    const key = "getTodayClasses";
+    const cached = getCached<ScheduleEntry[]>(key);
+    if (cached) return Promise.resolve(cached);
+    return invoke<ScheduleEntry[]>("get_today_classes").then((data) => { setCached(key, data); return data; });
+  },
   saveScheduleEntry: (entry: Partial<ScheduleEntry>) =>
     invoke<ScheduleEntry>("save_schedule_entry", { entry }),
   deleteScheduleEntry: (id: number) => invoke<void>("delete_schedule_entry", { id }),
@@ -288,6 +362,10 @@ export const api = {
   exportBoardPng: (courseId: number | null, name: string, dataUrl: string) =>
     invoke<FileItem>("export_board_png", { courseId, name, dataUrl }),
   saveExport: (name: string, dataUrl: string) => invoke<FileItem>("save_export", { name, dataUrl }),
+  updateFile: (fileId: number, dataUrl: string) => invoke<FileItem>("update_file", { fileId, dataUrl }),
+  getFileVersions: (fileId: number) => invoke<any[]>("get_file_versions", { fileId }),
+  readVersionData: (name: string) => invoke<string>("read_version_data", { name }),
+  ensureOriginalVersion: (fileId: number) => invoke<void>("ensure_original_version", { fileId }),
 
   // PDF annotations
   saveAnnotations: (fileId: number, json: string) =>
@@ -303,10 +381,13 @@ export const api = {
   },
   runDemo: (path: string) => invoke<PythonResult>("run_python_demo", { path }),
   runCode: (code: string) => invoke<PythonResult>("run_python_code", { code }),
+  pythonComplete: (code: string, line: number, column: number, filename?: string) =>
+    invoke<PythonCompletion[]>("python_complete", { code, line, column, filename }),
   createScript: (name: string, code: string) =>
     invoke<PythonDemo>("create_python_script", { name, code }),
   saveScript: (path: string, code: string) => invoke<void>("save_python_script", { path, code }),
   deleteScript: (path: string) => invoke<void>("delete_python_script", { path }),
+  renameScript: (path: string, newName: string) => invoke<PythonDemo>("rename_python_script", { path, newName }),
   importScript: () => invoke<PythonDemo | null>("import_python_script"),
 
   // Keep awake
@@ -314,7 +395,13 @@ export const api = {
   keepAwakeStatus: () => invoke<boolean>("keep_awake_status"),
 
   // Pronote
-  pronoteStatus: () => invoke<PronoteStatus>("pronote_status"),
+  pronoteStatus: () => {
+    const key = "pronoteStatus";
+    const cached = getCached<PronoteStatus>(key);
+    if (cached) return Promise.resolve(cached);
+    // 30s TTL is fine; status changes only on login/logout/sync
+    return invoke<PronoteStatus>("pronote_status").then((data) => { setCached(key, data); return data; });
+  },
   pronoteQrLogin: (qrJson: string, pin: string) =>
     invoke<PronoteStatus>("pronote_qr_login", { qrJson, pin }),
   pronotePasswordLogin: (url: string, username: string, password: string) =>
@@ -333,11 +420,12 @@ export const api = {
   // Returns prof's available classes from Pronote (for dropdowns when attaching to courses)
   pronoteClasses: () => invoke<any>("pronote_classes"),
 
-  // Usage & recap
+  // Usage events (for various stats / history)
   logEvent: (kind: string, label: string, courseId: number | null) =>
     invoke<void>("log_event", { kind, label, courseId }),
-  getRecap: (period: string) => invoke<RecapData>("get_recap", { period }),
-  cleanupOldUsageData: () => invoke<void>("cleanup_old_usage_data"),
+
+  // Recap / Bilan (activity summary)
+  getRecap: (period: string = "today") => invoke<RecapData>("get_recap", { period }),
 
   // Settings
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),

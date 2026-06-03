@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { api, openWith, type Opener } from "../lib/api";
 import { FolderIcon, GlobeIcon, FileIcon } from "./icons";
+import { get } from "../lib/i18n";
 
 export function OpenWithButton({
   fileId,
@@ -24,9 +25,9 @@ export function OpenWithButton({
     } catch {
       // fallback minimal
       const fb: Opener[] = [
-        { name: "Navigateur par défaut", app: undefined, is_reveal: false },
-        { name: "Application par défaut", app: undefined, is_reveal: false },
-        { name: "Afficher dans le dossier", app: undefined, is_reveal: true },
+        { name: get("openWith.browser", "Navigateur"), app: undefined, is_reveal: false },
+        { name: get("openWith.defaultApp", "Application"), app: undefined, is_reveal: false },
+        { name: get("openWith.reveal", "Dossier"), app: undefined, is_reveal: true },
       ];
       setOptions(fb);
       return fb;
@@ -66,9 +67,9 @@ export function OpenWithButton({
       <button
         onClick={handleClick}
         className={className}
-        title="Ouvrir dehors"
+        title={get("openWith.title", "Ouvrir dehors")}
       >
-        {label}
+        {label || get("openWith.label", "Ouvrir dehors")}
       </button>
       {open && options && (
         <div

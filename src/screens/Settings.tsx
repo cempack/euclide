@@ -7,7 +7,7 @@ import {
   type PronoteStatus,
   type ScheduleEntry,
 } from "../lib/api";
-import { t, fmt } from "../lib/i18n";
+import { t, fmt, get } from "../lib/i18n";
 import { DAY_LABELS } from "../lib/format";
 
 import { EmptyState, Modal, SectionHeader, useToast } from "../components/ui";
@@ -19,25 +19,84 @@ export default function Settings({ info }: { info: AppInfo | null }) {
     <div className="flex flex-col gap-8">
       <header>
         <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.settings}</h1>
-        <p className="text-mute text-sm mt-1">{t.settings?.subtitle || "Pronote, emploi du temps et personnalisation."}</p>
+        <p className="text-mute text-sm mt-1">{t.settings?.subtitle || "Pronote, emploi du temps et onglets."}</p>
       </header>
 
-
+      <TabsSection />
       <PronoteSection />
       <ScheduleSection />
-      <TabsSection />
+      <DataStorageSection info={info} />
       <AboutSection info={info} />
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// (Appearance section removed — Mistral design system uses fixed theme)
-// ---------------------------------------------------------------------------
+// Data storage root (the folder containing EVERYTHING: db, documents, courses files, whiteboards, python scripts).
+// The choice is stored in a small euclide-data.json next to the exe so the USB setup remains self-contained.
+// Changing the folder requires a restart (DB and caches are bound at launch).
 
-// ---------------------------------------------------------------------------
+function DataStorageSection({ info }: { info: AppInfo | null }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const current = info?.data_dir || "";
+
+  const choose = async () => {
+    setBusy(true);
+    try {
+      const p = await api.chooseDataDir();
+      if (p) {
+        toast(
+          "Dossier de stockage sélectionné. Redémarrez Euclide pour utiliser le nouveau dossier (toute la DB, fichiers, scripts…).",
+          "success"
+        );
+      }
+    } catch {
+      toast(get("settings.pickFolderError", "Impossible de sélectionner le dossier"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    if (!confirm("Revenir au dossier par défaut (Euclide-Data à côté de l'exécutable) ?")) return;
+    setBusy(true);
+    try {
+      await api.resetDataDir();
+      toast(get("settings.resetSuccess", "Configuration réinitialisée. Redémarrez Euclide pour appliquer."), "success");
+    } catch {
+      toast(get("settings.resetError", "Erreur lors de la réinitialisation"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section>
+      <SectionHeader title={t.settings?.dataDirTitle || "Dossier de stockage"} />
+      <div className="new-card p-4">
+        <p className="text-sm mb-1 text-primary">Emplacement de toutes les données (base, documents, cours, tableaux, scripts Python) :</p>
+        <p className="text-[11px] font-mono text-mute break-all selectable mb-3">{current || "(chemin inconnu)"}</p>
+
+        <div className="flex flex-wrap gap-2">
+          <button onClick={choose} disabled={busy} className="new-btn-ghost">
+            Choisir un dossier…
+          </button>
+          <button onClick={reset} disabled={busy} className="new-btn-ghost text-mute">
+            Réinitialiser (par défaut)
+          </button>
+        </div>
+
+        <p className="text-[11px] text-mute mt-3 leading-snug">
+          {t.settings?.dataDirHint ||
+            "Parfait pour une clé USB : choisissez un dossier sur la clé. Le pointeur (euclide-data.json) reste à côté de l'exécutable. Un redémarrage est nécessaire après tout changement. Aucune migration automatique : copiez les anciens fichiers si besoin."}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 // Pronote
-// ---------------------------------------------------------------------------
 
 type LoginMethod = "qr" | "direct";
 
@@ -197,7 +256,7 @@ function PronoteSection() {
         </div>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Connexion a Pronote" width="max-w-xl">
+      <Modal open={open} onClose={() => setOpen(false)} title={get("settings.pronoteTitle", "Pronote")} width="max-w-xl">
         <div className="flex flex-col gap-4">
           <div className="new-segment w-full">
             <button
@@ -301,9 +360,7 @@ function PronoteSection() {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Schedule (manual)
-// ---------------------------------------------------------------------------
 
 function ScheduleSection() {
   const toast = useToast();
@@ -340,7 +397,7 @@ function ScheduleSection() {
   return (
     <section>
       <SectionHeader
-        title="Emploi du temps"
+        title={get("settings.scheduleTitle", "Emploi du temps")}
         action={
           <button onClick={() => setOpen(true)} className="new-btn-ghost py-1.5 px-2.5 text-xs">
             <PlusIcon className="w-4 h-4" /> {t.common?.add || "Ajouter"}
@@ -365,7 +422,7 @@ function ScheduleSection() {
                 <div className="flex flex-col gap-1.5">
                   {items.map((e) => (
                     <div key={e.id} className="flex items-center gap-2 group text-sm">
-                      <span className="text-accent-sunset font-medium tabular-nums w-24 shrink-0">
+                      <span className="text-tui-accent font-medium tabular-nums w-24 shrink-0">
                         {e.start_time}-{e.end_time}
                       </span>
                       <span className="flex-1 text-primary truncate">{e.subject}</span>
@@ -461,9 +518,7 @@ function ScheduleSection() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Tabs (max tabs limit customization)
-// ---------------------------------------------------------------------------
+// Tabs (max tabs limit)
 
 function TabsSection() {
   const tabsCtx = useTabs();
@@ -499,7 +554,7 @@ function TabsSection() {
           </span>
         }
       />
-      <div className="new-card p-4 bg-white">
+      <div className="new-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <input
             id="tabs-unlimited"
@@ -557,14 +612,12 @@ function TabsSection() {
   );
 }
 
-// ---------------------------------------------------------------------------
 // About
-// ---------------------------------------------------------------------------
 
 function AboutSection({ info }: { info: AppInfo | null }) {
   return (
     <section>
-      <SectionHeader title="A propos" />
+      <SectionHeader title={get("about.title", "À propos")} />
       <div className="new-card p-6 flex items-center gap-4">
         <img src="/euclide-logo.png" alt="Euclide" className="w-16 h-16 rounded-2xl object-contain" />
         <div>

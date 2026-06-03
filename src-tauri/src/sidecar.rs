@@ -36,6 +36,23 @@ pub fn run(
     serde_json::from_str(line).map_err(|e| format!("Reponse sidecar invalide : {e} :: {line}"))
 }
 
+/// Async version of `run` that offloads the blocking `Command::output()` (subprocess +
+/// network for Pronote, PDF parsing, etc.) to a background thread from the async runtime's
+/// blocking pool. This ensures long Pronote loads (or other sidecar work) never freeze
+/// the main UI thread or starve Tauri's command dispatch.
+pub async fn run_async(
+    app: &AppHandle,
+    command: &str,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let app = app.clone();
+    let command = command.to_owned();
+    let payload = payload.clone();
+    tauri::async_runtime::spawn_blocking(move || run(&app, &command, &payload))
+        .await
+        .map_err(|join_err| format!("Erreur d'exécution sidecar (spawn_blocking): {join_err}"))?
+}
+
 /// Returns (program, leading_args). For a frozen binary leading_args is empty;
 /// for the dev fallback it is `[script_path]` run through a Python interpreter.
 fn resolve(app: &AppHandle) -> Result<(String, Vec<String>), String> {

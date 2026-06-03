@@ -1,10 +1,42 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import { api, type Reminder } from "../lib/api";
-import { t } from "../lib/i18n";
+import { t, get } from "../lib/i18n";
 import { useToast } from "../components/ui";
 import { BellIcon, CheckIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
 import { formatDueLabel } from "../lib/format";
-import { notifyPendingReminders } from "../lib/notify";
+
+// Hoisted memo row for snappier list updates (filter/search/parent state changes)
+const MemoReminderRow = memo(function MemoReminderRow({ r, onToggle, onDelete, due }: { r: Reminder; onToggle: (r: Reminder) => void; onDelete: (id: number) => void; due: ReturnType<typeof formatDueLabel> }) {
+  const isDone = r.done;
+  return (
+    <div className={`flex items-center gap-4 px-4 py-4 group transition-colors ${isDone ? "bg-surface-soft/40" : "hover:bg-surface-soft"}`}>
+      <button
+        onClick={() => onToggle(r)}
+        className={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full border transition ${isDone ? "bg-emerald-600 border-emerald-600 text-white" : "border-hairline text-mute hover:border-tui-accent hover:text-tui-accent"}`}
+        title={isDone ? "Marquer à faire" : "Marquer fait"}
+      >
+        {isDone ? <CheckIcon className="w-3.5 h-3.5" /> : <span className="w-2 h-2 rounded-full bg-current" />}
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div className={`font-medium truncate ${isDone ? "line-through text-mute" : "text-primary"}`}>{r.title}</div>
+        {r.due_at && (
+          <div className="text-[10px] text-mute mt-0.5 font-mono">{new Date(r.due_at).toLocaleDateString("fr-FR")}</div>
+        )}
+      </div>
+
+      {due.text && (
+        <span className={`text-[10px] px-1.5 py-px rounded border font-mono tabular-nums shrink-0 ${due.tone === "over" ? "text-red-700 border-red-200 bg-red-50" : due.tone === "soon" ? "text-orange-700 border-orange-200 bg-orange-50" : "text-mute border-hairline"}`}>
+          {due.text}
+        </span>
+      )}
+
+      <button onClick={() => onDelete(r.id)} className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 active:text-red-600 transition-all" title="Supprimer">
+        <TrashIcon className="w-4 h-4" />
+      </button>
+    </div>
+  );
+});
 
 export default function Reminders() {
   const toast = useToast();
@@ -60,21 +92,21 @@ export default function Reminders() {
     setNewDue(d.toISOString().slice(0, 10));
   };
 
-  const toggle = async (r: Reminder) => {
+  const toggle = useCallback(async (r: Reminder) => {
     const markingDone = !r.done;
     await api.toggleReminder(r.id, markingDone);
     if (markingDone) {
       api.logEvent("reminder_done", r.title, null);
       const cheers: string[] = (t.dashboard?.cheers as string[] | undefined)?.length
         ? (t.dashboard?.cheers as string[])
-        : ["Bien joué !", "Un de fait ✓", "Nickel !"];
+        : ["Bien joué !", "Fait !", "Nickel !"];
       toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
     }
     window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
     refresh();
-  };
+  }, [refresh, setReminders, toast]);
 
-  const deleteOne = async (id: number, e?: React.MouseEvent) => {
+  const deleteOne = useCallback(async (id: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (!confirm(t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?")) return;
     try {
@@ -84,7 +116,7 @@ export default function Reminders() {
     } catch {
       toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
     }
-  };
+  }, [refresh, toast]);
 
   const clearDone = async () => {
     const done = reminders.filter((r) => r.done);
@@ -97,11 +129,6 @@ export default function Reminders() {
     }
     window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
     refresh();
-  };
-
-  const notifyNow = async () => {
-    await notifyPendingReminders();
-    toast("Notifications envoyées pour les rappels en attente.", "success");
   };
 
   const filtered = useMemo(() => {
@@ -193,7 +220,7 @@ export default function Reminders() {
         <div className="relative flex-1 w-full">
           <input
             className="new-input pl-9 w-full"
-            placeholder="Rechercher un rappel..."
+            placeholder={get("common.search", "Rechercher") + "..."}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -206,14 +233,9 @@ export default function Reminders() {
           <button onClick={() => setFilter("all")} className={`px-3 py-1 rounded border font-mono text-xs ${filter === "all" ? "bg-primary text-white border-primary" : "border-hairline text-mute hover:bg-surface-soft"}`}>Tous</button>
         </div>
 
-        <div className="flex gap-2">
-          <button onClick={notifyNow} className="new-btn-ghost text-xs flex items-center gap-1" title="Envoyer une notification système pour les rappels en attente">
-            <BellIcon className="w-3.5 h-3.5" /> Notifier
-          </button>
-          {doneCount > 0 && (
-            <button onClick={clearDone} className="new-btn-ghost text-xs text-mute hover:text-red-600">Effacer terminés</button>
-          )}
-        </div>
+        {doneCount > 0 && (
+          <button onClick={clearDone} className="new-btn-ghost text-xs text-mute hover:text-red-600">Effacer terminés</button>
+        )}
       </div>
 
       {/* List */}
@@ -228,40 +250,14 @@ export default function Reminders() {
         <div className="new-card divide-y divide-hairline/60 overflow-hidden">
           {filtered.map((r) => {
             const due = formatDueLabel(r.due_at);
-            const isDone = r.done;
             return (
-              <div key={r.id} className={`flex items-center gap-4 px-4 py-4 group transition-colors ${isDone ? "bg-surface-soft/40" : "hover:bg-surface-soft"}`}>
-                <button
-                  onClick={() => toggle(r)}
-                  className={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full border transition ${isDone ? "bg-emerald-600 border-emerald-600 text-white" : "border-hairline text-mute hover:border-tui-accent hover:text-tui-accent"}`}
-                  title={isDone ? "Marquer à faire" : "Marquer fait"}
-                >
-                  {isDone ? <CheckIcon className="w-3.5 h-3.5" /> : <span className="w-2 h-2 rounded-full bg-current" />}
-                </button>
-
-                <div className="flex-1 min-w-0">
-                  <div className={`font-medium truncate ${isDone ? "line-through text-mute" : "text-primary"}`}>{r.title}</div>
-                  {r.due_at && (
-                    <div className="text-[10px] text-mute mt-0.5 font-mono">{new Date(r.due_at).toLocaleDateString("fr-FR")}</div>
-                  )}
-                </div>
-
-                {due.text && (
-                  <span
-                    className={`text-[10px] px-1.5 py-px rounded border font-mono tabular-nums shrink-0 ${due.tone === "over" ? "text-red-700 border-red-200 bg-red-50" : due.tone === "soon" ? "text-orange-700 border-orange-200 bg-orange-50" : "text-mute border-hairline"}`}
-                  >
-                    {due.text}
-                  </span>
-                )}
-
-                <button
-                  onClick={(e) => deleteOne(r.id, e)}
-                  className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 transition-all shrink-0"
-                  title="Supprimer"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
+              <MemoReminderRow
+                key={r.id}
+                r={r}
+                onToggle={toggle}
+                onDelete={deleteOne}
+                due={due}
+              />
             );
           })}
         </div>
