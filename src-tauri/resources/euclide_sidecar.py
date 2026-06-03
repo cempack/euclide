@@ -283,16 +283,24 @@ def pronote_sync(payload):
     if not all([url, username, password]):
         return {"ok": False, "error": "Identifiants Pronote incomplets."}
 
+    client = None
     try:
         if mode == "password":
             client = pronotepy.Client(url, username, password)
         else:
             client = pronotepy.Client.token_login(url, username, password, uuid)
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+    except Exception:  # noqa: BLE001
+        client = None
 
-    if not getattr(client, "logged_in", False):
-        return {"ok": False, "error": "Session Pronote expiree."}
+    # Auto-retry with direct login if token_login failed (token rotation race)
+    if client is None or not getattr(client, "logged_in", False):
+        if mode != "password":
+            try:
+                client = pronotepy.Client(url, username, password)
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+        if client is None or not getattr(client, "logged_in", False):
+            return {"ok": False, "error": "Session Pronote expiree."}
 
     lessons = _lessons_for_week(client)
     # In QR mode the token rotates on every login - return the fresh one so it
@@ -673,16 +681,24 @@ def pronote_contents(payload):
     if not all([url, username, password]):
         return {"ok": False, "error": "Identifiants Pronote incomplets."}
 
+    client = None
     try:
         if mode == "password":
             client = pronotepy.Client(url, username, password)
         else:
             client = pronotepy.Client.token_login(url, username, password, uuid)
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+    except Exception:  # noqa: BLE001
+        client = None
 
-    if not getattr(client, "logged_in", False):
-        return {"ok": False, "error": "Session Pronote expiree."}
+    # Auto-retry with direct login if token_login failed (token rotation race)
+    if client is None or not getattr(client, "logged_in", False):
+        if mode != "password":
+            try:
+                client = pronotepy.Client(url, username, password)
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+        if client is None or not getattr(client, "logged_in", False):
+            return {"ok": False, "error": "Session Pronote expiree."}
 
     # Resolve class filter to a proper Pronote classe object when possible.
     # This is key for teacher accounts that can see multiple classes.
@@ -793,16 +809,24 @@ def pronote_classes(payload):
     if not all([url, username, password]):
         return {"ok": False, "error": "Identifiants Pronote incomplets."}
 
+    client = None
     try:
         if mode == "password":
             client = pronotepy.Client(url, username, password)
         else:
             client = pronotepy.Client.token_login(url, username, password, uuid)
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+    except Exception:  # noqa: BLE001
+        client = None
 
-    if not getattr(client, "logged_in", False):
-        return {"ok": False, "error": "Session Pronote expiree."}
+    # Auto-retry with direct login if token_login failed (token rotation race)
+    if client is None or not getattr(client, "logged_in", False):
+        if mode != "password":
+            try:
+                client = pronotepy.Client(url, username, password)
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"Reconnexion impossible : {exc}"}
+        if client is None or not getattr(client, "logged_in", False):
+            return {"ok": False, "error": "Session Pronote expiree."}
 
     classes_raw = (
         client.parametres_utilisateur.get("dataSec", {})

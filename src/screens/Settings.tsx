@@ -186,9 +186,24 @@ function PronoteSection() {
       setQrJson("");
       setPin("");
       setPassword("");
-      const n = await api.pronoteSync();
-      window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-      toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");
+      // Small delay to let the QR token settle before sync (token rotation race)
+      await new Promise((r) => setTimeout(r, 800));
+      try {
+        const n = await api.pronoteSync();
+        window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+        toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");
+      } catch {
+        // Token may have rotated — retry once after a short wait
+        try {
+          await new Promise((r) => setTimeout(r, 1500));
+          const n2 = await api.pronoteSync();
+          window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+          toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n2 }), "success");
+        } catch {
+          // Sync failed but login itself worked — user can manually sync later
+          toast(t.settings?.toastSyncFail || "Synchronisation impossible (réessayez manuellement)", "error");
+        }
+      }
       refresh();
     } else {
       toast(t.settings?.toastConnectFailed || "Connexion échouée, vérifiez vos informations", "error");

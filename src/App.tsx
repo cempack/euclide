@@ -2,6 +2,20 @@ import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "
 import { api, type AppInfo, isTauri } from "./lib/api";
 import { get } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
+
+/**
+ * On Windows/Linux, CSS `-webkit-app-region: drag` is unreliable with WebView2.
+ * Use Tauri's `getCurrentWindow().startDragging()` API instead.
+ * On macOS, CSS drag works natively so this is a no-op.
+ */
+const startDrag = (e: React.MouseEvent) => {
+  if (isMac || !isTauri()) return;
+  // Only drag on left mouse button
+  if (e.button !== 0) return;
+  import("@tauri-apps/api/window")
+    .then(({ getCurrentWindow }) => getCurrentWindow().startDragging())
+    .catch(() => {});
+};
 import { TabsProvider, useTabs, type TabKind } from "./lib/tabs";
 import { ToastProvider, useToast, Loading, COURSE_ICONS } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
@@ -67,7 +81,7 @@ const Sidebar = memo(function Sidebar() {
 
   return (
     <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono pt-10`}>
-      <div className="flex items-center gap-3 px-3 mb-10 eu-drag">
+      <div className="flex items-center gap-3 px-3 mb-10 eu-drag" onMouseDown={startDrag}>
         <img src="/euclide-logo.png" alt="Euclide" className="w-10 h-10 rounded-2xl object-contain" />
         <div className="leading-none">
           <h1 className="font-display-xl text-body-strong text-primary tracking-tight">EUCLIDE</h1>
@@ -138,7 +152,16 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
   return (
     <div
       className="eu-topbar h-14 shrink-0 flex items-center eu-drag bg-transparent font-mono overflow-hidden border-b border-hairline"
-      style={{ paddingLeft: 12 }}
+      style={{ paddingLeft: 12, paddingRight: (!isMac ? 140 : undefined) }}
+      onMouseDown={startDrag}
+      onDoubleClick={(e) => {
+        // Double-click titlebar to toggle maximize (Windows/Linux convention)
+        if (isMac || !isTauri()) return;
+        e.preventDefault();
+        import("@tauri-apps/api/window")
+          .then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize())
+          .catch(() => {});
+      }}
     >
       {/* Tab strip group (content-sized when few tabs; shrinks + scrolls internally when many).
           The + lives right after the scroller (inside the group, before the big spacer) so it is
@@ -264,15 +287,25 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
 
 function WindowControls() {
   const [win, setWin] = useState<any>(null);
+  const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
     if (!isTauri()) return;
     import("@tauri-apps/api/window")
-      .then(({ getCurrentWindow }) => setWin(getCurrentWindow()))
+      .then(({ getCurrentWindow }) => {
+        const w = getCurrentWindow();
+        setWin(w);
+        // Track maximized state for the restore/maximize icon toggle
+        w.isMaximized().then(setMaximized).catch(() => {});
+        w.onResized(() => {
+          w.isMaximized().then(setMaximized).catch(() => {});
+        }).catch(() => {});
+      })
       .catch(() => {});
   }, []);
 
-  if (!win) return null;
+  // On macOS, native traffic lights are provided by titleBarStyle: Overlay — hide custom controls
+  if (isMac || !win) return null;
 
   const handleClose = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -287,48 +320,57 @@ function WindowControls() {
     try { await win.toggleMaximize(); } catch {}
   };
 
+  // Windows / Linux: standard top-right window controls (─  □/❐  ✕)
   return (
     <div
-      className="fixed top-2.5 left-3 z-[999] flex items-center gap-1.5 eu-no-drag"
-      style={{ WebkitAppRegion: "no-drag" } as any}
+      className="fixed top-0 right-0 z-[999] flex items-stretch h-[38px] eu-no-drag"
+      style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as any}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {/* Close (red) */}
-      <button
-        onClick={handleClose}
-        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        className="group w-4 h-4 rounded-full bg-[#ff5f57] hover:bg-[#ff3b30] flex items-center justify-center transition-all eu-no-drag"
-        style={{ WebkitAppRegion: "no-drag" } as any}
-        title="Close"
-      >
-        <div className="relative h-[10px] w-[10px] text-[#5a0000] opacity-0 group-hover:opacity-90 transition-opacity">
-          <div className="absolute left-1/2 top-1/2 h-px w-[11px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-current" />
-          <div className="absolute left-1/2 top-1/2 h-px w-[11px] -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-current" />
-        </div>
-      </button>
-      {/* Minimize (yellow) */}
+      {/* Minimize */}
       <button
         onClick={handleMinimize}
         onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        className="group w-4 h-4 rounded-full bg-[#ffbd2e] hover:bg-[#ff9500] flex items-center justify-center transition-all eu-no-drag"
+        className="w-[46px] h-full flex items-center justify-center text-[var(--eu-text)] hover:bg-[rgb(var(--eu-surface-container))] transition-colors eu-no-drag"
         style={{ WebkitAppRegion: "no-drag" } as any}
         title="Minimize"
       >
-        <div className="relative h-[10px] w-[10px] text-[#5a3a00] opacity-0 group-hover:opacity-90 transition-opacity">
-          <div className="absolute left-1/2 top-1/2 h-px w-[7px] -translate-x-1/2 bg-current" />
-        </div>
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <path d="M2 6h8" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        </svg>
       </button>
-      {/* Maximize (green) */}
+      {/* Maximize / Restore */}
       <button
         onClick={handleMaximize}
         onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-        className="group w-4 h-4 rounded-full bg-[#28c840] hover:bg-[#1aab2e] flex items-center justify-center transition-all eu-no-drag"
+        className="w-[46px] h-full flex items-center justify-center text-[var(--eu-text)] hover:bg-[rgb(var(--eu-surface-container))] transition-colors eu-no-drag"
         style={{ WebkitAppRegion: "no-drag" } as any}
-        title="Maximize / Restore"
+        title={maximized ? "Restore" : "Maximize"}
       >
-        <div className="relative h-[10px] w-[10px] text-[#0a4a12] opacity-0 group-hover:opacity-90 transition-opacity">
-          <div className="absolute left-1/2 top-1/2 h-[6px] w-[6px] -translate-x-1/2 -translate-y-1/2 border border-current" />
-        </div>
+        {maximized ? (
+          /* Restore icon (two overlapping squares) */
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <rect x="3" y="3" width="7" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.1" fill="none" />
+            <path d="M3 7.5V2.5a1 1 0 0 1 1-1h5" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          </svg>
+        ) : (
+          /* Maximize icon (single square) */
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <rect x="2" y="2" width="8" height="8" rx="0.5" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          </svg>
+        )}
+      </button>
+      {/* Close */}
+      <button
+        onClick={handleClose}
+        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        className="w-[46px] h-full flex items-center justify-center text-[var(--eu-text)] hover:bg-[#c42b1c] hover:text-white transition-colors rounded-none eu-no-drag"
+        style={{ WebkitAppRegion: "no-drag" } as any}
+        title="Close"
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        </svg>
       </button>
     </div>
   );
@@ -338,7 +380,7 @@ const MainContent = memo(function MainContent({ info, activeId }: { info: AppInf
   return (
     <div
       key={activeId}
-      className="flex-1 min-h-0 bg-[rgb(var(--eu-bg))] animate-fade-in eu-drag"
+      className="flex-1 min-h-0 bg-[rgb(var(--eu-bg))] animate-fade-in"
     >
       <TabContent info={info} />
     </div>
