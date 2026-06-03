@@ -387,7 +387,7 @@ def _french_date_label(date_str: str) -> str:
         return date_str or ""
 
 
-def _lesson_contents(client, days_back: int = 120, classe: dict | None = None, date_debut: str | None = None):
+def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, date_debut: str | None = None):
     """Fetch 'contenu des cours' (lesson contents) from the cahier de textes.
     Supports optional `classe` dict ({"N": "...", "G": 1}) to scope to a specific class
     (important for teacher / multi-class accounts). For professeur accounts the request
@@ -429,27 +429,51 @@ def _lesson_contents(client, days_back: int = 120, classe: dict | None = None, d
 
     items = []
     seen = set()
-    for w in range(first_w, last_w + 1):
-        try:
-            data = {"domaine": {"_T": 8, "V": f"[{w}..{w}]"}}
-            if classe:
-                # For professeur accounts, to fetch "Contenu de mes cours" / vision for a specific class,
-                # the working payload uses "ressource": the classe dict (not "classe").
-                # Both are set for broader compatibility across instances.
-                data["ressource"] = classe
-                data["classe"] = classe
-                # Additional fields sometimes used in professeur view for "contenu de mes cours" / vision classe
-                data["estCours"] = True
-                data["avecCoursAnnules"] = True
-            resp = client.post("PageCahierDeTexte", 89, data)
-            lst = (
-                resp.get("dataSec", {})
-                .get("data", {})
-                .get("ListeCahierDeTextes", {})
-                .get("V", [])
-            )
-            for e in lst:
-                conts = (e.get("listeContenus") or {}).get("V") or []
+
+    # Try querying the entire range in a single request first (extremely fast!)
+    lst = None
+    try:
+        data = {"domaine": {"_T": 8, "V": f"[{first_w}..{last_w}]"}}
+        if classe:
+            data["ressource"] = classe
+            data["classe"] = classe
+            data["estCours"] = True
+            data["avecCoursAnnules"] = True
+        resp = client.post("PageCahierDeTexte", 89, data)
+        lst = (
+            resp.get("dataSec", {})
+            .get("data", {})
+            .get("ListeCahierDeTextes", {})
+            .get("V", [])
+        )
+    except Exception:  # noqa: BLE001
+        lst = None
+
+    # Fallback to week-by-week loop if range query failed or returned nothing
+    if not lst:
+        lst = []
+        for w in range(first_w, last_w + 1):
+            try:
+                data = {"domaine": {"_T": 8, "V": f"[{w}..{w}]"}}
+                if classe:
+                    data["ressource"] = classe
+                    data["classe"] = classe
+                    data["estCours"] = True
+                    data["avecCoursAnnules"] = True
+                resp = client.post("PageCahierDeTexte", 89, data)
+                sub_lst = (
+                    resp.get("dataSec", {})
+                    .get("data", {})
+                    .get("ListeCahierDeTextes", {})
+                    .get("V", [])
+                )
+                if sub_lst:
+                    lst.extend(sub_lst)
+            except Exception:  # noqa: BLE001
+                continue
+
+    for e in lst:
+        conts = (e.get("listeContenus") or {}).get("V") or []
                 if not conts:
                     continue
                 c = conts[0]
@@ -551,7 +575,7 @@ def _lesson_contents(client, days_back: int = 120, classe: dict | None = None, d
     return items
 
 
-def _contents_via_lessons(client, days_back: int = 120, class_name: str | None = None):
+def _contents_via_lessons(client, days_back: int = 365, class_name: str | None = None):
     """Alternative way to collect contents: get recent lessons and call .content on each.
     This can surface per-lesson contenus even if the bulk cahier list is empty or not scoped.
     Useful for some teacher accounts (professeur view).
