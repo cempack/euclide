@@ -66,15 +66,15 @@ const Sidebar = memo(function Sidebar() {
   const isActive = (kind: TabKind) => tabs.active?.kind === kind;
 
   return (
-    <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono eu-drag pt-10`}>
-      <div className="flex items-center gap-3 px-3 mb-10">
+    <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono pt-10`}>
+      <div className="flex items-center gap-3 px-3 mb-10 eu-drag">
         <img src="/euclide-logo.png" alt="Euclide" className="w-10 h-10 rounded-2xl object-contain" />
         <div className="leading-none">
           <h1 className="font-display-xl text-body-strong text-primary tracking-tight">EUCLIDE</h1>
         </div>
       </div>
 
-      <nav className="flex-1 flex flex-col gap-1 text-sm font-body-strong">
+      <nav className="flex-1 flex flex-col gap-1 text-sm font-body-strong eu-no-drag">
         {NAV.map((item) => (
           <button
             key={item.kind}
@@ -274,17 +274,17 @@ function WindowControls() {
 
   if (!win) return null;
 
-  const handleClose = (e: React.MouseEvent) => {
+  const handleClose = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    win.close();
+    try { await win.close(); } catch {}
   };
-  const handleMinimize = (e: React.MouseEvent) => {
+  const handleMinimize = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    win.minimize();
+    try { await win.minimize(); } catch {}
   };
-  const handleMaximize = (e: React.MouseEvent) => {
+  const handleMaximize = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    win.toggleMaximize();
+    try { await win.toggleMaximize(); } catch {}
   };
 
   return (
@@ -296,26 +296,39 @@ function WindowControls() {
       {/* Close (red) */}
       <button
         onClick={handleClose}
-        className="group w-3.5 h-3.5 rounded-full bg-[#ff5f57] hover:bg-[#ff3b30] flex items-center justify-center transition-all shadow-sm"
+        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        className="group w-4 h-4 rounded-full bg-[#ff5f57] hover:bg-[#ff3b30] flex items-center justify-center transition-all eu-no-drag"
+        style={{ WebkitAppRegion: "no-drag" } as any}
         title="Close"
       >
-        <XIcon className="w-2 h-2 text-[#5a0000] opacity-0 group-hover:opacity-90 transition-opacity" />
+        <div className="relative h-[10px] w-[10px] text-[#5a0000] opacity-0 group-hover:opacity-90 transition-opacity">
+          <div className="absolute left-1/2 top-1/2 h-px w-[11px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-current" />
+          <div className="absolute left-1/2 top-1/2 h-px w-[11px] -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-current" />
+        </div>
       </button>
       {/* Minimize (yellow) */}
       <button
         onClick={handleMinimize}
-        className="group w-3.5 h-3.5 rounded-full bg-[#ffbd2e] hover:bg-[#ff9500] flex items-center justify-center transition-all shadow-sm"
+        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        className="group w-4 h-4 rounded-full bg-[#ffbd2e] hover:bg-[#ff9500] flex items-center justify-center transition-all eu-no-drag"
+        style={{ WebkitAppRegion: "no-drag" } as any}
         title="Minimize"
       >
-        <span className="block w-[9px] h-px bg-[#5a3a00] opacity-0 group-hover:opacity-90 transition-opacity" />
+        <div className="relative h-[10px] w-[10px] text-[#5a3a00] opacity-0 group-hover:opacity-90 transition-opacity">
+          <div className="absolute left-1/2 top-1/2 h-px w-[7px] -translate-x-1/2 bg-current" />
+        </div>
       </button>
       {/* Maximize (green) */}
       <button
         onClick={handleMaximize}
-        className="group w-3.5 h-3.5 rounded-full bg-[#28c840] hover:bg-[#1aab2e] flex items-center justify-center transition-all shadow-sm"
+        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        className="group w-4 h-4 rounded-full bg-[#28c840] hover:bg-[#1aab2e] flex items-center justify-center transition-all eu-no-drag"
+        style={{ WebkitAppRegion: "no-drag" } as any}
         title="Maximize / Restore"
       >
-        <span className="block w-[7px] h-[7px] border border-[#0a4a12] opacity-0 group-hover:opacity-90 transition-opacity" />
+        <div className="relative h-[10px] w-[10px] text-[#0a4a12] opacity-0 group-hover:opacity-90 transition-opacity">
+          <div className="absolute left-1/2 top-1/2 h-[6px] w-[6px] -translate-x-1/2 -translate-y-1/2 border border-current" />
+        </div>
       </button>
     </div>
   );
@@ -401,7 +414,7 @@ function TabContent({ info }: { info: AppInfo | null }) {
 
 function Scroll({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-full overflow-y-auto eu-drag">
+    <div className="h-full overflow-y-auto eu-no-drag">
       <div className="mx-auto max-w-[960px] px-6 lg:px-8 py-6 font-mono">{children}</div>
     </div>
   );
@@ -563,7 +576,7 @@ function Shell() {
   }, [tabs]);
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[rgb(var(--eu-bg))] eu-drag eu-root">
+    <div className="flex h-full w-full overflow-hidden bg-[rgb(var(--eu-bg))] eu-root">
       <WindowControls />
       <Sidebar />
       <main className="flex-1 h-full flex flex-col min-w-0 bg-[rgb(var(--eu-bg))] eu-main">

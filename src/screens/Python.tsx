@@ -273,7 +273,7 @@ export default function Python() {
   };
 
   return (
-    <div className="h-full eu-drag">
+    <div className="h-full eu-no-drag">
       {/* Clean split that fits the app's new-card + hairline style, with IDE touches inside */}
       <div className="new-card p-0 overflow-hidden h-full grid grid-cols-1 md:grid-cols-[200px_1fr]">
         {/* Left: Explorer / script list */}

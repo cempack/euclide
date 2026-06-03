@@ -94,7 +94,9 @@ textarea,
   app-region: no-drag;
 }
 
-/* draggable window region for the hidden/overlay titlebar */
+/* draggable window region — only apply to actual titlebar / drag handles (TopBar, logo header).
+   Do NOT apply to scroll containers, content areas, or interactive UI.
+   This prevents scrollbars, wheel, buttons, and custom titlebar controls from triggering window drag on Windows/Linux. */
 .eu-drag {
   -webkit-app-region: drag;
   app-region: drag;

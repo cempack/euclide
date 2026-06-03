@@ -5,6 +5,7 @@ mod paths;
 mod sidecar;
 
 use keepawake::KeepAwake;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -146,6 +147,17 @@ pub fn run() {
             commands::update_course_class_notes,
             commands::pronote_classes,
         ])
-        .run(tauri::generate_context!())
-        .expect("erreur au lancement de Euclide");
+        .build(tauri::generate_context!())
+        .expect("erreur au lancement de Euclide")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                // Gracefully stop the warm sidecar on app exit so the Python process doesn't linger.
+                let app_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(sc) = app_handle.try_state::<sidecar::Sidecar>() {
+                        sc.stop().await;
+                    }
+                });
+            }
+        });
 }

@@ -171,6 +171,15 @@ impl Sidecar {
     }
 }
 
+impl Drop for InnerSidecar {
+    fn drop(&mut self) {
+        // Ensure the Python sidecar process is killed when InnerSidecar is dropped
+        // (e.g. on explicit stop, on restart in call() when we do *guard = None, or app exit).
+        // start_kill is synchronous and best-effort.
+        let _ = self.child.start_kill();
+    }
+}
+
 /// Public helper so call sites stay almost identical:
 ///   crate::sidecar::call(&app, "pronote_sync", &creds).await?
 pub async fn call(
