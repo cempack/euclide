@@ -89,15 +89,17 @@ Le sidecar Python (pronotepy + pypdf) est multi-plateforme ; le binaire PyInstal
 
 Push a tag `vX.Y.Z` (or use "Run workflow" in Actions) to automatically build on GitHub-hosted runners:
 
-- macOS Intel (via macos-13) → x86_64 .dmg etc.
-- macOS Apple Silicon (macos-latest) → aarch64
-- Linux (ubuntu-22.04) → .AppImage, .deb, .rpm
-- Windows → .exe / nsis installer
+- macOS Intel (macos-13) → x86_64 portable .app (zipped)
+- macOS Apple Silicon (macos-latest) → aarch64 portable .app (zipped)
+- Linux (ubuntu-22.04) → portable AppImage (standard portable app)
+- Windows → portable zip (euclide.exe + sidecar.exe + README; no installers/setups)
+
+All builds are "standard apps" (not "setups"/installers) and fully portable (extract/run from USB or any folder; data goes in Euclide-Data/ next to the executable).
 
 The workflow:
 - Builds the platform-specific Python sidecar binary (via PyInstaller) and bundles it.
-- Runs `tauri build` for the native targets using official `tauri-apps/tauri-action`.
-- Creates a draft GitHub Release with all artifacts.
+- Runs `tauri build` (with --bundles limited to app/appimage to avoid setups) + custom post-packaging for portable zips.
+- Creates a draft GitHub Release with the portable artifacts.
 
 See `.github/workflows/publish.yml` for the matrix and steps (based on official Tauri v2 guide + custom sidecar integration).
 

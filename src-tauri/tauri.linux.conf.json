@@ -5,5 +5,9 @@
         "decorations": false
       }
     ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["appimage"]
   }
 }

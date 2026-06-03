@@ -18,6 +18,10 @@ sidecar/.venv/
 __pycache__/
 *.pyc
 
+# do not commit platform-specific sidecar binaries (built in CI per platform, copied to resources during build)
+src-tauri/resources/euclide-sidecar
+src-tauri/resources/euclide-sidecar.exe
+
 # os / editor
 .DS_Store
 *.log
