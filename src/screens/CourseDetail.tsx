@@ -20,6 +20,21 @@ import {
 const pronoteClassesCache = { data: null as any[] | null, ts: 0 };
 const PRONOTE_CACHE_TTL = 5 * 60 * 1000;
 
+function isMainClass(name: string): boolean {
+  if (!name) return false;
+  const n = name.trim();
+  // Filter out subgroups, options, or admin codes.
+  // Standard main classes do NOT contain spaces, dots, parentheses, or commas.
+  if (n.includes(" ") || n.includes(".") || n.includes("(") || n.includes(")") || n.includes(",")) {
+    return false;
+  }
+  // Real class names are typically short (length <= 6)
+  if (n.length > 6) {
+    return false;
+  }
+  return true;
+}
+
 // Keep only "real" main class names from Pronote (e.g. "3C", "4A", "5B", "6D").
 // Drop subgroup/division entries that look like "4ITAGR.1", "3ESPGR.2", "5ALLGR.1", "4AP.1", "6P.1" etc.
 // These come from listeClasses but are not the primary class labels teachers usually attach for progression.
@@ -29,7 +44,7 @@ function sanitizePronoteClasses(raw: any[]): any[] {
   for (const c of (raw || [])) {
     if (!c || typeof c.name !== "string") continue;
     const n = c.name.trim();
-    if (!n || n.includes(".") || seen.has(n)) continue;
+    if (!isMainClass(n) || seen.has(n)) continue;
     seen.add(n);
     out.push({ ...c, name: n });
   }
@@ -127,7 +142,7 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
     return (pronoteClasses || []).filter((c: any) => {
       if (!c || typeof c.name !== "string") return false;
       const n = c.name.trim();
-      if (!n || n.includes(".") || attached.has(n) || seen.has(n)) return false;
+      if (!isMainClass(n) || attached.has(n) || seen.has(n)) return false;
       seen.add(n);
       return true;
     });

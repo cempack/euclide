@@ -251,7 +251,10 @@ export const api = {
     }
     return;
   }),
-  deleteCourse: (id: number) => invoke<void>("delete_course", { id }),
+  deleteCourse: (id: number) => invoke<void>("delete_course", { id }).then(() => {
+    invalidateCache("listCourses");
+    invalidateCache("listCourseClasses");
+  }),
 
   // Course classes: casier is the course's files; per attached class (exact Pronote name) we track progress + prof notes
   listCourseClasses: (courseId: number) => {
@@ -261,12 +264,25 @@ export const api = {
     return invoke<CourseClass[]>("list_course_classes", { courseId }).then((data) => { setCached(key, data); return data; });
   },
   attachClassToCourse: (courseId: number, className: string) =>
-    invoke<CourseClass>("attach_class_to_course", { courseId, className }),
-  detachCourseClass: (id: number) => invoke<void>("detach_course_class", { id }),
+    invoke<CourseClass>("attach_class_to_course", { courseId, className }).then((data) => {
+      invalidateCache("listCourseClasses");
+      return data;
+    }),
+  detachCourseClass: (id: number) =>
+    invoke<void>("detach_course_class", { id }).then((data) => {
+      invalidateCache("listCourseClasses");
+      return data;
+    }),
   setCourseClassProgress: (courseId: number, className: string, fileId: number | null) =>
-    invoke<void>("set_course_class_progress", { courseId, className, fileId }),
+    invoke<void>("set_course_class_progress", { courseId, className, fileId }).then((data) => {
+      invalidateCache("listCourseClasses");
+      return data;
+    }),
   updateCourseClassNotes: (courseId: number, className: string, notes: string) =>
-    invoke<void>("update_course_class_notes", { courseId, className, notes }),
+    invoke<void>("update_course_class_notes", { courseId, className, notes }).then((data) => {
+      invalidateCache("listCourseClasses");
+      return data;
+    }),
 
   // Notes
   listNotes: (courseId: number | null) => {

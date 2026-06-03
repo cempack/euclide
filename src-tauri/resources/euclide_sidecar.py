@@ -865,9 +865,13 @@ def pronote_classes(payload):
     classes = []
     for c in classes_raw:
         name = (c.get("L") or "").strip()
-        # Only main class labels (e.g. "3C", "4A"). Skip subgroup/GR entries like "4ITAGR.1", "3ESPGR.2"
-        # which Pronote puts in listeClasses but are not the primary classes for progression tracking.
-        if name and "." not in name:
+        # Filter out subgroups, options, or admin codes.
+        # Main classes have no space, dot, parenthesis, or comma, and length <= 6.
+        if (
+            name
+            and len(name) <= 6
+            and not any(char in name for char in [" ", ".", "(", ")", ","])
+        ):
             classes.append({
                 "name": name,
                 "N": c.get("N"),
