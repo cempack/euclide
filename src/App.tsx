@@ -366,13 +366,7 @@ function Shell() {
  appFocusedRef.current = appFocused;
  }, [appFocused]);
 
- // macOS vibrancy (frosted sidebar/topbar)
- useEffect(() => {
- // Enable frosted glass / transparency styles on all desktop platforms.
- // The system vibrancy (mac) or mica/acrylic (win) will show through the alpha bgs.
- // On linux it provides subtle transparency for a modern look.
- document.documentElement.classList.add("has-vibrancy");
- }, []);
+ // (Vibrancy removed – using standard native decorations for window controls.)
 
  const handleHelp = useCallback(() => setHelp(true), []);
  const handleSearch = useCallback(() => setPalette(true), []);

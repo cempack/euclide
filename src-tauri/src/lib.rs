@@ -32,7 +32,6 @@ pub fn run() {
                 crate::keepawake::set(&ka, should_on);
             }
 
-            // A more native feel: translucent window material behind the UI.
             if let Some(win) = app.get_webview_window("main") {
                 // Adjust size dynamically to screen/monitor resolution for a perfect aspect ratio.
                 if let Ok(Some(monitor)) = win.current_monitor() {
@@ -50,27 +49,6 @@ pub fn run() {
                         height: target_height,
                     }));
                     let _ = win.center();
-                }
-
-                #[cfg(target_os = "macos")]
-                {
-                    // Use UnderWindowBackground for a more uniform frosted glass effect across the whole window.
-                    let _ = window_vibrancy::apply_vibrancy(
-                        &win,
-                        window_vibrancy::NSVisualEffectMaterial::UnderWindowBackground,
-                        Some(window_vibrancy::NSVisualEffectState::Active),
-                        Some(20.0),
-                    );
-                }
-                #[cfg(target_os = "windows")]
-                {
-                    // Acrylic provides more blur and "transparent" frosted look than mica.
-                    let _ = window_vibrancy::apply_acrylic(&win, None)
-                        .or_else(|_| window_vibrancy::apply_mica(&win, None));
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    let _ = window_vibrancy::apply_blur(&win, None);
                 }
             }
 

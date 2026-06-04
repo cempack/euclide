@@ -116,6 +116,8 @@ function PronoteSection() {
   const [url, setUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [pinCode, setPinCode] = useState("");
+  const [needsPin, setNeedsPin] = useState(false);
 
   const refresh = () => api.pronoteStatus().then(setStatus).catch(() => {});
   useEffect(() => {
@@ -169,10 +171,17 @@ function PronoteSection() {
     }
     setBusy(true);
     try {
-      const s = await api.pronotePasswordLogin(url.trim(), username.trim(), password);
+      const s = await api.pronotePasswordLogin(url.trim(), username.trim(), password, pinCode.trim() || undefined);
       await finishConnect(s);
     } catch (err) {
-      toast(typeof err === "string" ? err : (t.settings?.toastConnectFail || "Connexion impossible"), "error");
+      const msg = typeof err === "string" ? err : "";
+      // Detect PIN-required error from the backend
+      if (msg.startsWith("NEEDS_PIN:")) {
+        setNeedsPin(true);
+        toast("Code PIN requis pour cet appareil. Saisissez-le ci-dessous.", "error");
+      } else {
+        toast(msg || (t.settings?.toastConnectFail || "Connexion impossible"), "error");
+      }
     } finally {
       setBusy(false);
     }
@@ -186,6 +195,8 @@ function PronoteSection() {
       setQrJson("");
       setPin("");
       setPassword("");
+      setPinCode("");
+      setNeedsPin(false);
       // Small delay to let the QR token settle before sync (token rotation race)
       await new Promise((r) => setTimeout(r, 800));
       try {
@@ -359,6 +370,30 @@ function PronoteSection() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              {/* PIN field: shown when the account requires it (auto-detected) or expandable */}
+              {needsPin ? (
+                <div className="border border-tui-accent/30 rounded p-3 bg-surface-soft/50">
+                  <p className="text-sm font-medium text-primary mb-1.5">Code PIN du compte</p>
+                  <p className="text-mute text-xs mb-2">Votre compte Pronote exige un code PIN pour les nouveaux appareils.</p>
+                  <input
+                    className="new-input tracking-[0.5em] text-center text-lg"
+                    inputMode="numeric"
+                    maxLength={8}
+                    placeholder="1234"
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ""))}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNeedsPin(true)}
+                  className="text-xs text-mute hover:text-primary transition-colors text-left"
+                >
+                  + Code PIN du compte (optionnel)
+                </button>
+              )}
               <div className="flex justify-end gap-2">
                 <button className="new-btn-ghost" onClick={() => setOpen(false)}>
                   {t.common?.cancel || "Annuler"}

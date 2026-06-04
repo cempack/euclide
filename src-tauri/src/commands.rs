@@ -2136,19 +2136,50 @@ pub async fn pronote_password_login(
     url: String,
     username: String,
     password: String,
+    pin: Option<String>,
 ) -> R<PronoteStatus> {
-    let res = crate::sidecar::call(
-        &app,
-        "pronote_password_login",
-        &json!({ "url": url, "username": username, "password": password }),
-    )
-    .await?;
+    // Generate or retrieve a stable device name for PIN-based device registration
+    let device_name = {
+        let conn = state.0.lock().unwrap();
+        match get_setting_raw(&conn, "pronote_device_name") {
+            Some(d) => d,
+            None => {
+                let d = format!("Euclide-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+                set_setting_raw(&conn, "pronote_device_name", &d);
+                d
+            }
+        }
+    };
+    // Load previously saved client_identifier (skips PIN on repeat logins)
+    let client_id = {
+        let conn = state.0.lock().unwrap();
+        get_setting_raw(&conn, "pronote_client_identifier")
+    };
+
+    let mut payload = json!({
+        "url": url,
+        "username": username,
+        "password": password,
+        "device_name": device_name,
+    });
+    if let Some(p) = &pin {
+        payload["pin"] = serde_json::Value::String(p.clone());
+    }
+    if let Some(cid) = &client_id {
+        payload["client_identifier"] = serde_json::Value::String(cid.clone());
+    }
+
+    let res = crate::sidecar::call(&app, "pronote_password_login", &payload).await?;
 
     if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
         let err = res
             .get("error")
             .and_then(|x| x.as_str())
             .unwrap_or("Connexion echouee");
+        // Surface needs_pin flag in the error message so the frontend can detect it
+        if res.get("needs_pin").and_then(|x| x.as_bool()) == Some(true) {
+            return Err(format!("NEEDS_PIN:{}", err));
+        }
         return Err(err.to_string());
     }
 
@@ -2161,6 +2192,12 @@ pub async fn pronote_password_login(
         set_setting_raw(&conn, "pronote_url", &url);
         set_setting_raw(&conn, "pronote_username", &username);
         set_setting_raw(&conn, "pronote_password", &password);
+        // Persist client_identifier for future logins (skips PIN next time)
+        if let Some(cid) = res.get("client_identifier").and_then(|x| x.as_str()) {
+            if !cid.is_empty() {
+                set_setting_raw(&conn, "pronote_client_identifier", cid);
+            }
+        }
     }
 
     Ok(PronoteStatus {
@@ -2180,6 +2217,8 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
             "username": get_setting_raw(&conn, "pronote_username"),
             "password": get_setting_raw(&conn, "pronote_password"),
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
+            "device_name": get_setting_raw(&conn, "pronote_device_name"),
+            "client_identifier": get_setting_raw(&conn, "pronote_client_identifier"),
         })
     };
     if creds.get("url").map(|v| v.is_null()).unwrap_or(true) {
@@ -2203,6 +2242,12 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
     if let Some(name) = res.get("account_name").and_then(|x| x.as_str()) {
         if !name.is_empty() {
             set_setting_raw(&conn, "pronote_account", name);
+        }
+    }
+    // Persist client_identifier if returned (PIN device registration)
+    if let Some(cid) = res.get("client_identifier").and_then(|x| x.as_str()) {
+        if !cid.is_empty() {
+            set_setting_raw(&conn, "pronote_client_identifier", cid);
         }
     }
 
@@ -2250,6 +2295,8 @@ pub fn pronote_logout(state: State<Db>) -> R<()> {
         "pronote_username",
         "pronote_password",
         "pronote_last_sync",
+        "pronote_client_identifier",
+        "pronote_device_name",
     ] {
         let _ = conn.execute("DELETE FROM settings WHERE key=?1", [key]);
     }
@@ -2279,6 +2326,8 @@ pub async fn pronote_contents(
             "username": get_setting_raw(&conn, "pronote_username"),
             "password": get_setting_raw(&conn, "pronote_password"),
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
+            "device_name": get_setting_raw(&conn, "pronote_device_name"),
+            "client_identifier": get_setting_raw(&conn, "pronote_client_identifier"),
             "subject": subject,
             "class": class_name,
             "from_date": from_date,
@@ -2306,6 +2355,12 @@ pub async fn pronote_contents(
             set_setting_raw(&conn, &format!("pronote_{key}"), v);
         }
     }
+    // Persist client_identifier if returned (PIN device registration)
+    if let Some(cid) = res.get("client_identifier").and_then(|x| x.as_str()) {
+        if !cid.is_empty() {
+            set_setting_raw(&conn, "pronote_client_identifier", cid);
+        }
+    }
 
     Ok(res)
 }
@@ -2322,6 +2377,8 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
             "username": get_setting_raw(&conn, "pronote_username"),
             "password": get_setting_raw(&conn, "pronote_password"),
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
+            "device_name": get_setting_raw(&conn, "pronote_device_name"),
+            "client_identifier": get_setting_raw(&conn, "pronote_client_identifier"),
         })
     };
     if creds.get("url").map(|v| v.is_null()).unwrap_or(true) {
@@ -2342,6 +2399,12 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
     for key in ["username", "password"] {
         if let Some(v) = res.get(key).and_then(|x| x.as_str()) {
             set_setting_raw(&conn, &format!("pronote_{key}"), v);
+        }
+    }
+    // Persist client_identifier if returned (PIN device registration)
+    if let Some(cid) = res.get("client_identifier").and_then(|x| x.as_str()) {
+        if !cid.is_empty() {
+            set_setting_raw(&conn, "pronote_client_identifier", cid);
         }
     }
 

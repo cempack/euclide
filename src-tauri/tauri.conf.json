@@ -18,11 +18,9 @@
         "minWidth": 1000,
         "minHeight": 680,
         "center": true,
-        "decorations": true,
-        "transparent": true
+        "decorations": true
       }
     ],
-    "macOSPrivateApi": true,
     "security": {
       "csp": null,
       "assetProtocol": {
