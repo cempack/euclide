@@ -94,18 +94,6 @@ textarea,
   app-region: no-drag;
 }
 
-/* draggable window region — only apply to actual titlebar / drag handles (TopBar, logo header).
-   Do NOT apply to scroll containers, content areas, or interactive UI.
-   This prevents scrollbars, wheel, buttons, and custom titlebar controls from triggering window drag on Windows/Linux. */
-.eu-drag {
-  -webkit-app-region: drag;
-  app-region: drag;
-}
-.eu-no-drag {
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-
 ::-webkit-scrollbar {
   width: 11px;
   height: 11px;
@@ -127,11 +115,11 @@ textarea,
 @layer components {
   /* Terminal / brutalist flat aesthetic - sharp containers, 4px interactive affordance, hairlines, mono rhythm */
   .eu-card {
-    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none eu-no-drag; /* sharp, no shadow */
+    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp, no shadow */
   }
   .eu-btn {
     @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium font-mono
-      transition-all duration-100 active:scale-[0.985] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)] disabled:opacity-50 disabled:pointer-events-none eu-no-drag;
+      transition-all duration-100 active:scale-[0.985] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)] disabled:opacity-50 disabled:pointer-events-none;
   }
   .eu-btn-primary {
     @apply eu-btn bg-[var(--eu-primary)] text-white border border-[var(--eu-primary)] hover:brightness-95;
@@ -166,27 +154,27 @@ textarea,
     @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp containers */
   }
   .stat-card {
-    @apply rounded-none bg-[#f1eeee] border border-[rgba(15,0,0,0.12)] p-6 flex gap-4 items-center eu-no-drag; /* mock-style soft tint */
+    @apply rounded-none bg-[#f1eeee] border border-[rgba(15,0,0,0.12)] p-6 flex gap-4 items-center; /* mock-style soft tint */
   }
   .new-btn {
     @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
       border border-[rgba(15,0,0,0.12)] bg-[#f1eeee] text-primary hover:bg-[var(--eu-surface-soft)]
-      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
+      active:scale-[0.985] transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
   }
   .new-btn-primary {
     @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
       bg-primary text-white border border-primary hover:brightness-95 active:scale-[0.985]
-      transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40;
+      transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40;
   }
   .new-btn-ghost {
     @apply inline-flex items-center gap-2 rounded px-3 py-1 text-sm font-medium font-mono
       text-primary hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)]
-      active:scale-[0.985] transition-all eu-no-drag focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
+      active:scale-[0.985] transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
   }
   .new-input {
     @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
       placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[rgb(0,122,255)] focus:border-[rgb(0,122,255)]
-      transition-all eu-no-drag;
+      transition-all;
   }
   .new-segment {
     @apply inline-flex rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface)] p-1;
