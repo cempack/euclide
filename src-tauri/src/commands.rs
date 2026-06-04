@@ -2136,11 +2136,29 @@ pub async fn pronote_password_login(
     url: String,
     username: String,
     password: String,
+    pin: Option<String>,
 ) -> R<PronoteStatus> {
+    let uuid = {
+        let conn = state.0.lock().unwrap();
+        match get_setting_raw(&conn, "pronote_uuid") {
+            Some(u) => u,
+            None => {
+                let u = uuid::Uuid::new_v4().to_string();
+                set_setting_raw(&conn, "pronote_uuid", &u);
+                u
+            }
+        }
+    };
+
+    let client_id = {
+        let conn = state.0.lock().unwrap();
+        get_setting_raw(&conn, "pronote_client_identifier")
+    };
+
     let res = crate::sidecar::call(
         &app,
         "pronote_password_login",
-        &json!({ "url": url, "username": username, "password": password }),
+        &json!({ "url": url, "username": username, "password": password, "pin": pin, "uuid": uuid, "client_identifier": client_id }),
     )
     .await?;
 
@@ -2153,6 +2171,8 @@ pub async fn pronote_password_login(
     }
 
     let account = res.get("account_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let new_client_id = res.get("client_identifier").and_then(|x| x.as_str()).unwrap_or("").to_string();
+
     {
         let conn = state.0.lock().unwrap();
         set_setting_raw(&conn, "pronote_connected", "1");
@@ -2161,6 +2181,12 @@ pub async fn pronote_password_login(
         set_setting_raw(&conn, "pronote_url", &url);
         set_setting_raw(&conn, "pronote_username", &username);
         set_setting_raw(&conn, "pronote_password", &password);
+        if !new_client_id.is_empty() {
+            set_setting_raw(&conn, "pronote_client_identifier", &new_client_id);
+        }
+        if let Some(p) = pin {
+            set_setting_raw(&conn, "pronote_pin", &p);
+        }
     }
 
     Ok(PronoteStatus {
@@ -2180,6 +2206,8 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
             "username": get_setting_raw(&conn, "pronote_username"),
             "password": get_setting_raw(&conn, "pronote_password"),
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
+            "pin": get_setting_raw(&conn, "pronote_pin"),
+            "client_identifier": get_setting_raw(&conn, "pronote_client_identifier"),
         })
     };
     if creds.get("url").map(|v| v.is_null()).unwrap_or(true) {
@@ -2279,6 +2307,8 @@ pub async fn pronote_contents(
             "username": get_setting_raw(&conn, "pronote_username"),
             "password": get_setting_raw(&conn, "pronote_password"),
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
+            "pin": get_setting_raw(&conn, "pronote_pin"),
+            "client_identifier": get_setting_raw(&conn, "pronote_client_identifier"),
             "subject": subject,
             "class": class_name,
             "from_date": from_date,
@@ -2322,6 +2352,8 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
             "username": get_setting_raw(&conn, "pronote_username"),
             "password": get_setting_raw(&conn, "pronote_password"),
             "uuid": get_setting_raw(&conn, "pronote_uuid"),
+            "pin": get_setting_raw(&conn, "pronote_pin"),
+            "client_identifier": get_setting_raw(&conn, "pronote_client_identifier"),
         })
     };
     if creds.get("url").map(|v| v.is_null()).unwrap_or(true) {

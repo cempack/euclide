@@ -423,8 +423,8 @@ export const api = {
       setCached("pronoteStatus", data);
       return data;
     }),
-  pronotePasswordLogin: (url: string, username: string, password: string) =>
-    invoke<PronoteStatus>("pronote_password_login", { url, username, password }).then((data) => {
+  pronotePasswordLogin: (url: string, username: string, password: string, pin?: string) =>
+    invoke<PronoteStatus>("pronote_password_login", { url, username, password, pin }).then((data) => {
       setCached("pronoteStatus", data);
       return data;
     }),

@@ -234,6 +234,15 @@ def _get_client(payload):
     username = payload.get("username")
     password = payload.get("password")
     uuid = str(payload.get("uuid", ""))
+    pin = str(payload.get("pin", "")).strip()
+    client_id = str(payload.get("client_identifier", "")).strip()
+
+    kwargs = {}
+    if pin:
+        kwargs["account_pin"] = pin
+        kwargs["device_name"] = uuid if uuid else "euclide-app"
+    if client_id:
+        kwargs["client_identifier"] = client_id
 
     if not all([url, username, password]):
         raise ValueError("Identifiants Pronote incomplets.")
@@ -250,10 +259,11 @@ def _get_client(payload):
 
     client = None
     if mode == "password":
-        client = pronotepy.Client(url, username, password)
+        client = pronotepy.Client(url, username, password, **kwargs)
     else:
         try:
-            client = pronotepy.Client.token_login(url, username, password, uuid)
+            # Using token_login. Passing kwargs as well if any identifier is present.
+            client = pronotepy.Client.token_login(url, username, password, uuid, client_identifier=client_id if client_id else None)
         except Exception:  # noqa: BLE001
             client = None
 
@@ -261,7 +271,7 @@ def _get_client(payload):
         if client is None or not getattr(client, "logged_in", False):
             if mode != "password":
                 try:
-                    client = pronotepy.Client(url, username, password)
+                    client = pronotepy.Client(url, username, password, **kwargs)
                 except Exception as exc:  # noqa: BLE001
                     _clear_cache()
                     raise exc
@@ -321,11 +331,22 @@ def pronote_password_login(payload):
     url = str(payload.get("url", "")).strip()
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", ""))
+    pin = str(payload.get("pin", "")).strip()
+    uuid_val = str(payload.get("uuid", "")).strip()
+    client_id = str(payload.get("client_identifier", "")).strip()
+
     if not all([url, username, password]):
         return {"ok": False, "error": "URL, identifiant et mot de passe requis."}
 
+    kwargs = {}
+    if pin:
+        kwargs["account_pin"] = pin
+        kwargs["device_name"] = uuid_val if uuid_val else "euclide-app"
+    if client_id:
+        kwargs["client_identifier"] = client_id
+
     try:
-        client = pronotepy.Client(url, username, password)
+        client = pronotepy.Client(url, username, password, **kwargs)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": f"Connexion refusee : {exc}"}
 
@@ -342,6 +363,7 @@ def pronote_password_login(payload):
         "url": url,
         "username": username,
         "password": password,
+        "client_identifier": getattr(client, "client_identifier", ""),
     }
 
 

@@ -169,10 +169,15 @@ function PronoteSection() {
     }
     setBusy(true);
     try {
-      const s = await api.pronotePasswordLogin(url.trim(), username.trim(), password);
+      const s = await api.pronotePasswordLogin(url.trim(), username.trim(), password, pin.trim());
       await finishConnect(s);
     } catch (err) {
-      toast(typeof err === "string" ? err : (t.settings?.toastConnectFail || "Connexion impossible"), "error");
+      const msg = typeof err === "string" ? err : (t.settings?.toastConnectFail || "Connexion impossible");
+      if (msg.toLowerCase().includes("pin") || msg.toLowerCase().includes("authenticator")) {
+        toast("Code PIN requis. Veuillez entrer votre code PIN dans le champ correspondant.", "error");
+      } else {
+        toast(msg, "error");
+      }
     } finally {
       setBusy(false);
     }
@@ -358,6 +363,12 @@ function PronoteSection() {
                 placeholder="Mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+              />
+              <input
+                className="new-input"
+                placeholder="Code PIN (si requis par l'établissement)"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
               />
               <div className="flex justify-end gap-2">
                 <button className="new-btn-ghost" onClick={() => setOpen(false)}>
