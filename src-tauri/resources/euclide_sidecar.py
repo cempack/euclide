@@ -207,26 +207,36 @@ _cached_client = None
 _cached_url = None
 _cached_username = None
 _cached_password = None
+_cached_client_identifier = None
 
 
 def _save_to_cache(client, url, username, password):
-    global _cached_client, _cached_url, _cached_username, _cached_password
+    global _cached_client, _cached_url, _cached_username, _cached_password, _cached_client_identifier
     _cached_client = client
     _cached_url = url
     _cached_username = username
     _cached_password = password
+    _cached_client_identifier = getattr(client, "client_identifier", None)
 
 
 def _clear_cache():
-    global _cached_client, _cached_url, _cached_username, _cached_password
+    global _cached_client, _cached_url, _cached_username, _cached_password, _cached_client_identifier
     _cached_client = None
     _cached_url = None
     _cached_username = None
     _cached_password = None
+    _cached_client_identifier = None
+
+
+def _generate_device_name(user_id):
+    """Generate a unique device name for PIN authentication."""
+    import uuid
+    # Use app name + user ID + UUID for uniqueness
+    return f"euclide-{user_id}-{uuid.uuid4().hex[:8]}"
 
 
 def _get_client(payload):
-    global _cached_client, _cached_url, _cached_username, _cached_password
+    global _cached_client, _cached_url, _cached_username, _cached_password, _cached_client_identifier
     import pronotepy
 
     mode = payload.get("mode") or "qr"
@@ -234,6 +244,9 @@ def _get_client(payload):
     username = payload.get("username")
     password = payload.get("password")
     uuid = str(payload.get("uuid", ""))
+    pin_code = payload.get("pin_code") or payload.get("pin")
+    device_name = payload.get("device_name")
+    client_identifier = payload.get("client_identifier")
 
     if not all([url, username, password]):
         raise ValueError("Identifiants Pronote incomplets.")
@@ -250,7 +263,41 @@ def _get_client(payload):
 
     client = None
     if mode == "password":
-        client = pronotepy.Client(url, username, password)
+        # Try with PIN first if provided
+        if pin_code:
+            if not device_name:
+                device_name = _generate_device_name(username)
+            try:
+                client = pronotepy.Client(
+                    url, 
+                    username=username, 
+                    password=password,
+                    account_pin=pin_code,
+                    device_name=device_name,
+                    client_identifier=client_identifier
+                )
+            except Exception as exc:  # noqa: BLE001
+                # If PIN fails, try without PIN (might be cached client_identifier)
+                if "PIN" in str(exc) or "pin" in str(exc).lower():
+                    _clear_cache()
+                    raise Exception(f"Code PIN invalide: {exc}")
+                # Fall back to regular login
+                try:
+                    client = pronotepy.Client(url, username, password)
+                except Exception as fallback_exc:  # noqa: BLE001
+                    _clear_cache()
+                    raise fallback_exc
+        else:
+            # Regular password login without PIN
+            try:
+                client = pronotepy.Client(url, username, password)
+            except Exception as exc:  # noqa: BLE001
+                # Check if error is PIN-related
+                if "PIN" in str(exc) or "pin" in str(exc).lower() or "device" in str(exc).lower():
+                    _clear_cache()
+                    raise Exception(f"Compte protégé par PIN: {exc}")
+                _clear_cache()
+                raise exc
     else:
         try:
             client = pronotepy.Client.token_login(url, username, password, uuid)
@@ -312,7 +359,8 @@ def pronote_login(payload):
 
 
 def pronote_password_login(payload):
-    """Direct URL + username + password login (non-ENT / demo accounts)."""
+    """Direct URL + username + password login (non-ENT / demo accounts).
+    Supports PIN authentication for accounts that require it."""
     try:
         import pronotepy
     except ImportError:
@@ -321,12 +369,38 @@ def pronote_password_login(payload):
     url = str(payload.get("url", "")).strip()
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", ""))
+    pin_code = payload.get("pin_code") or payload.get("pin")
+    device_name = payload.get("device_name")
+    client_identifier = payload.get("client_identifier")
+
     if not all([url, username, password]):
         return {"ok": False, "error": "URL, identifiant et mot de passe requis."}
 
     try:
-        client = pronotepy.Client(url, username, password)
+        # Try with PIN if provided
+        if pin_code:
+            if not device_name:
+                device_name = _generate_device_name(username)
+            client = pronotepy.Client(
+                url, 
+                username=username, 
+                password=password,
+                account_pin=pin_code,
+                device_name=device_name,
+                client_identifier=client_identifier
+            )
+        else:
+            # Try without PIN first
+            client = pronotepy.Client(url, username, password)
     except Exception as exc:  # noqa: BLE001
+        error_str = str(exc)
+        # Check if this is a PIN-related error
+        if "PIN" in error_str or "pin" in error_str.lower() or "device" in error_str.lower():
+            return {
+                "ok": False, 
+                "error": f"Compte protégé par PIN: {exc}",
+                "requires_pin": True
+            }
         return {"ok": False, "error": f"Connexion refusee : {exc}"}
 
     if not getattr(client, "logged_in", False):
@@ -335,7 +409,10 @@ def pronote_password_login(payload):
     # Save to cache
     _save_to_cache(client, url, username, password)
 
-    return {
+    # Return client_identifier for future logins to skip PIN
+    client_id = getattr(client, "client_identifier", None)
+    
+    result = {
         "ok": True,
         "mode": "password",
         "account_name": _account_name(client),
@@ -343,6 +420,16 @@ def pronote_password_login(payload):
         "username": username,
         "password": password,
     }
+    
+    # Include client_identifier if available to persist for future logins
+    if client_id:
+        result["client_identifier"] = client_id
+    
+    # Include device name for reference
+    if device_name:
+        result["device_name"] = device_name
+        
+    return result
 
 
 def pronote_sync(payload):
