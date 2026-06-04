@@ -234,6 +234,9 @@ def _get_client(payload):
     username = payload.get("username")
     password = payload.get("password")
     uuid = str(payload.get("uuid", ""))
+    pin = payload.get("pin") or None
+    device_name = payload.get("device_name") or None
+    client_id = payload.get("client_identifier") or None
 
     if not all([url, username, password]):
         raise ValueError("Identifiants Pronote incomplets.")
@@ -250,10 +253,22 @@ def _get_client(payload):
 
     client = None
     if mode == "password":
-        client = pronotepy.Client(url, username, password)
+        # Build kwargs for pronotepy.Client, adding PIN params when provided
+        kwargs = {}
+        if pin:
+            kwargs["account_pin"] = str(pin)
+        if device_name:
+            kwargs["device_name"] = str(device_name)
+        if client_id:
+            kwargs["client_identifier"] = str(client_id)
+        client = pronotepy.Client(url, username, password, **kwargs)
     else:
         try:
-            client = pronotepy.Client.token_login(url, username, password, uuid)
+            login_args = [url, username, password, uuid]
+            if client_id:
+                client = pronotepy.Client.token_login(*login_args, client_identifier=str(client_id))
+            else:
+                client = pronotepy.Client.token_login(*login_args)
         except Exception:  # noqa: BLE001
             client = None
 
@@ -312,7 +327,10 @@ def pronote_login(payload):
 
 
 def pronote_password_login(payload):
-    """Direct URL + username + password login (non-ENT / demo accounts)."""
+    """Direct URL + username + password login (non-ENT / demo accounts).
+    Supports optional account_pin (PIN code), device_name and client_identifier
+    for accounts that have PIN authentication enabled.
+    """
     try:
         import pronotepy
     except ImportError:
@@ -321,12 +339,27 @@ def pronote_password_login(payload):
     url = str(payload.get("url", "")).strip()
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", ""))
+    pin = payload.get("pin") or None
+    device_name = payload.get("device_name") or None
+    client_id = payload.get("client_identifier") or None
+
     if not all([url, username, password]):
         return {"ok": False, "error": "URL, identifiant et mot de passe requis."}
 
     try:
-        client = pronotepy.Client(url, username, password)
+        kwargs = {}
+        if pin:
+            kwargs["account_pin"] = str(pin)
+        if device_name:
+            kwargs["device_name"] = str(device_name)
+        if client_id:
+            kwargs["client_identifier"] = str(client_id)
+        client = pronotepy.Client(url, username, password, **kwargs)
     except Exception as exc:  # noqa: BLE001
+        err_str = str(exc).lower()
+        # Detect PIN-required errors so the UI can prompt the user
+        if "pin" in err_str or "code" in err_str or "appareil" in err_str or "device" in err_str:
+            return {"ok": False, "error": f"Code PIN requis : {exc}", "needs_pin": True}
         return {"ok": False, "error": f"Connexion refusee : {exc}"}
 
     if not getattr(client, "logged_in", False):
@@ -335,6 +368,9 @@ def pronote_password_login(payload):
     # Save to cache
     _save_to_cache(client, url, username, password)
 
+    # Return client_identifier so the Rust layer can persist it for future sessions
+    cid = getattr(client, "client_identifier", None) or ""
+
     return {
         "ok": True,
         "mode": "password",
@@ -342,6 +378,7 @@ def pronote_password_login(payload):
         "url": url,
         "username": username,
         "password": password,
+        "client_identifier": cid,
     }
 
 
@@ -365,12 +402,14 @@ def pronote_sync(payload):
 
     # In QR mode the token rotates on every login - return the fresh one so it
     # is persisted. In password mode the credentials stay the same.
+    cid = getattr(client, "client_identifier", None) or ""
     return {
         "ok": True,
         "account_name": _account_name(client),
         "username": client.username,
         "password": client.password,
         "lessons": lessons,
+        "client_identifier": cid,
     }
 
 
@@ -852,6 +891,7 @@ def pronote_contents(payload):
     ]
 
     # Return fresh token so caller can persist (like sync) + extra context
+    cid = getattr(client, "client_identifier", None) or ""
     return {
         "ok": True,
         "username": client.username,
@@ -860,6 +900,7 @@ def pronote_contents(payload):
         "contents": filtered,
         "matieres": matieres,
         "classe_used": classe_dict,
+        "client_identifier": cid,
     }
 
 
@@ -905,12 +946,14 @@ def pronote_classes(payload):
                 "G": c.get("G", 1),
             })
 
+    cid = getattr(client, "client_identifier", None) or ""
     return {
         "ok": True,
         "classes": classes,
         "account_name": _account_name(client),
         "username": client.username,
         "password": client.password,
+        "client_identifier": cid,
     }
 
 

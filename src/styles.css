@@ -42,38 +42,8 @@ body {
   cursor: default;
 }
 
-/* On macOS we keep the content readable (mostly opaque) and let only the
-   sidebar/topbar reveal the native vibrancy for a subtle frosted feel. */
-.has-vibrancy html,
-.has-vibrancy body,
-.has-vibrancy #root {
-  background: transparent !important;
-}
-.has-vibrancy .eu-root {
-  background-color: rgb(var(--eu-bg) / 0.65) !important;
-}
-.has-vibrancy .eu-root {
-  background-color: rgb(var(--eu-bg) / 0.55) !important;
-}
-.has-vibrancy .eu-sidebar {
-  background-color: rgb(var(--eu-surface) / 0.4) !important;
-}
-.has-vibrancy .eu-topbar {
-  background-color: rgb(var(--eu-bg) / 0.3) !important;
-}
-.has-vibrancy main,
-.has-vibrancy .eu-main,
-.has-vibrancy .flex-1.min-h-0 {
-  background-color: rgb(var(--eu-bg) / 0.65) !important;
-}
-.has-vibrancy .eu-card,
-.has-vibrancy .new-card,
-.has-vibrancy .stat-card {
-  background-color: rgb(var(--eu-card) / 0.5) !important;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
-}
+
+
 
 /* Hide scrollbar on the tab strip for a clean, modern tab bar look (still fully scrollable with trackpad/mouse) */
 .eu-topbar .overflow-x-auto::-webkit-scrollbar {
