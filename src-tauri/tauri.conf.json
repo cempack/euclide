@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Euclide",
         "width": 1080,
         "height": 720,
