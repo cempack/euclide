@@ -325,6 +325,12 @@ export const api = {
   renameFile: (id: number, name: string) => invoke<FileItem>("rename_file", { id, newName: name }),
   globalSearch: (query: string) => invoke<SearchResult[]>("global_search", { query }),
   reindexDocuments: () => invoke<number>("reindex_documents"),
+  indexFiles: (ids: number[]) => invoke<number>("index_files", { ids }),
+  indexImportedPdfs: async (files: FileItem[]) => {
+    const ids = files.filter((f) => f.kind === "pdf").map((f) => f.id);
+    if (!ids.length) return 0;
+    return invoke<number>("index_files", { ids });
+  },
 
   // Reminders
   listReminders: () => {

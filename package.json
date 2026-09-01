@@ -20,11 +20,14 @@
     "framer-motion": "^11.15.0",
     "jspdf": "^2.5.2",
     "jsqr": "^1.4.0",
+    "katex": "^0.18.5",
     "lucide-react": "^1.17.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-markdown": "^9.0.1"
+    "react-markdown": "^9.0.1",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",

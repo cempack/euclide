@@ -91,6 +91,7 @@ pub fn run() {
             commands::rename_file,
             commands::global_search,
             commands::reindex_documents,
+            commands::index_files,
             commands::list_reminders,
             commands::create_reminder,
             commands::toggle_reminder,

@@ -1,20 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useTabs } from "../lib/tabs";
 import { api, type Course, type Note } from "../lib/api";
-import { useToast } from "./ui";
-import { TrashIcon, CodeIcon, LinkIcon } from "./icons";
+import { useToast, useConfirm, Loading } from "./ui";
+import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
 import { get } from "../lib/i18n";
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import { jsPDF } from "jspdf";
+import "katex/dist/katex.min.css";
 
 interface NoteEditorProps {
+  tabId: string;
   noteId?: number;
   isNew?: boolean;
   initialCourseId?: number;
 }
 
-export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEditorProps) {
+export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const tabs = useTabs();
   const toast = useToast();
+  const confirm = useConfirm();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [courses, setCourses] = useState<Course[]>([]);
@@ -25,6 +31,12 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
   });
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const loggedWrite = useRef(false);
+
+  const draftRef = useRef(draft);
+  const dirtyRef = useRef(dirty);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
 
   // Link popup state
   const [linkPopupOpen, setLinkPopupOpen] = useState(false);
@@ -42,6 +54,10 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
         setCourses(cs);
 
         if (noteId) {
+          if (draftRef.current.id === noteId) {
+            if (mounted) setLoading(false);
+            return;
+          }
           const all = await api.allNotes();
           const found = all.find((n) => n.id === noteId);
           if (found && mounted) {
@@ -66,38 +82,66 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
     return () => { mounted = false; };
   }, [noteId, isNew, initialCourseId, toast]);
 
+  const persist = useCallback(async () => {
+    const d = draftRef.current;
+    if (!d.title) return d;
+    const wasNew = d.id == null;
+    const saved = await api.saveNote({
+      id: d.id,
+      title: d.title,
+      body: d.body || "",
+      course_id: d.course_id ?? null,
+    });
+    setDraft(saved);
+    setDirty(false);
+    if (wasNew && saved.id) {
+      api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
+      loggedWrite.current = true;
+      const nextId = `note:${saved.id}`;
+      if (tabId !== nextId) {
+        tabs.retarget(tabId, nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
+      }
+      tabs.rename(nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
+    } else if (!loggedWrite.current) {
+      api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
+      loggedWrite.current = true;
+      tabs.rename(tabId, saved.title || "Note");
+    } else {
+      tabs.rename(tabId, saved.title || "Note");
+    }
+    window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    return saved;
+  }, [tabId, tabs]);
+
+  useEffect(() => {
+    tabs.setTabDirty(tabId, dirty);
+    return () => tabs.setTabDirty(tabId, false);
+  }, [tabId, dirty, tabs]);
+
+  useEffect(() => {
+    return tabs.registerFlush(tabId, async () => {
+      if (dirtyRef.current) await persist();
+    });
+  }, [tabId, tabs, persist]);
+
   // Auto save on changes (debounced)
   useEffect(() => {
     if (!dirty || !draft.title) return;
-    const t = setTimeout(async () => {
-      try {
-        const wasNew = draft.id == null;
-        const saved = await api.saveNote({
-          id: draft.id,
-          title: draft.title,
-          body: draft.body || "",
-          course_id: draft.course_id ?? null,
-        });
-        setDraft(saved);
-        setDirty(false);
-        // If this was a fresh "new" tab, migrate it to the stable note:<id> key so lists can target it without dup tabs
-        if (wasNew && saved.id) {
-          const cur = tabs.activeId;
-          if (cur && cur.startsWith("note:new:")) {
-            setTimeout(() => {
-              tabs.close(cur);
-              tabs.open({ kind: "note", title: saved.title || "Note", params: { noteId: saved.id } });
-            }, 0);
-          }
-        }
-        // refresh documents etc
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
-      } catch (e) {
+    const t = setTimeout(() => {
+      persist().catch(() => {
         toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
-      }
+      });
     }, 800);
     return () => clearTimeout(t);
-  }, [dirty, draft, toast]);
+  }, [dirty, draft, persist, toast]);
+
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current && draftRef.current.title) {
+        persist().catch(() => {});
+      }
+    };
+  }, [persist]);
 
   const markDirty = (updates: Partial<Note>) => {
     setDraft((d) => ({ ...d, ...updates }));
@@ -228,19 +272,23 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
 
   const onTitleChange = (title: string) => {
     markDirty({ title });
-    // keep the tab title in sync live (even for unsaved new notes)
-    if (tabs.activeId) tabs.rename(tabs.activeId, title || "Nouvelle note");
+    tabs.rename(tabId, title || "Nouvelle note");
   };
   const onCourseChange = (courseId: number | null) => markDirty({ course_id: courseId });
 
   const doDelete = async () => {
     if (!draft.id) return;
-    if (!confirm("Supprimer cette note ?")) return;
+    const ok = await confirm.ask({
+      title: get("notes.deleteConfirm", "Supprimer cette note ?"),
+      message: get("notes.deleteConfirm", "Supprimer cette note ?"),
+      confirmLabel: get("common.delete", "Supprimer"),
+      danger: true,
+    });
+    if (!ok) return;
     await api.deleteNote(draft.id);
     toast(get("notes.deleted", "Note supprimée"), "success");
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    // close tab? for simplicity, user can close, or navigate away
-    tabs.close(tabs.activeId!); // rough, may go to previous
+    tabs.close(tabId);
   };
 
   const doSave = async () => {
@@ -248,31 +296,38 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
       toast(get("notes.titleRequired", "Le titre est requis"), "error");
       return;
     }
-    const wasNew = draft.id == null;
-    const saved = await api.saveNote({
-      id: draft.id,
-      title: draft.title,
-      body: draft.body || "",
-      course_id: draft.course_id ?? null,
-    });
-    setDraft(saved);
-    setDirty(false);
-    toast(get("notes.saved", "Note enregistrée"), "success");
-    // migrate new tab -> stable id tab (prevents duplicate tabs when later opening from Documents/Course list)
-    if (wasNew && saved.id) {
-      const cur = tabs.activeId;
-      if (cur && cur.startsWith("note:new:")) {
-        setTimeout(() => {
-          tabs.close(cur);
-          tabs.open({ kind: "note", title: saved.title || "Note", params: { noteId: saved.id } });
-        }, 0);
-      }
+    try {
+      await persist();
+      toast(get("notes.saved", "Note enregistrée"), "success");
+    } catch {
+      toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
     }
-    window.dispatchEvent(new CustomEvent("eu:library-changed"));
+  };
+
+  const exportPdf = async () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const title = draft.title || "Note";
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(title, 48, 56);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    const body = (draft.body || "").replace(/\$\$[\s\S]*?\$\$/g, "[formule]").replace(/\$[^$]+\$/g, "[formule]");
+    const lines = doc.splitTextToSize(body || " ", 500);
+    doc.text(lines, 48, 84);
+    const dataUrl = doc.output("dataurlstring");
+    try {
+      const f = await api.saveExport(`${title}.pdf`, dataUrl);
+      toast(get("notes.exported", "Exporté : {name}").replace("{name}", f.name), "success");
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    } catch {
+      doc.save(`${title}.pdf`);
+      toast(get("notes.exported", "Exporté : {name}").replace("{name}", `${title}.pdf`), "success");
+    }
   };
 
   if (loading) {
-    return <div className="p-6 text-mute">Chargement…</div>;
+    return <Loading label={get("notes.loading", "Chargement…")} />;
   }
 
   const selectedCourse = courses.find((c) => c.id === draft.course_id);
@@ -315,6 +370,9 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
               <TrashIcon className="w-4 h-4" /> Supprimer
             </button>
           )}
+          <button onClick={exportPdf} className="new-btn-ghost text-sm flex items-center gap-1" title={get("notes.exportPdf", "Exporter en PDF")}>
+            <DownloadIcon className="w-4 h-4" /> PDF
+          </button>
         </div>
       </div>
 
@@ -389,6 +447,8 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
           <div className="flex-1 overflow-auto p-3 bg-surface-soft rounded text-sm leading-relaxed">
             {draft.body?.trim() ? (
               <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   a: ({ ...props }) => (
                     <a {...props} className="text-tui-accent underline hover:opacity-80" target="_blank" rel="noopener noreferrer" />
