@@ -633,8 +633,9 @@ function Shell() {
  } else if (mod && e.key === "/") {
  e.preventDefault();
  setHelp((h) => !h);
- } else if (e.ctrlKey && e.key === "Tab") {
+ } else if (e.ctrlKey && (e.key === "Tab" || e.code === "Tab")) {
  e.preventDefault();
+ e.stopPropagation();
  if (e.shiftKey) tabs.prev();
  else tabs.next();
  } else if (mod && /^[1-9]$/.test(e.key)) {
@@ -642,8 +643,8 @@ function Shell() {
  tabs.focusIndex(Number(e.key) - 1);
  }
  };
- window.addEventListener("keydown", onKey);
- return () => window.removeEventListener("keydown", onKey);
+ window.addEventListener("keydown", onKey, true);
+ return () => window.removeEventListener("keydown", onKey, true);
  }, [tabs, requestClose]);
 
  return (
