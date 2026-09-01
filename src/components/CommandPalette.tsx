@@ -16,6 +16,7 @@ import {
   SearchIcon,
   ToolIcon,
   CodeIcon,
+  SparkleIcon,
 } from "./icons";
 
 interface Action {
@@ -109,6 +110,7 @@ export default function CommandPalette({
         icon: <NoteIcon className="w-4 h-4" />,
         run: go("note", get("common.newNote", "Nouvelle note"), { isNew: true }),
       },
+      { id: "recap", label: get("nav.recap", "Bilan"), icon: <SparkleIcon className="w-4 h-4" />, run: go("recap", get("nav.recap", "Bilan")) },
       { id: "settings", label: get("nav.settings", "Réglages"), icon: <GearIcon className="w-4 h-4" />, run: go("settings") },
       {
         id: "help",
@@ -143,8 +145,7 @@ export default function CommandPalette({
           hint: "note",
           icon: <NoteIcon className="w-4 h-4" />,
           run: () => {
-            if (r.course_id) tabs.open({ kind: "course", params: { courseId: r.course_id } });
-            else tabs.open({ kind: "courses" });
+            tabs.open({ kind: "note", title: r.title || get("notes.newTitle", "Note"), params: { noteId: r.id } });
             onClose();
           },
         };
@@ -181,7 +182,14 @@ export default function CommandPalette({
     return scored.slice(0, 16).map((x) => x.a);
   }, [baseActions, resultActions, query]);
 
+  const listRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => setSel(0), [query, results]);
+
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-sel="${sel}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [sel]);
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
@@ -228,13 +236,14 @@ export default function CommandPalette({
                 className="flex-1 bg-transparent py-3.5 text-[15px] outline-none placeholder:text-body-mute"
               />
             </div>
-            <div className="max-h-[46vh] overflow-y-auto p-2">
+            <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-2">
               {filtered.length === 0 ? (
                 <p className="px-3 py-6 text-center text-body-mute">{get("documents.nothingHere", "Aucun résultat")}</p>
               ) : (
                 filtered.map((a, i) => (
                   <button
                     key={a.id}
+                    data-sel={i}
                     onClick={a.run}
                     onMouseEnter={() => setSel(i)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-100 active:bg-surface-container ${

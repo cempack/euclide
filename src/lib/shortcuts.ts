@@ -25,6 +25,7 @@ export const SHORTCUTS: { group: string; items: ShortcutDoc[] }[] = [
       { keys: [MOD, "W"], label: "Fermer onglet" },
       { keys: [MOD, "1…9"], label: "Aller à l'onglet" },
       { keys: ["Ctrl", "Tab"], label: "Onglet suivant" },
+      { keys: ["Ctrl", "Shift", "Tab"], label: "Onglet précédent" },
       { keys: [MOD, "D"], label: get("nav.dashboard", "Tableau de bord") },
     ],
   },
