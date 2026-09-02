@@ -71,9 +71,23 @@ function errorMessage(err: unknown): string {
   }
 }
 
-/** Quiet check: missing GitHub latest release is not an app error. */
+function errorText(err: unknown): string {
+  return errorMessage(err).toLowerCase();
+}
+
+/** `latest.json` exists but this OS is not in `platforms` yet (matrix still running). */
+export function isIncompleteUpdateManifest(err: unknown): boolean {
+  const msg = errorText(err);
+  return (
+    msg.includes("none of the fallback platforms") ||
+    (msg.includes("fallback platforms") && msg.includes("were found in the response"))
+  );
+}
+
+/** Quiet check: missing or unfinished GitHub latest release is not an app error. */
 export function isNoPublishedUpdate(err: unknown): boolean {
-  const msg = errorMessage(err).toLowerCase();
+  if (isIncompleteUpdateManifest(err)) return true;
+  const msg = errorText(err);
   return (
     msg.includes("404") ||
     msg.includes("not found") ||
@@ -172,9 +186,13 @@ export async function installPendingUpdate(
   await pending.downloadAndInstall(report);
   pending = null;
   try {
-    const { relaunch } = await import("@tauri-apps/plugin-process");
-    await relaunch();
+    await invoke("relaunch_after_update");
   } catch {
-    // Windows NSIS quits during install; relaunch is for macOS / Linux.
+    try {
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch {
+      throw new Error("Mise à jour installée. Relancez Euclide.");
+    }
   }
 }
