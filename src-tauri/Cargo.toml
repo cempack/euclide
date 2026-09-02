@@ -25,7 +25,11 @@ uuid = { version = "1", features = ["v4"] }
 keepawake = "0.6"
 tokio = { version = "1", features = ["process", "io-util", "sync"] }
 tauri-plugin-process = "2.3.1"
-zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+# deflate-flate2 alone leaves flate2 with no compression backend. On Windows,
+# reqwest also depends on flate2 with default-features = false, so the unified
+# graph has no rust_backend/zlib-rs and MSVC CI dies with
+# "You need to choose a zlib backend". zlib-rs is pure Rust (no system zlib).
+zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 minisign-verify = "0.2"
 
 [target.'cfg(windows)'.dependencies]
