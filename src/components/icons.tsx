@@ -46,8 +46,8 @@ export const ToolIcon = (p: IconProps) => (
 
 export const SparkleIcon = (p: IconProps) => (
   <svg {...base(p)}>
-    <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
-    <path d="M12 8.5 13.2 11l2.5 1-2.5 1L12 15.5 10.8 13l-2.5-1 2.5-1z" />
+    <path d="M12 4.5c.5 2.6 1.4 3.5 4 4-2.6.5-3.5 1.4-4 4-.5-2.6-1.4-3.5-4-4 2.6-.5 3.5-1.4 4-4Z" />
+    <path d="M18.5 14.5c.28 1.3.7 1.72 2 2-1.3.28-1.72.7-2 2-.28-1.3-.7-1.72-2-2 1.3-.28 1.72-.7 2-2Z" />
   </svg>
 );
 
@@ -327,6 +327,65 @@ export const TextIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M7 7 h10" />
     <path d="M12 7 v10" />
+  </svg>
+);
+
+// Chrome / appearance icons
+export const ProjectorIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="2.5" y="7.5" width="19" height="9" rx="1.5" />
+    <circle cx="9" cy="12" r="2.5" />
+    <path d="M16 11h2M6 16.5v2M18 16.5v2" />
+  </svg>
+);
+
+export const PinIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 15v6" />
+    <path d="M8.5 4h7l-1 6 3 2v1H6.5v-1l3-2z" />
+  </svg>
+);
+
+export const PauseIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M9.5 6v12M14.5 6v12" />
+  </svg>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m9.5 6 6 6-6 6" />
+  </svg>
+);
+
+export const ChevronDownIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m6 9.5 6 6 6-6" />
+  </svg>
+);
+
+export const ArchiveIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="5" width="17" height="4" rx="1" />
+    <path d="M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
+    <path d="M10 13h4" />
+  </svg>
+);
+
+export const RepeatIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 12a6 6 0 0 1 6-6h9" />
+    <path d="m16 3 3 3-3 3" />
+    <path d="M20 12a6 6 0 0 1-6 6H5" />
+    <path d="m8 21-3-3 3-3" />
+  </svg>
+);
+
+export const LayersIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m12 3 8 4.5-8 4.5-8-4.5z" />
+    <path d="m4 12.5 8 4.5 8-4.5" />
+    <path d="m4 16.5 8 4.5 8-4.5" />
   </svg>
 );
 

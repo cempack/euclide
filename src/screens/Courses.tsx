@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, memo } from "react";
 import { motion } from "framer-motion";
 import { useTabs } from "../lib/tabs";
 import { api, type Course } from "../lib/api";
-import { t, get } from "../lib/i18n";
+import { t, get, fmt } from "../lib/i18n";
 import {
   COURSE_COLORS,
   COURSE_ICONS,
@@ -11,353 +11,378 @@ import {
   Modal,
   useToast,
 } from "../components/ui";
-import { ArrowRightIcon, BookIcon, PenIcon, PlusIcon } from "../components/icons";
+import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
+import { courseVisual } from "../lib/color";
+import { useAppearance } from "../lib/theme";
+import { ChevronRightIcon, BookIcon, PenIcon, PlusIcon } from "../components/icons";
 
-// Hoisted MemoCourseCard at module scope so memo() is stable across renders of Courses (for snappier list)
-const MemoCourseCard = memo(function MemoCourseCard({ c, onOpen, onEdit }: { c: Course; onOpen: (c: Course) => void; onEdit: (c: Course) => void }) {
+type Matiere = "Mathématiques" | "NSI" | "Maths expertes";
+const MATIERES: Matiere[] = ["Mathématiques", "NSI", "Maths expertes"];
+
+// Hoisted at module scope so memo() stays stable across renders of Courses.
+const CourseCard = memo(function CourseCard({
+  c,
+  dark,
+  onOpen,
+  onEdit,
+}: {
+  c: Course;
+  dark: boolean;
+  onOpen: (c: Course) => void;
+  onEdit: (c: Course) => void;
+}) {
   const IconComp = useMemo(() => {
     const found = COURSE_ICONS.find((i) => i.key === (c.emoji || "book"));
     return found ? found.Icon : BookIcon;
   }, [c.emoji]);
+  const visual = useMemo(() => courseVisual(c.color, dark), [c.color, dark]);
 
   return (
-    <motion.button
-      key={c.id}
-      initial={{ opacity: 0, y: 8 }}
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
-      onClick={() => onOpen(c)}
-      className="new-card p-5 text-left group hover:border-tui-accent/40 hover:-translate-y-0.5 active:scale-[0.995] active:border-tui-accent/30 transition-all duration-150"
+      className="eu-panel group relative flex overflow-hidden hover:border-line-strong transition-colors duration-fast"
     >
-      <div className="flex items-start justify-between">
+      <span aria-hidden className="w-1 shrink-0" style={{ background: visual.fg }} />
+      <button
+        type="button"
+        onClick={() => onOpen(c)}
+        className="flex-1 min-w-0 text-left p-[14px] pr-9"
+      >
         <span
-          className="grid place-items-center w-10 h-10 rounded-none border border-[rgba(15,0,0,0.12)]"
-          style={{ background: `${c.color}22`, color: c.color }}
+          className="grid place-items-center w-8 h-8 rounded border"
+          style={{ background: visual.tint, borderColor: visual.border, color: visual.fg }}
         >
-          <IconComp className="w-5 h-5" strokeWidth={1.8} />
+          <IconComp className="w-4 h-4" strokeWidth={1.8} />
         </span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(c);
-            }}
-            className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 text-mute hover:text-primary transition-all"
-            title="Modifier le cours"
-          >
-            <PenIcon className="w-3.5 h-3.5" />
-          </button>
-          <ArrowRightIcon className="w-5 h-5 text-body-mute opacity-40 group-hover:text-tui-accent group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-150" />
-        </div>
-      </div>
-      <h3 className="mt-4 font-semibold text-primary">{c.name}</h3>
-      {c.matiere && (
-        <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface/80">{c.matiere}</span>
-      )}
-      {c.description && (
-        <p className="text-body-mute text-sm mt-1 line-clamp-2">{c.description}</p>
-      )}
-      <div className="mt-3 h-1 rounded-full" style={{ background: c.color }} />
-    </motion.button>
+        <h3 className="eu-t-section text-ink mt-3 truncate">{c.name}</h3>
+        <p className="eu-t-meta mt-1 flex items-center gap-2 flex-wrap">
+          {c.matiere && <span>{c.matiere}</span>}
+        </p>
+        {c.description && <p className="eu-t-meta mt-1.5 line-clamp-2">{c.description}</p>}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(c);
+        }}
+        aria-label={fmt(get("courses.editCourse", "Modifier {name}"), { name: c.name })}
+        title={get("courses.editCourse", "Modifier le cours")}
+        className="absolute top-2 right-2 eu-btn-quiet eu-btn-icon eu-btn-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-fast"
+      >
+        <PenIcon className="w-3.5 h-3.5" />
+      </button>
+      <ChevronRightIcon
+        aria-hidden
+        className="absolute bottom-3 right-2.5 w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
+      />
+    </motion.div>
   );
 });
+
+/** Shared body of the create and edit dialogs — they were duplicated. */
+function CourseForm({
+  name,
+  setName,
+  desc,
+  setDesc,
+  matiere,
+  setMatiere,
+  color,
+  setColor,
+  iconKey,
+  setIconKey,
+  dark,
+  onCancel,
+  onSubmit,
+  submitLabel,
+}: {
+  name: string;
+  setName: (v: string) => void;
+  desc: string;
+  setDesc: (v: string) => void;
+  matiere: Matiere;
+  setMatiere: (v: Matiere) => void;
+  color: string;
+  setColor: (v: string) => void;
+  iconKey: string;
+  setIconKey: (v: string) => void;
+  dark: boolean;
+  onCancel: () => void;
+  onSubmit: () => void;
+  submitLabel: string;
+}) {
+  const preview = courseVisual(color, dark);
+  const PreviewIcon = COURSE_ICONS.find((i) => i.key === iconKey)?.Icon ?? BookIcon;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <span
+          className="grid place-items-center w-10 h-10 shrink-0 rounded border"
+          style={{ background: preview.tint, borderColor: preview.border, color: preview.fg }}
+        >
+          <PreviewIcon className="w-5 h-5" strokeWidth={1.8} />
+        </span>
+        <input
+          autoFocus
+          className="eu-input"
+          placeholder={get("courses.namePlaceholder", "Nom du cours (ex : Mathématiques, NSI)")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) onSubmit();
+          }}
+          aria-label={get("courses.name", "Nom du cours")}
+        />
+      </div>
+
+      <Field label={get("courses.matiere", "Matière")}>
+        <Segmented
+          value={matiere}
+          onChange={setMatiere}
+          label={get("courses.matiere", "Matière")}
+          options={MATIERES.map((m) => ({ value: m, label: m }))}
+        />
+      </Field>
+
+      <Field
+        label={get("courses.description", "Description")}
+        hint={get("courses.descriptionHint", "Optionnel — s'affiche sur la carte du cours.")}
+      >
+        <textarea
+          className="eu-textarea min-h-[64px]"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          aria-label={get("courses.description", "Description")}
+        />
+      </Field>
+
+      <Field label={get("courses.color", "Couleur")}>
+        <div className="flex flex-wrap gap-1.5">
+          {COURSE_COLORS.map((col) => (
+            <button
+              key={col}
+              type="button"
+              onClick={() => setColor(col)}
+              aria-label={col}
+              aria-pressed={color === col}
+              className={`w-7 h-7 rounded border transition-transform duration-fast ${
+                color === col ? "border-ink scale-110" : "border-line hover:scale-105"
+              }`}
+              style={{ background: col }}
+            />
+          ))}
+        </div>
+      </Field>
+
+      <Field label={get("courses.icon", "Icône")}>
+        <div className="flex flex-wrap gap-1.5">
+          {COURSE_ICONS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setIconKey(key)}
+              title={label}
+              aria-label={label}
+              aria-pressed={iconKey === key}
+              className={`w-8 h-8 grid place-items-center rounded border transition-colors duration-fast ${
+                iconKey === key
+                  ? "border-ink bg-panel-alt text-ink"
+                  : "border-line text-ink-muted hover:bg-panel-alt"
+              }`}
+            >
+              <Icon className="w-4 h-4" strokeWidth={1.8} />
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <div className="flex justify-end gap-2 mt-1">
+        <button className="eu-btn-ghost" onClick={onCancel}>
+          {t.common?.cancel || get("common.cancel", "Annuler")}
+        </button>
+        <button className="eu-btn-primary" onClick={onSubmit} disabled={!name.trim()}>
+          {submitLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Courses() {
   const tabs = useTabs();
   const toast = useToast();
+  const { resolved } = useAppearance();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+
+  // One dialog for both create and edit: `editing` holds the course being
+  // modified, or null when creating. The two 80-line duplicated forms are gone.
+  const [dialog, setDialog] = useState<"closed" | "create" | "edit">("closed");
+  const [editing, setEditing] = useState<Course | null>(null);
   const [name, setName] = useState("");
-  const [color, setColor] = useState(COURSE_COLORS[0]);
   const [desc, setDesc] = useState("");
-  const [matiere, setMatiere] = useState<"Mathématiques" | "NSI" | "Maths expertes">("Mathématiques");
+  const [matiere, setMatiere] = useState<Matiere>("Mathématiques");
+  const [color, setColor] = useState(COURSE_COLORS[0]);
   const [iconKey, setIconKey] = useState("book");
 
-  // Edit state for popup
-  const [editOpen, setEditOpen] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editColor, setEditColor] = useState(COURSE_COLORS[0]);
-  const [editDesc, setEditDesc] = useState("");
-  const [editMatiere, setEditMatiere] = useState<"Mathématiques" | "NSI" | "Maths expertes">("Mathématiques");
-  const [editIconKey, setEditIconKey] = useState("book");
-
-  const refresh = () => {
-    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => {
-    refresh();
+  const refresh = useCallback(() => {
+    api
+      .listCourses()
+      .then((c) => setCourses(Array.isArray(c) ? c : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const create = async () => {
+  useEffect(() => {
+    refresh();
+    const onChange = () => refresh();
+    window.addEventListener("eu:course-changed", onChange);
+    return () => window.removeEventListener("eu:course-changed", onChange);
+  }, [refresh]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setName("");
+    setDesc("");
+    setMatiere("Mathématiques");
+    setColor(COURSE_COLORS[courses.length % COURSE_COLORS.length]);
+    setIconKey("book");
+    setDialog("create");
+  };
+
+  const openEdit = useCallback((c: Course) => {
+    setEditing(c);
+    setName(c.name);
+    setDesc(c.description || "");
+    setMatiere((c.matiere as Matiere) || "Mathématiques");
+    setColor(c.color || COURSE_COLORS[0]);
+    setIconKey(c.emoji || "book");
+    setDialog("edit");
+  }, []);
+
+  const close = () => setDialog("closed");
+
+  const submit = async () => {
     if (!name.trim()) return;
     try {
-      const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
-      if (!created?.id) {
-        toast(get("messages.genericError", "Erreur"), "error");
-        return;
+      if (editing) {
+        await api.updateCourse({
+          ...editing,
+          name: name.trim(),
+          emoji: iconKey,
+          color,
+          description: desc.trim(),
+          matiere,
+        });
+        toast(get("courses.updated", "Cours modifié"), "success");
+      } else {
+        const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
+        if (!created?.id) {
+          toast(get("messages.genericError", "Erreur"), "error");
+          return;
+        }
+        toast(`${t.common?.newCourse || "Nouveau cours"} : ${name.trim()}`, "success");
       }
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
       window.dispatchEvent(new CustomEvent("eu:course-changed"));
-      toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
-      setName("");
-      setDesc("");
-      setMatiere("Mathématiques");
-      setIconKey("book");
-      setOpen(false);
+      close();
       refresh();
     } catch {
       toast(get("messages.genericError", "Erreur"), "error");
     }
   };
 
-  const openEdit = (c: Course) => {
-    setEditId(c.id);
-    setEditName(c.name);
-    setEditColor(c.color);
-    setEditDesc(c.description || "");
-    setEditMatiere((c.matiere as any) || "Mathématiques");
-    setEditIconKey(c.emoji || "book");
-    setEditOpen(true);
-  };
-
-  const saveEdit = async () => {
-    if (!editName.trim() || !editId) return;
-    const courseToUpdate = courses.find((c) => c.id === editId);
-    if (!courseToUpdate) return;
-    try {
-      await api.updateCourse({
-        ...courseToUpdate,
-        name: editName.trim(),
-        emoji: editIconKey,
-        color: editColor,
-        description: editDesc.trim(),
-        matiere: editMatiere,
-      });
-      window.dispatchEvent(new CustomEvent("eu:library-changed")); // ensure fresh lists everywhere (triggers cache invalidation + listeners)
-      window.dispatchEvent(new CustomEvent("eu:course-changed"));
-      toast("Cours modifié", "success");
-      setEditOpen(false);
-      // reset edit
-      setEditId(null);
-      setEditName("");
-      setEditDesc("");
-      setEditMatiere("Mathématiques");
-      setEditIconKey("book");
-      refresh();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
-    }
-  };
-
-  const closeEdit = () => {
-    setEditOpen(false);
-    setEditId(null);
-    setEditName("");
-    setEditDesc("");
-    setEditMatiere("Mathématiques");
-    setEditIconKey("book");
-  };
-
-  // Stable callbacks for memo cards (MemoCourseCard hoisted at module top)
-  const handleOpenCourse = useCallback((c: Course) => {
-    tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } });
-  }, [tabs]);
-
-  const handleEditCourse = useCallback((c: Course) => {
-    openEdit(c);
-  }, [openEdit]);
+  const handleOpenCourse = useCallback(
+    (c: Course) => {
+      tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } });
+    },
+    [tabs]
+  );
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.courses}</h1>
-          <p className="text-body-mute text-sm mt-1">{get("courses.subtitle", "Classes, séquences et casiers.")}</p>
-        </div>
-        <button onClick={() => { setIconKey("book"); setOpen(true); }} className="new-btn-primary">
-          <PlusIcon className="w-4 h-4" /> {t.common?.newCourse || "Nouveau cours"}
-        </button>
-      </header>
+    <>
+      <PageHeader
+        title={t.nav.courses}
+        meta={
+          <>
+            <span>{fmt(get("courses.metaCount", "{count} cours"), { count: courses.length })}</span>
+            <MetaDot />
+            <span>{get("courses.subtitle", "Classes, séquences et casiers")}</span>
+          </>
+        }
+        actions={
+          <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
+            <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newCourse || "Nouveau cours"}
+          </button>
+        }
+      />
 
       {loading ? (
-        <div className="new-card">
-          <Loading label="Chargement des cours…" />
-        </div>
+        <Panel>
+          <Loading label={get("courses.loading", "Chargement des cours…")} />
+        </Panel>
       ) : courses.length === 0 ? (
-        <div className="new-card">
+        <Panel>
           <EmptyState
-            icon={<BookIcon className="w-9 h-9" />}
-            title="Aucun cours pour le moment"
-            hint="Créez un cours : il aura un casier de documents, des notes, et vous attacherez des classes (noms exacts Pronote) pour le suivi de progression par groupe."
+            icon={<BookIcon className="w-4 h-4" />}
+            title={get("courses.emptyTitle", "Aucun cours pour le moment")}
+            hint={get(
+              "courses.emptyHint",
+              "Un cours rassemble un casier de documents, des notes, une progression par séquences, et les classes qui le suivent (noms Pronote exacts)."
+            )}
+            action={
+              <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
+                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newCourse || "Nouveau cours"}
+              </button>
+            }
           />
-        </div>
+        </Panel>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {courses.map((c) => (
-            <MemoCourseCard key={c.id} c={c} onOpen={handleOpenCourse} onEdit={handleEditCourse} />
+            <CourseCard
+              key={c.id}
+              c={c}
+              dark={resolved === "dark"}
+              onOpen={handleOpenCourse}
+              onEdit={openEdit}
+            />
           ))}
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t.common?.newCourse || "Nouveau cours"}>
-        <div className="flex flex-col gap-4">
-          <input
-            autoFocus
-            className="new-input"
-            placeholder="Nom du cours (ex : Mathématiques, NSI, Physique)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <textarea
-            className="new-input min-h-[72px] resize-none"
-            placeholder="Description (optionnel)"
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-          />
-          {/* Beautiful minimal selector matching theme and creation values */}
-          <div className="new-segment text-xs">
-            <button
-              onClick={() => setMatiere("Mathématiques")}
-              className={`px-2.5 py-0.5 rounded transition-colors ${matiere === "Mathématiques" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-            >
-              Mathématiques
-            </button>
-            <button
-              onClick={() => setMatiere("NSI")}
-              className={`px-2.5 py-0.5 rounded transition-colors ${matiere === "NSI" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-            >
-              NSI
-            </button>
-            <button
-              onClick={() => setMatiere("Maths expertes")}
-              className={`px-2.5 py-0.5 rounded transition-colors ${matiere === "Maths expertes" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-            >
-              Maths expertes
-            </button>
-          </div>
-          <div>
-            <p className="text-body-mute text-sm mb-2">Couleur</p>
-            <div className="flex flex-wrap gap-2">
-              {COURSE_COLORS.map((col) => (
-                <button
-                  key={col}
-                  onClick={() => setColor(col)}
-                  className={`w-8 h-8 rounded-full transition-transform border border-hairline ${
-                    color === col ? "ring-2 ring-offset-2 ring-tui-accent ring-offset-surface scale-110" : ""
-                  }`}
-                  style={{ background: col }}
-                />
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-body-mute text-sm mb-2">Icône (SVG)</p>
-            <div className="flex flex-wrap gap-1">
-              {COURSE_ICONS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setIconKey(key)}
-                  title={label}
-                  className={`w-9 h-9 rounded border flex items-center justify-center transition ${
-                    iconKey === key ? "ring-2 ring-tui-accent bg-surface" : "border-hairline hover:bg-surface-container/50"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" strokeWidth={1.8} />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-1">
-            <button className="new-btn-ghost" onClick={() => setOpen(false)}>
-              {t.common?.cancel || get("common.cancel", "Annuler")}
-            </button>
-            <button className="new-btn-primary" onClick={create}>
-              {t.common?.add || "Ajouter"}
-            </button>
-          </div>
-        </div>
+      <Modal
+        open={dialog !== "closed"}
+        onClose={close}
+        title={
+          dialog === "edit"
+            ? get("courses.editTitle", "Modifier le cours")
+            : t.common?.newCourse || "Nouveau cours"
+        }
+      >
+        <CourseForm
+          name={name}
+          setName={setName}
+          desc={desc}
+          setDesc={setDesc}
+          matiere={matiere}
+          setMatiere={setMatiere}
+          color={color}
+          setColor={setColor}
+          iconKey={iconKey}
+          setIconKey={setIconKey}
+          dark={resolved === "dark"}
+          onCancel={close}
+          onSubmit={submit}
+          submitLabel={
+            dialog === "edit" ? get("common.save", "Enregistrer") : t.common?.add || "Ajouter"
+          }
+        />
       </Modal>
-
-      {/* Edit popup for cours: name, description, matiere, color, icon */}
-      <Modal open={editOpen} onClose={closeEdit} title="Modifier le cours">
-        <div className="flex flex-col gap-4">
-          <input
-            autoFocus
-            className="new-input"
-            placeholder="Nom du cours"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-          />
-          <textarea
-            className="new-input min-h-[72px] resize-none"
-            placeholder="Description (optionnel)"
-            value={editDesc}
-            onChange={(e) => setEditDesc(e.target.value)}
-          />
-          <div className="new-segment text-xs">
-            <button
-              onClick={() => setEditMatiere("Mathématiques")}
-              className={`px-2.5 py-0.5 rounded transition-colors ${editMatiere === "Mathématiques" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-            >
-              Mathématiques
-            </button>
-            <button
-              onClick={() => setEditMatiere("NSI")}
-              className={`px-2.5 py-0.5 rounded transition-colors ${editMatiere === "NSI" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-            >
-              NSI
-            </button>
-            <button
-              onClick={() => setEditMatiere("Maths expertes")}
-              className={`px-2.5 py-0.5 rounded transition-colors ${editMatiere === "Maths expertes" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-            >
-              Maths expertes
-            </button>
-          </div>
-          <div>
-            <p className="text-body-mute text-sm mb-2">Couleur</p>
-            <div className="flex flex-wrap gap-2">
-              {COURSE_COLORS.map((col) => (
-                <button
-                  key={col}
-                  onClick={() => setEditColor(col)}
-                  className={`w-8 h-8 rounded-full transition-transform border border-hairline ${
-                    editColor === col ? "ring-2 ring-offset-2 ring-tui-accent ring-offset-surface scale-110" : ""
-                  }`}
-                  style={{ background: col }}
-                />
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-body-mute text-sm mb-2">Icône (SVG)</p>
-            <div className="flex flex-wrap gap-1">
-              {COURSE_ICONS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setEditIconKey(key)}
-                  title={label}
-                  className={`w-9 h-9 rounded border flex items-center justify-center transition ${
-                    editIconKey === key ? "ring-2 ring-tui-accent bg-surface" : "border-hairline hover:bg-surface-container/50"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" strokeWidth={1.8} />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-1">
-            <button className="new-btn-ghost" onClick={closeEdit}>
-              {t.common?.cancel || "Annuler"}
-            </button>
-            <button className="new-btn-primary" onClick={saveEdit} disabled={!editName.trim()}>
-              Enregistrer
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+    </>
   );
 }

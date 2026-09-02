@@ -5,23 +5,20 @@ pub struct Db(pub Mutex<Connection>);
 
 pub fn open() -> Connection {
     let path = crate::paths::db_path();
-    let conn = Connection::open(&path).unwrap_or_else(|e| {
-        panic!(
-            "impossible d'ouvrir la base {} : {e}",
-            path.display()
-        )
-    });
+    let conn = Connection::open(&path)
+        .unwrap_or_else(|e| panic!("impossible d'ouvrir la base {} : {e}", path.display()));
     conn.execute_batch(SCHEMA).expect("init schema");
-    // Migration for existing DBs: add matiere column to courses (for subject filtering with Pronote)
-    let _ = conn.execute("ALTER TABLE courses ADD COLUMN matiere TEXT NOT NULL DEFAULT ''", []);
+    run_migrations(&conn);
 
     // Performance PRAGMAs (WAL already in SCHEMA; these are safe to re-apply).
     // synchronous=NORMAL is good balance with WAL; busy_timeout helps under contention; temp_store in mem.
-    let _ = conn.execute_batch(r#"
+    let _ = conn.execute_batch(
+        r#"
 PRAGMA synchronous = NORMAL;
 PRAGMA busy_timeout = 5000;
 PRAGMA temp_store = MEMORY;
-"#);
+"#,
+    );
 
     seed_python_demos();
     conn
@@ -49,6 +46,7 @@ CREATE TABLE IF NOT EXISTS course_classes (
     course_id           INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     class_name          TEXT NOT NULL,
     last_file_id        INTEGER REFERENCES files(id) ON DELETE SET NULL,
+    last_item_id        INTEGER,  -- step of a sequence (see `sequence_items`)
     progress_updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     notes               TEXT NOT NULL DEFAULT '',
     UNIQUE(course_id, class_name)
@@ -72,12 +70,40 @@ CREATE TABLE IF NOT EXISTS files (
     added_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Reminders. `course_id` ties a reminder to a course so it can surface on the
+-- course page and next to the class in progress; `repeat_rule` is a tiny
+-- recurrence ('none' | 'daily' | 'weekly' | 'monthly'): completing a recurring
+-- reminder schedules the next occurrence instead of ending the series.
 CREATE TABLE IF NOT EXISTS reminders (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    due_at      TEXT,
+    done        INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    course_id   INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+    repeat_rule TEXT NOT NULL DEFAULT 'none'
+);
+
+-- Sequences: the teaching progression of a course, as chapters (sequences)
+-- containing steps (items). A step may point at a document from the course
+-- locker. Per-class progress points at a step, which is what makes "where is
+-- 3C in the chapter?" answerable — the previous model only remembered the last
+-- document opened.
+CREATE TABLE IF NOT EXISTS sequences (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id  INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     title      TEXT NOT NULL,
-    due_at     TEXT,
-    done       INTEGER NOT NULL DEFAULT 0,
+    position   INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sequence_items (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    sequence_id INTEGER NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
+    title       TEXT NOT NULL,
+    file_id     INTEGER REFERENCES files(id) ON DELETE SET NULL,
+    position    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS links (
@@ -136,7 +162,30 @@ CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_schedule_day_start ON schedule(day_of_week, start_time);
 CREATE INDEX IF NOT EXISTS idx_schedule_source ON schedule(source);
+
+CREATE INDEX IF NOT EXISTS idx_sequences_course ON sequences(course_id, position);
+CREATE INDEX IF NOT EXISTS idx_sequence_items_sequence ON sequence_items(sequence_id, position);
 "#;
+
+/// Additive migrations for databases created by earlier versions.
+///
+/// Every statement is idempotent-by-failure: SQLite refuses a duplicate column,
+/// and we ignore that error. Nothing is ever dropped or rewritten, so a USB key
+/// carrying an older database keeps working after an update.
+fn run_migrations(conn: &Connection) {
+    const ADD_COLUMNS: &[&str] = &[
+        // 0.1: subject, for Pronote content filtering
+        "ALTER TABLE courses ADD COLUMN matiere TEXT NOT NULL DEFAULT ''",
+        // Reminders: course link + simple recurrence
+        "ALTER TABLE reminders ADD COLUMN course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL",
+        "ALTER TABLE reminders ADD COLUMN repeat_rule TEXT NOT NULL DEFAULT 'none'",
+        // Per-class progress can now point at a step of a sequence
+        "ALTER TABLE course_classes ADD COLUMN last_item_id INTEGER REFERENCES sequence_items(id) ON DELETE SET NULL",
+    ];
+    for stmt in ADD_COLUMNS {
+        let _ = conn.execute(stmt, []);
+    }
+}
 
 /// Drop a couple of friendly starter demos so the Tools screen isn't empty.
 fn seed_python_demos() {
@@ -203,7 +252,9 @@ mod tests {
         )
         .unwrap();
         let course_after: Option<i64> = conn
-            .query_row("SELECT course_id FROM notes WHERE id=?1", [note_id], |r| r.get(0))
+            .query_row("SELECT course_id FROM notes WHERE id=?1", [note_id], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(course_after, None);
 
@@ -218,7 +269,8 @@ mod tests {
             params![course_id, note_id],
         )
         .unwrap();
-        conn.execute("DELETE FROM courses WHERE id=?1", [course_id]).unwrap();
+        conn.execute("DELETE FROM courses WHERE id=?1", [course_id])
+            .unwrap();
         let notes_left: i64 = conn
             .query_row("SELECT COUNT(*) FROM notes", [], |r| r.get(0))
             .unwrap();
@@ -248,6 +300,84 @@ mod tests {
     }
 
     #[test]
+    fn reminders_carry_course_and_recurrence() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO courses (name, emoji, color, description, matiere) VALUES ('NSI', 'code', '#000', '', 'NSI')",
+            [],
+        )
+        .unwrap();
+        let course_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO reminders (title, due_at, course_id, repeat_rule) VALUES (?1, ?2, ?3, ?4)",
+            params!["Photocopies", "2025-06-02T21:59:59Z", course_id, "weekly"],
+        )
+        .unwrap();
+        let (course, rule): (Option<i64>, String) = conn
+            .query_row(
+                "SELECT course_id, repeat_rule FROM reminders LIMIT 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(course, Some(course_id));
+        assert_eq!(rule, "weekly");
+
+        // Deleting the course must not delete the reminder, only unlink it.
+        conn.execute("DELETE FROM courses WHERE id=?1", [course_id])
+            .unwrap();
+        let after: Option<i64> = conn
+            .query_row("SELECT course_id FROM reminders LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(after, None);
+    }
+
+    #[test]
+    fn sequences_cascade_from_course_and_keep_order() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO courses (name, emoji, color, description, matiere) VALUES ('Maths', 'calc', '#000', '', 'Mathématiques')",
+            [],
+        )
+        .unwrap();
+        let course_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO sequences (course_id, title, position) VALUES (?1, 'Fonctions affines', 0)",
+            [course_id],
+        )
+        .unwrap();
+        let seq_id = conn.last_insert_rowid();
+        for (i, title) in ["Activité d'introduction", "Cours", "Exercices"]
+            .iter()
+            .enumerate()
+        {
+            conn.execute(
+                "INSERT INTO sequence_items (sequence_id, title, position) VALUES (?1, ?2, ?3)",
+                params![seq_id, title, i as i64],
+            )
+            .unwrap();
+        }
+        let titles: Vec<String> = conn
+            .prepare("SELECT title FROM sequence_items WHERE sequence_id=?1 ORDER BY position")
+            .unwrap()
+            .query_map([seq_id], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            titles,
+            vec!["Activité d'introduction", "Cours", "Exercices"]
+        );
+
+        conn.execute("DELETE FROM courses WHERE id=?1", [course_id])
+            .unwrap();
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sequence_items", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(left, 0);
+    }
+
+    #[test]
     fn course_classes_unique_per_course() {
         let conn = mem();
         conn.execute(
@@ -268,4 +398,3 @@ mod tests {
         assert!(dup.is_err());
     }
 }
-

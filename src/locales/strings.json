@@ -2,7 +2,6 @@
   "appName": "Euclide",
   "tagline": "Le bureau d'enseignement",
   "madeBy": "Elliot Moreau",
-
   "nav": {
     "dashboard": "Tableau de bord",
     "courses": "Cours",
@@ -13,9 +12,10 @@
     "whiteboard": "Tableau blanc",
     "settings": "Réglages",
     "reminders": "Rappels",
-    "recap": "Bilan"
+    "recap": "Bilan",
+    "groupWork": "Travail",
+    "groupTools": "Outils"
   },
-
   "common": {
     "save": "Enregistrer",
     "cancel": "Annuler",
@@ -41,9 +41,16 @@
     "rename": "Renommer",
     "edit": "Modifier",
     "back": "Retour",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "none": "Aucune",
+    "retry": "Réessayer",
+    "document": "Document",
+    "saving": "enregistrement…",
+    "manage": "Gérer",
+    "clear": "Effacer",
+    "active": "Activé",
+    "enable": "Activer"
   },
-
   "dashboard": {
     "todayClasses": "Cours du jour",
     "noClassesToday": "Aucun cours aujourd'hui.",
@@ -58,8 +65,11 @@
     "upcoming": "à venir",
     "past": "passé",
     "newTabWhiteboard": "Nouveau tableau",
-
-    "cheers": ["Bien joué !", "Fait !", "Nickel !"],
+    "cheers": [
+      "Bien joué !",
+      "Fait !",
+      "Nickel !"
+    ],
     "confirmDeleteReminder": "Supprimer le rappel ?",
     "errorDeleteReminder": "Suppression impossible",
     "toastReminderAdded": "Rappel ajouté",
@@ -71,18 +81,45 @@
     "dueIn3Days": "+3 j",
     "dueInWeek": "1 sem",
     "dueNone": "Aucune",
-    "addReminderBtn": "Ajouter"
+    "addReminderBtn": "Ajouter",
+    "metaNoClass": "aucun cours",
+    "metaClasses": "{count} cours",
+    "metaReminders": "{count} rappels",
+    "newNote": "Note",
+    "newBoard": "Tableau",
+    "todayTitle": "Aujourd'hui",
+    "schedule": "Emploi du temps",
+    "noClassTitle": "Aucun cours aujourd'hui",
+    "noLinksTitle": "Aucun lien rapide",
+    "noLinksHint": "Ajoutez depuis Outils les adresses que vous ouvrez tous les jours.",
+    "noRemindersTitle": "Rien à retenir",
+    "resumeTitle": "Reprendre",
+    "noRecentTitle": "Rien d'ouvert récemment",
+    "noRecentHint": "Importez des PDF, des images ou créez un tableau : ils apparaîtront ici.",
+    "activeToday": "Aujourd'hui",
+    "nowLabel": "En cours",
+    "nextLabel": "Prochain cours",
+    "resumeFile": "Reprendre · {name}",
+    "setProgress": "Définir la progression",
+    "openContent": "Cahier de textes",
+    "linkCourse": "Associer un cours"
   },
-
   "greetings": [
-    "Bonjour M. Madrias",
-    "Prêt M. Madrias ?",
-    "On y va M. Madrias ?",
-    "Bonjour M. Madrias !",
-    "Bonne journée M. Madrias !",
-    "En forme M. Madrias ?"
+    "Bonjour",
+    "Prêt ?",
+    "On y va ?",
+    "Bonjour !",
+    "Bonne journée",
+    "En forme ?"
   ],
-
+  "greetingsNamed": [
+    "Bonjour {name}",
+    "Prêt {name} ?",
+    "On y va {name} ?",
+    "Bonjour {name} !",
+    "Bonne journée {name} !",
+    "En forme {name} ?"
+  ],
   "tools": {
     "subtitle": "Outils et scripts.",
     "keepAwakeDesc": "Écran non verrouillé.",
@@ -123,13 +160,37 @@
     "noScriptSelected": "Aucun script ouvert",
     "linkNamePlaceholder": "Nom",
     "linkUrlPlaceholder": "URL",
-    "starterCode": "# Script Python\n\nprint(\"Bonjour\")\n"
+    "starterCode": "# Script Python\n\nprint(\"Bonjour\")\n",
+    "metaClassroom": "Pour la classe",
+    "metaLinks": "Liens rapides",
+    "classroomTitle": "En classe",
+    "projectionHint": "Typographie agrandie, barres masquées — pour le vidéoprojecteur.",
+    "shortcuts": "Ouvrir :",
+    "timerMinutes": "{count} min",
+    "timerCustom": "Durée libre",
+    "timerStart": "Lancer",
+    "noQuickLinksHint": "Ajoutez les adresses que vous ouvrez tous les jours : Pronote, l'ENT, un manuel en ligne. Elles apparaissent aussi sur le tableau de bord.",
+    "confirmDeleteLink": "Supprimer le lien « {name} » ?",
+    "linkName": "Nom",
+    "linkUrl": "Adresse"
   },
-
   "courses": {
-    "subtitle": "Classes, séquences et casiers."
+    "subtitle": "Classes, séquences et casiers.",
+    "matiere": "Matière",
+    "editCourse": "Modifier le cours",
+    "namePlaceholder": "Nom du cours (ex : Mathématiques, NSI)",
+    "name": "Nom du cours",
+    "description": "Description",
+    "descriptionHint": "Optionnel — s'affiche sur la carte du cours.",
+    "color": "Couleur",
+    "icon": "Icône",
+    "updated": "Cours modifié",
+    "metaCount": "{count} cours",
+    "loading": "Chargement des cours…",
+    "emptyTitle": "Aucun cours pour le moment",
+    "emptyHint": "Un cours rassemble un casier de documents, des notes, une progression par séquences, et les classes qui le suivent (noms Pronote exacts).",
+    "editTitle": "Modifier le cours"
   },
-
   "documents": {
     "subtitle": "Documents et notes.",
     "searchPlaceholder": "Rechercher...",
@@ -139,9 +200,15 @@
     "noteFallbackTitle": "Note",
     "toastImported": "{count} importé(s)",
     "toastRenamed": "Renommé \"{name}\"",
-    "toastDeleted": "Supprimé"
+    "toastDeleted": "Supprimé",
+    "noteKind": "Note",
+    "metaFiles": "{count} fichiers",
+    "metaNotes": "{count} notes",
+    "filterAll": "Tout",
+    "noResult": "Aucun résultat",
+    "noResultHint": "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents.",
+    "newName": "Nouveau nom"
   },
-
   "whiteboard": {
     "saved": "Enregistré",
     "exported": "Exporté {name}",
@@ -166,9 +233,16 @@
     "saveTooltip": "Enregistrer",
     "saveCleanTooltip": "Enregistrer",
     "exportPng": "PNG",
-    "textInputPlaceholder": "Texte..."
+    "textInputPlaceholder": "Texte...",
+    "zoom": "Zoom",
+    "customColor": "Couleur personnalisée",
+    "opacityShort": "Opacité",
+    "zoomReset": "Réinitialiser le zoom",
+    "history": "Historique",
+    "clear": "Tout effacer",
+    "course": "Cours",
+    "noCourse": "Sans cours"
   },
-
   "courseDetail": {
     "notFoundTitle": "Cours introuvable",
     "notFoundHint": "Supprimé ?",
@@ -213,9 +287,22 @@
     "matterLabel": "Matière",
     "matterHelp": "Filtre Pronote",
     "documentsHint": "Documents, PDF, tableaux du casier (depuis la bibliothèque).",
-    "last": "Dernier"
+    "last": "Dernier",
+    "metaClasses": "{count} classes",
+    "metaFiles": "{count} documents",
+    "metaNotes": "{count} notes",
+    "confirmDeleteCourseBody": "Le casier, les notes et les séquences de ce cours seront supprimés.",
+    "deleteCourse": "Supprimer « {name} »",
+    "lockerTitle": "Casier du cours",
+    "confirmDeleteFile": "Supprimer « {name} » ?",
+    "updated": "mise à jour {when}",
+    "detach": "Détacher {name}",
+    "detachTitle": "Détacher cette classe",
+    "noDocument": "— Aucun document —",
+    "classNotes": "Notes pour cette classe",
+    "contentTab": "Contenu {name}",
+    "showPronoteContentsTitle": "Cahier de textes et documents Pronote"
   },
-
   "settings": {
     "subtitle": "Pronote, planning, onglets.",
     "pronoteTitle": "Pronote",
@@ -271,9 +358,24 @@
     "dataDirHint": "Dossier pour DB, fichiers, scripts. Idéal USB. Redémarrage requis.",
     "resetSuccess": "Configuration réinitialisée. Redémarrez Euclide pour appliquer.",
     "resetError": "Erreur lors de la réinitialisation",
-    "pickFolderError": "Impossible de sélectionner le dossier"
+    "pickFolderError": "Impossible de sélectionner le dossier",
+    "metaAppearance": "Apparence",
+    "resetTitle": "Dossier de stockage",
+    "backupRunning": "Sauvegarde en cours…",
+    "backupDone": "Sauvegarde créée : {path}",
+    "backupError": "Sauvegarde impossible",
+    "dataDirLabel": "Emplacement des données",
+    "dataDirUnknown": "(chemin inconnu)",
+    "pickFolder": "Choisir un dossier…",
+    "resetFolder": "Réinitialiser (par défaut)",
+    "backupTitle": "Sauvegarde",
+    "backupHint": "Crée une archive .zip horodatée de tout le dossier de données, à côté de celui-ci. Sur une clé USB qui vit dans une poche, c'est une assurance élémentaire.",
+    "backupNow": "Sauvegarder maintenant",
+    "disconnect": "Déconnecter",
+    "scheduleWeek": "Vue de la semaine — les cours Pronote sont en lecture seule.",
+    "fromPronote": "Depuis Pronote",
+    "pinHint": "Astuce : double-cliquez sur un onglet pour l’épingler — un onglet épinglé n’est jamais fermé automatiquement, et il se réordonne par glisser-déposer."
   },
-
   "app": {
     "tabWhiteboard": "Tableau",
     "newTab": "Nouvel onglet",
@@ -282,20 +384,25 @@
     "settingsTitle": "Réglages",
     "minimize": "Réduire",
     "maximize": "Agrandir",
-    "closeWindow": "Fermer"
+    "closeWindow": "Fermer",
+    "tagline": "Bureau d'enseignement",
+    "title": "Euclide",
+    "openTabs": "Onglets ouverts",
+    "pinned": "Épinglé",
+    "unsaved": "Non enregistré",
+    "tabLimitHint": "la limite est atteinte : le plus ancien sera fermé"
   },
-
   "messages": {
     "genericError": "Erreur",
     "imported": "{count} importé(s)",
     "importing": "Import…",
     "indexing": "Indexation…",
-    "importError": "Import impossible (sélection annulée ?)"
+    "importError": "Import impossible (sélection annulée ?)",
+    "saved": "Enregistré"
   },
-
   "recap": {
-    "subtitle": "Activité.",
-    "today": "AUJOURD'HUI",
+    "subtitle": "temps passé dans l'application",
+    "today": "Jour",
     "activityTime": "Temps actif",
     "timeByArea": "Temps par zone",
     "timeByAreaHint": "basé sur l'usage",
@@ -318,9 +425,18 @@
     "highlightTopDoc": "Doc consulté : {name}.",
     "highlightTopTool": "Outil : {name}.",
     "highlightReminders": "{count} rappel(s) fait(s).",
-    "highlightEmpty": "Rien pour cette période."
+    "highlightEmpty": "Rien pour cette période.",
+    "todayLabel": "aujourd'hui",
+    "weekLabel": "cette semaine",
+    "monthLabel": "ce mois",
+    "period": "Période",
+    "week": "Semaine",
+    "month": "Mois",
+    "noDataTitle": "Pas encore de données",
+    "opens": "{count} ouverture(s)",
+    "uses": "{count} utilisation(s)",
+    "highlights": "À retenir"
   },
-
   "notes": {
     "newTitle": "Nouvelle note",
     "titlePlaceholder": "Titre de la note",
@@ -342,9 +458,20 @@
     "saveError": "Erreur lors de l'enregistrement",
     "deleteConfirm": "Supprimer cette note ?",
     "exportPdf": "Exporter en PDF",
-    "exported": "Exporté : {name}"
+    "exported": "Exporté : {name}",
+    "courseTitle": "Affecter à un cours",
+    "format": "Mise en forme",
+    "bold": "Gras",
+    "italic": "Italique",
+    "heading": "Titre",
+    "list": "Liste",
+    "code": "Code",
+    "link": "Lien",
+    "markdownHint": "Markdown · formules LaTeX entre $…$",
+    "bodyPlaceholder": "Écrivez ici…",
+    "savedAt": "enregistré {when}",
+    "neverSaved": "jamais enregistré"
   },
-
   "pdf": {
     "loading": "Chargement du PDF…",
     "loadError": "Impossible d'ouvrir ce document.",
@@ -369,9 +496,14 @@
     "activeColor": "Couleur active : {c}",
     "thumbnailsLoading": "Chargement des pages…",
     "noVersionsYet": "Aucune version — enregistrez pour créer",
-    "original": "Original"
+    "original": "Original",
+    "mode": "Affichage",
+    "selectTitle": "Sélection : visualiser sans annoter",
+    "select": "Sélection",
+    "penTitle": "Stylo : dessin à main levée",
+    "pagesTitle": "Vignettes des pages",
+    "deleteAnnotationTitle": "Supprimer l'annotation sélectionnée (Suppr)"
   },
-
   "openWith": {
     "label": "Ouvrir dehors",
     "title": "Ouvrir dehors",
@@ -379,11 +511,9 @@
     "defaultApp": "Application par défaut",
     "reveal": "Afficher dans le dossier"
   },
-
   "about": {
     "title": "À propos"
   },
-
   "updater": {
     "check": "Vérifier les mises à jour",
     "checking": "Recherche…",
@@ -404,7 +534,6 @@
     "hint": "Windows installé : mise à jour via l’installateur. Linux et macOS se mettent à jour en place.",
     "hintPortable": "Windows portable : la mise à jour remplace uniquement le programme dans ce dossier (clé USB comprise). Euclide-Data et vos fichiers restent en place."
   },
-
   "classContent": {
     "back": "Retour au cours",
     "title": "Contenu du cours — {class}",
@@ -425,18 +554,36 @@
     "linkCopied": "Lien copié dans le presse-papiers",
     "linkFallback": "Lien : {url}",
     "loading": "Chargement du contenu Pronote pour la classe {class}…",
-    "dateRail": "date"
+    "dateRail": "date",
+    "metaEntries": "{count} séances",
+    "metaRefreshed": "actualisé à {time}",
+    "errorTitle": "Contenu indisponible",
+    "loadingFor": "Chargement du contenu Pronote pour {class}…"
   },
-
   "dragDrop": {
     "drop": "Déposez vos fichiers",
     "hint": "Ils rejoindront votre bibliothèque de documents."
   },
-
   "shortcuts": {
-    "tip": "Ouvrez la palette ({mod}K) et tapez."
+    "tip": "Ouvrez la palette ({mod}K) et tapez.",
+    "groupNavigation": "Navigation",
+    "palette": "Palette de recherche",
+    "closeTab": "Fermer l'onglet",
+    "gotoTab": "Aller à l'onglet",
+    "nextTab": "Onglet suivant",
+    "prevTab": "Onglet précédent",
+    "groupActions": "Actions",
+    "save": "Enregistrer (note, tableau, script)",
+    "runPython": "Exécuter le script Python",
+    "groupTabs": "Barre d'onglets",
+    "doubleClick": "Double-clic",
+    "pinTab": "Épingler l'onglet",
+    "drag": "Glisser",
+    "reorderTab": "Réordonner les onglets",
+    "middleClick": "Clic milieu",
+    "groupPalette": "Dans la palette",
+    "navigateList": "Parcourir les résultats"
   },
-
   "confirm": {
     "unsavedTitle": "Modifications non enregistrées",
     "unsavedMessage": "Enregistrer avant de fermer cet onglet ?",
@@ -444,8 +591,131 @@
     "discard": "Ne pas enregistrer",
     "cancel": "Annuler"
   },
-
   "timer": {
-    "done": "Minuteur terminé"
+    "done": "Minuteur terminé",
+    "pause": "Pause",
+    "resume": "Reprendre",
+    "addMinute": "+1 minute",
+    "stop": "Arrêter"
+  },
+  "appearance": {
+    "auto": "Auto",
+    "light": "Clair",
+    "dark": "Sombre",
+    "theme": "Thème",
+    "projection": "Mode projection",
+    "leaveProjection": "Quitter la projection",
+    "themeHint": "« Auto » suit le réglage clair/sombre du système.",
+    "density": "Densité",
+    "densityHint": "« Compact » resserre les listes sur un petit écran.",
+    "comfortable": "Confortable",
+    "compact": "Compact",
+    "projectionHint": "Typographie agrandie et barres masquées, pour le vidéoprojecteur.",
+    "remoteIcons": "Icônes de sites distantes",
+    "remoteIconsHint": "Décoché, Euclide dessine les icônes de liens localement et n'émet aucune requête réseau. Coché, il télécharge les favicons réels."
+  },
+  "status": {
+    "openDashboard": "Ouvrir le tableau de bord",
+    "remaining": "reste {time}",
+    "ending": "fin",
+    "inTime": "dans {time}",
+    "noClass": "aucun cours en cours",
+    "pronoteHint": "État de la connexion Pronote",
+    "pronoteOn": "pronote connecté",
+    "pronoteOff": "pronote hors ligne",
+    "awake": "écran maintenu",
+    "tabs": "onglets"
+  },
+  "capture": {
+    "noteSaved": "Note créée",
+    "reminderSaved": "Rappel ajouté",
+    "title": "Capture rapide",
+    "placeholder": "Noter quelque chose… (! rappel · # note)",
+    "target": "Enregistrer comme",
+    "asReminder": "Rappel",
+    "asNote": "Note",
+    "save": "enregistrer"
+  },
+  "classEnd": {
+    "notice": "{subject} : fin dans {minutes} min",
+    "title": "Fin de cours annoncée",
+    "hint": "Un rappel discret avant la sonnerie, d'après l'emploi du temps, pour boucler l'activité et donner le travail à faire.",
+    "lead": "Minutes avant la fin",
+    "off": "Aucune",
+    "silent": "Silencieuse",
+    "sound": "Sonnerie"
+  },
+  "palette": {
+    "prefixCommands": "Commandes",
+    "prefixCourses": "Cours",
+    "prefixDocs": "Documents",
+    "prefixReminders": "rappels",
+    "groupCommands": "Commandes",
+    "new": "nouveau",
+    "groupCourses": "Cours",
+    "groupDocs": "Documents et notes",
+    "placeholder": "Rechercher un cours, un document, une note…",
+    "open": "ouvrir"
+  },
+  "sequences": {
+    "title": "Progression",
+    "newPlaceholder": "Nouvelle séquence",
+    "add": "Ajouter",
+    "emptyTitle": "Aucune séquence",
+    "emptyHint": "Découpez le cours en séquences (chapitres) puis en étapes : activité, cours, exercices, évaluation. Chaque classe peut ensuite être positionnée sur une étape.",
+    "stepCount": "{count} étapes",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "deleteTitle": "Supprimer la séquence",
+    "deleteMessage": "Supprimer « {name} » et ses étapes ?",
+    "markClass": "Marquer une classe ici",
+    "markClassShort": "Classe ici…",
+    "stepPlaceholder": "Titre de l'étape",
+    "stepFile": "Document lié",
+    "noFile": "— Sans document —",
+    "addStep": "Ajouter une étape"
+  },
+  "reminders": {
+    "markDone": "Marquer fait",
+    "repeatNone": "Une fois",
+    "repeatDaily": "Chaque jour",
+    "repeatWeekly": "Chaque semaine",
+    "repeatMonthly": "Chaque mois",
+    "markTodo": "Marquer à faire",
+    "clearDoneTitle": "Effacer les terminés",
+    "clearDoneMessage": "Supprimer les {count} rappels terminés ?",
+    "groupOver": "En retard",
+    "groupSoon": "Aujourd'hui et demain",
+    "groupLater": "À venir",
+    "groupNoDate": "Sans échéance",
+    "groupDone": "Terminés",
+    "metaPending": "{count} à faire",
+    "metaDone": "{count} terminés",
+    "clearDone": "Effacer les terminés",
+    "hideDetails": "Moins",
+    "showDetails": "Détails",
+    "course": "Cours",
+    "noCourse": "— Aucun cours —",
+    "repeat": "Répétition",
+    "repeatNeedsDate": "Une répétition demande une échéance.",
+    "filter": "Filtre",
+    "todo": "À faire",
+    "all": "Tous",
+    "noResult": "Aucun résultat",
+    "emptyTitle": "Rien à afficher",
+    "noResultHint": "Essayez un autre mot-clé ou changez de filtre.",
+    "emptyHint": "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies."
+  },
+  "python": {
+    "newScript": "Nouveau script",
+    "newScriptTitle": "Nouveau script temporaire (non enregistré)",
+    "importTitle": "Importer un fichier .py",
+    "tempScript": "Script temporaire (non enregistré)",
+    "namePlaceholder": "Nom du script",
+    "renameTitle": "Cliquer pour renommer",
+    "temp": "temporaire",
+    "emptyTitle": "Aucun script ouvert",
+    "ok": "terminé",
+    "failed": "erreur"
   }
 }

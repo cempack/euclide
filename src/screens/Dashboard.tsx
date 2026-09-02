@@ -4,24 +4,75 @@ import {
   api,
   type AppInfo,
   type Course,
+  type CourseClass,
   type FileItem,
   type Note,
+  type PronoteStatus,
   type QuickLink,
   type Reminder,
   type ScheduleEntry,
   type RecapData,
 } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
-import { getClassStatus, findNextClassIndex, minutesUntil, formatDueLabel, relativeTime, greeting } from "../lib/format";
-import { COURSE_ICONS, useToast, useConfirm } from "../components/ui";
-import { BookIcon, NoteIcon, CalendarIcon, ScheduleIcon, DescriptionIcon, TrashIcon, CheckIcon, FileKindIcon } from "../components/icons";
+import {
+  classProgress,
+  focusClass,
+  formatDueLabel,
+  getClassStatus,
+  humanMinutes,
+  longDate,
+  minutesRemaining,
+  minutesUntil,
+  relativeTime,
+  greeting,
+} from "../lib/format";
+import { courseVisual } from "../lib/color";
+import { useAppearance } from "../lib/theme";
+import { COURSE_ICONS, EmptyState, useToast, useConfirm } from "../components/ui";
+import {
+  MetaDot,
+  PageHeader,
+  Panel,
+  StatStrip,
+  StatTile,
+} from "../components/layout";
+import {
+  BellIcon,
+  BookIcon,
+  CalendarIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  DescriptionIcon,
+  FileKindIcon,
+  LayersIcon,
+  LinkIcon,
+  NoteIcon,
+  PenIcon,
+  PlayIcon,
+  PlusIcon,
+  TrashIcon,
+} from "../components/icons";
 import { Favicon } from "../components/Favicon";
 
-
+/**
+ * Le tableau de bord.
+ *
+ * Hierarchy, in the order a teacher needs it between two bells:
+ *   1. what is happening now (the class in progress, and how to resume it),
+ *   2. what must be done (reminders due),
+ *   3. where I left off (recent documents),
+ *   4. the inventory (counts, quick links).
+ *
+ * State that used to live here as widgets — Pronote connection, screen lock,
+ * the mini activity recap — now lives in the window status bar and in Outils,
+ * so it is reachable from every screen instead of only from this one.
+ */
 export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();
+  const { resolved } = useAppearance();
+
   const [classes, setClasses] = useState<ScheduleEntry[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -29,46 +80,46 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const [docCount, setDocCount] = useState(0);
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [recentFiles, setRecentFiles] = useState<FileItem[]>([]);
-  const [pronoteStatus, setPronoteStatus] = useState<any>(null);
-  const [keepAwakeOn, setKeepAwakeOn] = useState(true); // default on (backend now starts with screen keep-awake enabled)
+  const [pronoteStatus, setPronoteStatus] = useState<PronoteStatus | null>(null);
   const [recap, setRecap] = useState<RecapData | null>(null);
+  const [remoteIcons, setRemoteIcons] = useState(false);
 
-
-
-  // live tick so current/upcoming times + progress bar update without full refresh
-  const [nowTick, setNowTick] = useState(new Date());
+  // Live tick so "in progress", countdowns and the gauge move without a refetch.
+  const [nowTick, setNowTick] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNowTick(new Date()), 30000);
-    return () => clearInterval(id);
+    const id = window.setInterval(() => setNowTick(new Date()), 30_000);
+    return () => window.clearInterval(id);
   }, []);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     api.getTodayClasses().then(setClasses).catch(() => {});
-    api.listReminders().then(setReminders).catch(() => {});
+    api.listReminders().then((r) => setReminders(Array.isArray(r) ? r : [])).catch(() => {});
     api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
     api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
     api.listFiles(null).then((f) => setDocCount(Array.isArray(f) ? f.length : 0)).catch(() => {});
     api.listLinks().then((l) => setLinks(Array.isArray(l) ? l : [])).catch(() => {});
-    api.recentFiles(5).then((f) => setRecentFiles(Array.isArray(f) ? f : [])).catch(() => {});
+    api.recentFiles(6).then((f) => setRecentFiles(Array.isArray(f) ? f : [])).catch(() => {});
     api.pronoteStatus().then(setPronoteStatus).catch(() => {});
-    api.keepAwakeStatus().then((s) => setKeepAwakeOn(!!s)).catch(() => {});
     api.getRecap("today").then(setRecap).catch(() => {});
-  };
+    api.getSetting("remote_favicons").then((v) => setRemoteIcons(v === "1")).catch(() => {});
+  }, []);
 
   useEffect(() => {
     refresh();
     const onChange = () => refresh();
-    window.addEventListener("eu:library-changed", onChange);
-    window.addEventListener("eu:quicklinks-changed", onChange);
-    window.addEventListener("eu:schedule-changed", onChange);
-    window.addEventListener("eu:reminders-changed", onChange);
-    return () => {
-      window.removeEventListener("eu:library-changed", onChange);
-      window.removeEventListener("eu:quicklinks-changed", onChange);
-      window.removeEventListener("eu:schedule-changed", onChange);
-      window.removeEventListener("eu:reminders-changed", onChange);
-    };
-  }, []);
+    const events = [
+      "eu:library-changed",
+      "eu:quicklinks-changed",
+      "eu:schedule-changed",
+      "eu:reminders-changed",
+      "eu:course-changed",
+      "eu:pronote-changed",
+    ];
+    events.forEach((ev) => window.addEventListener(ev, onChange));
+    return () => events.forEach((ev) => window.removeEventListener(ev, onChange));
+  }, [refresh]);
+
+  // ---- reminders -----------------------------------------------------------
 
   const toggle = async (r: Reminder) => {
     const markingDone = !r.done;
@@ -76,8 +127,9 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
     try {
       await api.toggleReminder(r.id, markingDone);
       if (markingDone) {
-        api.logEvent("reminder_done", r.title, null);
-        const cheers: string[] = (t.dashboard?.cheers && t.dashboard.cheers.length) ? t.dashboard.cheers : ["Bien joué !"];
+        api.logEvent("reminder_done", r.title, r.course_id);
+        const cheers: string[] =
+          t.dashboard?.cheers && t.dashboard.cheers.length ? t.dashboard.cheers : ["Bien joué !"];
         toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
       }
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
@@ -98,8 +150,8 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
     if (!ok) return;
     try {
       await api.deleteReminder(id);
-      refresh();
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
+      refresh();
     } catch {
       toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
     }
@@ -107,444 +159,632 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
 
   const pending = reminders.filter((r) => !r.done);
 
-  const openFromSchedule = useCallback(async (c: ScheduleEntry) => {
-    const sub = (c.subject || "").toLowerCase();
-    let course = typeof c.course_id === "number" ? courses.find((x) => x.id === c.course_id) : undefined;
-    if (!course) {
-      course =
-        courses.find((x) => sub.includes(x.name.toLowerCase())) ||
-        courses.find((x) => x.matiere && sub.includes(x.matiere.toLowerCase().slice(0, 8)));
-    }
-    if (!course) {
-      tabs.open({ kind: "courses" });
-      return;
-    }
-    try {
-      const attached = await api.listCourseClasses(course.id);
-      const hit = attached.find(
-        (cc) =>
-          sub.includes(cc.class_name.toLowerCase()) ||
-          (c.subject || "").includes(cc.class_name)
+  // ---- opening things ------------------------------------------------------
+
+  /** Best-effort match between a schedule entry and a course of the library. */
+  const courseForEntry = useCallback(
+    (entry: ScheduleEntry): Course | undefined => {
+      const sub = (entry.subject || "").toLowerCase();
+      if (typeof entry.course_id === "number") {
+        const byId = courses.find((c) => c.id === entry.course_id);
+        if (byId) return byId;
+      }
+      return (
+        courses.find((c) => sub.includes(c.name.toLowerCase())) ||
+        courses.find((c) => c.matiere && sub.includes(c.matiere.toLowerCase().slice(0, 8)))
       );
-      if (hit) {
-        tabs.open({
-          kind: "class-content",
-          title: hit.class_name,
-          params: { courseId: course.id, className: hit.class_name, matiere: course.matiere },
-        });
+    },
+    [courses]
+  );
+
+  const openFromSchedule = useCallback(
+    async (entry: ScheduleEntry) => {
+      const course = courseForEntry(entry);
+      if (!course) {
+        tabs.open({ kind: "courses" });
         return;
       }
-    } catch {
-      // fall through to course
-    }
-    tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } });
-  }, [courses, tabs]);
+      try {
+        const attached = await api.listCourseClasses(course.id);
+        const hit = attached.find(
+          (cc) =>
+            (entry.subject || "").toLowerCase().includes(cc.class_name.toLowerCase()) ||
+            (entry.subject || "").includes(cc.class_name)
+        );
+        if (hit) {
+          tabs.open({
+            kind: "class-content",
+            title: hit.class_name,
+            params: { courseId: course.id, className: hit.class_name, matiere: course.matiere },
+          });
+          return;
+        }
+      } catch {
+        // fall through to the course page
+      }
+      tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } });
+    },
+    [courseForEntry, tabs]
+  );
 
-  const startTimer = (minutes: number) => {
-    window.dispatchEvent(new CustomEvent("eu:timer-start", { detail: { minutes } }));
-  };
+  const openFile = useCallback(
+    (f: { id: number; name: string; kind: string; course_id?: number | null }) => {
+      api.logEvent("file_open", f.name, f.course_id ?? null);
+      if (f.kind === "board") {
+        tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
+      } else if (f.kind === "pdf" || f.kind === "image") {
+        tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
+      } else {
+        api.openFile(f.id);
+      }
+    },
+    [tabs]
+  );
 
-  const openRecent = (f: FileItem) => {
-    if (f.kind === "board") {
-      tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
-    } else if (f.kind === "pdf" || f.kind === "image") {
-      tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
-    } else {
-      api.openFile(f.id);
-    }
-  };
-
-  const syncPronote = async () => {
+  const importDocs = async () => {
     try {
-      toast(get("settings.toastSyncing", "Synchronisation…"), "info");
-      const n = await api.pronoteSync();
-      toast(get("settings.toastSyncCount", "{count} cours").replace("{count}", String(n)), "success");
-      refresh();
-      window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+      toast(get("messages.importing", "Import…"), "info");
+      const added = await api.importFiles(null);
+      const count = Array.isArray(added) ? added.length : 0;
+      if (count === 0) {
+        toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+        return;
+      }
+      toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
+      await api.indexImportedPdfs(Array.isArray(added) ? added : []).catch(() => {});
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
     } catch {
-      toast(get("settings.toastSyncFail", "Sync impossible"), "error");
+      toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
     }
   };
 
-  const toggleKeepAwake = async () => {
-    try {
-      const next = !!(await api.setKeepAwake(!keepAwakeOn));
-      setKeepAwakeOn(next);
-      toast(next ? (t.tools?.keepAwakeOn || "L'écran reste allumé") : (t.tools?.keepAwakeOff || "Verrouillage écran normal"), next ? "success" : "info");
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+  // ---- « maintenant » -------------------------------------------------------
+
+  const focus = useMemo(() => focusClass(classes, nowTick), [classes, nowTick]);
+  const focusCourse = focus ? courseForEntry(focus.entry) : undefined;
+  const [focusClasses, setFocusClasses] = useState<CourseClass[]>([]);
+
+  // Per-class progress for the class in front of us: this is the data that
+  // powers « Reprendre ». It already existed but was only visible three clicks
+  // deep, inside the course page.
+  useEffect(() => {
+    if (!focusCourse) {
+      setFocusClasses([]);
+      return;
     }
-  };
+    let cancelled = false;
+    api
+      .listCourseClasses(focusCourse.id)
+      .then((list) => {
+        if (!cancelled) setFocusClasses(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setFocusClasses([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusCourse?.id]);
 
-  // Memoized schedule items (avoids re-compute + IIFE on every nowTick / re-render)
-  const scheduleItems = useMemo(() => {
-    if (classes.length === 0) return null;
-    const nextIdx = findNextClassIndex(classes);
-    return classes.slice(0, 6).map((c, i) => {
-      const status = getClassStatus(c);
-      const isCurrent = status === "current";
-      const isNext = i === nextIdx && !isCurrent;
-      const mins = !isCurrent ? minutesUntil(c.start_time) : null;
-      const sMin = parseInt(c.start_time, 10) * 60 + parseInt(c.start_time.split(":")[1] || "0", 10);
-      const eMin = parseInt(c.end_time, 10) * 60 + parseInt(c.end_time.split(":")[1] || "0", 10);
-      const curMin = new Date().getHours() * 60 + new Date().getMinutes();
-      const progress = isCurrent && eMin > sMin ? Math.max(0, Math.min(100, ((curMin - sMin) / (eMin - sMin)) * 100)) : 0;
-
-      return (
-        <div
-          key={i}
-          role="button"
-          tabIndex={0}
-          onClick={() => openFromSchedule(c)}
-          onKeyDown={(e) => { if (e.key === "Enter") openFromSchedule(c); }}
-          className={`flex items-start gap-3 px-3 py-2.5 rounded mb-1 last:mb-0 border transition-all cursor-pointer ${
-            isCurrent ? "bg-[#fff7ed] border-[#fed7aa]" : isNext ? "bg-[#f8fafc] border-[#e2e8f0]" : status === "past" ? "opacity-60 border-transparent" : "border-transparent hover:bg-[#f8fafc]"
-          }`}
-        >
-          <div className="pt-1 shrink-0">
-            <div className={`w-2 h-2 rounded-full mt-1 ${isCurrent ? "bg-[#f97316]" : isNext ? "bg-[#fb923c]" : "bg-[#d1d5db]"}`} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2 text-[13px]">
-              <span className="font-mono text-[#666] w-[78px] shrink-0 tabular-nums">{c.start_time}–{c.end_time}</span>
-              <span className="font-medium text-[#222] truncate">{c.subject}</span>
-              {c.room && <span className="text-[10px] px-1.5 py-px rounded bg-white border border-[#e5e5e5] text-[#666] tabular-nums">{c.room}</span>}
-              {status === "past" && <span className="ml-auto text-[9px] px-1.5 py-px rounded border border-[#e5e5e5] text-[#888] tabular-nums">passé</span>}
-            </div>
-
-            <div className="mt-0.5 text-[10px] font-mono flex items-center gap-2">
-              {isCurrent && (
-                <>
-                  <span className="font-semibold text-[#ea580c]">[EN COURS]</span>
-                  <div className="flex-1 h-px bg-[#fed7aa]" />
-                  <span className="text-[#c2410c] tabular-nums">{Math.round(progress)}%</span>
-                </>
-              )}
-              {isNext && <span className="text-[#c2410c] font-medium">{mins ? `DANS ${mins} MIN` : "PROCHAIN"}</span>}
-              {status === "upcoming" && !isNext && <span className="text-[#888]">à venir</span>}
-            </div>
-
-            {isCurrent && (
-              <div className="mt-1 h-1 bg-[#fed7aa] rounded overflow-hidden">
-                <div className="h-1 bg-[#f97316] transition-all" style={{ width: `${progress}%` }} />
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    });
-  }, [classes, nowTick, openFromSchedule]);
+  const focusClassRow = useMemo(() => {
+    if (!focus) return undefined;
+    const subject = (focus.entry.subject || "").toLowerCase();
+    return focusClasses.find(
+      (cc) => subject.includes(cc.class_name.toLowerCase()) || focus.entry.subject.includes(cc.class_name)
+    );
+  }, [focus, focusClasses]);
 
   return (
-    <div className="max-w-[960px] mx-auto flex flex-col gap-8 pb-12 font-mono">
-      {/* Hero title — matches the provided mock exactly ("Une nouvelle page, un nouveau cours.") */}
-      <div className="pt-2">
-        <h1 className="font-display-xl text-[42px] leading-[1.05] tracking-[-1.2px] text-primary">
-          {greeting()} — tableau de bord.
-        </h1>
-      </div>
-
-      {/* Stats row — inspired by the mock (light cards, icon circles, big nums, small caps labels).
-          These are simple inventory overviews. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button
-          type="button"
-          onClick={() => tabs.open({ kind: "courses" })}
-          className="stat-card cursor-pointer active:scale-[0.985] transition-all hover:border-hairline-strong text-left"
-        >
-          <div className="w-11 h-11 rounded grid place-items-center bg-white border border-hairline text-mute">
-            <BookIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[34px] font-semibold tabular-nums tracking-[-1px] text-primary leading-none">{courses.length}</div>
-            <div className="text-[10px] font-mono tracking-[2px] text-mute mt-0.5">COURS</div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => tabs.open({ kind: "documents" })}
-          className="stat-card cursor-pointer active:scale-[0.985] transition-all hover:border-hairline-strong text-left"
-        >
-          <div className="w-11 h-11 rounded grid place-items-center bg-white border border-hairline text-mute">
-            <DescriptionIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[34px] font-semibold tabular-nums tracking-[-1px] text-primary leading-none">{docCount}</div>
-            <div className="text-[10px] font-mono tracking-[2px] text-mute mt-0.5">DOCUMENTS</div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => tabs.open({ kind: "documents", params: { filter: "note" } })}
-          className="stat-card cursor-pointer active:scale-[0.985] transition-all hover:border-hairline-strong text-left"
-        >
-          <div className="w-11 h-11 rounded grid place-items-center bg-white border border-hairline text-mute">
-            <NoteIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[34px] font-semibold tabular-nums tracking-[-1px] text-primary leading-none">{notes.length}</div>
-            <div className="text-[10px] font-mono tracking-[2px] text-mute mt-0.5">NOTES</div>
-          </div>
-        </button>
-      </div>
-
-      <section>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => tabs.open({ kind: "courses" })} className="new-btn shrink-0">
-            <span className="text-secondary">[+]</span> {t.common?.newCourse || "Nouveau cours"}
-          </button>
-          <button onClick={() => tabs.open({ kind: "whiteboard", title: t.dashboard?.newTabWhiteboard || "Nouveau tableau", params: { isNew: true } })} className="new-btn shrink-0">
-            <span className="text-secondary">[+]</span> {t.common?.whiteboard || "Tableau blanc"}
-          </button>
-          <button onClick={() => tabs.open({ kind: "reminders" })} className="new-btn shrink-0">
-            <span className="text-secondary">[+]</span> {t.common?.newReminder || "Nouveau rappel"}
-          </button>
-          <button onClick={() => tabs.open({ kind: "note", title: t.common?.newNote || "Nouvelle note", params: { isNew: true } })} className="new-btn shrink-0">
-            <span className="text-secondary">[+]</span> {t.common?.newNote || "Nouvelle note"}
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                toast(get("messages.importing", "Import…"), "info");
-                const added = await api.importFiles(null);
-                const count = Array.isArray(added) ? added.length : 0;
-                if (count === 0) {
-                  toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
-                  return;
-                }
-                toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
-                await api.indexImportedPdfs(Array.isArray(added) ? added : []).catch(() => {});
-                window.dispatchEvent(new CustomEvent("eu:library-changed"));
-              } catch {
-                toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+    <>
+      <PageHeader
+        title={greeting(
+          nowTick,
+          pronoteStatus?.connected ? pronoteStatus.account_name : null
+        )}
+        meta={
+          <>
+            <span>{longDate(nowTick)}</span>
+            <MetaDot />
+            <span>
+              {classes.length === 0
+                ? get("dashboard.metaNoClass", "aucun cours")
+                : fmt(get("dashboard.metaClasses", "{count} cours"), { count: classes.length })}
+            </span>
+            <MetaDot />
+            <span>
+              {fmt(get("dashboard.metaReminders", "{count} rappels"), { count: pending.length })}
+            </span>
+            {pronoteStatus && (
+              <>
+                <MetaDot />
+                <span className={pronoteStatus.connected ? "text-ok" : ""}>
+                  {pronoteStatus.connected
+                    ? get("status.pronoteOn", "pronote connecté")
+                    : get("status.pronoteOff", "pronote hors ligne")}
+                </span>
+              </>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <button
+              className="eu-btn-ghost eu-btn-sm"
+              onClick={() =>
+                tabs.open({
+                  kind: "note",
+                  title: t.common?.newNote || "Nouvelle note",
+                  params: { isNew: true },
+                })
               }
-            }}
-            className="new-btn shrink-0"
+            >
+              <NoteIcon className="w-3.5 h-3.5" />
+              {get("dashboard.newNote", "Note")}
+            </button>
+            <button
+              className="eu-btn-ghost eu-btn-sm"
+              onClick={() =>
+                tabs.open({
+                  kind: "whiteboard",
+                  title: get("app.tabWhiteboard", "Tableau"),
+                  params: { isNew: true },
+                })
+              }
+            >
+              <PenIcon className="w-3.5 h-3.5" />
+              {get("dashboard.newBoard", "Tableau")}
+            </button>
+            <button className="eu-btn-primary eu-btn-sm" onClick={importDocs}>
+              <PlusIcon className="w-3.5 h-3.5" />
+              {t.common?.importFiles || "Importer"}
+            </button>
+          </>
+        }
+      />
+
+      {focus && (
+        <NowCard
+          entry={focus.entry}
+          state={focus.state}
+          now={nowTick}
+          course={focusCourse}
+          courseClass={focusClassRow}
+          dark={resolved === "dark"}
+          onOpenContent={() => void openFromSchedule(focus.entry)}
+          onResume={openFile}
+          onOpenBoard={() =>
+            tabs.open({
+              kind: "whiteboard",
+              title: get("app.tabWhiteboard", "Tableau"),
+              params: { isNew: true, courseId: focusCourse?.id },
+            })
+          }
+        />
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-4 items-start">
+        <div className="flex flex-col gap-4 min-w-0">
+          <Panel
+            title={get("dashboard.todayTitle", "Aujourd'hui")}
+            icon={<CalendarIcon className="w-3.5 h-3.5" />}
+            action={
+              <button
+                className="eu-btn-quiet eu-btn-sm"
+                onClick={() => tabs.open({ kind: "settings" })}
+              >
+                {get("dashboard.schedule", "Emploi du temps")}
+                <ChevronRightIcon className="w-3 h-3" />
+              </button>
+            }
           >
-            <span className="text-secondary">[+]</span> {t.common?.importFiles || "Importer des fichiers"}
-          </button>
-          <button onClick={() => tabs.open({ kind: "python" })} className="new-btn shrink-0">
-            <span className="text-secondary">[+]</span> Python
-          </button>
-          <button onClick={() => startTimer(5)} className="new-btn shrink-0" title="Minuteur 5 min">
-            <span className="text-secondary">[⏱]</span> 5 min
-          </button>
-          <button onClick={() => startTimer(10)} className="new-btn shrink-0" title="Minuteur 10 min">
-            10 min
-          </button>
-          <button onClick={() => startTimer(15)} className="new-btn shrink-0" title="Minuteur 15 min">
-            15 min
-          </button>
-        </div>
-      </section>
-
-      {/* Main two widgets — schedule + rappels (core daily use, matching the mock structure & empty states) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Les cours d'aujourd'hui — rich status, progress, live tick (kept from previous, styled clean) */}
-        <div className="terminal-card overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-hairline bg-surface-soft flex items-center justify-between text-sm">
-            <div className="font-medium text-primary">Les cours d'aujourd'hui</div>
-            <div className="text-[10px] px-2 py-0.5 rounded border border-hairline text-mute tabular-nums flex items-center gap-1">
-              <ScheduleIcon className="w-3.5 h-3.5" /> {classes.length}
-            </div>
-          </div>
-
-          {classes.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-surface-soft">
-              <CalendarIcon className="w-9 h-9 text-ash mb-3" />
-              <p className="text-mute text-sm">{t.dashboard?.noClassesToday || "Aucun cours prévu aujourd'hui. Profitez du calme."}</p>
-            </div>
-          ) : (
-            <div className="flex-1 p-2 text-sm bg-[rgb(var(--eu-card))]">
-              {scheduleItems}
-            </div>
-          )}
-        </div>
-
-        {/* Rappels — clean list + empty state matching mock */}
-        <div className="terminal-card overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-hairline bg-surface-soft flex items-center justify-between text-sm">
-            <div className="font-medium text-primary">Rappels</div>
-            <button onClick={() => tabs.open({ kind: "reminders" })} className="w-6 h-6 rounded border border-hairline flex items-center justify-center text-mute hover:text-primary hover:bg-surface-soft active:bg-surface-container text-xs">+</button>
-          </div>
-
-          {pending.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-surface-soft">
-              <p className="text-mute text-sm">{t.dashboard?.noReminders || "Aucun rappel."}</p>
-            </div>
-          ) : (
-            <ul className="flex-1 p-2 text-sm bg-[rgb(var(--eu-card))]">
-              {pending.slice(0, 6).map((r, i) => {
-                const due = formatDueLabel(r.due_at);
-                const isOver = due.tone === "over";
-                const isSoon = due.tone === "soon";
-                return (
-                  <li key={i} className="group flex items-center gap-2 px-3 py-2 rounded hover:bg-surface-soft border border-transparent hover:border-hairline">
-                    <button onClick={() => toggle(r)} className="text-emerald-600 hover:scale-110 active:scale-95 transition-transform shrink-0">
-                      <CheckIcon className="w-4 h-4" />
-                    </button>
-                    <span className="truncate flex-1 text-primary">{r.title}</span>
-                    {due.text && (
-                      <span className={`text-[10px] px-1.5 py-px rounded border font-mono tabular-nums shrink-0 ${isOver ? "text-red-700 border-red-200 bg-red-50" : isSoon ? "text-orange-700 border-orange-200 bg-orange-50" : "text-mute border-hairline"}`}>
-                        {due.text}
-                      </span>
-                    )}
-                    <button onClick={(e) => deleteReminder(r.id, e)} className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 active:text-red-600 transition-all" title={get("common.delete", "Supprimer")}>
-                      <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Additional widgets — "everything the app does" surfaced on the dashboard. Quick links now own category. Added recap activity + keep-awake from tools + python entry point. */}
-      <div>
-        <div className="uppercase tracking-[1.5px] text-[11px] text-[#666] mb-2 font-mono">{get("dashboard.quickLinks", "Liens")}</div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Mes cours widget */}
-          <div className="terminal-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-primary">Mes cours</div>
-              <button onClick={() => tabs.open({ kind: "courses" })} className="text-[10px] text-[#666] hover:text-primary">voir tout →</button>
-            </div>
-            {courses.length === 0 ? (
-              <div className="text-xs text-[#777] py-3">Créez votre premier cours pour organiser notes, casiers et progressions par classe.</div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {courses.slice(0, 6).map((c) => (
+            {classes.length === 0 ? (
+              <EmptyState
+                icon={<CalendarIcon className="w-4 h-4" />}
+                title={get("dashboard.noClassTitle", "Aucun cours aujourd'hui")}
+                hint={
+                  t.dashboard?.noClassesToday ||
+                  "Profitez du calme — ou ajoutez vos cours dans l'emploi du temps."
+                }
+                action={
                   <button
-                    key={c.id}
-                    onClick={() => tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } })}
-                    className="text-left px-3 py-1 rounded-lg border border-[#e5e5e5] hover:border-[#ccc] active:scale-[0.985] transition text-sm flex items-center gap-2 max-w-[170px]"
-                    style={{ background: `${c.color}15` }}
+                    className="eu-btn-ghost eu-btn-sm"
+                    onClick={() => tabs.open({ kind: "settings" })}
                   >
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: c.color }} />
-                    {(() => {
-                      const found = COURSE_ICONS.find((i) => i.key === (c.emoji || "book"));
-                      const IconComp = found ? found.Icon : BookIcon;
-                      return <IconComp className="w-3.5 h-3.5 text-[#444]" strokeWidth={1.8} />;
-                    })()}
-                    <span className="truncate flex-1 min-w-0 text-[#222]">{c.name}</span>
-                    {c.matiere && <span className="text-[9px] px-1 rounded bg-white/70 text-[#666] flex-shrink-0">{c.matiere === 'Mathématiques' ? 'Math' : c.matiere === 'Maths expertes' ? 'Maths+' : c.matiere.slice(0,4)}</span>}
+                    {get("dashboard.schedule", "Emploi du temps")}
                   </button>
-                ))}
-                {courses.length > 6 && (
-                  <span className="text-xs self-center text-[#777]">+{courses.length - 6}</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Fichiers récents — surfaces the document library + PDF/whiteboard viewers */}
-          <div className="terminal-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-primary">Récents</div>
-              <button onClick={() => tabs.open({ kind: "documents" })} className="text-[10px] text-[#666] hover:text-primary">bibliothèque →</button>
-            </div>
-            {recentFiles.length === 0 ? (
-              <div className="text-xs text-[#777] py-3">Importez des PDF, images ou tableaux. Ils apparaîtront ici.</div>
+                }
+              />
             ) : (
-              <div className="space-y-0.5 text-sm">
-                {recentFiles.map((f: FileItem) => (
-                  <button
-                    key={f.id}
-                    onClick={() => openRecent(f)}
-                    className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-[#f8fafc] active:bg-[#f1f5f9] text-[#222] group"
-                    title={f.name}
-                  >
-                    <FileKindIcon kind={f.kind} className="w-4 h-4 text-[#888]" />
-                    <span className="truncate flex-1 text-[13px]">{f.name}</span>
-                    <span className="text-[9px] text-[#999] tabular-nums shrink-0 opacity-80 group-hover:opacity-100">{relativeTime(f.added_at)}</span>
-                  </button>
+              <div className="eu-divide">
+                {classes.map((c, i) => (
+                  <ScheduleRow
+                    key={c.id ?? i}
+                    entry={c}
+                    now={nowTick}
+                    isFocus={focus?.entry === c}
+                    onOpen={() => void openFromSchedule(c)}
+                  />
                 ))}
               </div>
             )}
-          </div>
+          </Panel>
 
-          {/* Liens rapides — now its own category (extracted from Outils, dedicated card) */}
-          <div className="terminal-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-primary">Liens rapides</div>
-              <button onClick={() => tabs.open({ kind: "tools" })} className="text-[10px] text-[#666] hover:text-primary">gérer →</button>
-            </div>
+          <Panel
+            title={get("dashboard.quickLinks", "Liens rapides")}
+            icon={<LinkIcon className="w-3.5 h-3.5" />}
+            action={
+              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
+                {get("common.manage", "Gérer")}
+                <ChevronRightIcon className="w-3 h-3" />
+              </button>
+            }
+          >
             {links.length === 0 ? (
-              <div className="text-xs text-[#777] py-3">Ajoutez des liens (sites, manuels, ENT…) depuis Outils pour un accès direct.</div>
+              <EmptyState
+                title={get("dashboard.noLinksTitle", "Aucun lien rapide")}
+                hint={get(
+                  "dashboard.noLinksHint",
+                  "Ajoutez depuis Outils les adresses que vous ouvrez tous les jours."
+                )}
+                action={
+                  <button
+                    className="eu-btn-ghost eu-btn-sm"
+                    onClick={() => tabs.open({ kind: "tools" })}
+                  >
+                    {get("common.add", "Ajouter")}
+                  </button>
+                }
+              />
             ) : (
-              <div className="grid grid-cols-1 gap-1 text-sm">
-                {links.slice(0, 6).map((l) => (
+              <div className="flex flex-wrap gap-1.5 p-[14px]">
+                {links.slice(0, 8).map((l) => (
                   <button
                     key={l.id}
                     onClick={() => api.openUrl(l.url)}
-                    className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-[#f8fafc] active:bg-[#f1f5f9] text-[#222]"
+                    className="eu-btn-ghost eu-btn-sm"
+                    title={l.url}
                   >
-                    <Favicon url={l.url} className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{l.label}</span>
+                    <Favicon url={l.url} className="w-4 h-4 text-[9px]" remote={remoteIcons} />
+                    <span className="truncate max-w-[18ch]">{l.label}</span>
                   </button>
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Outils & Pronote — quick access, pronote status, keep-awake toggle + activity recap from everywhere */}
-          <div className="terminal-card p-4">
-            <div className="text-sm font-medium text-primary mb-2">Outils &amp; Pronote</div>
-
-            <div className="flex flex-wrap gap-2 text-sm">
-              <button onClick={() => tabs.open({ kind: "tools" })} className="px-3 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985]">Ouvrir Outils</button>
-              <button onClick={() => tabs.open({ kind: "python" })} className="px-3 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985]">Python</button>
-              <button onClick={() => tabs.open({ kind: "whiteboard", params: { isNew: true } })} className="px-3 py-1 rounded border border-[#e5e5e5] hover:bg-[#f8fafc] active:scale-[0.985]">Nouveau tableau</button>
-            </div>
-
-            {pronoteStatus && (
-              <div className="mt-3 pt-3 border-t border-[#f0f0f0] text-xs flex items-center gap-2">
-                {pronoteStatus.connected ? (
-                  <>
-                    <span className="inline-block w-2 h-2 rounded-full bg-[#16a34a]" />
-                    <span className="text-[#16a34a]">Pronote connecté</span>
-                    <button onClick={syncPronote} className="ml-auto text-[10px] px-2 py-0.5 rounded border border-[#d1d5db] hover:bg-white">Sync</button>
-                  </>
-                ) : (
-                  <span className="text-[#888]">Pronote non connecté (QR ou identifiants dans Réglages)</span>
-                )}
-              </div>
-            )}
-
-            {/* Keep awake toggle (from Tools) */}
-            <div className="mt-2 pt-2 border-t border-[#f0f0f0] flex items-center justify-between text-xs">
-              <span className="text-mute">{t.tools?.keepAwake || "Veille écran"}</span>
-              <button
-                onClick={toggleKeepAwake}
-                className={`px-2 py-0.5 rounded border text-[10px] transition ${keepAwakeOn ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#e5e5e5] hover:bg-[#f8fafc]"}`}
-              >
-                {keepAwakeOn ? (t.tools?.keepAwakeOn || "Écran allumé") : (t.tools?.keepAwakeOff || "Veille normale")}
-              </button>
-            </div>
-
-            {/* Mini activity recap pulled from Recap (everywhere usage) */}
-            {recap && (
-              <button
-                type="button"
-                onClick={() => tabs.open({ kind: "recap", title: get("nav.recap", "Bilan") })}
-                className="mt-2 pt-2 border-t border-[#f0f0f0] text-[10px] text-[#666] flex flex-wrap items-center gap-x-3 gap-y-0.5 w-full text-left hover:text-primary"
-                title="Ouvrir le bilan"
-              >
-                <span>{recap.files_opened || 0} fichiers</span>
-                <span>{recap.notes_written || 0} notes</span>
-                <span>{recap.reminders_done || 0} rappels</span>
-                <span>{recap.demos_run || 0} scripts</span>
-                <span className="ml-auto">{get("nav.recap", "Bilan")} →</span>
-              </button>
-            )}
-          </div>
+          </Panel>
         </div>
 
+        <div className="flex flex-col gap-4 min-w-0">
+          <Panel
+            title={t.nav?.reminders || "Rappels"}
+            icon={<BellIcon className="w-3.5 h-3.5" />}
+            action={
+              <button
+                className="eu-btn-quiet eu-btn-sm"
+                onClick={() => tabs.open({ kind: "reminders" })}
+                aria-label={get("common.add", "Ajouter")}
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+              </button>
+            }
+          >
+            {pending.length === 0 ? (
+              <EmptyState
+                title={get("dashboard.noRemindersTitle", "Rien à retenir")}
+                hint={t.dashboard?.noReminders || "Aucun rappel en attente."}
+                action={
+                  <button
+                    className="eu-btn-ghost eu-btn-sm"
+                    onClick={() => tabs.open({ kind: "reminders" })}
+                  >
+                    {t.common?.newReminder || "Nouveau rappel"}
+                  </button>
+                }
+              />
+            ) : (
+              <div className="eu-divide">
+                {pending.slice(0, 6).map((r) => {
+                  const due = formatDueLabel(r.due_at);
+                  const course = courses.find((c) => c.id === r.course_id);
+                  return (
+                    <div key={r.id} className="eu-row-hover group">
+                      <button
+                        onClick={() => toggle(r)}
+                        aria-label={`${get("reminders.markDone", "Marquer fait")} — ${r.title}`}
+                        title={get("reminders.markDone", "Marquer fait")}
+                        className="w-4 h-4 shrink-0 rounded-sm border border-line-strong hover:border-ok hover:bg-ok-soft transition-colors duration-fast"
+                      />
+                      <span className="eu-t-body text-ink truncate flex-1">{r.title}</span>
+                      {course && (
+                        <span
+                          className="w-2 h-2 rounded-sm shrink-0"
+                          style={{ background: courseVisual(course.color, resolved === "dark").fg }}
+                          title={course.name}
+                        />
+                      )}
+                      {due.text && (
+                        <span
+                          className={
+                            due.tone === "over"
+                              ? "eu-chip-danger"
+                              : due.tone === "soon"
+                              ? "eu-chip-warn"
+                              : "eu-chip"
+                          }
+                        >
+                          {due.text}
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => deleteReminder(r.id, e)}
+                        aria-label={`${get("common.delete", "Supprimer")} — ${r.title}`}
+                        title={get("common.delete", "Supprimer")}
+                        className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+
+          <Panel
+            title={get("dashboard.resumeTitle", "Reprendre")}
+            icon={<ClockIcon className="w-3.5 h-3.5" />}
+            action={
+              <button
+                className="eu-btn-quiet eu-btn-sm"
+                onClick={() => tabs.open({ kind: "documents" })}
+              >
+                {t.nav?.documents || "Documents"}
+                <ChevronRightIcon className="w-3 h-3" />
+              </button>
+            }
+          >
+            {recentFiles.length === 0 ? (
+              <EmptyState
+                title={get("dashboard.noRecentTitle", "Rien d'ouvert récemment")}
+                hint={get(
+                  "dashboard.noRecentHint",
+                  "Importez des PDF, des images ou créez un tableau : ils apparaîtront ici."
+                )}
+                action={
+                  <button className="eu-btn-ghost eu-btn-sm" onClick={importDocs}>
+                    {t.common?.importFiles || "Importer"}
+                  </button>
+                }
+              />
+            ) : (
+              <div className="eu-divide">
+                {recentFiles.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => openFile(f)}
+                    className="eu-row-hover w-full text-left"
+                    title={f.name}
+                  >
+                    <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
+                    <span className="eu-t-body text-ink truncate flex-1">{f.name}</span>
+                    <span className="eu-t-label normal-case tracking-normal shrink-0">
+                      {relativeTime(f.added_at)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
       </div>
-    </div>
+
+      <StatStrip>
+        <StatTile
+          icon={<BookIcon className="w-4 h-4" />}
+          value={courses.length}
+          label={t.nav?.courses || "Cours"}
+          onClick={() => tabs.open({ kind: "courses" })}
+        />
+        <StatTile
+          icon={<DescriptionIcon className="w-4 h-4" />}
+          value={docCount}
+          label={t.nav?.documents || "Documents"}
+          onClick={() => tabs.open({ kind: "documents" })}
+        />
+        <StatTile
+          icon={<NoteIcon className="w-4 h-4" />}
+          value={notes.length}
+          label={get("nav.notes", "Notes")}
+          onClick={() => tabs.open({ kind: "documents", params: { filter: "note" } })}
+        />
+        <StatTile
+          icon={<ClockIcon className="w-4 h-4" />}
+          value={
+            <span className="flex items-baseline gap-0.5">
+              {Math.floor((recap?.active_minutes ?? 0) / 60)}
+              <span className="text-[16px] text-ink-faint font-normal">h</span>
+              {String((recap?.active_minutes ?? 0) % 60).padStart(2, "0")}
+            </span>
+          }
+          label={get("dashboard.activeToday", "Aujourd'hui")}
+          hint={`${get("nav.recap", "Bilan")} →`}
+          onClick={() => tabs.open({ kind: "recap", title: get("nav.recap", "Bilan") })}
+        />
+      </StatStrip>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// « Maintenant » — the class in progress (or the next one), and the two actions
+// that matter at that moment: resume the document, open the cahier de textes.
+// ---------------------------------------------------------------------------
+
+function NowCard({
+  entry,
+  state,
+  now,
+  course,
+  courseClass,
+  dark,
+  onOpenContent,
+  onResume,
+  onOpenBoard,
+}: {
+  entry: ScheduleEntry;
+  state: "current" | "next";
+  now: Date;
+  course?: Course;
+  courseClass?: CourseClass;
+  dark: boolean;
+  onOpenContent: () => void;
+  onResume: (f: { id: number; name: string; kind: string; course_id?: number | null }) => void;
+  onOpenBoard: () => void;
+}) {
+  const visual = courseVisual(course?.color, dark);
+  const remaining = state === "current" ? minutesRemaining(entry, now) : null;
+  const until = state === "next" ? minutesUntil(entry.start_time, now) : null;
+  const progress = state === "current" ? classProgress(entry, now) : 0;
+  const resumeFile =
+    courseClass?.last_file_id != null
+      ? {
+          id: courseClass.last_file_id,
+          name: courseClass.last_file_name || get("common.document", "Document"),
+          kind: courseClass.last_file_kind || "file",
+          course_id: course?.id ?? null,
+        }
+      : null;
+  const Icon = COURSE_ICONS.find((i) => i.key === (course?.emoji || "book"))?.Icon ?? BookIcon;
+
+  return (
+    <section className="eu-panel flex overflow-hidden">
+      <span aria-hidden className="w-1 shrink-0" style={{ background: visual.fg }} />
+      <div className="flex-1 min-w-0 p-[18px]">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className="eu-t-label">
+            {state === "current"
+              ? get("dashboard.nowLabel", "En cours")
+              : get("dashboard.nextLabel", "Prochain cours")}
+          </span>
+          <span className={state === "current" ? "eu-chip-warn" : "eu-chip"}>
+            {entry.start_time}–{entry.end_time}
+          </span>
+          {state === "current" && remaining != null && (
+            <span className="eu-t-label normal-case tracking-normal text-warn">
+              {fmt(get("status.remaining", "reste {time}"), { time: humanMinutes(remaining) })}
+            </span>
+          )}
+          {state === "next" && until != null && (
+            <span className="eu-t-label normal-case tracking-normal">
+              {fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(until) })}
+            </span>
+          )}
+        </div>
+
+        <h2 className="mt-2 flex items-center gap-2.5 min-w-0">
+          <span
+            className="w-7 h-7 shrink-0 grid place-items-center rounded border"
+            style={{ background: visual.tint, borderColor: visual.border, color: visual.fg }}
+          >
+            <Icon className="w-4 h-4" strokeWidth={1.8} />
+          </span>
+          <span className="text-[20px] font-semibold tracking-[-0.018em] text-ink truncate">
+            {entry.subject}
+          </span>
+          {entry.room && <span className="eu-chip shrink-0">{entry.room}</span>}
+        </h2>
+
+        {state === "current" && (
+          <div className="eu-gauge mt-3.5">
+            <i style={{ width: `${progress}%`, background: visual.fg }} />
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap mt-3.5">
+          {resumeFile ? (
+            <button className="eu-btn-primary eu-btn-sm" onClick={() => onResume(resumeFile)}>
+              <PlayIcon className="w-3.5 h-3.5" />
+              <span className="truncate max-w-[26ch]">
+                {fmt(get("dashboard.resumeFile", "Reprendre · {name}"), { name: resumeFile.name })}
+              </span>
+            </button>
+          ) : (
+            course && (
+              <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenContent}>
+                <LayersIcon className="w-3.5 h-3.5" />
+                {get("dashboard.setProgress", "Définir la progression")}
+              </button>
+            )
+          )}
+          <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenContent}>
+            <BookIcon className="w-3.5 h-3.5" />
+            {course
+              ? get("dashboard.openContent", "Cahier de textes")
+              : get("dashboard.linkCourse", "Associer un cours")}
+          </button>
+          <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenBoard}>
+            <PenIcon className="w-3.5 h-3.5" />
+            {get("nav.whiteboard", "Tableau blanc")}
+          </button>
+          {courseClass?.last_item_title && (
+            <span className="eu-t-meta ml-auto truncate max-w-[34ch]">
+              {courseClass.last_sequence_title
+                ? `${courseClass.last_sequence_title} — ${courseClass.last_item_title}`
+                : courseClass.last_item_title}
+            </span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// One line of today's schedule.
+// ---------------------------------------------------------------------------
+
+function ScheduleRow({
+  entry,
+  now,
+  isFocus,
+  onOpen,
+}: {
+  entry: ScheduleEntry;
+  now: Date;
+  isFocus: boolean;
+  onOpen: () => void;
+}) {
+  const status = getClassStatus(entry, now);
+  const isCurrent = status === "current";
+  const mins = status === "upcoming" ? minutesUntil(entry.start_time, now) : null;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`eu-row-hover w-full text-left ${status === "past" ? "opacity-55" : ""} ${
+        isCurrent ? "bg-warn-soft hover:bg-warn-soft" : ""
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`w-0.5 self-stretch rounded-sm shrink-0 ${
+          isCurrent ? "bg-warn-solid" : isFocus ? "bg-line-strong" : "bg-line"
+        }`}
+      />
+      <span className="eu-t-num text-[11.5px] text-ink-faint w-[86px] shrink-0">
+        {entry.start_time}–{entry.end_time}
+      </span>
+      <span className="eu-t-body text-ink font-medium truncate flex-1">{entry.subject}</span>
+      {entry.room && <span className="eu-chip shrink-0 hidden sm:inline-flex">{entry.room}</span>}
+      <span className="eu-t-label normal-case tracking-normal shrink-0 w-[78px] text-right">
+        {isCurrent
+          ? get("dashboard.inProgress", "en cours")
+          : status === "past"
+          ? get("dashboard.past", "passé")
+          : mins != null
+          ? fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(mins) })
+          : ""}
+      </span>
+    </button>
   );
 }

@@ -16,26 +16,240 @@ import {
   updaterSupported,
   type AppUpdateInfo,
 } from "../lib/updater";
-import { DAY_LABELS } from "../lib/format";
+import { DAY_LABELS, isoDayOfWeek } from "../lib/format";
 
-import { EmptyState, Modal, SectionHeader, useToast, useConfirm } from "../components/ui";
-import { CheckIcon, PlusIcon, QrIcon, TrashIcon } from "../components/icons";
+import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
+import { Field, MetaDot, PageHeader, Panel, Section, Segmented } from "../components/layout";
+import {
+  ArchiveIcon,
+  CheckIcon,
+  MoonIcon,
+  PlusIcon,
+  ProjectorIcon,
+  QrIcon,
+  SunIcon,
+  TrashIcon,
+} from "../components/icons";
 import { useTabs } from "../lib/tabs";
+import { useAppearance } from "../lib/theme";
+import { MOD } from "../lib/shortcuts";
 
 export default function Settings({ info }: { info: AppInfo | null }) {
   return (
-    <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.settings}</h1>
-        <p className="text-mute text-sm mt-1">{t.settings?.subtitle || "Pronote, emploi du temps et onglets."}</p>
-      </header>
+    <>
+      <PageHeader
+        title={t.nav.settings}
+        meta={
+          <>
+            <span>{get("settings.metaAppearance", "Apparence")}</span>
+            <MetaDot />
+            <span>Pronote</span>
+            <MetaDot />
+            <span>{get("settings.scheduleTitle", "Emploi du temps")}</span>
+            <MetaDot />
+            <span>{get("settings.dataDirTitle", "Stockage")}</span>
+          </>
+        }
+      />
 
-      <TabsSection />
+      <AppearanceSection />
       <PronoteSection />
       <ScheduleSection />
+      <TabsSection />
       <DataStorageSection info={info} />
       <AboutSection info={info} />
-    </div>
+    </>
+  );
+}
+
+// Appearance: theme, density, projection, site icons and the end-of-class notice.
+// These are the settings that used to have no home at all.
+
+function AppearanceSection() {
+  const { pref, setPref, density, setDensity, projection, toggleProjection } = useAppearance();
+  const [remoteIcons, setRemoteIcons] = useState(false);
+  const [endNotice, setEndNotice] = useState<"off" | "toast" | "sound">("toast");
+  const [endLead, setEndLead] = useState(5);
+
+  useEffect(() => {
+    api
+      .getSetting("remote_favicons")
+      .then((v) => setRemoteIcons(v === "1"))
+      .catch(() => {});
+    api
+      .getSetting("class_end_notice")
+      .then((v) => {
+        if (v === "off" || v === "toast" || v === "sound") setEndNotice(v);
+      })
+      .catch(() => {});
+    api
+      .getSetting("class_end_lead")
+      .then((v) => {
+        const n = v ? parseInt(v, 10) : NaN;
+        if (!Number.isNaN(n) && n >= 1 && n <= 15) setEndLead(n);
+      })
+      .catch(() => {});
+  }, []);
+
+  const persist = (key: string, value: string) => {
+    api.setSetting(key, value).catch(() => {});
+    window.dispatchEvent(new CustomEvent("eu:settings-changed"));
+  };
+
+  return (
+    <Section title={get("settings.metaAppearance", "Apparence")}>
+      <Panel pad>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">{get("appearance.theme", "Thème")}</p>
+              <p className="eu-t-meta">
+                {get("appearance.themeHint", "« Auto » suit le réglage clair/sombre du système.")}
+              </p>
+            </div>
+            <Segmented
+              value={pref}
+              onChange={setPref}
+              label={get("appearance.theme", "Thème")}
+              options={[
+                { value: "auto", label: get("appearance.auto", "Auto") },
+                {
+                  value: "light",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <SunIcon className="w-3.5 h-3.5" />
+                      {get("appearance.light", "Clair")}
+                    </span>
+                  ),
+                },
+                {
+                  value: "dark",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <MoonIcon className="w-3.5 h-3.5" />
+                      {get("appearance.dark", "Sombre")}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">{get("appearance.density", "Densité")}</p>
+              <p className="eu-t-meta">
+                {get("appearance.densityHint", "« Compact » resserre les listes sur un petit écran.")}
+              </p>
+            </div>
+            <Segmented
+              value={density}
+              onChange={setDensity}
+              label={get("appearance.density", "Densité")}
+              options={[
+                { value: "comfortable", label: get("appearance.comfortable", "Confortable") },
+                { value: "compact", label: get("appearance.compact", "Compact") },
+              ]}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">
+                {get("appearance.projection", "Mode projection")}
+              </p>
+              <p className="eu-t-meta">
+                {get(
+                  "appearance.projectionHint",
+                  "Typographie agrandie et barres masquées, pour le vidéoprojecteur."
+                )}{" "}
+                <span className="eu-kbd">{MOD}⇧P</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleProjection}
+              aria-pressed={projection}
+              className={projection ? "eu-btn-primary eu-btn-sm" : "eu-btn-ghost eu-btn-sm"}
+            >
+              <ProjectorIcon className="w-3.5 h-3.5" />
+              {projection ? get("common.active", "Activé") : get("common.enable", "Activer")}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">
+                {get("classEnd.title", "Fin de cours annoncée")}
+              </p>
+              <p className="eu-t-meta max-w-[62ch]">
+                {get(
+                  "classEnd.hint",
+                  "Un rappel discret avant la sonnerie, d'après l'emploi du temps, pour boucler l'activité et donner le travail à faire."
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {endNotice !== "off" && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={15}
+                    value={endLead}
+                    onChange={(e) => {
+                      const n = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 1));
+                      setEndLead(n);
+                      persist("class_end_lead", String(n));
+                    }}
+                    aria-label={get("classEnd.lead", "Minutes avant la fin")}
+                    className="eu-input w-16 text-center tabular-nums"
+                  />
+                  <span className="eu-t-meta">min</span>
+                </div>
+              )}
+              <Segmented
+                value={endNotice}
+                onChange={(v) => {
+                  setEndNotice(v);
+                  persist("class_end_notice", v);
+                }}
+                label={get("classEnd.title", "Fin de cours annoncée")}
+                options={[
+                  { value: "off", label: get("classEnd.off", "Aucune") },
+                  { value: "toast", label: get("classEnd.silent", "Silencieuse") },
+                  { value: "sound", label: get("classEnd.sound", "Sonnerie") },
+                ]}
+              />
+            </div>
+          </div>
+
+          <label className="flex items-start gap-2.5 border-t border-line pt-4 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-accent mt-0.5"
+              checked={remoteIcons}
+              onChange={(e) => {
+                setRemoteIcons(e.target.checked);
+                persist("remote_favicons", e.target.checked ? "1" : "0");
+                window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
+              }}
+            />
+            <span className="min-w-0">
+              <span className="eu-t-body font-medium text-ink block">
+                {get("appearance.remoteIcons", "Icônes de sites distantes")}
+              </span>
+              <span className="eu-t-meta block">
+                {get(
+                  "appearance.remoteIconsHint",
+                  "Décoché, Euclide dessine les icônes de liens localement et n'émet aucune requête réseau. Coché, il télécharge les favicons réels."
+                )}
+              </span>
+            </span>
+          </label>
+        </div>
+      </Panel>
+    </Section>
   );
 }
 
@@ -86,28 +300,65 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
     }
   };
 
-  return (
-    <section>
-      <SectionHeader title={t.settings?.dataDirTitle || "Dossier de stockage"} />
-      <div className="new-card p-4">
-        <p className="text-sm mb-1 text-primary">Emplacement de toutes les données (base, documents, cours, tableaux, scripts Python) :</p>
-        <p className="text-[11px] font-mono text-mute break-all selectable mb-3">{current || "(chemin inconnu)"}</p>
+  const backup = async () => {
+    setBusy(true);
+    try {
+      toast(get("settings.backupRunning", "Sauvegarde en cours…"), "info");
+      const path = await api.backupDataDir();
+      toast(fmt(get("settings.backupDone", "Sauvegarde créée : {path}"), { path }), "success");
+    } catch (err) {
+      toast(
+        typeof err === "string" && err ? err : get("settings.backupError", "Sauvegarde impossible"),
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
-        <div className="flex flex-wrap gap-2">
-          <button onClick={choose} disabled={busy} className="new-btn-ghost">
-            Choisir un dossier…
+  return (
+    <Section title={t.settings?.dataDirTitle || "Dossier de stockage"}>
+      <Panel pad>
+        <Field
+          label={get("settings.dataDirLabel", "Emplacement des données")}
+          hint={
+            t.settings?.dataDirHint ||
+            "Parfait pour une clé USB : choisissez un dossier sur la clé. Le pointeur (euclide-data.json) reste à côté de l'exécutable. Un redémarrage est nécessaire après tout changement. Aucune migration automatique : copiez les anciens fichiers si besoin."
+          }
+        >
+          <p className="eu-panel-alt rounded px-2.5 py-2 font-mono text-[12px] text-ink-muted break-all selectable">
+            {current || get("settings.dataDirUnknown", "(chemin inconnu)")}
+          </p>
+        </Field>
+
+        <div className="flex flex-wrap gap-2 mt-3.5">
+          <button onClick={choose} disabled={busy} className="eu-btn-ghost eu-btn-sm">
+            {get("settings.pickFolder", "Choisir un dossier…")}
           </button>
-          <button onClick={reset} disabled={busy} className="new-btn-ghost text-mute">
-            Réinitialiser (par défaut)
+          <button onClick={reset} disabled={busy} className="eu-btn-quiet eu-btn-sm">
+            {get("settings.resetFolder", "Réinitialiser (par défaut)")}
           </button>
         </div>
 
-        <p className="text-[11px] text-mute mt-3 leading-snug">
-          {t.settings?.dataDirHint ||
-            "Parfait pour une clé USB : choisissez un dossier sur la clé. Le pointeur (euclide-data.json) reste à côté de l'exécutable. Un redémarrage est nécessaire après tout changement. Aucune migration automatique : copiez les anciens fichiers si besoin."}
-        </p>
-      </div>
-    </section>
+        <div className="border-t border-line mt-4 pt-4 flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <p className="eu-t-body font-medium text-ink">
+              {get("settings.backupTitle", "Sauvegarde")}
+            </p>
+            <p className="eu-t-meta max-w-[62ch]">
+              {get(
+                "settings.backupHint",
+                "Crée une archive .zip horodatée de tout le dossier de données, à côté de celui-ci. Sur une clé USB qui vit dans une poche, c'est une assurance élémentaire."
+              )}
+            </p>
+          </div>
+          <button onClick={backup} disabled={busy} className="eu-btn-ghost eu-btn-sm">
+            <ArchiveIcon className="w-3.5 h-3.5" />
+            {get("settings.backupNow", "Sauvegarder maintenant")}
+          </button>
+        </div>
+      </Panel>
+    </Section>
   );
 }
 
@@ -257,22 +508,23 @@ function PronoteSection() {
   };
 
   return (
-    <section>
-      <SectionHeader title={t.pronoteTitle} />
-      <div className="new-card p-5 flex flex-col gap-4">
-        <div className="flex items-center gap-4">
+    <Section title={get("settings.pronoteTitle", "Pronote")}>
+      <Panel pad>
+        <div className="flex items-center gap-3.5 flex-wrap">
           <span
-            className={`grid place-items-center w-12 h-12 rounded-[12px] ${
-              status?.connected ? "bg-emerald-500/15 text-emerald-400" : "bg-surface-container text-tui-accent"
+            className={`grid place-items-center w-9 h-9 shrink-0 rounded border ${
+              status?.connected
+                ? "bg-ok-soft border-ok/25 text-ok"
+                : "bg-panel-alt border-line text-ink-muted"
             }`}
           >
-            {status?.connected ? <CheckIcon className="w-6 h-6" /> : <QrIcon className="w-6 h-6" />}
+            {status?.connected ? <CheckIcon className="w-4 h-4" /> : <QrIcon className="w-4 h-4" />}
           </span>
-          <div className="flex-1">
-            <p className="font-semibold text-primary">
+          <div className="flex-1 min-w-[24ch]">
+            <p className="eu-t-body font-medium text-ink">
               {status?.connected ? fmt(t.settings?.connectedAs || "Connecté - {name}", { name: status.account_name ?? "" }) : (t.settings?.notConnected || "Non connecté")}
             </p>
-            <p className="text-on-surface-variant text-sm">
+            <p className="eu-t-meta">
               {status?.connected
                 ? status.last_sync
                   ? fmt(t.settings?.lastSync || "Dernière synchro : {date}", { date: status.last_sync })
@@ -281,35 +533,36 @@ function PronoteSection() {
             </p>
           </div>
           {status?.connected ? (
-            <div className="flex gap-2">
-              <button onClick={sync} disabled={busy} className="new-btn-ghost">
-                {busy ? "..." : "Synchroniser"}
+            <div className="flex gap-2 shrink-0">
+              <button onClick={sync} disabled={busy} className="eu-btn-ghost eu-btn-sm">
+                {busy ? "…" : get("settings.sync", "Synchroniser")}
               </button>
               <button
                 onClick={async () => {
                   await api.pronoteLogout();
+                  window.dispatchEvent(new CustomEvent("eu:pronote-changed"));
                   refresh();
                 }}
-                className="new-btn-ghost text-mute"
+                className="eu-btn-quiet eu-btn-sm"
               >
-                Deconnecter
+                {get("settings.disconnect", "Déconnecter")}
               </button>
             </div>
           ) : (
-            <button onClick={() => setOpen(true)} className="new-btn-primary bg-primary text-white">
+            <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm shrink-0">
               {t.common?.connect || "Connecter"}
             </button>
           )}
         </div>
-      </div>
+      </Panel>
 
       <Modal open={open} onClose={() => setOpen(false)} title={get("settings.pronoteTitle", "Pronote")} width="max-w-xl">
         <div className="flex flex-col gap-4">
-          <div className="new-segment w-full">
+          <div className="eu-segment w-full">
             <button
               onClick={() => setMethod("qr")}
               className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                method === "qr" ? "active bg-primary text-white" : ""
+                method === "qr" ? "active bg-ink text-panel" : ""
               }`}
             >
               QR code (ENT)
@@ -317,7 +570,7 @@ function PronoteSection() {
             <button
               onClick={() => setMethod("direct")}
               className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                method === "direct" ? "active bg-primary text-white" : ""
+                method === "direct" ? "active bg-ink text-panel" : ""
               }`}
             >
               Identifiants
@@ -326,7 +579,7 @@ function PronoteSection() {
 
           {method === "qr" ? (
             <>
-              <ol className="text-sm text-mute flex flex-col gap-1.5 list-decimal list-inside">
+              <ol className="text-sm text-ink-muted flex flex-col gap-1.5 list-decimal list-inside">
                 <li>Application mobile Pronote : Mon compte &gt; Generer un QR code.</li>
                 <li>Choisissez un code PIN a 4 chiffres (a retenir).</li>
                 <li>Importez la capture d'ecran du QR code ci-dessous.</li>
@@ -339,18 +592,18 @@ function PronoteSection() {
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && decodeImage(e.target.files[0])}
               />
-              <button onClick={() => fileRef.current?.click()} className="new-btn-ghost justify-center py-3">
+              <button onClick={() => fileRef.current?.click()} className="eu-btn-ghost justify-center py-3">
                 <QrIcon className="w-5 h-5" /> Importer l'image du QR code
               </button>
               {qrJson && (
-                <p className="new-chip w-fit">
+                <p className="eu-chip w-fit">
                   <CheckIcon className="w-3.5 h-3.5" /> QR code charge
                 </p>
               )}
               <div>
-                <p className="text-mute text-sm mb-1.5">Code PIN (4 chiffres)</p>
+                <p className="text-ink-muted text-sm mb-1.5">Code PIN (4 chiffres)</p>
                 <input
-                  className="new-input tracking-[0.5em] text-center text-lg"
+                  className="eu-input tracking-[0.5em] text-center text-lg"
                   inputMode="numeric"
                   maxLength={4}
                   placeholder="----"
@@ -359,33 +612,33 @@ function PronoteSection() {
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <button className="new-btn-ghost" onClick={() => setOpen(false)}>
+                <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
                   {t.common?.cancel || "Annuler"}
                 </button>
-                <button className="new-btn-primary bg-primary text-white" onClick={connectQr} disabled={busy}>
+                <button className="eu-btn-primary" onClick={connectQr} disabled={busy}>
                   {busy ? "Connexion..." : (t.common?.connect || "Connecter")}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p className="text-mute text-sm">
+              <p className="text-ink-muted text-sm">
                 Connexion directe par identifiant et mot de passe (comptes hors ENT, ou demonstration).
               </p>
               <input
-                className="new-input"
+                className="eu-input"
                 placeholder="Adresse Pronote (https://...)"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
               <input
-                className="new-input"
+                className="eu-input"
                 placeholder="Identifiant"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
               <input
-                className="new-input"
+                className="eu-input"
                 type="password"
                 placeholder="Mot de passe"
                 value={password}
@@ -393,11 +646,11 @@ function PronoteSection() {
               />
               {/* PIN field: shown when the account requires it (auto-detected) or expandable */}
               {needsPin ? (
-                <div className="border border-tui-accent/30 rounded p-3 bg-surface-soft/50">
-                  <p className="text-sm font-medium text-primary mb-1.5">Code PIN du compte</p>
-                  <p className="text-mute text-xs mb-2">Votre compte Pronote exige un code PIN pour les nouveaux appareils.</p>
+                <div className="border border-accent/30 rounded p-3 bg-panel-alt/50">
+                  <p className="text-sm font-medium text-ink mb-1.5">Code PIN du compte</p>
+                  <p className="text-ink-muted text-xs mb-2">Votre compte Pronote exige un code PIN pour les nouveaux appareils.</p>
                   <input
-                    className="new-input tracking-[0.5em] text-center text-lg"
+                    className="eu-input tracking-[0.5em] text-center text-lg"
                     inputMode="numeric"
                     maxLength={8}
                     placeholder="1234"
@@ -410,16 +663,16 @@ function PronoteSection() {
                 <button
                   type="button"
                   onClick={() => setNeedsPin(true)}
-                  className="text-xs text-mute hover:text-primary transition-colors text-left"
+                  className="text-xs text-ink-muted hover:text-ink transition-colors text-left"
                 >
                   + Code PIN du compte (optionnel)
                 </button>
               )}
               <div className="flex justify-end gap-2">
-                <button className="new-btn-ghost" onClick={() => setOpen(false)}>
+                <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
                   {t.common?.cancel || "Annuler"}
                 </button>
-                <button className="new-btn-primary bg-primary text-white" onClick={connectDirect} disabled={busy}>
+                <button className="eu-btn-primary" onClick={connectDirect} disabled={busy}>
                   {busy ? "Connexion..." : (t.common?.connect || "Connecter")}
                 </button>
               </div>
@@ -427,11 +680,11 @@ function PronoteSection() {
           )}
         </div>
       </Modal>
-    </section>
+    </Section>
   );
 }
 
-// Schedule (manual)
+// Schedule: week grid, manual entries + read-only Pronote entries
 
 function ScheduleSection() {
   const toast = useToast();
@@ -473,59 +726,92 @@ function ScheduleSection() {
   const byDay = (d: number) =>
     entries.filter((e) => e.day_of_week === d).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
+  const days = [1, 2, 3, 4, 5, 6].filter((d) => d !== 6 || byDay(6).length > 0);
+  const todayIso = isoDayOfWeek();
+
+  const remove = async (id: number) => {
+    await api.deleteScheduleEntry(id);
+    window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+    refresh();
+  };
+
   return (
-    <section>
-      <SectionHeader
-        title={get("settings.scheduleTitle", "Emploi du temps")}
-        action={
-          <button onClick={() => setOpen(true)} className="new-btn-ghost py-1.5 px-2.5 text-xs">
-            <PlusIcon className="w-4 h-4" /> {t.common?.add || "Ajouter"}
-          </button>
-        }
-      />
+    <Section
+      title={get("settings.scheduleTitle", "Emploi du temps")}
+      description={get("settings.scheduleWeek", "Vue de la semaine — les cours Pronote sont en lecture seule.")}
+      action={
+        <button onClick={() => setOpen(true)} className="eu-btn-ghost eu-btn-sm">
+          <PlusIcon className="w-3.5 h-3.5" /> {t.common?.add || "Ajouter"}
+        </button>
+      }
+    >
       {entries.length === 0 ? (
-        <div className="new-card p-5">
+        <Panel>
           <EmptyState
             title={t.settings?.emptyScheduleTitle || "Emploi du temps vide"}
             hint={t.settings?.emptyScheduleHint || "Ajoutez vos cours à la main, ou synchronisez Pronote ci-dessus."}
+            action={
+              <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm">
+                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.add || "Ajouter un cours"}
+              </button>
+            }
           />
-        </div>
+        </Panel>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {[1, 2, 3, 4, 5, 6].map((d) => {
-            const items = byDay(d);
-            if (items.length === 0) return null;
-            return (
-              <div key={d} className="new-card p-4">
-                <p className="font-semibold text-primary mb-2">{DAY_LABELS[d - 1]}</p>
-                <div className="flex flex-col gap-1.5">
-                  {items.map((e) => (
-                    <div key={e.id} className="flex items-center gap-2 group text-sm">
-                      <span className="text-tui-accent font-medium tabular-nums w-24 shrink-0">
-                        {e.start_time}-{e.end_time}
-                      </span>
-                      <span className="flex-1 text-primary truncate">{e.subject}</span>
-                      {e.room && <span className="text-mute text-xs shrink-0">{e.room}</span>}
-                      {e.source === "pronote" ? (
-                        <span className="new-chip shrink-0 text-[10px] py-0.5">P</span>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            await api.deleteScheduleEntry(e.id);
-                            window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-                            refresh();
-                          }}
-                          className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-500 transition-all shrink-0"
+        <div className="eu-panel overflow-x-auto">
+          <div className="flex min-w-[720px]">
+            {days.map((d) => {
+              const items = byDay(d);
+              const isToday = d === todayIso;
+              return (
+                <div key={d} className="flex-1 min-w-[120px] border-r border-line last:border-r-0">
+                  <div
+                    className={`px-2.5 py-2 border-b border-line ${
+                      isToday ? "bg-accent-soft" : "bg-panel-alt"
+                    }`}
+                  >
+                    <p className={`eu-t-label ${isToday ? "text-accent" : ""}`}>{DAY_LABELS[d - 1]}</p>
+                  </div>
+                  <div className="p-1.5 flex flex-col gap-1.5 min-h-[92px]">
+                    {items.length === 0 ? (
+                      <p className="eu-t-meta px-1 pt-1 opacity-60">—</p>
+                    ) : (
+                      items.map((e) => (
+                        <div
+                          key={e.id}
+                          className="group rounded border border-line bg-panel px-2 py-1.5 relative"
+                          title={`${e.subject}${e.room ? ` · ${e.room}` : ""}`}
                         >
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                          <p className="font-mono text-[10.5px] tabular-nums text-ink-faint">
+                            {e.start_time}–{e.end_time}
+                          </p>
+                          <p className="eu-t-meta text-ink font-medium truncate mt-0.5">{e.subject}</p>
+                          {e.room && <p className="eu-t-label mt-1 normal-case">{e.room}</p>}
+                          {e.source === "pronote" ? (
+                            <span
+                              className="absolute top-1 right-1 font-mono text-[9px] text-ink-faint"
+                              title={get("settings.fromPronote", "Depuis Pronote")}
+                            >
+                              P
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => void remove(e.id)}
+                              aria-label={`${get("common.delete", "Supprimer")} — ${e.subject}`}
+                              title={get("common.delete", "Supprimer")}
+                              className="absolute top-0.5 right-0.5 w-6 h-6 grid place-items-center rounded-sm text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger-soft transition-opacity duration-fast"
+                            >
+                              <TrashIcon className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -533,14 +819,14 @@ function ScheduleSection() {
         <div className="flex flex-col gap-3">
           <input
             autoFocus
-            className="new-input"
+            className="eu-input"
             placeholder={t.settings?.subjectPlaceholder || "Matière (ex : Mathématiques 4e B)"}
             value={form.subject ?? ""}
             onChange={(e) => setForm({ ...form, subject: e.target.value })}
           />
           <div className="grid grid-cols-3 gap-2">
             <select
-              className="new-input"
+              className="eu-input"
               value={form.day_of_week}
               onChange={(e) => setForm({ ...form, day_of_week: Number(e.target.value) })}
             >
@@ -552,26 +838,26 @@ function ScheduleSection() {
             </select>
             <input
               type="time"
-              className="new-input"
+              className="eu-input"
               value={form.start_time}
               onChange={(e) => setForm({ ...form, start_time: e.target.value })}
             />
             <input
               type="time"
-              className="new-input"
+              className="eu-input"
               value={form.end_time}
               onChange={(e) => setForm({ ...form, end_time: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <input
-              className="new-input"
+              className="eu-input"
               placeholder={t.settings?.roomOptional || "Salle (optionnel)"}
               value={form.room ?? ""}
               onChange={(e) => setForm({ ...form, room: e.target.value })}
             />
             <select
-              className="new-input"
+              className="eu-input"
               value={form.course_id ?? ""}
               onChange={(e) => setForm({ ...form, course_id: e.target.value ? Number(e.target.value) : null })}
             >
@@ -584,16 +870,16 @@ function ScheduleSection() {
             </select>
           </div>
           <div className="flex justify-end gap-2 mt-1">
-            <button className="new-btn-ghost" onClick={() => setOpen(false)}>
+            <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
               {t.common?.cancel || "Annuler"}
             </button>
-            <button className="new-btn-primary bg-primary text-white" onClick={save}>
+            <button className="eu-btn-primary" onClick={save} disabled={!form.subject?.trim()}>
               {t.common?.add || "Ajouter"}
             </button>
           </div>
         </div>
       </Modal>
-    </section>
+    </Section>
   );
 }
 
@@ -624,21 +910,16 @@ function TabsSection() {
   };
 
   return (
-    <section>
-      <SectionHeader
-        title={t.settings?.tabsTitle || "Onglets"}
-        action={
-          <span className="text-[10px] px-2 py-0.5 rounded border border-hairline text-mute font-mono">
-            {tabsCtx.maxTabs === 0 ? "ILLIMITÉ" : `${tabsCtx.maxTabs} MAX`}
-          </span>
-        }
-      />
-      <div className="new-card p-4">
+    <Section
+      title={t.settings?.tabsTitle || "Onglets"}
+      action={<span className="eu-chip">{tabsCtx.maxTabs === 0 ? "ILLIMITÉ" : `${tabsCtx.maxTabs} MAX`}</span>}
+    >
+      <Panel pad>
         <div className="flex items-center gap-2 mb-3">
           <input
             id="tabs-unlimited"
             type="checkbox"
-            className="accent-tui-accent"
+            className="accent-accent"
             checked={unlimited}
             onChange={(e) => apply(e.target.checked, sliderVal)}
           />
@@ -651,9 +932,9 @@ function TabsSection() {
           <div className="pl-1">
             <div className="flex items-baseline justify-between text-sm mb-1.5">
               <div>
-                <span className="font-medium text-primary">{t.settings?.maxTabsLabel || "Nombre maximum d'onglets"}</span>
+                <span className="font-medium text-ink">{t.settings?.maxTabsLabel || "Nombre maximum d'onglets"}</span>
               </div>
-              <div className="font-mono tabular-nums text-primary text-lg leading-none">{sliderVal}</div>
+              <div className="font-mono tabular-nums text-ink text-lg leading-none">{sliderVal}</div>
             </div>
 
             <input
@@ -667,14 +948,14 @@ function TabsSection() {
                 setSliderVal(v);
                 apply(false, v);
               }}
-              className="w-full accent-tui-accent cursor-pointer"
+              className="w-full accent-accent cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-mute mt-0.5 font-mono tabular-nums">
+            <div className="flex justify-between text-[10px] text-ink-muted mt-0.5 font-mono tabular-nums">
               <span>{MIN}</span>
               <span>{MAX}</span>
             </div>
 
-            <p className="text-[11px] text-mute mt-2 leading-snug">
+            <p className="text-[11px] text-ink-muted mt-2 leading-snug">
               {t.settings?.maxTabsHint ||
                 "Lorsque la limite est atteinte, l’onglet le plus ancien (non actif) est automatiquement fermé à l’ouverture d’un nouveau. La limite s’applique aux nouveaux onglets seulement."}
             </p>
@@ -682,12 +963,18 @@ function TabsSection() {
         )}
 
         {unlimited && (
-          <p className="text-[11px] text-mute pl-1">
+          <p className="eu-t-meta pl-1">
             {t.settings?.maxTabsDisabledHint || "Vous pouvez ouvrir autant d’onglets que vous voulez (le + dans la barre d’onglets reste toujours actif)."}
           </p>
         )}
-      </div>
-    </section>
+        <p className="eu-t-meta mt-3 pt-3 border-t border-line leading-snug">
+          {get(
+            "settings.pinHint",
+            "Astuce : double-cliquez sur un onglet pour l’épingler — un onglet épinglé n’est jamais fermé automatiquement, et il se réordonne par glisser-déposer."
+          )}
+        </p>
+      </Panel>
+    </Section>
   );
 }
 
@@ -695,6 +982,7 @@ function TabsSection() {
 
 function AboutSection({ info }: { info: AppInfo | null }) {
   const toast = useToast();
+  const confirmDlg = useConfirm();
   const [status, setStatus] = useState<"idle" | "checking" | "upToDate" | "available" | "installing" | "error">(
     "idle"
   );
@@ -744,11 +1032,15 @@ function AboutSection({ info }: { info: AppInfo | null }) {
 
   const install = async () => {
     if (!update) return;
-    const ok = confirm(
-      fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
+    // The app has its own confirmation dialog; the native window.confirm()
+    // that used to be here looked foreign inside the Tauri window.
+    const ok = await confirmDlg.ask({
+      title: get("updater.install", "Installer et redémarrer"),
+      message: fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
         version: update.version,
-      })
-    );
+      }),
+      confirmLabel: get("updater.install", "Installer et redémarrer"),
+    });
     if (!ok) return;
     setStatus("installing");
     setPercent(0);
@@ -784,28 +1076,26 @@ function AboutSection({ info }: { info: AppInfo | null }) {
               : "";
 
   return (
-    <section>
-      <SectionHeader title={get("about.title", "À propos")} />
-      <div className="new-card p-6 flex flex-col gap-4">
-        <div className="flex items-center gap-4">
-          <img src="/euclide-logo.png" alt="Euclide" className="w-16 h-16 rounded-2xl object-contain" />
-          <div>
-            <p className="font-semibold text-primary">
-              {t.appName} {info && <span className="text-mute font-normal">v{info.version}</span>}
+    <Section title={get("about.title", "À propos")}>
+      <Panel pad>
+        <div className="flex items-center gap-3.5">
+          <img src="/euclide-logo.png" alt="" className="w-11 h-11 rounded object-contain" />
+          <div className="min-w-0">
+            <p className="eu-t-body font-medium text-ink">
+              {t.appName} {info && <span className="text-ink-muted font-normal">v{info.version}</span>}
             </p>
-            <p className="text-mute text-sm mt-1">{t.madeBy}</p>
-            {info && <p className="text-[11px] text-mute opacity-60 mt-2 selectable">{info.data_dir}</p>}
+            <p className="eu-t-meta">{t.madeBy}</p>
           </div>
         </div>
 
         {isTauri() && (
-          <div className="border-t border-hairline pt-4 flex flex-col gap-3">
+          <div className="border-t border-line mt-4 pt-4 flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => void runCheck(false)}
                 disabled={status === "checking" || status === "installing"}
-                className="new-btn-ghost"
+                className="eu-btn-ghost eu-btn-sm"
               >
                 {get("updater.check", "Vérifier les mises à jour")}
               </button>
@@ -814,36 +1104,31 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                   type="button"
                   onClick={() => void install()}
                   disabled={status === "installing"}
-                  className="new-btn-primary bg-primary text-white"
+                  className="eu-btn-primary eu-btn-sm"
                 >
                   {get("updater.install", "Installer et redémarrer")}
                 </button>
               )}
             </div>
             {statusLine && (
-              <p className={`text-[11px] leading-snug ${status === "error" ? "text-tui-danger" : "text-mute"}`}>
+              <p className={`eu-t-meta leading-snug ${status === "error" ? "text-danger" : ""}`}>
                 {statusLine}
               </p>
             )}
             {status === "available" && update?.body && (
-              <p className="text-[11px] text-mute leading-snug whitespace-pre-wrap">{update.body}</p>
+              <p className="eu-t-meta leading-snug whitespace-pre-wrap">{update.body}</p>
             )}
             {status === "installing" && (
-              <div className="h-1 rounded-full bg-hairline overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-[width] duration-150"
-                  style={{ width: `${percent ?? 0}%` }}
-                />
+              <div className="eu-gauge">
+                <i style={{ width: `${percent ?? 0}%` }} />
               </div>
             )}
-            <p className="text-[11px] text-mute leading-snug">
-              {info?.windows_portable
-                ? get("updater.hintPortable")
-                : get("updater.hint")}
+            <p className="eu-t-meta leading-snug">
+              {info?.windows_portable ? get("updater.hintPortable") : get("updater.hint")}
             </p>
           </div>
         )}
-      </div>
-    </section>
+      </Panel>
+    </Section>
   );
 }

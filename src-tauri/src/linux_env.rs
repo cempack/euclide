@@ -92,11 +92,15 @@ mod tests {
         apply();
 
         assert_eq!(
-            std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").ok().as_deref(),
+            std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER")
+                .ok()
+                .as_deref(),
             Some("1")
         );
         assert_eq!(
-            std::env::var("WEBKIT_DISABLE_COMPOSITING_MODE").ok().as_deref(),
+            std::env::var("WEBKIT_DISABLE_COMPOSITING_MODE")
+                .ok()
+                .as_deref(),
             Some("1")
         );
 

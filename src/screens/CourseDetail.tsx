@@ -1,15 +1,28 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useTabs } from "../lib/tabs";
-import { api, type Course, type CourseClass, type FileItem, type Note } from "../lib/api";
+import {
+  api,
+  type Course,
+  type CourseClass,
+  type FileItem,
+  type Note,
+  type Sequence,
+  type SequenceItem,
+} from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { COURSE_ICONS, EmptyState, Loading, Modal, useToast, useConfirm } from "../components/ui";
+import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
+import { courseVisual } from "../lib/color";
+import { useAppearance } from "../lib/theme";
 import {
-  ArrowRightIcon,
   BookIcon,
-  ClockIcon,
+  CheckIcon,
+  ChevronDownIcon,
+
   FileIcon,
   FileKindIcon,
+  LayersIcon,
   PenIcon,
   PlusIcon,
   TrashIcon,
@@ -71,9 +84,28 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
   const [attachDocs, setAttachDocs] = useState<FileItem[]>([]);
   const [attachSelected, setAttachSelected] = useState<number[]>([]);
 
-  const refreshNotes = () => api.listNotes(courseId).then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
-  const refreshFiles = () => api.listFiles(courseId).then((f) => setFiles(Array.isArray(f) ? f : [])).catch(() => {});
-  const refreshClasses = () => api.listCourseClasses(courseId).then((c) => setCourseClasses(Array.isArray(c) ? c : [])).catch(() => {});
+  const { resolved } = useAppearance();
+
+  const refreshNotes = useCallback(
+    () => api.listNotes(courseId).then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {}),
+    [courseId]
+  );
+  const refreshFiles = useCallback(
+    () => api.listFiles(courseId).then((f) => setFiles(Array.isArray(f) ? f : [])).catch(() => {}),
+    [courseId]
+  );
+  const refreshClasses = useCallback(
+    () =>
+      api
+        .listCourseClasses(courseId)
+        .then((c) => setCourseClasses(Array.isArray(c) ? c : []))
+        .catch(() => {}),
+    [courseId]
+  );
+  const refreshAll = useCallback(() => {
+    refreshFiles();
+    refreshClasses();
+  }, [refreshFiles, refreshClasses]);
 
   useEffect(() => {
     setLoading(true);
@@ -247,7 +279,7 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
   if (loading) {
     return (
       <div className="py-10">
-        <div className="new-card">
+        <div className="eu-panel">
           <Loading label="Chargement du cours…" />
         </div>
       </div>
@@ -262,201 +294,246 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
     );
   }
 
+  const visual = courseVisual(course.color, resolved === "dark");
+  const CourseIcon =
+    COURSE_ICONS.find((i) => i.key === (course.emoji || "book"))?.Icon ?? BookIcon;
+
   return (
-    <div className="flex flex-col gap-6">
-      <button
-        onClick={() => tabs.open({ kind: "courses" })}
-        className="text-mute flex items-center gap-1.5 hover:text-primary transition-colors w-fit"
+    <>
+      <PageHeader
+        onBack={() => tabs.open({ kind: "courses" })}
+        backLabel={t.common?.courses || t.nav.courses}
+        icon={
+          <span
+            className="grid place-items-center w-8 h-8 rounded border"
+            style={{ background: visual.tint, borderColor: visual.border, color: visual.fg }}
+          >
+            <CourseIcon className="w-4 h-4" strokeWidth={1.8} />
+          </span>
+        }
+        title={course.name}
+        meta={
+          <>
+            <span>
+              {fmt(get("courseDetail.metaClasses", "{count} classes"), { count: courseClasses.length })}
+            </span>
+            <MetaDot />
+            <span>
+              {fmt(get("courseDetail.metaFiles", "{count} documents"), { count: files.length })}
+            </span>
+            <MetaDot />
+            <span>{fmt(get("courseDetail.metaNotes", "{count} notes"), { count: notes.length })}</span>
+            {course.description && (
+              <>
+                <MetaDot />
+                <span className="normal-case tracking-normal">{course.description}</span>
+              </>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <Segmented
+              value={course.matiere || ""}
+              onChange={(v) => void updateMatiere(v)}
+              label={get("courses.matiere", "Matière")}
+              options={[
+                { value: "", label: get("common.none", "Aucune") },
+                { value: "Mathématiques", label: "Maths" },
+                { value: "NSI", label: "NSI" },
+                { value: "Maths expertes", label: "Expertes" },
+              ]}
+            />
+            <button
+              onClick={async () => {
+                const ok = await confirmDlg.ask({
+                  title: fmt(t.courseDetail?.confirmDeleteCourse || 'Supprimer le cours "{name}" ?', {
+                    name: course.name,
+                  }),
+                  message: get(
+                    "courseDetail.confirmDeleteCourseBody",
+                    "Le casier, les notes et les séquences de ce cours seront supprimés."
+                  ),
+                  confirmLabel: get("common.delete", "Supprimer"),
+                  danger: true,
+                });
+                if (!ok) return;
+                await api.deleteCourse(courseId);
+                window.dispatchEvent(new CustomEvent("eu:course-changed"));
+                tabs.open({ kind: "courses" });
+                tabs.close(`course:${courseId}`);
+              }}
+              aria-label={get("common.delete", "Supprimer")}
+              title={fmt(get("courseDetail.deleteCourse", "Supprimer « {name} »"), { name: course.name })}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+            >
+              <TrashIcon className="w-4 h-4" />
+            </button>
+          </>
+        }
+      />
+
+      <SequencePane courseId={courseId} files={files} courseClasses={courseClasses} onRefresh={refreshAll} />
+
+      {/* Casier: documents shared by every class of this course. */}
+      <Panel
+        title={get("courseDetail.lockerTitle", "Casier du cours")}
+        icon={<FileIcon className="w-3.5 h-3.5" />}
+        action={
+          <button onClick={openAttachModal} className="eu-btn-quiet eu-btn-sm">
+            <PlusIcon className="w-3.5 h-3.5" />{" "}
+            {t.courseDetail?.importToLocker || "Attacher depuis Documents"}
+          </button>
+        }
       >
-        <ArrowRightIcon className="w-4 h-4 rotate-180" /> {t.common?.courses || t.nav.courses}
-      </button>
-
-      <header className="flex items-center gap-4">
-        <span
-          className="grid place-items-center w-10 h-10 rounded-none border border-[rgba(15,0,0,0.12)]"
-          style={{ background: `${course.color}22`, color: course.color }}
-        >
-          {(() => {
-            const found = COURSE_ICONS.find((i) => i.key === (course.emoji || "book"));
-            const IconComp = found ? found.Icon : BookIcon;
-            return <IconComp className="w-5 h-5" strokeWidth={1.8} />;
-          })()}
-        </span>
-        <div className="flex-1">
-          <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{course.name}</h1>
-          {course.description && <p className="text-mute text-sm mt-0.5">{course.description}</p>}
-        </div>
-        {/* Beautiful minimal theme selector for Pronote matiere (values match creation, no clutter text) */}
-        <div className="new-segment text-xs">
-          <button
-            onClick={() => updateMatiere("")}
-            className={`px-2 py-0.5 rounded transition-colors ${!course.matiere ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-          >
-            Aucune
-          </button>
-          <button
-            onClick={() => updateMatiere("Mathématiques")}
-            className={`px-2 py-0.5 rounded transition-colors ${course.matiere === "Mathématiques" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-          >
-            Mathématiques
-          </button>
-          <button
-            onClick={() => updateMatiere("NSI")}
-            className={`px-2 py-0.5 rounded transition-colors ${course.matiere === "NSI" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-          >
-            NSI
-          </button>
-          <button
-            onClick={() => updateMatiere("Maths expertes")}
-            className={`px-2 py-0.5 rounded transition-colors ${course.matiere === "Maths expertes" ? "bg-primary text-white" : "hover:bg-surface-container/60"}`}
-          >
-            Maths expertes
-          </button>
-        </div>
-        <button
-          onClick={async () => {
-            const ok = await confirmDlg.ask({
-              title: fmt(t.courseDetail?.confirmDeleteCourse || 'Supprimer le cours "{name}" ?', { name: course.name }),
-              message: fmt(t.courseDetail?.confirmDeleteCourse || 'Supprimer le cours "{name}" ?', { name: course.name }),
-              confirmLabel: get("common.delete", "Supprimer"),
-              danger: true,
-            });
-            if (!ok) return;
-            await api.deleteCourse(courseId);
-            tabs.open({ kind: "courses" });
-            tabs.close(`course:${courseId}`);
+        <FilesPane
+          files={files}
+          onChanged={() => {
+            refreshFiles();
+            refreshClasses(); // last_file may have been deleted
           }}
-          className="new-btn-ghost"
-        >
-          <TrashIcon className="w-4 h-4" />
-        </button>
-      </header>
+          onAttach={openAttachModal}
+        />
+      </Panel>
 
-      {/* Casier du cours : documents partagés pour ce cours (toutes classes) */}
-      <section className="terminal-card overflow-hidden">
-        <div className="terminal-header">
-          <div className="font-medium">Casier du cours</div>
-          <button onClick={openAttachModal} className="new-btn-ghost text-xs py-0.5">
-            <PlusIcon className="w-3.5 h-3.5" /> {t.courseDetail?.importToLocker || "Attacher depuis Documents"}
-          </button>
-        </div>
-        <div className="p-3">
-          <p className="text-[11px] text-mute mb-3">{t.courseDetail?.documentsHint || "Documents, PDF, tableaux du casier (copiés depuis Documents)."}</p>
-          <FilesPane
-            files={files}
-            onChanged={() => {
-              refreshFiles();
-              refreshClasses(); // last_file may have been deleted
-            }}
-          />
-        </div>
-      </section>
-
-      {/* Notes de cours — liste simple ; cliquer ouvre l'éditeur complet dans un onglet (comme Tableau blanc) */}
-      <section className="terminal-card overflow-hidden">
-        <div className="terminal-header flex items-center justify-between">
-          <div className="font-medium">{t.courseDetail?.courseNotesHeader || "Notes de cours"}</div>
+      {/* Course notes: clicking opens the full Markdown editor in a tab. */}
+      <Panel
+        title={t.courseDetail?.courseNotesHeader || "Notes de cours"}
+        icon={<PenIcon className="w-3.5 h-3.5" />}
+        action={
           <button
-            onClick={() => tabs.open({ kind: "note", title: "Nouvelle note", params: { isNew: true, courseId } })}
-            className="new-btn-ghost text-xs py-0.5"
+            onClick={() =>
+              tabs.open({
+                kind: "note",
+                title: t.common?.newNote || "Nouvelle note",
+                params: { isNew: true, courseId },
+              })
+            }
+            className="eu-btn-quiet eu-btn-sm"
           >
             <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newNote || "Nouvelle note"}
           </button>
-        </div>
-        <div className="p-3">
-          {notes.length === 0 ? (
+        }
+      >
+        {notes.length === 0 ? (
+          <EmptyState
+            icon={<PenIcon className="w-4 h-4" />}
+            title={t.courseDetail?.noNotesTitle || "Aucune note"}
+            hint={
+              t.courseDetail?.noNotesHint ||
+              "Une note s'ouvre dans un onglet, avec un éditeur Markdown, un aperçu et l'export PDF."
+            }
+            action={
+              <button
+                onClick={() =>
+                  tabs.open({
+                    kind: "note",
+                    title: t.common?.newNote || "Nouvelle note",
+                    params: { isNew: true, courseId },
+                  })
+                }
+                className="eu-btn-primary eu-btn-sm"
+              >
+                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newNote || "Nouvelle note"}
+              </button>
+            }
+          />
+        ) : (
+          <div className="eu-divide">
+            {notes.map((n) => (
+              <button
+                key={n.id}
+                onClick={() =>
+                  tabs.open({ kind: "note", title: n.title || "Note", params: { noteId: n.id } })
+                }
+                className="eu-row-hover w-full text-left"
+              >
+                <PenIcon className="w-4 h-4 text-ink-faint shrink-0" />
+                <span className="eu-t-body text-ink truncate flex-1">
+                  {n.title || t.courseDetail?.noTitle || "Sans titre"}
+                </span>
+                <span className="eu-t-label normal-case tracking-normal shrink-0">
+                  {relativeTime(n.updated_at)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {/* Classes attachées + système de progression + notes prof par classe */}
+      <Panel
+        title={t.courseDetail?.attachedClassesHeader || "Classes attachées"}
+        icon={<BookIcon className="w-3.5 h-3.5" />}
+      >
+        <div className="eu-panel-pad flex flex-col gap-4">
+          <div className="flex gap-2">
+            {availablePronoteClasses.length > 0 ? (
+              <select
+                className="eu-select flex-1"
+                value={selectedPronoteClass}
+                onChange={(e) => setSelectedPronoteClass(e.target.value)}
+                aria-label={t.courseDetail?.choosePronoteClass || "Choisir une classe"}
+              >
+                <option value="">{t.courseDetail?.choosePronoteClass || "— Choisir une classe —"}</option>
+                {availablePronoteClasses.map((c: any, i: number) => (
+                  <option key={i} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="eu-input flex-1"
+                placeholder={
+                  pronoteClasses.length > 0
+                    ? t.courseDetail?.allPronoteAttached || "Toutes les classes Pronote déjà attachées"
+                    : t.courseDetail?.classNamePlaceholder || "Nom Pronote exact"
+                }
+                value={newClassName}
+                onChange={(e) => setNewClassName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") attachClass();
+                }}
+                aria-label={t.courseDetail?.classNamePlaceholder || "Nom Pronote exact"}
+              />
+            )}
+            <button
+              className="eu-btn-primary eu-btn-sm"
+              onClick={attachClass}
+              disabled={availablePronoteClasses.length > 0 ? !selectedPronoteClass : !newClassName.trim()}
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              {t.courseDetail?.attach || "Attacher"}
+            </button>
+          </div>
+
+          {courseClasses.length === 0 ? (
             <EmptyState
-              icon={<PenIcon className="w-6 h-6" />}
-              title={t.courseDetail?.noNotesTitle || "Aucune note"}
-              hint={t.courseDetail?.noNotesHint || "Créez une note — elle s'ouvrira dans un onglet avec un éditeur Markdown complet (aperçu, barre d'outils, choix du cours ou général)."}
+              icon={<BookIcon className="w-4 h-4" />}
+              title={t.courseDetail?.noClassesAttachedTitle || "Aucune classe attachée"}
+              hint={
+                t.courseDetail?.noClassesAttachedHint ||
+                "Attachez une classe avec son nom Pronote exact : Euclide suit alors sa progression et affiche son cahier de textes."
+              }
             />
           ) : (
-            <div className="flex flex-col gap-1">
-              {notes.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => tabs.open({ kind: "note", title: n.title || "Note", params: { noteId: n.id } })}
-                  className="text-left px-3 py-2 rounded hover:bg-surface-container/60 flex items-center justify-between group"
-                >
-                  <span className="text-sm font-medium truncate text-primary">{n.title || (t.courseDetail?.noTitle || "Sans titre")}</span>
-                  <span className="text-[11px] text-mute ml-2 shrink-0">{relativeTime(n.updated_at)}</span>
-                </button>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {courseClasses.map((cc) => (
+                <ClassCard
+                  key={cc.id}
+                  cc={cc}
+                  files={files}
+                  courseId={courseId}
+                  courseMatiere={course?.matiere || ""}
+                  onRefresh={refreshAll}
+                  onDetach={detachClass}
+                />
               ))}
             </div>
           )}
         </div>
-      </section>
-
-      {/* Classes attachées + système de progression + notes prof par classe */}
-      <section className="terminal-card overflow-hidden">
-        <div className="terminal-header">
-          <div className="font-medium">{t.courseDetail?.attachedClassesHeader || "Classes attachées"}</div>
-        </div>
-        <div className="p-4">
-        <div className="flex gap-2 mb-5">
-          {availablePronoteClasses.length > 0 ? (
-            <select
-              className="new-input flex-1"
-              value={selectedPronoteClass}
-              onChange={(e) => setSelectedPronoteClass(e.target.value)}
-            >
-              <option value="">{t.courseDetail?.choosePronoteClass || "— Choisir une classe —"}</option>
-              {availablePronoteClasses.map((c: any, i: number) => (
-                <option key={i} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className="new-input flex-1"
-              placeholder={
-                pronoteClasses.length > 0
-                  ? (t.courseDetail?.allPronoteAttached || "Toutes les classes Pronote déjà attachées")
-                  : (t.courseDetail?.classNamePlaceholder || "Nom Pronote exact")
-              }
-              value={newClassName}
-              onChange={(e) => setNewClassName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") attachClass();
-              }}
-            />
-          )}
-          <button
-            className="new-btn-primary bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={attachClass}
-            disabled={availablePronoteClasses.length > 0 ? !selectedPronoteClass : !newClassName.trim()}
-          >
-            {t.courseDetail?.attach || "Attacher"}
-          </button>
-        </div>
-
-        {courseClasses.length === 0 ? (
-          <div className="py-3">
-            <EmptyState
-              icon={<BookIcon className="w-6 h-6" />}
-              title={t.courseDetail?.noClassesAttachedTitle || "Aucune classe attachée"}
-              hint={t.courseDetail?.noClassesAttachedHint || "Ajoutez une classe (nom Pronote exact) pour le suivi de progression."}
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {courseClasses.map((cc) => (
-              <ClassCard
-                key={cc.id}
-                cc={cc}
-                files={files}
-                courseId={courseId}
-                courseMatiere={course?.matiere || ""}
-                onRefresh={() => {
-                  refreshClasses();
-                  refreshFiles();
-                }}
-                onDetach={detachClass}
-              />
-            ))}
-          </div>
-        )}
-        </div>
-      </section>
+      </Panel>
 
       {/* Modal to select+attach existing global documents instead of direct upload (fixes update/refresh issues from cour page) */}
       <Modal
@@ -466,19 +543,19 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
         width="max-w-xl"
       >
         <div className="space-y-3">
-          <p className="text-sm text-mute">
+          <p className="text-sm text-ink-muted">
             {t.courseDetail?.attachDocsHint || "Sélectionnez des fichiers de la bibliothèque Documents pour les copier dans le casier de ce cours."}
           </p>
           {attachDocs.length === 0 ? (
-            <p className="text-sm text-mute">Aucun document dans la bibliothèque globale.</p>
+            <p className="text-sm text-ink-muted">Aucun document dans la bibliothèque globale.</p>
           ) : (
-            <div className="max-h-72 overflow-auto border border-hairline rounded divide-y divide-hairline/60">
+            <div className="max-h-72 overflow-auto border border-line rounded divide-y divide-line/60">
               {attachDocs.map((d) => {
                 const isSel = attachSelected.includes(d.id);
                 return (
                   <div
                     key={d.id}
-                    className={`flex items-center gap-3 p-2 text-sm hover:bg-surface-soft cursor-pointer ${isSel ? 'bg-surface-container' : ''}`}
+                    className={`flex items-center gap-3 p-2 text-sm hover:bg-panel-alt cursor-pointer ${isSel ? 'bg-panel-alt' : ''}`}
                     onClick={() => toggleAttachDoc(d.id)}
                   >
                     <input
@@ -488,13 +565,13 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
                         e.stopPropagation();
                         toggleAttachDoc(d.id);
                       }}
-                      className="w-4 h-4 accent-primary"
+                      className="w-4 h-4 accent-ink"
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <FileKindIcon kind={d.kind} className="w-4 h-4 text-mute shrink-0" />
+                    <FileKindIcon kind={d.kind} className="w-4 h-4 text-ink-muted shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="truncate text-primary">{d.name}</div>
-                      <div className="text-[10px] text-mute">
+                      <div className="truncate text-ink">{d.name}</div>
+                      <div className="text-[10px] text-ink-muted">
                         {fileKindLabel(d.kind)} · {humanSize(d.size)} · {relativeTime(d.added_at)}
                       </div>
                     </div>
@@ -504,33 +581,36 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setShowAttach(false)} className="new-btn-ghost">
+            <button onClick={() => setShowAttach(false)} className="eu-btn-ghost">
               Annuler
             </button>
             <button
               onClick={doAttachDocs}
               disabled={attachSelected.length === 0}
-              className="new-btn-primary"
+              className="eu-btn-primary"
             >
               {attachSelected.length > 0 ? `Attacher ${attachSelected.length} document(s)` : "Attacher des documents"}
             </button>
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }
 
 function FilesPane({
   files,
   onChanged,
+  onAttach,
 }: {
   files: FileItem[];
   onChanged: () => void;
+  onAttach: () => void;
 }) {
   const tabs = useTabs();
   const toast = useToast();
   const confirmDlg = useConfirm();
+
   const openFile = (f: FileItem) => {
     api.logEvent("file_open", f.name, f.course_id);
     if (f.kind === "board") tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
@@ -538,73 +618,425 @@ function FilesPane({
       tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
     else api.openFile(f.id);
   };
+
+  if (files.length === 0) {
+    return (
+      <EmptyState
+        icon={<FileIcon className="w-4 h-4" />}
+        title={t.courseDetail?.noFilesTitle || "Aucun document dans ce casier"}
+        hint={
+          t.courseDetail?.noFilesHint ||
+          "Attachez des documents de la bibliothèque, ou déposez-les directement dans la fenêtre."
+        }
+        action={
+          <button onClick={onAttach} className="eu-btn-primary eu-btn-sm">
+            <PlusIcon className="w-3.5 h-3.5" />
+            {t.courseDetail?.importToLocker || "Attacher un document"}
+          </button>
+        }
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-2">
-      {files.length === 0 ? (
-        <div className="new-card min-h-[180px] flex items-center justify-center">
-          <EmptyState
-            icon={<FileIcon className="w-8 h-8" />}
-            title={t.courseDetail?.noFilesTitle || "Aucun fichier"}
-            hint={t.courseDetail?.noFilesHint || "Attachez des documents de la bibliothèque."}
-          />
+    <div className="eu-divide">
+      {files.map((f) => (
+        <div key={f.id} className="eu-row-hover group">
+          <button
+            onClick={() => openFile(f)}
+            className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+            title={f.name}
+          >
+            <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
+            <span className="eu-t-body text-ink truncate">{f.name}</span>
+          </button>
+          <span className="eu-t-label normal-case tracking-normal shrink-0 hidden sm:block">
+            {fileKindLabel(f.kind)} · {humanSize(f.size)} · {relativeTime(f.added_at)}
+          </span>
+          <button
+            onClick={async () => {
+              const ok = await confirmDlg.ask({
+                title: get("common.delete", "Supprimer"),
+                message: fmt(get("courseDetail.confirmDeleteFile", "Supprimer « {name} » ?"), {
+                  name: f.name,
+                }),
+                confirmLabel: get("common.delete", "Supprimer"),
+                danger: true,
+              });
+              if (!ok) return;
+              try {
+                await api.deleteFile(f.id);
+                tabs.tabs
+                  .filter((tab) => tab.params.fileId === f.id)
+                  .forEach((tab) => tabs.close(tab.id));
+                window.dispatchEvent(new CustomEvent("eu:library-changed"));
+                onChanged();
+              } catch (err: any) {
+                toast(err?.message || get("messages.genericError", "Erreur"), "error");
+              }
+            }}
+            aria-label={`${get("common.delete", "Supprimer")} — ${f.name}`}
+            title={get("common.delete", "Supprimer")}
+            className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+          </button>
         </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Progression: sequences (chapters) -> items (steps) -> optional document.
+//
+// This answers a question the previous model could not: "where is 3C in the
+// chapter?". Before, per-class progress was only "the last document opened",
+// which says nothing about what remains to be done.
+// ---------------------------------------------------------------------------
+
+function SequencePane({
+  courseId,
+  files,
+  courseClasses,
+  onRefresh,
+}: {
+  courseId: number;
+  files: FileItem[];
+  courseClasses: CourseClass[];
+  onRefresh: () => void;
+}) {
+  const toast = useToast();
+  const confirmDlg = useConfirm();
+  const tabs = useTabs();
+
+  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [items, setItems] = useState<SequenceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newSequence, setNewSequence] = useState("");
+  const [addingTo, setAddingTo] = useState<number | null>(null);
+  const [newItem, setNewItem] = useState("");
+  const [newItemFile, setNewItemFile] = useState<number | "">("");
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+
+  const load = useCallback(async () => {
+    try {
+      const [s, i] = await Promise.all([
+        api.listSequences(courseId),
+        api.listSequenceItems(courseId),
+      ]);
+      setSequences(Array.isArray(s) ? s : []);
+      setItems(Array.isArray(i) ? i : []);
+    } catch {
+      setSequences([]);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const reload = async () => {
+    await load();
+    onRefresh();
+  };
+
+  const addSequence = async () => {
+    const title = newSequence.trim();
+    if (!title) return;
+    try {
+      await api.createSequence(courseId, title);
+      setNewSequence("");
+      await reload();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
+  };
+
+  const addItem = async (sequenceId: number) => {
+    const title = newItem.trim();
+    if (!title) return;
+    try {
+      await api.createSequenceItem(sequenceId, title, newItemFile === "" ? null : Number(newItemFile));
+      setNewItem("");
+      setNewItemFile("");
+      await reload();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
+  };
+
+  /** Which classes have stopped at a given step. */
+  const classesAt = (itemId: number) => courseClasses.filter((cc) => cc.last_item_id === itemId);
+
+  const markClassHere = async (className: string, itemId: number | null) => {
+    try {
+      await api.setCourseClassItem(courseId, className, itemId);
+      await reload();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
+  };
+
+  const openItemFile = (item: SequenceItem) => {
+    if (item.file_id == null) return;
+    const name = item.file_name || get("common.document", "Document");
+    api.logEvent("file_open", name, courseId);
+    if (item.file_kind === "board") {
+      tabs.open({ kind: "whiteboard", title: name, params: { fileId: item.file_id } });
+    } else if (item.file_kind === "pdf" || item.file_kind === "image") {
+      tabs.open({ kind: "pdf", title: name, params: { fileId: item.file_id, fileName: name } });
+    } else {
+      api.openFile(item.file_id);
+    }
+  };
+
+  return (
+    <Panel
+      title={get("sequences.title", "Progression")}
+      icon={<LayersIcon className="w-3.5 h-3.5" />}
+      action={
+        <div className="flex items-center gap-1.5">
+          <input
+            className="eu-input h-7 w-[190px] text-[12px]"
+            placeholder={get("sequences.newPlaceholder", "Nouvelle séquence…")}
+            value={newSequence}
+            onChange={(e) => setNewSequence(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void addSequence();
+            }}
+            aria-label={get("sequences.newPlaceholder", "Nouvelle séquence")}
+          />
+          <button
+            className="eu-btn-ghost eu-btn-sm"
+            onClick={() => void addSequence()}
+            disabled={!newSequence.trim()}
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            {get("sequences.add", "Ajouter")}
+          </button>
+        </div>
+      }
+    >
+      {loading ? (
+        <Loading label={get("common.loading", "Chargement…")} size="small" />
+      ) : sequences.length === 0 ? (
+        <EmptyState
+          icon={<LayersIcon className="w-4 h-4" />}
+          title={get("sequences.emptyTitle", "Aucune séquence")}
+          hint={get(
+            "sequences.emptyHint",
+            "Découpez le cours en séquences (chapitres) puis en étapes : activité, cours, exercices, évaluation. Chaque classe peut ensuite être positionnée sur une étape."
+          )}
+        />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {files.map((f) => (
-            <div key={f.id} className="new-card p-4 flex items-center gap-3 group">
-              <button
-                onClick={() => openFile(f)}
-                className="flex items-center gap-3 flex-1 min-w-0 text-left"
-              >
-                <FileIcon className="w-5 h-5 text-mute shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-primary truncate">{f.name}</p>
-                  <p className="text-[11px] text-mute">
-                    {fileKindLabel(f.kind)} · {humanSize(f.size)} · {relativeTime(f.added_at)}
-                  </p>
+        <div className="eu-divide">
+          {sequences.map((seq, seqIndex) => {
+            const seqItems = items.filter((i) => i.sequence_id === seq.id);
+            const isCollapsed = !!collapsed[seq.id];
+            return (
+              <div key={seq.id}>
+                <div className="eu-row group bg-panel-alt/60">
+                  <button
+                    onClick={() => setCollapsed((c) => ({ ...c, [seq.id]: !c[seq.id] }))}
+                    aria-expanded={!isCollapsed}
+                    aria-label={seq.title}
+                    className="eu-btn-quiet eu-btn-icon eu-btn-sm shrink-0"
+                  >
+                    <ChevronDownIcon
+                      className={`w-3.5 h-3.5 transition-transform duration-fast ${
+                        isCollapsed ? "-rotate-90" : ""
+                      }`}
+                    />
+                  </button>
+                  <span className="eu-t-body font-medium text-ink truncate flex-1">{seq.title}</span>
+                  <span className="eu-chip shrink-0">
+                    {fmt(get("sequences.stepCount", "{count} étapes"), { count: seqItems.length })}
+                  </span>
+                  <div className="eu-row-actions flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => void api.moveSequence(courseId, seq.id, -1).then(reload)}
+                      disabled={seqIndex === 0}
+                      aria-label={get("sequences.moveUp", "Monter")}
+                      title={get("sequences.moveUp", "Monter")}
+                      className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                    >
+                      <ChevronDownIcon className="w-3.5 h-3.5 rotate-180" />
+                    </button>
+                    <button
+                      onClick={() => void api.moveSequence(courseId, seq.id, 1).then(reload)}
+                      disabled={seqIndex === sequences.length - 1}
+                      aria-label={get("sequences.moveDown", "Descendre")}
+                      title={get("sequences.moveDown", "Descendre")}
+                      className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                    >
+                      <ChevronDownIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const ok = await confirmDlg.ask({
+                          title: get("sequences.deleteTitle", "Supprimer la séquence"),
+                          message: fmt(
+                            get("sequences.deleteMessage", "Supprimer « {name} » et ses étapes ?"),
+                            { name: seq.title }
+                          ),
+                          confirmLabel: get("common.delete", "Supprimer"),
+                          danger: true,
+                        });
+                        if (!ok) return;
+                        await api.deleteSequence(seq.id);
+                        await reload();
+                      }}
+                      aria-label={`${get("common.delete", "Supprimer")} — ${seq.title}`}
+                      title={get("common.delete", "Supprimer")}
+                      className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </button>
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const ok = await confirmDlg.ask({
-                    title: get("common.delete", "Supprimer"),
-                    message: `Supprimer le fichier « ${f.name} » ?`,
-                    confirmLabel: get("common.delete", "Supprimer"),
-                    danger: true,
-                  });
-                  if (!ok) return;
-                  try {
-                    await api.deleteFile(f.id);
-                    tabs.tabs
-                      .filter((tab) => tab.params.fileId === f.id)
-                      .forEach((tab) => tabs.close(tab.id));
-                    window.dispatchEvent(new CustomEvent("eu:library-changed"));
-                    onChanged();
-                  } catch (err: any) {
-                    toast(err?.message || "Erreur lors de la suppression", "error");
-                  }
-                }}
-                className="opacity-0 group-hover:opacity-100 text-mute hover:text-red-400 transition-all duration-150"
-                title={`Supprimer ${f.name}`}
-              >
-                <TrashIcon className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openFile(f);
-                }}
-                className="opacity-0 group-hover:opacity-100 text-[10px] px-1.5 py-0.5 rounded bg-tui-accent hover:brightness-90 text-white transition"
-                title="Ouvrir le document"
-              >
-                →
-              </button>
-            </div>
-          ))}
+
+                {!isCollapsed && (
+                  <div className="pl-8">
+                    {seqItems.map((item, itemIndex) => {
+                      const here = classesAt(item.id);
+                      return (
+                        <div key={item.id} className="eu-row group border-t border-line">
+                          <span className="eu-t-num text-[11px] text-ink-faint w-5 shrink-0">
+                            {itemIndex + 1}
+                          </span>
+                          <span className="eu-t-body text-ink truncate flex-1">{item.title}</span>
+                          {item.file_id != null && (
+                            <button
+                              onClick={() => openItemFile(item)}
+                              className="eu-chip hover:text-ink shrink-0 max-w-[22ch]"
+                              title={item.file_name || ""}
+                            >
+                              <FileKindIcon kind={item.file_kind || "file"} className="w-3 h-3" />
+                              <span className="truncate">{item.file_name}</span>
+                            </button>
+                          )}
+                          {here.map((cc) => (
+                            <span key={cc.id} className="eu-chip-accent shrink-0">
+                              <CheckIcon className="w-3 h-3" />
+                              {cc.class_name}
+                            </span>
+                          ))}
+                          <div className="eu-row-actions flex items-center gap-0.5 shrink-0">
+                            {courseClasses.length > 0 && (
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) void markClassHere(e.target.value, item.id);
+                                }}
+                                className="eu-select h-7 text-[11px] w-[104px]"
+                                aria-label={get("sequences.markClass", "Marquer une classe ici")}
+                                title={get("sequences.markClass", "Marquer une classe ici")}
+                              >
+                                <option value="">{get("sequences.markClassShort", "Classe ici…")}</option>
+                                {courseClasses.map((cc) => (
+                                  <option key={cc.id} value={cc.class_name}>
+                                    {cc.class_name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            <button
+                              onClick={() => void api.moveSequenceItem(seq.id, item.id, -1).then(reload)}
+                              disabled={itemIndex === 0}
+                              aria-label={get("sequences.moveUp", "Monter")}
+                              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                            >
+                              <ChevronDownIcon className="w-3.5 h-3.5 rotate-180" />
+                            </button>
+                            <button
+                              onClick={() => void api.moveSequenceItem(seq.id, item.id, 1).then(reload)}
+                              disabled={itemIndex === seqItems.length - 1}
+                              aria-label={get("sequences.moveDown", "Descendre")}
+                              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                            >
+                              <ChevronDownIcon className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                await api.deleteSequenceItem(item.id);
+                                await reload();
+                              }}
+                              aria-label={`${get("common.delete", "Supprimer")} — ${item.title}`}
+                              title={get("common.delete", "Supprimer")}
+                              className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+                            >
+                              <TrashIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {addingTo === seq.id ? (
+                      <div className="eu-row border-t border-line gap-2">
+                        <input
+                          autoFocus
+                          className="eu-input flex-1"
+                          placeholder={get("sequences.stepPlaceholder", "Titre de l'étape…")}
+                          value={newItem}
+                          onChange={(e) => setNewItem(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void addItem(seq.id);
+                            if (e.key === "Escape") setAddingTo(null);
+                          }}
+                          aria-label={get("sequences.stepPlaceholder", "Titre de l'étape")}
+                        />
+                        <select
+                          className="eu-select w-[170px]"
+                          value={newItemFile}
+                          onChange={(e) =>
+                            setNewItemFile(e.target.value === "" ? "" : Number(e.target.value))
+                          }
+                          aria-label={get("sequences.stepFile", "Document lié")}
+                        >
+                          <option value="">{get("sequences.noFile", "— Sans document —")}</option>
+                          {files.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="eu-btn-primary eu-btn-sm"
+                          onClick={() => void addItem(seq.id)}
+                          disabled={!newItem.trim()}
+                        >
+                          {get("common.add", "Ajouter")}
+                        </button>
+                        <button className="eu-btn-quiet eu-btn-sm" onClick={() => setAddingTo(null)}>
+                          {get("common.cancel", "Annuler")}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setAddingTo(seq.id);
+                          setNewItem("");
+                          setNewItemFile("");
+                        }}
+                        className="eu-row-hover w-full text-left border-t border-line text-ink-muted"
+                      >
+                        <PlusIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="eu-t-meta">{get("sequences.addStep", "Ajouter une étape")}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -664,100 +1096,106 @@ function ClassCard({
   };
 
   return (
-    <div className="new-card p-5 flex flex-col gap-5">
-      {/* Header: class indicator + name + subtle meta + trash */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)] flex items-center justify-center font-semibold text-primary tracking-tight ${
-            cc.class_name.length > 2 ? "text-[11px]" : "text-sm"
-          }`}>
+    <div className="eu-panel-alt p-3.5 flex flex-col gap-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line bg-panel font-mono text-[12px] font-semibold text-ink">
             {cc.class_name.slice(0, 3)}
-          </div>
-          <div>
-            <div className="font-semibold text-primary text-lg leading-none">{cc.class_name}</div>
-            <div className="text-[11px] text-mute flex items-center gap-1 mt-1">
-              <ClockIcon className="w-3.5 h-3.5" />
-              Progression {cc.progress_updated_at ? "• " + relativeTime(cc.progress_updated_at) : "—"}
-            </div>
+          </span>
+          <div className="min-w-0">
+            <p className="eu-t-section text-ink truncate">{cc.class_name}</p>
+            <p className="eu-t-label normal-case tracking-normal">
+              {cc.progress_updated_at
+                ? fmt(get("courseDetail.updated", "mise à jour {when}"), {
+                    when: relativeTime(cc.progress_updated_at),
+                  })
+                : "—"}
+            </p>
           </div>
         </div>
-        <button 
-          onClick={() => onDetach(cc)} 
-          className="text-mute hover:text-red-400 p-1 -mr-1 -mt-1 rounded hover:bg-surface-container/50 transition-colors" 
-          title="Détacher cette classe"
+        <button
+          onClick={() => onDetach(cc)}
+          aria-label={fmt(get("courseDetail.detach", "Détacher {name}"), { name: cc.class_name })}
+          title={get("courseDetail.detachTitle", "Détacher cette classe")}
+          className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger shrink-0"
         >
-          <TrashIcon className="w-4 h-4" />
+          <TrashIcon className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Progress: clean, breathing, no redundant "Dernier" line */}
-      <div>
-        <div className="flex items-center gap-2 text-xs font-medium text-mute mb-1.5">
-          <ClockIcon className="w-4 h-4" />
-          {t.courseDetail?.whereWeWere || "Où on en était :"}
+      {/* Progression: which step of the course, and which document. */}
+      {cc.last_item_title && (
+        <div className="flex items-center gap-2 min-w-0">
+          <LayersIcon className="w-3.5 h-3.5 text-ink-faint shrink-0" />
+          <span className="eu-t-meta truncate">
+            {cc.last_sequence_title ? `${cc.last_sequence_title} — ` : ""}
+            <span className="text-ink">{cc.last_item_title}</span>
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <p className="eu-t-label">{t.courseDetail?.whereWeWere || "Où on en était"}</p>
+        <div className="flex items-center gap-1.5">
           <select
-            className="new-input text-sm flex-1"
+            className="eu-select flex-1 min-w-0"
             value={cc.last_file_id ?? ""}
             onChange={(e) => setProgress(e.target.value ? Number(e.target.value) : null)}
+            aria-label={t.courseDetail?.whereWeWere || "Où on en était"}
           >
-            <option value="">— Aucun document —</option>
+            <option value="">{get("courseDetail.noDocument", "— Aucun document —")}</option>
             {files.map((f) => (
               <option key={f.id} value={f.id}>
-                {fileKindLabel(f.kind)} {f.name}
+                {fileKindLabel(f.kind)} · {f.name}
               </option>
             ))}
           </select>
-          {cc.last_file_id && (
-            <button onClick={reopen} className="new-btn-primary bg-primary text-white text-sm whitespace-nowrap px-3">
+          {cc.last_file_id != null && (
+            <button onClick={reopen} className="eu-btn-primary eu-btn-sm shrink-0">
               {t.courseDetail?.reopen || "Reprendre"}
             </button>
           )}
-          {cc.last_file_id && (
-            <button onClick={() => setProgress(null)} className="new-btn-ghost text-sm px-2">
-              Effacer
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Notes: cleaner, no auto-save text, more breathing */}
-      <div>
-        <div className="flex items-center justify-between text-xs font-medium text-mute mb-1.5">
-          <span className="flex items-center gap-2">
-            <PenIcon className="w-4 h-4" />
-            Notes professeur (cette classe)
-          </span>
-          {savingNotes && <span className="text-[10px] text-mute">enregistrement…</span>}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <p className="eu-t-label">{get("courseDetail.classNotes", "Notes pour cette classe")}</p>
+          {savingNotes && (
+            <span className="eu-t-label normal-case tracking-normal">
+              {get("common.saving", "enregistrement…")}
+            </span>
+          )}
         </div>
         <textarea
-          className="new-input text-sm min-h-[68px] resize-y"
-          placeholder={t.courseDetail?.classNotesPlaceholder || "Ex : fini exo p.47, distribuer DM pour le 12, revoir les bases sur les fonctions..."}
+          className="eu-textarea min-h-[60px] text-[13px]"
+          placeholder={
+            t.courseDetail?.classNotesPlaceholder ||
+            "Ex : fini l'exercice p.47, distribuer le DM pour le 12, revoir les fonctions."
+          }
           value={notesDraft}
           onChange={(e) => setNotesDraft(e.target.value)}
           onBlur={saveNotes}
+          aria-label={get("courseDetail.classNotes", "Notes pour cette classe")}
         />
       </div>
 
-      {/* Action: subtle, icon + short text */}
       {courseMatiere && (
         <button
           onClick={() => {
             tabs.open({
               kind: "class-content",
-              title: `Contenu ${cc.class_name} — ${courseMatiere}`,
+              title: fmt(get("courseDetail.contentTab", "Contenu {name}"), { name: cc.class_name }),
               params: { courseId, className: cc.class_name, matiere: courseMatiere },
             });
           }}
-          className="new-btn-ghost text-sm w-full justify-center flex items-center gap-2 text-mute hover:text-primary"
-          title="Afficher le contenu Pronote (cahier de textes + documents)"
+          className="eu-btn-ghost eu-btn-sm w-full"
+          title={get("courseDetail.showPronoteContentsTitle", "Cahier de textes et documents Pronote")}
         >
-          <BookIcon className="w-4 h-4" />
+          <BookIcon className="w-3.5 h-3.5" />
           {t.courseDetail?.showPronoteContents || "Contenu Pronote"}
         </button>
       )}
     </div>
   );
 }
-
