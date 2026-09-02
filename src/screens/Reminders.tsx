@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import { api, type Reminder } from "../lib/api";
 import { t, get } from "../lib/i18n";
-import { useToast } from "../components/ui";
+import { useToast, useConfirm, Loading } from "../components/ui";
 import { BellIcon, CheckIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
 import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
 
@@ -40,6 +40,7 @@ const MemoReminderRow = memo(function MemoReminderRow({ r, onToggle, onDelete, d
 
 export default function Reminders() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "done">("pending");
   const [search, setSearch] = useState("");
@@ -49,8 +50,8 @@ export default function Reminders() {
   const [newTitle, setNewTitle] = useState("");
   const [newDue, setNewDue] = useState("");
 
-  const refresh = async () => {
-    setLoading(true);
+  const refresh = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const list = await api.listReminders();
       setReminders(Array.isArray(list) ? list : []);
@@ -62,7 +63,7 @@ export default function Reminders() {
 
   useEffect(() => {
     refresh();
-    const onChange = () => refresh();
+    const onChange = () => refresh({ silent: true });
     window.addEventListener("eu:reminders-changed", onChange);
     return () => window.removeEventListener("eu:reminders-changed", onChange);
   }, []);
@@ -96,34 +97,50 @@ export default function Reminders() {
 
   const toggle = useCallback(async (r: Reminder) => {
     const markingDone = !r.done;
-    await api.toggleReminder(r.id, markingDone);
-    if (markingDone) {
-      api.logEvent("reminder_done", r.title, null);
-      const cheers: string[] = (t.dashboard?.cheers as string[] | undefined)?.length
-        ? (t.dashboard?.cheers as string[])
-        : ["Bien joué !", "Fait !", "Nickel !"];
-      toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
+    setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: markingDone } : x)));
+    try {
+      await api.toggleReminder(r.id, markingDone);
+      if (markingDone) {
+        api.logEvent("reminder_done", r.title, null);
+        const cheers: string[] = (t.dashboard?.cheers as string[] | undefined)?.length
+          ? (t.dashboard?.cheers as string[])
+          : ["Bien joué !", "Fait !", "Nickel !"];
+        toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
+      }
+      window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
+    } catch {
+      setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: !markingDone } : x)));
+      toast(get("messages.genericError", "Erreur"), "error");
     }
-    window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-    refresh();
-  }, [refresh, setReminders, toast]);
+  }, [toast]);
 
   const deleteOne = useCallback(async (id: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!confirm(t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?")) return;
+    const ok = await confirm.ask({
+      title: t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?",
+      message: t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?",
+      confirmLabel: get("common.delete", "Supprimer"),
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.deleteReminder(id);
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-      refresh();
     } catch {
       toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
     }
-  }, [refresh, toast]);
+  }, [toast, confirm]);
 
   const clearDone = async () => {
     const done = reminders.filter((r) => r.done);
     if (done.length === 0) return;
-    if (!confirm(`Supprimer les ${done.length} rappels terminés ?`)) return;
+    const ok = await confirm.ask({
+      title: "Effacer les terminés",
+      message: `Supprimer les ${done.length} rappels terminés ?`,
+      confirmLabel: get("common.delete", "Supprimer"),
+      danger: true,
+    });
+    if (!ok) return;
     for (const r of done) {
       try {
         await api.deleteReminder(r.id);
@@ -242,7 +259,7 @@ export default function Reminders() {
 
       {/* List */}
       {loading ? (
-        <div className="new-card p-8 text-center text-mute">Chargement…</div>
+        <div className="new-card p-8"><Loading label={get("common.loading", "Chargement…")} /></div>
       ) : filtered.length === 0 ? (
         <div className="new-card p-8 text-center">
           <div className="text-mute/70 mb-2"><BellIcon className="w-8 h-8 mx-auto" /></div>

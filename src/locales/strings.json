@@ -89,6 +89,10 @@
     "keepAwake": "Veille écran",
     "keepAwakeOn": "Écran allumé",
     "keepAwakeOff": "Veille normale",
+    "timerTitle": "Minuteur de classe",
+    "timerHint": "Compte à rebours visible dans la barre d'onglets.",
+    "unsavedTitle": "Script non enregistré",
+    "unsavedSwitch": "Les modifications en cours seront perdues. Continuer ?",
     "pythonDemos": "Python",
     "quickLinks": "Liens",
     "noScripts": "Aucun script.",
@@ -134,7 +138,8 @@
     "nothingHint": "Importez des fichiers ou créez des notes.",
     "noteFallbackTitle": "Note",
     "toastImported": "{count} importé(s)",
-    "toastRenamed": "Renommé \"{name}\""
+    "toastRenamed": "Renommé \"{name}\"",
+    "toastDeleted": "Supprimé"
   },
 
   "whiteboard": {
@@ -157,6 +162,7 @@
     "resetZoom": "Reset zoom",
     "undo": "Annuler",
     "clearAll": "Effacer",
+    "clearConfirm": "Effacer tout le tableau ?",
     "saveTooltip": "Enregistrer",
     "saveCleanTooltip": "Enregistrer",
     "exportPng": "PNG",
@@ -234,6 +240,7 @@
     "toastSyncCount": "{count} cours",
     "toastConnectFailed": "Échec connexion",
     "toastSyncFail": "Sync impossible",
+    "toastSyncing": "Synchronisation…",
     "toastMissingDirect": "URL + ident + mdp requis",
     "scheduleTitle": "Emploi du temps",
     "addEntry": "Ajouter",
@@ -281,6 +288,8 @@
   "messages": {
     "genericError": "Erreur",
     "imported": "{count} importé(s)",
+    "importing": "Import…",
+    "indexing": "Indexation…",
     "importError": "Import impossible (sélection annulée ?)"
   },
 
@@ -331,7 +340,9 @@
     "titleRequired": "Le titre est requis",
     "loadError": "Erreur de chargement",
     "saveError": "Erreur lors de l'enregistrement",
-    "deleteConfirm": "Supprimer cette note ?"
+    "deleteConfirm": "Supprimer cette note ?",
+    "exportPdf": "Exporter en PDF",
+    "exported": "Exporté : {name}"
   },
 
   "pdf": {
@@ -356,7 +367,8 @@
     "versionLoadError": "Erreur chargement de la version",
     "color": "Couleur {c}",
     "activeColor": "Couleur active : {c}",
-    "thumbnailsLoading": "Loading pages…",
+    "thumbnailsLoading": "Chargement des pages…",
+    "noVersionsYet": "Aucune version — enregistrez pour créer",
     "original": "Original"
   },
 
@@ -422,6 +434,18 @@
   },
 
   "shortcuts": {
-    "tip": "Ouvrez la palette (⌘K) et tapez."
+    "tip": "Ouvrez la palette ({mod}K) et tapez."
+  },
+
+  "confirm": {
+    "unsavedTitle": "Modifications non enregistrées",
+    "unsavedMessage": "Enregistrer avant de fermer cet onglet ?",
+    "save": "Enregistrer",
+    "discard": "Ne pas enregistrer",
+    "cancel": "Annuler"
+  },
+
+  "timer": {
+    "done": "Minuteur terminé"
   }
 }

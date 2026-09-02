@@ -764,6 +764,20 @@ pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
         .query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
         .optional()
         .map_err(e)?;
+    let versions_key = format!("file_versions_{id}");
+    let annot_key = format!("pdf_annot_{id}");
+    if let Some(vstr) = get_setting_raw(&conn, &versions_key) {
+        if let Ok(versions) = serde_json::from_str::<Vec<Value>>(&vstr) {
+            let vdir = crate::paths::documents_dir().join(".versions");
+            for v in versions {
+                if let Some(name) = v.get("backup_name").and_then(|x| x.as_str()) {
+                    let _ = fs::remove_file(vdir.join(name));
+                }
+            }
+        }
+    }
+    let _ = conn.execute("DELETE FROM settings WHERE key=?1", [&versions_key]);
+    let _ = conn.execute("DELETE FROM settings WHERE key=?1", [&annot_key]);
     conn.execute("DELETE FROM files WHERE id=?1", [id]).map_err(e)?;
     conn.execute("DELETE FROM doc_index WHERE file_id=?1", [id]).map_err(e)?;
     if let Some(rel) = rel {
@@ -1136,6 +1150,32 @@ pub async fn reindex_documents(app: AppHandle, state: State<'_, Db>) -> R<i64> {
             .map_err(e)?;
         let rows = stmt
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .map_err(e)?;
+        rows.collect::<Result<_, _>>().map_err(e)?
+    };
+    let count = pdfs.len() as i64;
+    for (id, name, rel) in pdfs {
+        index_pdf(&app, &state, id, &name, &abs_path(&rel)).await;
+    }
+    Ok(count)
+}
+
+#[tauri::command]
+pub async fn index_files(app: AppHandle, state: State<'_, Db>, ids: Vec<i64>) -> R<i64> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT id, name, rel_path FROM files WHERE kind='pdf' AND id IN ({placeholders})"
+    );
+    let pdfs: Vec<(i64, String, String)> = {
+        let conn = state.0.lock().unwrap();
+        let mut stmt = conn.prepare(&sql).map_err(e)?;
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(ids.iter()), |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
             .map_err(e)?;
         rows.collect::<Result<_, _>>().map_err(e)?
     };
@@ -2065,7 +2105,7 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
     let mut top_tools: Vec<TopItem> = Vec::new();
     if let Ok(mut stmt) = conn.prepare(&format!(
         "SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind IN ('demo_run','whiteboard_save') AND {day_events} \
-         GROUP BY label ORDER BY cnt DESC LIMIT 5"
+         GROUP BY label ORDER BY cnt DESC"
     )) {
         if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
             for r in rows {
@@ -2107,6 +2147,10 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
 #[tauri::command]
 pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
     let conn = state.0.lock().unwrap();
+    let _ = conn.execute(
+        "DELETE FROM usage_events WHERE created_at < datetime('now', '-30 days')",
+        [],
+    );
     Ok(recap_from_conn(&conn, &period))
 }
 
@@ -2151,11 +2195,11 @@ pub async fn pronote_qr_login(app: AppHandle, state: State<'_, Db>, qr_json: Str
     .await?;
 
     if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
-        return Ok(PronoteStatus {
-            connected: false,
-            account_name: None,
-            last_sync: None,
-        });
+        let err = res
+            .get("error")
+            .and_then(|x| x.as_str())
+            .unwrap_or("Connexion QR impossible");
+        return Err(err.to_string());
     }
 
     let account = res.get("account_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
@@ -2300,7 +2344,8 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
         }
     }
 
-    conn.execute("DELETE FROM schedule WHERE source='pronote'", []).map_err(e)?;
+    let tx = conn.unchecked_transaction().map_err(e)?;
+    tx.execute("DELETE FROM schedule WHERE source='pronote'", []).map_err(e)?;
     let mut count = 0i64;
     if let Some(lessons) = res.get("lessons").and_then(|x| x.as_array()) {
         for l in lessons {
@@ -2318,7 +2363,7 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
             } else {
                 format!("{subject} · {group}")
             };
-            conn.execute(
+            tx.execute(
                 "INSERT INTO schedule (day_of_week, start_time, end_time, subject, room, source) VALUES (?1,?2,?3,?4,?5,'pronote')",
                 params![day, start, end, subject, room],
             ).map_err(e)?;
@@ -2326,10 +2371,11 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
         }
     }
     set_setting_raw(
-        &conn,
+        &tx,
         "pronote_last_sync",
         &chrono::Local::now().format("%d/%m %H:%M").to_string(),
     );
+    tx.commit().map_err(e)?;
     Ok(count)
 }
 

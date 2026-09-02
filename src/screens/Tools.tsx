@@ -20,6 +20,8 @@ export default function Tools() {
 
       <KeepAwakeCard />
 
+      <TimerCard />
+
       <LinksCard />
     </div>
   );
@@ -69,6 +71,23 @@ function KeepAwakeCard() {
           />
         </span>
       </button>
+    </section>
+  );
+}
+
+function TimerCard() {
+  const start = (minutes: number) => {
+    window.dispatchEvent(new CustomEvent("eu:timer-start", { detail: { minutes } }));
+  };
+  return (
+    <section>
+      <SectionHeader title={t.tools?.timerTitle || "Minuteur de classe"} />
+      <div className="new-card p-5 flex flex-wrap items-center gap-3">
+        <p className="text-sm text-mute flex-1 min-w-[16ch]">{t.tools?.timerHint || "Compte à rebours visible dans la barre d'onglets."}</p>
+        <button type="button" className="new-btn" onClick={() => start(5)}>5 min</button>
+        <button type="button" className="new-btn" onClick={() => start(10)}>10 min</button>
+        <button type="button" className="new-btn" onClick={() => start(15)}>15 min</button>
+      </div>
     </section>
   );
 }

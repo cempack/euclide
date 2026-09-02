@@ -18,7 +18,7 @@ import {
 } from "../lib/updater";
 import { DAY_LABELS } from "../lib/format";
 
-import { EmptyState, Modal, SectionHeader, useToast } from "../components/ui";
+import { EmptyState, Modal, SectionHeader, useToast, useConfirm } from "../components/ui";
 import { CheckIcon, PlusIcon, QrIcon, TrashIcon } from "../components/icons";
 import { useTabs } from "../lib/tabs";
 
@@ -45,6 +45,7 @@ export default function Settings({ info }: { info: AppInfo | null }) {
 
 function DataStorageSection({ info }: { info: AppInfo | null }) {
   const toast = useToast();
+  const confirmDlg = useConfirm();
   const [busy, setBusy] = useState(false);
 
   const current = info?.data_dir || "";
@@ -67,7 +68,13 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
   };
 
   const reset = async () => {
-    if (!confirm("Revenir au dossier par défaut (Euclide-Data à côté de l'exécutable) ?")) return;
+    const ok = await confirmDlg.ask({
+      title: get("settings.resetTitle", "Dossier de stockage"),
+      message: "Revenir au dossier par défaut (Euclide-Data à côté de l'exécutable) ?",
+      confirmLabel: get("common.done", "Terminé"),
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api.resetDataDir();
@@ -212,6 +219,7 @@ function PronoteSection() {
       // Small delay to let the QR token settle before sync (token rotation race)
       await new Promise((r) => setTimeout(r, 800));
       try {
+        toast(t.settings?.toastSyncing || "Synchronisation…", "info");
         const n = await api.pronoteSync();
         window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
         toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");
@@ -236,6 +244,7 @@ function PronoteSection() {
   const sync = async () => {
     setBusy(true);
     try {
+      toast(t.settings?.toastSyncing || "Synchronisation…", "info");
       const n = await api.pronoteSync();
       window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
       toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");

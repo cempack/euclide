@@ -16,17 +16,17 @@ export function greeting(date = new Date()): string {
 const DAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 const MONTHS = [
   "janvier",
-  "fevrier",
+  "février",
   "mars",
   "avril",
   "mai",
   "juin",
   "juillet",
-  "aout",
+  "août",
   "septembre",
   "octobre",
   "novembre",
-  "decembre",
+  "décembre",
 ];
 
 export function longDate(date = new Date()): string {
@@ -57,7 +57,7 @@ export function relativeTime(iso: string): string {
   if (Number.isNaN(then)) return "";
   const diff = Date.now() - then;
   const min = Math.round(diff / 60000);
-  if (min < 1) return "a l'instant";
+  if (min < 1) return "à l'instant";
   if (min < 60) return `il y a ${min} min`;
   const h = Math.round(min / 60);
   if (h < 24) return `il y a ${h} h`;

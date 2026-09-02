@@ -3,7 +3,7 @@ import { useTabs } from "../lib/tabs";
 import { api, type Course, type CourseClass, type FileItem, type Note } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
-import { COURSE_ICONS, EmptyState, Loading, Modal, useToast } from "../components/ui";
+import { COURSE_ICONS, EmptyState, Loading, Modal, useToast, useConfirm } from "../components/ui";
 import {
   ArrowRightIcon,
   BookIcon,
@@ -54,6 +54,7 @@ function sanitizePronoteClasses(raw: any[]): any[] {
 export default function CourseDetail({ courseId }: { courseId: number }) {
   const tabs = useTabs();
   const toast = useToast();
+  const confirmDlg = useConfirm();
 
   const [course, setCourse] = useState<Course | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -170,7 +171,13 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
   };
 
   const detachClass = async (cc: CourseClass) => {
-    if (!confirm(fmt(t.courseDetail?.confirmDetach || 'Détacher la classe "{name}" ?', { name: cc.class_name }))) return;
+    const ok = await confirmDlg.ask({
+      title: fmt(t.courseDetail?.confirmDetach || 'Détacher la classe "{name}" ?', { name: cc.class_name }),
+      message: fmt(t.courseDetail?.confirmDetach || 'Détacher la classe "{name}" ?', { name: cc.class_name }),
+      confirmLabel: get("common.delete", "Supprimer"),
+      danger: true,
+    });
+    if (!ok) return;
     await api.detachCourseClass(cc.id);
     refreshClasses();
   };
@@ -308,11 +315,16 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
         </div>
         <button
           onClick={async () => {
-            if (confirm(fmt(t.courseDetail?.confirmDeleteCourse || 'Supprimer le cours "{name}" ?', { name: course.name }))) {
-              await api.deleteCourse(courseId);
-              tabs.open({ kind: "courses" });
-              tabs.close(`course:${courseId}`);
-            }
+            const ok = await confirmDlg.ask({
+              title: fmt(t.courseDetail?.confirmDeleteCourse || 'Supprimer le cours "{name}" ?', { name: course.name }),
+              message: fmt(t.courseDetail?.confirmDeleteCourse || 'Supprimer le cours "{name}" ?', { name: course.name }),
+              confirmLabel: get("common.delete", "Supprimer"),
+              danger: true,
+            });
+            if (!ok) return;
+            await api.deleteCourse(courseId);
+            tabs.open({ kind: "courses" });
+            tabs.close(`course:${courseId}`);
           }}
           className="new-btn-ghost"
         >
@@ -518,6 +530,7 @@ function FilesPane({
 }) {
   const tabs = useTabs();
   const toast = useToast();
+  const confirmDlg = useConfirm();
   const openFile = (f: FileItem) => {
     api.logEvent("file_open", f.name, f.course_id);
     if (f.kind === "board") tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
@@ -554,9 +567,18 @@ function FilesPane({
               <button
                 onClick={async (e) => {
                   e.stopPropagation();
-                  if (!confirm(`Supprimer le fichier "${f.name}" ?`)) return;
+                  const ok = await confirmDlg.ask({
+                    title: get("common.delete", "Supprimer"),
+                    message: `Supprimer le fichier « ${f.name} » ?`,
+                    confirmLabel: get("common.delete", "Supprimer"),
+                    danger: true,
+                  });
+                  if (!ok) return;
                   try {
                     await api.deleteFile(f.id);
+                    tabs.tabs
+                      .filter((tab) => tab.params.fileId === f.id)
+                      .forEach((tab) => tabs.close(tab.id));
                     window.dispatchEvent(new CustomEvent("eu:library-changed"));
                     onChanged();
                   } catch (err: any) {
