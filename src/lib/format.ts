@@ -142,12 +142,40 @@ export function minutesUntil(start_time: string, now: Date = new Date()): number
   return d > 0 ? d : null;
 }
 
+/** Local YYYY-MM-DD for <input type="date"> (not UTC, unlike toISOString().slice(0,10)). */
+export function localYmd(date: Date = new Date(), offsetDays = 0): string {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate() + offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Store a date-only picker value as end-of-local-day ISO so "today" stays today until midnight. */
+export function localYmdToIso(yyyyMmDd: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(yyyyMmDd.trim());
+  if (!match) return null;
+  const y = Number(match[1]);
+  const mo = Number(match[2]);
+  const d = Number(match[3]);
+  const dt = new Date(y, mo - 1, d, 23, 59, 59, 999);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+}
+
+function calendarDayDiff(due: Date, now: Date): number {
+  const a = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate());
+  const b = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((a - b) / 86_400_000);
+}
+
 export function formatDueLabel(dueIso: string | null | undefined): { text: string; tone: "default" | "soon" | "over" } {
   if (!dueIso) return { text: "", tone: "default" };
-  const d = new Date(dueIso.replace(" ", "T") + (dueIso.includes("T") ? "" : "Z"));
+  const normalized = dueIso.includes("T") ? dueIso : dueIso.replace(" ", "T") + (dueIso.includes("Z") ? "" : "Z");
+  const d = new Date(normalized);
   if (Number.isNaN(d.getTime())) return { text: "", tone: "default" };
   const now = new Date();
-  const dayDiff = Math.floor((d.getTime() - now.getTime()) / (1000 * 3600 * 24));
+  const dayDiff = calendarDayDiff(d, now);
   if (dayDiff < 0) return { text: "en retard", tone: "over" };
   if (dayDiff === 0) return { text: "aujourd'hui", tone: "soon" };
   if (dayDiff === 1) return { text: "demain", tone: "soon" };

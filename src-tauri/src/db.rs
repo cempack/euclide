@@ -21,7 +21,7 @@ PRAGMA temp_store = MEMORY;
     conn
 }
 
-const SCHEMA: &str = r#"
+pub(crate) const SCHEMA: &str = r#"
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 

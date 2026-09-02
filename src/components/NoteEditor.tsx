@@ -39,7 +39,7 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
       try {
         const cs = await api.listCourses();
         if (!mounted) return;
-        setCourses(cs);
+        setCourses(Array.isArray(cs) ? cs : []);
 
         if (noteId) {
           const all = (await api.allNotes()) ?? [];

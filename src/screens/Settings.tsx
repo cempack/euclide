@@ -195,7 +195,11 @@ function PronoteSection() {
     }
   };
 
-  const finishConnect = async (s: PronoteStatus) => {
+  const finishConnect = async (s: PronoteStatus | null) => {
+    if (!s) {
+      toast(t.settings?.toastConnectFailed || "Connexion échouée, vérifiez vos informations", "error");
+      return;
+    }
     setStatus(s);
     if (s.connected) {
       toast(t.settings?.toastConnected || "Connecté à Pronote", "success");
@@ -433,20 +437,28 @@ function ScheduleSection() {
     room: "",
   });
 
-  const refresh = () => api.listSchedule().then(setEntries).catch(() => {});
+  const refresh = () => api.listSchedule().then((e) => setEntries(Array.isArray(e) ? e : [])).catch(() => {});
   useEffect(() => {
     refresh();
-    api.listCourses().then(setCourses).catch(() => {});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
   }, []);
 
   const save = async () => {
     if (!form.subject?.trim()) return;
-    await api.saveScheduleEntry({ ...form, source: "manual" });
-    toast(t.settings?.toastScheduleAdded || "Cours ajouté à l'emploi du temps", "success");
-    setOpen(false);
-    setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
-    window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-    refresh();
+    try {
+      const saved = await api.saveScheduleEntry({ ...form, source: "manual" });
+      if (!saved?.id) {
+        toast(get("messages.genericError", "Erreur"), "error");
+        return;
+      }
+      toast(t.settings?.toastScheduleAdded || "Cours ajouté à l'emploi du temps", "success");
+      setOpen(false);
+      setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
+      window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const byDay = (d: number) =>
