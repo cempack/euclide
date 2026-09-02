@@ -34,7 +34,7 @@ export default function Python() {
 
   const refresh = async (selectPath?: string): Promise<PythonDemo[]> => {
     const list = await api.listDemos().catch(() => [] as PythonDemo[]);
-    setDemos(list);
+    setDemos(Array.isArray(list) ? list : []);
 
     if (selectPath) {
       const found = list.find((d) => d.path === selectPath);
@@ -132,6 +132,10 @@ export default function Python() {
         // (Backend will unique the filename if needed; we adopt the returned display name.)
         // This makes "Enregistrer" on a new entry actually persist it, just like the other saved scripts.
         const created = await api.createScript(openScript.name, openScript.code);
+        if (!created?.path) {
+          toast(get("tools.toastScriptSaveError", "Impossible d'enregistrer le script"), "error");
+          return;
+        }
 
         // Immediately promote the open buffer to a real persisted script (no more temp row / "*").
         // Optimistically update the list so the new file appears among the other ones right away.
@@ -186,7 +190,7 @@ export default function Python() {
           ? await api.runDemo(openScript.path)
           : await api.runCode(openScript.code);
       setResult(res);
-      if (!res.ok) toast(t.tools?.toastScriptError || "Le script a renvoyé une erreur", "error");
+      if (!res?.ok) toast(t.tools?.toastScriptError || "Le script a renvoyé une erreur", "error");
     } catch {
       toast(t.tools?.toastScriptRunError || "Impossible de lancer le script", "error");
     } finally {
@@ -242,6 +246,10 @@ export default function Python() {
       if (openScript.path) {
         // Persisted script: rename the file on disk (path may change due to slugify)
         const updated = await api.renameScript(openScript.path, newName);
+        if (!updated?.path) {
+          toast("Impossible de renommer le script", "error");
+          return;
+        }
         invalidateCache("listDemos");
         // Optimistically update demos list (path may be new)
         setDemos((prev) => {

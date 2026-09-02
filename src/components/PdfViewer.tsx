@@ -39,6 +39,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       setError(null);
       try {
         const abs = await api.filePath(fileId);
+        if (!abs) throw new Error("no path");
         const src = convertFileSrc(abs);
         if (!cancelled) {
           if (legacyMode) {
@@ -277,8 +278,12 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   };
 
   const legacySave = async () => {
-    await api.saveAnnotations(fileId, JSON.stringify(legacyAnnots.current));
-    toast(get("pdf.imageAnnotationsSaved", "Annotations image enregistrées"), "success");
+    try {
+      await api.saveAnnotations(fileId, JSON.stringify(legacyAnnots.current));
+      toast(get("pdf.imageAnnotationsSaved", "Annotations image enregistrées"), "success");
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const legacyExport = async () => {
@@ -293,8 +298,16 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     if (ov) m.drawImage(ov,0,0);
     const dataUrl = merged.toDataURL("image/png");
     const base = fileName.replace(/\.[^.]+$/, "");
-    const f = await api.saveExport(`${base} (annoté).png`, dataUrl);
-    toast(get("pdf.exported", "Exporté : {name}").replace("{name}", f.name), "success");
+    try {
+      const f = await api.saveExport(`${base} (annoté).png`, dataUrl);
+      if (!f?.id) {
+        toast(get("messages.genericError", "Erreur"), "error");
+        return;
+      }
+      toast(get("pdf.exported", "Exporté : {name}").replace("{name}", f.name), "success");
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   // RENDER

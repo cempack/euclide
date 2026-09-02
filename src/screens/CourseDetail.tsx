@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useTabs } from "../lib/tabs";
 import { api, type Course, type CourseClass, type FileItem, type Note } from "../lib/api";
-import { t, fmt } from "../lib/i18n";
+import { t, fmt, get } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { COURSE_ICONS, EmptyState, Loading, Modal, useToast } from "../components/ui";
 import {
@@ -70,9 +70,9 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
   const [attachDocs, setAttachDocs] = useState<FileItem[]>([]);
   const [attachSelected, setAttachSelected] = useState<number[]>([]);
 
-  const refreshNotes = () => api.listNotes(courseId).then(setNotes);
-  const refreshFiles = () => api.listFiles(courseId).then(setFiles);
-  const refreshClasses = () => api.listCourseClasses(courseId).then(setCourseClasses).catch(() => {});
+  const refreshNotes = () => api.listNotes(courseId).then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
+  const refreshFiles = () => api.listFiles(courseId).then((f) => setFiles(Array.isArray(f) ? f : [])).catch(() => {});
+  const refreshClasses = () => api.listCourseClasses(courseId).then((c) => setCourseClasses(Array.isArray(c) ? c : [])).catch(() => {});
 
   useEffect(() => {
     setLoading(true);
@@ -154,11 +154,19 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
     const useSelect = availablePronoteClasses.length > 0;
     const classToAttach = (useSelect ? selectedPronoteClass : newClassName).trim();
     if (!classToAttach) return;
-    await api.attachClassToCourse(courseId, classToAttach);
-    toast(fmt(t.courseDetail?.attachSuccess || 'Classe "{name}" attachée', { name: classToAttach }), "success");
-    setNewClassName("");
-    setSelectedPronoteClass("");
-    refreshClasses();
+    try {
+      const attached = await api.attachClassToCourse(courseId, classToAttach);
+      if (!attached?.id) {
+        toast(get("messages.genericError", "Erreur"), "error");
+        return;
+      }
+      toast(fmt(t.courseDetail?.attachSuccess || 'Classe "{name}" attachée', { name: classToAttach }), "success");
+      setNewClassName("");
+      setSelectedPronoteClass("");
+      refreshClasses();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const detachClass = async (cc: CourseClass) => {
