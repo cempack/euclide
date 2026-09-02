@@ -2,11 +2,13 @@ import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "
 import { api, type AppInfo, isTauri } from "./lib/api";
 import { get } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
+import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 
 import { TabsProvider, useTabs, type TabKind } from "./lib/tabs";
 import { ToastProvider, useToast, Loading, COURSE_ICONS } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import ShortcutsHelp from "./components/ShortcutsHelp";
+import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
 import {
  BookIcon,
  DocIcon,
@@ -24,6 +26,7 @@ import {
  NoteIcon,
  ImageIcon,
  FolderIcon,
+ SparkleIcon,
 } from "./components/icons";
 import Dashboard from "./screens/Dashboard";
 import Courses from "./screens/Courses";
@@ -33,6 +36,7 @@ import Tools from "./screens/Tools";
 const Python = lazy(() => import("./screens/Python"));
 import Settings from "./screens/Settings";
 import Reminders from "./screens/Reminders";
+const Recap = lazy(() => import("./screens/Recap"));
 const ClassContent = lazy(() => import("./screens/ClassContent"));
 const Whiteboard = lazy(() => import("./components/Whiteboard"));
 const PdfViewer = lazy(() => import("./components/PdfViewer"));
@@ -47,6 +51,7 @@ const TAB_ICONS: Partial<Record<TabKind, React.ReactNode>> = {
  python: <CodeIcon className="w-4 h-4" />,
  settings: <GearIcon className="w-4 h-4" />,
  reminders: <BellIcon className="w-4 h-4" />,
+ recap: <SparkleIcon className="w-4 h-4" />,
 };
 
 const NAV: { kind: TabKind; label: string; icon: React.ReactNode }[] = [
@@ -319,6 +324,14 @@ function TabContent({ info }: { info: AppInfo | null }) {
  return <Scroll><Settings info={info} /></Scroll>;
  case "reminders":
  return <Scroll><Reminders /></Scroll>;
+ case "recap":
+ return (
+ <Scroll>
+ <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
+ <Recap />
+ </Suspense>
+ </Scroll>
+ );
  case "whiteboard":
  return (
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
@@ -355,6 +368,7 @@ function Shell() {
  const [palette, setPalette] = useState(false);
  const [help, setHelp] = useState(false);
  const [dragging, setDragging] = useState(false);
+ const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
  const tabs = useTabs();
  const toast = useToast();
 
@@ -366,6 +380,14 @@ function Shell() {
  appFocusedRef.current = appFocused;
  }, [appFocused]);
 
+ useEffect(() => {
+ const tab = tabs.active;
+ activityContextRef.current = {
+ area: tab?.kind ?? "dashboard",
+ courseId: typeof tab?.params?.courseId === "number" ? tab.params.courseId : null,
+ };
+ }, [tabs.activeId, tabs.active?.kind, tabs.active?.params?.courseId]);
+
  // (Vibrancy removed – using standard native decorations for window controls.)
 
  const handleHelp = useCallback(() => setHelp(true), []);
@@ -373,6 +395,36 @@ function Shell() {
 
  useEffect(() => {
  api.appInfo().then(setInfo).catch(() => {});
+ }, []);
+
+ useEffect(() => {
+ const onAvailable = (e: Event) => {
+ const detail = (e as CustomEvent<AppUpdateInfo>).detail;
+ if (!detail?.version) return;
+ if (wasUpdateDismissed(detail.version)) return;
+ setAvailableUpdate(detail);
+ };
+ window.addEventListener("eu:update-available", onAvailable);
+ return () => window.removeEventListener("eu:update-available", onAvailable);
+ }, []);
+
+ useEffect(() => {
+ if (!isTauri()) return;
+ let cancelled = false;
+ const timer = window.setTimeout(async () => {
+ try {
+ const update = await checkForAppUpdate();
+ if (cancelled || !update) return;
+ if (wasUpdateDismissed(update.version)) return;
+ window.dispatchEvent(new CustomEvent("eu:update-available", { detail: update }));
+ } catch {
+ // Draft-only GitHub releases, offline, etc. Stay quiet.
+ }
+ }, 4000);
+ return () => {
+ cancelled = true;
+ window.clearTimeout(timer);
+ };
  }, []);
 
  // Global drag-and-drop file import into the documents library.
@@ -415,6 +467,22 @@ function Shell() {
  unlisten?.();
  };
  }, [toast]);
+
+ useEffect(() => {
+ if (!isTauri()) return;
+ const tick = () => {
+ if (!appFocusedRef.current) return;
+ if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+ const ctx = activityContextRef.current;
+ api.logEvent("active_tick", ctx.area, ctx.courseId).catch(() => {});
+ };
+ const seed = window.setTimeout(tick, 2500);
+ const interval = window.setInterval(tick, 60_000);
+ return () => {
+ window.clearTimeout(seed);
+ window.clearInterval(interval);
+ };
+ }, []);
 
  // Window focus/blur tracking (Tauri) + seeds to ensure time recording starts/credits immediately on use.
  useEffect(() => {
@@ -508,6 +576,7 @@ function Shell() {
  </main>
  <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
  <ShortcutsHelp open={help} onClose={() => setHelp(false)} />
+ <UpdateAvailablePopup update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} />
  {dragging && (
  <div className="fixed inset-0 z-[80] grid place-items-center bg-tui-accent/10 backdrop-blur-sm pointer-events-none">
  <div className="eu-card px-8 py-6 border-2 border-dashed border-tui-accent text-center">
