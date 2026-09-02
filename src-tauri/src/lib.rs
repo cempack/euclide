@@ -4,6 +4,7 @@ mod keepawake;
 mod linux_env;
 mod paths;
 mod portable_update;
+mod relaunch;
 mod sidecar;
 
 use keepawake::KeepAwake;
@@ -160,6 +161,7 @@ pub fn run() {
             commands::update_course_class_notes,
             commands::pronote_classes,
             portable_update::apply_windows_portable_update,
+            relaunch::relaunch_after_update,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Euclide")

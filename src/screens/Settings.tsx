@@ -12,6 +12,7 @@ import { t, fmt, get } from "../lib/i18n";
 import {
   checkForAppUpdate,
   installPendingUpdate,
+  isIncompleteUpdateManifest,
   isNoPublishedUpdate,
   updaterSupported,
   type AppUpdateInfo,
@@ -695,9 +696,9 @@ function TabsSection() {
 
 function AboutSection({ info }: { info: AppInfo | null }) {
   const toast = useToast();
-  const [status, setStatus] = useState<"idle" | "checking" | "upToDate" | "available" | "installing" | "error">(
-    "idle"
-  );
+  const [status, setStatus] = useState<
+    "idle" | "checking" | "upToDate" | "publishing" | "available" | "installing" | "error"
+  >("idle");
   const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
   const [error, setError] = useState("");
   const [percent, setPercent] = useState<number | null>(null);
@@ -717,6 +718,11 @@ function AboutSection({ info }: { info: AppInfo | null }) {
         setStatus("upToDate");
       }
     } catch (err) {
+      if (isIncompleteUpdateManifest(err)) {
+        setUpdate(null);
+        setStatus("publishing");
+        return;
+      }
       if (isNoPublishedUpdate(err)) {
         setUpdate(null);
         setStatus("upToDate");
@@ -770,18 +776,23 @@ function AboutSection({ info }: { info: AppInfo | null }) {
       ? get("updater.checking", "Recherche…")
       : status === "upToDate"
         ? get("updater.upToDate", "Euclide est à jour.")
-        : status === "available" && update
-          ? fmt(get("updater.available", "Version {version} disponible (actuelle : {current})."), {
-              version: update.version,
-              current: update.currentVersion,
-            })
-          : status === "installing"
-            ? fmt(get("updater.installing", "Téléchargement… {percent} %"), {
-                percent: percent ?? 0,
+        : status === "publishing"
+          ? get(
+              "updater.publishing",
+              "Publication encore en cours pour cette plateforme. Réessayez dans un moment."
+            )
+          : status === "available" && update
+            ? fmt(get("updater.available", "Version {version} disponible (actuelle : {current})."), {
+                version: update.version,
+                current: update.currentVersion,
               })
-            : status === "error"
-              ? error || get("updater.error", "Impossible de vérifier les mises à jour.")
-              : "";
+            : status === "installing"
+              ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
+                  percent: percent ?? 0,
+                })
+              : status === "error"
+                ? error || get("updater.error", "Impossible de vérifier les mises à jour.")
+                : "";
 
   return (
     <section>
