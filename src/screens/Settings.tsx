@@ -690,6 +690,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
       if (next) {
         setUpdate(next);
         setStatus("available");
+        window.dispatchEvent(new CustomEvent("eu:update-available", { detail: next }));
       } else {
         setUpdate(null);
         setStatus("upToDate");
