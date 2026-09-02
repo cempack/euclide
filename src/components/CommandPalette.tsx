@@ -16,6 +16,7 @@ import {
   SearchIcon,
   ToolIcon,
   CodeIcon,
+  SparkleIcon,
 } from "./icons";
 
 interface Action {
@@ -78,7 +79,7 @@ export default function CommandPalette({
   useEffect(() => {
     const h = setTimeout(() => {
       if (query.trim().length < 2) return setResults([]);
-      api.globalSearch(query.trim()).then(setResults).catch(() => {});
+      api.globalSearch(query.trim()).then((r) => setResults(Array.isArray(r) ? r : [])).catch(() => {});
     }, 130);
     return () => clearTimeout(h);
   }, [query]);
@@ -95,6 +96,7 @@ export default function CommandPalette({
       { id: "tools", label: get("nav.tools", "Outils"), icon: <ToolIcon className="w-4 h-4" />, run: go("tools") },
       { id: "python", label: get("nav.python", "Python"), icon: <CodeIcon className="w-4 h-4" />, run: go("python") },
       { id: "reminders", label: get("nav.reminders", "Rappels"), icon: <BellIcon className="w-4 h-4" />, run: go("reminders") },
+      { id: "recap", label: get("nav.recap", "Bilan"), icon: <SparkleIcon className="w-4 h-4" />, run: go("recap") },
       {
         id: "board",
         label: get("nav.whiteboard", "Tableau blanc"),
@@ -143,8 +145,7 @@ export default function CommandPalette({
           hint: "note",
           icon: <NoteIcon className="w-4 h-4" />,
           run: () => {
-            if (r.course_id) tabs.open({ kind: "course", params: { courseId: r.course_id } });
-            else tabs.open({ kind: "courses" });
+            tabs.open({ kind: "note", title: r.title || get("notes.newTitle", "Note"), params: { noteId: r.id } });
             onClose();
           },
         };

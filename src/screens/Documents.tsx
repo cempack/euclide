@@ -203,7 +203,11 @@ export default function Documents() {
     }
     try {
       if (renameTarget.kind === "note") {
-        await api.renameNote(renameTarget.id, newName);
+        const renamed = await api.renameNote(renameTarget.id, newName);
+        if (!renamed?.id) {
+          toast(get("messages.genericError", "Erreur"), "error");
+          return;
+        }
         const tid = `note:${renameTarget.id}`;
         if (tabs.tabs.some((t) => t.id === tid)) {
           tabs.rename(tid, newName);
@@ -211,6 +215,10 @@ export default function Documents() {
         api.logEvent("note_rename", newName, null);
       } else {
         const updated = await api.renameFile(renameTarget.id, newName);
+        if (!updated?.id) {
+          toast(get("messages.genericError", "Erreur"), "error");
+          return;
+        }
         const tid =
           updated.kind === "board"
             ? `whiteboard:${updated.id}`

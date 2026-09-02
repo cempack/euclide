@@ -246,6 +246,10 @@ export default function Python() {
       if (openScript.path) {
         // Persisted script: rename the file on disk (path may change due to slugify)
         const updated = await api.renameScript(openScript.path, newName);
+        if (!updated?.path) {
+          toast("Impossible de renommer le script", "error");
+          return;
+        }
         invalidateCache("listDemos");
         // Optimistically update demos list (path may be new)
         setDemos((prev) => {

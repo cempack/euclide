@@ -26,6 +26,7 @@ import {
  NoteIcon,
  ImageIcon,
  FolderIcon,
+ SparkleIcon,
 } from "./components/icons";
 import Dashboard from "./screens/Dashboard";
 import Courses from "./screens/Courses";
@@ -35,6 +36,7 @@ import Tools from "./screens/Tools";
 const Python = lazy(() => import("./screens/Python"));
 import Settings from "./screens/Settings";
 import Reminders from "./screens/Reminders";
+const Recap = lazy(() => import("./screens/Recap"));
 const ClassContent = lazy(() => import("./screens/ClassContent"));
 const Whiteboard = lazy(() => import("./components/Whiteboard"));
 const PdfViewer = lazy(() => import("./components/PdfViewer"));
@@ -49,6 +51,7 @@ const TAB_ICONS: Partial<Record<TabKind, React.ReactNode>> = {
  python: <CodeIcon className="w-4 h-4" />,
  settings: <GearIcon className="w-4 h-4" />,
  reminders: <BellIcon className="w-4 h-4" />,
+ recap: <SparkleIcon className="w-4 h-4" />,
 };
 
 const NAV: { kind: TabKind; label: string; icon: React.ReactNode }[] = [
@@ -321,6 +324,14 @@ function TabContent({ info }: { info: AppInfo | null }) {
  return <Scroll><Settings info={info} /></Scroll>;
  case "reminders":
  return <Scroll><Reminders /></Scroll>;
+ case "recap":
+ return (
+ <Scroll>
+ <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
+ <Recap />
+ </Suspense>
+ </Scroll>
+ );
  case "whiteboard":
  return (
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
@@ -368,6 +379,14 @@ function Shell() {
  useEffect(() => {
  appFocusedRef.current = appFocused;
  }, [appFocused]);
+
+ useEffect(() => {
+ const tab = tabs.active;
+ activityContextRef.current = {
+ area: tab?.kind ?? "dashboard",
+ courseId: typeof tab?.params?.courseId === "number" ? tab.params.courseId : null,
+ };
+ }, [tabs.activeId, tabs.active?.kind, tabs.active?.params?.courseId]);
 
  // (Vibrancy removed – using standard native decorations for window controls.)
 
@@ -448,6 +467,22 @@ function Shell() {
  unlisten?.();
  };
  }, [toast]);
+
+ useEffect(() => {
+ if (!isTauri()) return;
+ const tick = () => {
+ if (!appFocusedRef.current) return;
+ if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+ const ctx = activityContextRef.current;
+ api.logEvent("active_tick", ctx.area, ctx.courseId).catch(() => {});
+ };
+ const seed = window.setTimeout(tick, 2500);
+ const interval = window.setInterval(tick, 60_000);
+ return () => {
+ window.clearTimeout(seed);
+ window.clearInterval(interval);
+ };
+ }, []);
 
  // Window focus/blur tracking (Tauri) + seeds to ensure time recording starts/credits immediately on use.
  useEffect(() => {

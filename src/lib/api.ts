@@ -78,6 +78,10 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
   return tauriInvoke<T>(cmd, args);
 }
 
+function asList<T>(data: unknown): T[] {
+  return Array.isArray(data) ? (data as T[]).filter((x) => x != null) : [];
+}
+
 function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
   const listCmds = new Set([
     "all_notes",
@@ -115,7 +119,11 @@ function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
       time_by_area: [],
     } as unknown as T;
   }
-  if (cmd === "pronote_status") {
+  if (
+    cmd === "pronote_status" ||
+    cmd === "pronote_qr_login" ||
+    cmd === "pronote_password_login"
+  ) {
     return { connected: false, account_name: null, last_sync: null } as unknown as T;
   }
   if (cmd === "keep_awake_status") return true as unknown as T;
@@ -128,6 +136,8 @@ function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
       stderr: "Sidecar Python indisponible hors application.",
     } as unknown as T;
   }
+  if (cmd === "read_board") return "{}" as unknown as T;
+  if (cmd === "file_path" || cmd === "choose_data_dir") return "" as unknown as T;
   return null as unknown as T;
 }
 
@@ -280,14 +290,19 @@ export const api = {
     const key = "listCourses";
     const cached = getCached<Course[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<Course[]>("list_courses").then((data) => { setCached(key, data); return data; });
+    return invoke<Course[]>("list_courses").then((data) => {
+      const list = asList<Course>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   createCourse: (name: string, emoji: string, color: string, description: string, matiere: string) =>
     invoke<Course>("create_course", { name, emoji, color, description, matiere }).then((c) => {
-      // optimistic patch for list cache
-      const key = "listCourses";
-      const cached = getCached<Course[]>(key);
-      if (cached) setCached(key, [...cached, c]);
+      if (c && typeof c.id === "number") {
+        const key = "listCourses";
+        const cached = getCached<Course[]>(key);
+        if (cached) setCached(key, [...cached, c]);
+      }
       return c;
     }),
   updateCourse: (course: Course) => invoke<void>("update_course", { course }).then(() => {
@@ -309,7 +324,11 @@ export const api = {
     const key = `listCourseClasses:${courseId}`;
     const cached = getCached<CourseClass[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<CourseClass[]>("list_course_classes", { courseId }).then((data) => { setCached(key, data); return data; });
+    return invoke<CourseClass[]>("list_course_classes", { courseId }).then((data) => {
+      const list = asList<CourseClass>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   attachClassToCourse: (courseId: number, className: string) =>
     invoke<CourseClass>("attach_class_to_course", { courseId, className }).then((data) => {
@@ -337,13 +356,21 @@ export const api = {
     const key = `listNotes:${courseId ?? "all"}`;
     const cached = getCached<Note[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<Note[]>("list_notes", { courseId }).then((data) => { setCached(key, data); return data; });
+    return invoke<Note[]>("list_notes", { courseId }).then((data) => {
+      const list = asList<Note>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   allNotes: () => {
     const key = "allNotes";
     const cached = getCached<Note[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<Note[]>("all_notes").then((data) => { setCached(key, data); return data; });
+    return invoke<Note[]>("all_notes").then((data) => {
+      const list = asList<Note>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   saveNote: (note: Partial<Note>) => invoke<Note>("save_note", { note }),
   deleteNote: (id: number) => invoke<void>("delete_note", { id }),
@@ -354,13 +381,21 @@ export const api = {
     const key = `listFiles:${courseId ?? "all"}`;
     const cached = getCached<FileItem[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<FileItem[]>("list_files", { courseId }).then((data) => { setCached(key, data); return data; });
+    return invoke<FileItem[]>("list_files", { courseId }).then((data) => {
+      const list = asList<FileItem>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   recentFiles: (limit: number) => {
     const key = `recentFiles:${limit}`;
     const cached = getCached<FileItem[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<FileItem[]>("recent_files", { limit }).then((data) => { setCached(key, data); return data; });
+    return invoke<FileItem[]>("recent_files", { limit }).then((data) => {
+      const list = asList<FileItem>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   importFiles: (courseId: number | null) => invoke<FileItem[]>("import_files", { courseId }),
   importPaths: (paths: string[], courseId: number | null) =>
@@ -379,7 +414,11 @@ export const api = {
     const key = "listReminders";
     const cached = getCached<Reminder[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<Reminder[]>("list_reminders").then((data) => { setCached(key, data); return data; });
+    return invoke<Reminder[]>("list_reminders").then((data) => {
+      const list = asList<Reminder>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   createReminder: (title: string, dueAt: string | null) =>
     invoke<Reminder>("create_reminder", { title, dueAt }),
@@ -391,7 +430,11 @@ export const api = {
     const key = "listLinks";
     const cached = getCached<QuickLink[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<QuickLink[]>("list_links").then((data) => { setCached(key, data); return data; });
+    return invoke<QuickLink[]>("list_links").then((data) => {
+      const list = asList<QuickLink>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   createLink: (label: string, url: string, icon: string) =>
     invoke<QuickLink>("create_link", { label, url, icon }),
@@ -403,13 +446,21 @@ export const api = {
     const key = "listSchedule";
     const cached = getCached<ScheduleEntry[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<ScheduleEntry[]>("list_schedule").then((data) => { setCached(key, data); return data; });
+    return invoke<ScheduleEntry[]>("list_schedule").then((data) => {
+      const list = asList<ScheduleEntry>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   getTodayClasses: () => {
     const key = "getTodayClasses";
     const cached = getCached<ScheduleEntry[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<ScheduleEntry[]>("get_today_classes").then((data) => { setCached(key, data); return data; });
+    return invoke<ScheduleEntry[]>("get_today_classes").then((data) => {
+      const list = asList<ScheduleEntry>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   saveScheduleEntry: (entry: Partial<ScheduleEntry>) =>
     invoke<ScheduleEntry>("save_schedule_entry", { entry }),
@@ -441,7 +492,11 @@ export const api = {
     const key = "listDemos";
     const cached = getCached<PythonDemo[]>(key);
     if (cached) return Promise.resolve(cached);
-    return invoke<PythonDemo[]>("list_python_demos").then((data) => { setCached(key, data); return data; });
+    return invoke<PythonDemo[]>("list_python_demos").then((data) => {
+      const list = asList<PythonDemo>(data);
+      setCached(key, list);
+      return list;
+    });
   },
   runDemo: (path: string) => invoke<PythonResult>("run_python_demo", { path }),
   runCode: (code: string) => invoke<PythonResult>("run_python_code", { code }),

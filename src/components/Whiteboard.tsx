@@ -59,7 +59,7 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
   useEffect(()=>{ const w=wrapRef.current; if(w){ const r=w.getBoundingClientRect(); if(r.width>0) updateCanvasSize(r.width,r.height,zoom); } },[zoom]);
 
   useEffect(()=>{
-    api.listCourses().then(setCourses).catch(()=>{}); if(fileId) api.readBoard(fileId).then(raw=>{ try{ const d=JSON.parse(raw) as BoardDoc; if(pendingText||pendingTextRef.current||editingTextOriginal.current){ editingTextOriginal.current=null; setPendingText(null); pendingTextRef.current=null; } strokes.current=d.strokes??[]; shapes.current=d.shapes??[]; texts.current=d.texts??[]; history.current=[]; setItemCount(strokes.current.length+shapes.current.length+texts.current.length); const rr=wrapRef.current?.getBoundingClientRect(); if(rr&&rr.width>0)updateCanvasSize(rr.width,rr.height,zoomRef.current); redraw(); }catch{} }).catch(()=>{});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(()=>{}); if(fileId) api.readBoard(fileId).then(raw=>{ try{ if(typeof raw !== "string" || !raw) return; const d=JSON.parse(raw) as BoardDoc; if(!d || typeof d !== "object") return; if(pendingText||pendingTextRef.current||editingTextOriginal.current){ editingTextOriginal.current=null; setPendingText(null); pendingTextRef.current=null; } strokes.current=d.strokes??[]; shapes.current=d.shapes??[]; texts.current=d.texts??[]; history.current=[]; setItemCount(strokes.current.length+shapes.current.length+texts.current.length); const rr=wrapRef.current?.getBoundingClientRect(); if(rr&&rr.width>0)updateCanvasSize(rr.width,rr.height,zoomRef.current); redraw(); }catch{} }).catch(()=>{});
   },[fileId]);
 
   // load + ensure original version snapshot for this board (so default counts as version, like PDF)
@@ -144,7 +144,8 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
     try {
       if(pendingText||pendingTextRef.current)commitPendingText(); redraw();
       const c=canvasRef.current!, o=document.createElement('canvas'); o.width=c.width;o.height=c.height; const oc=o.getContext('2d')!; oc.fillStyle='#fff'; oc.fillRect(0,0,o.width,o.height); oc.drawImage(c,0,0);
-      await api.exportBoardPng(courseId,tabs.tabs.find(t=>t.id===tabId)?.title??'Tableau',o.toDataURL('image/png'));
+      const exported = await api.exportBoardPng(courseId,tabs.tabs.find(t=>t.id===tabId)?.title??'Tableau',o.toDataURL('image/png'));
+      if(!exported?.id){ toast(get("messages.genericError","Erreur"),"error"); return; }
       toast(get("whiteboard.exported","Exporté"),"success");
     } catch {
       toast(get("messages.genericError","Erreur"),"error");

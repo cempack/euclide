@@ -23,7 +23,8 @@ export type TabKind =
   | "pdf"
   | "reminders"
   | "help"
-  | "note";
+  | "note"
+  | "recap";
 
 export interface TabParams {
   courseId?: number;
@@ -59,6 +60,7 @@ const SINGLETONS: TabKind[] = [
   "settings",
   "reminders",
   "help",
+  "recap",
 ];
 
 // Default max tabs (overridable via settings). 0 = unlimited (no limit, no eviction).
@@ -78,6 +80,7 @@ const DEFAULT_TITLES: Record<TabKind, string> = {
   reminders: "Rappels",
   help: "Raccourcis",
   note: "Note",
+  recap: "Bilan",
 };
 
 function keyOf(spec: OpenSpec): string {

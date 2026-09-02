@@ -85,7 +85,7 @@ export default function Courses() {
 
   const refresh = () => {
     setLoading(true);
-    api.listCourses().then(setCourses).catch(() => {}).finally(() => setLoading(false));
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {}).finally(() => setLoading(false));
   };
   useEffect(() => {
     refresh();
@@ -93,20 +93,24 @@ export default function Courses() {
 
   const create = async () => {
     if (!name.trim()) return;
-    const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
-    if (!created?.id) {
+    try {
+      const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
+      if (!created?.id) {
+        toast(get("messages.genericError", "Erreur"), "error");
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      window.dispatchEvent(new CustomEvent("eu:course-changed"));
+      toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
+      setName("");
+      setDesc("");
+      setMatiere("Mathématiques");
+      setIconKey("book");
+      setOpen(false);
+      refresh();
+    } catch {
       toast(get("messages.genericError", "Erreur"), "error");
-      return;
     }
-    window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    window.dispatchEvent(new CustomEvent("eu:course-changed"));
-    toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
-    setName("");
-    setDesc("");
-    setMatiere("Mathématiques");
-    setIconKey("book");
-    setOpen(false);
-    refresh();
   };
 
   const openEdit = (c: Course) => {
@@ -123,25 +127,29 @@ export default function Courses() {
     if (!editName.trim() || !editId) return;
     const courseToUpdate = courses.find((c) => c.id === editId);
     if (!courseToUpdate) return;
-    await api.updateCourse({
-      ...courseToUpdate,
-      name: editName.trim(),
-      emoji: editIconKey,
-      color: editColor,
-      description: editDesc.trim(),
-      matiere: editMatiere,
-    });
-    window.dispatchEvent(new CustomEvent("eu:library-changed")); // ensure fresh lists everywhere (triggers cache invalidation + listeners)
-    window.dispatchEvent(new CustomEvent("eu:course-changed"));
-    toast("Cours modifié", "success");
-    setEditOpen(false);
-    // reset edit
-    setEditId(null);
-    setEditName("");
-    setEditDesc("");
-    setEditMatiere("Mathématiques");
-    setEditIconKey("book");
-    refresh();
+    try {
+      await api.updateCourse({
+        ...courseToUpdate,
+        name: editName.trim(),
+        emoji: editIconKey,
+        color: editColor,
+        description: editDesc.trim(),
+        matiere: editMatiere,
+      });
+      window.dispatchEvent(new CustomEvent("eu:library-changed")); // ensure fresh lists everywhere (triggers cache invalidation + listeners)
+      window.dispatchEvent(new CustomEvent("eu:course-changed"));
+      toast("Cours modifié", "success");
+      setEditOpen(false);
+      // reset edit
+      setEditId(null);
+      setEditName("");
+      setEditDesc("");
+      setEditMatiere("Mathématiques");
+      setEditIconKey("book");
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const closeEdit = () => {
