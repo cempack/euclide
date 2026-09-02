@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Create/update a GitHub release. Version tags (v*) publish the Latest release for the in-app updater. Merges into main (when app/packaging source changed) and manual runs replace the published prerelease tagged dev-build.'
+        description: 'Create/update a GitHub release. Version tags (v*) and merges into main (when app/packaging source changed) publish a real Latest release. Main and manual runs replace the release tagged dev-build.'
         required: false
         default: true
         type: boolean
@@ -95,8 +95,8 @@ jobs:
           echo "No app/packaging source changes; skip rebuild."
           out false
 
-  # Workflow/docs-only main pushes do not rebuild. If a draft from an earlier
-  # run is still sitting unpublished, mark it live so artifacts are downloadable.
+  # Workflow/docs-only main pushes do not rebuild. Promote the existing
+  # dev-build tag to a full Latest release if it is still a draft/prerelease.
   start-dev-build:
     name: Publish existing dev-build
     needs: should-publish
@@ -106,7 +106,7 @@ jobs:
       needs.should-publish.outputs.run == 'false'
     runs-on: ubuntu-latest
     steps:
-      - name: Mark the last main build as published
+      - name: Mark the last main build as Latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -115,8 +115,8 @@ jobs:
             echo "No dev-build release yet."
             exit 0
           fi
-          gh release edit dev-build --draft=false --prerelease --repo "${{ github.repository }}"
-          echo "dev-build is published (prerelease)."
+          gh release edit dev-build --draft=false --prerelease=false --latest --repo "${{ github.repository }}"
+          echo "dev-build is a full Latest release."
 
   prepare-release:
     needs: should-publish
@@ -239,13 +239,13 @@ jobs:
             echo "tag=dev-build" >> "$GITHUB_OUTPUT"
             echo "name=Euclide main (${{ github.sha }})" >> "$GITHUB_OUTPUT"
             echo "draft=false" >> "$GITHUB_OUTPUT"
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "upload=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.create_release }}" = "true" ]; then
             echo "tag=dev-build" >> "$GITHUB_OUTPUT"
             echo "name=Euclide dev-build (manual)" >> "$GITHUB_OUTPUT"
             echo "draft=false" >> "$GITHUB_OUTPUT"
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "upload=true" >> "$GITHUB_OUTPUT"
           else
             echo "tag=" >> "$GITHUB_OUTPUT"
