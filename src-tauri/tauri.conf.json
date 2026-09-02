@@ -50,7 +50,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg2NzlBNzU1NkY1QzFGNkIKUldSckgxeHZWYWQ1aHYwODZxcGJQeXcwdnQ5bXN4M1RQV241SFdRcVNvN2xMUnRvMzdMWm5BU28K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENBNTIyRkI1QTk5MzA2MDUKUldRRkJwT3B0UzlTeXBCUWpnbTNHSkZSd3MxbHJHemlNVUkxRmUwaUU4ZjdscGxESmtDRkNxdVAK",
       "endpoints": [
         "https://github.com/cempack/euclide/releases/latest/download/latest.json"
       ],
