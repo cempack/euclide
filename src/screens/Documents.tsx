@@ -3,8 +3,8 @@ import { api, type Course, type FileItem, type Note } from "../lib/api";
 import { useTabs } from "../lib/tabs";
 import { t, fmt, get } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
-import { EmptyState, Modal, useToast } from "../components/ui";
-import { DocIcon, NoteIcon, PenIcon, PlusIcon, SearchIcon, FileKindIcon } from "../components/icons";
+import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
+import { DocIcon, NoteIcon, PenIcon, PlusIcon, SearchIcon, FileKindIcon, TrashIcon } from "../components/icons";
 
 type Filter = { kind: "all" } | { kind: "type"; value: string } | { kind: "class"; courseId: number };
 
@@ -48,11 +48,13 @@ const MemoFileItem = memo(function MemoFileItem({
   f,
   onOpen,
   onRename,
+  onDelete,
   courseName,
 }: {
   f: FileItem;
   onOpen: (f: FileItem) => void;
   onRename: (f: FileItem) => void;
+  onDelete: (f: FileItem) => void;
   courseName: (id: number | null) => string | undefined;
 }) {
   return (
@@ -72,10 +74,20 @@ const MemoFileItem = memo(function MemoFileItem({
           e.stopPropagation();
           onRename(f);
         }}
-        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-primary hover:bg-surface-container transition-all"
+        className="absolute top-2 right-8 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-primary hover:bg-surface-container transition-all"
         title="Renommer"
       >
         <PenIcon className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(f);
+        }}
+        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 hover:bg-red-50 transition-all"
+        title="Supprimer"
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
       </button>
     </div>
   );
@@ -85,11 +97,13 @@ const MemoNoteItem = memo(function MemoNoteItem({
   n,
   onOpen,
   onRename,
+  onDelete,
   courseName,
 }: {
   n: Note;
   onOpen: (n: Note) => void;
   onRename: (n: Note) => void;
+  onDelete: (n: Note) => void;
   courseName: (id: number | null) => string | undefined;
 }) {
   const displayTitle = n.title || (t.documents?.noteFallbackTitle || "Note");
@@ -112,18 +126,29 @@ const MemoNoteItem = memo(function MemoNoteItem({
           e.stopPropagation();
           onRename(n);
         }}
-        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-primary hover:bg-surface-container transition-all"
+        className="absolute top-2 right-8 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-primary hover:bg-surface-container transition-all"
         title="Renommer"
       >
         <PenIcon className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(n);
+        }}
+        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 hover:bg-red-50 transition-all"
+        title="Supprimer"
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
       </button>
     </div>
   );
 });
 
-export default function Documents() {
+export default function Documents({ filterHint }: { filterHint?: string }) {
   const toast = useToast();
   const tabs = useTabs();
+  const confirm = useConfirm();
   const [docs, setDocs] = useState<FileItem[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -148,17 +173,32 @@ export default function Documents() {
     };
   }, []);
 
+  useEffect(() => {
+    if (filterHint === "note" || filterHint === "pdf" || filterHint === "image" || filterHint === "board") {
+      setFilter({ kind: "type", value: filterHint });
+    } else {
+      setFilter({ kind: "all" });
+    }
+  }, [filterHint]);
+
   const courseName = useCallback((id: number | null) => courses.find((c) => c.id === id)?.name, [courses]);
 
   const importDocs = async () => {
-    const added = (await api.importFiles(null)) ?? [];
-    if (added.length) {
-      added.forEach((f) => api.logEvent("file_import", f.name, null));
-      toast(fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }), "success");
-      await api.reindexDocuments();
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    try {
+      toast(get("messages.importing", "Import…"), "info");
+      const added = (await api.importFiles(null)) ?? [];
+      if (added.length) {
+        added.forEach((f) => api.logEvent("file_import", f.name, null));
+        toast(fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }), "success");
+        await api.indexImportedPdfs(added).catch(() => {});
+        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      } else {
+        toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+      }
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
     }
-    refresh();
   };
 
   const openFile = (f: FileItem) => {
@@ -188,6 +228,46 @@ export default function Documents() {
   }, []);
   const handleRenameFile = useCallback((f: FileItem) => startRenameFile(f), [startRenameFile]);
   const handleRenameNote = useCallback((n: Note) => startRenameNote(n), [startRenameNote]);
+
+  const deleteFileItem = useCallback(async (f: FileItem) => {
+    const ok = await confirm.ask({
+      title: get("common.delete", "Supprimer"),
+      message: `Supprimer le fichier « ${f.name} » ?`,
+      confirmLabel: get("common.delete", "Supprimer"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteFile(f.id);
+      tabs.tabs
+        .filter((t) => t.params.fileId === f.id)
+        .forEach((t) => tabs.close(t.id));
+      toast(get("documents.toastDeleted", "Supprimé"), "success");
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    } catch (err: any) {
+      toast(err?.message || get("messages.genericError", "Erreur"), "error");
+    }
+  }, [confirm, tabs, toast]);
+
+  const deleteNoteItem = useCallback(async (n: Note) => {
+    const ok = await confirm.ask({
+      title: get("notes.deleteConfirm", "Supprimer cette note ?"),
+      message: get("notes.deleteConfirm", "Supprimer cette note ?"),
+      confirmLabel: get("common.delete", "Supprimer"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteNote(n.id);
+      tabs.tabs
+        .filter((t) => t.kind === "note" && t.params.noteId === n.id)
+        .forEach((t) => tabs.close(t.id));
+      toast(get("notes.deleted", "Note supprimée"), "success");
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    } catch (err: any) {
+      toast(err?.message || get("messages.genericError", "Erreur"), "error");
+    }
+  }, [confirm, tabs, toast]);
 
   const closeRename = useCallback(() => {
     setRenameTarget(null);
@@ -374,9 +454,9 @@ export default function Documents() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {g.its.map((it) =>
                   it.t === "file" ? (
-                    <MemoFileItem key={`f${it.f.id}`} f={it.f} onOpen={handleOpenFile} onRename={handleRenameFile} courseName={courseName} />
+                    <MemoFileItem key={`f${it.f.id}`} f={it.f} onOpen={handleOpenFile} onRename={handleRenameFile} onDelete={deleteFileItem} courseName={courseName} />
                   ) : (
-                    <MemoNoteItem key={`n${it.n.id}`} n={it.n} onOpen={handleOpenNote} onRename={handleRenameNote} courseName={courseName} />
+                    <MemoNoteItem key={`n${it.n.id}`} n={it.n} onOpen={handleOpenNote} onRename={handleRenameNote} onDelete={deleteNoteItem} courseName={courseName} />
                   )
                 )}
               </div>

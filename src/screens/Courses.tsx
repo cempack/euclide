@@ -84,7 +84,6 @@ export default function Courses() {
   const [editIconKey, setEditIconKey] = useState("book");
 
   const refresh = () => {
-    setLoading(true);
     api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {}).finally(() => setLoading(false));
   };
   useEffect(() => {

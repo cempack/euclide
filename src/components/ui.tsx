@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
   type ErrorInfo,
@@ -26,6 +27,7 @@ import {
   Ruler,
 } from "lucide-react";
 import { CheckCircleIcon, XIcon } from "./icons";
+import { get } from "../lib/i18n";
 
 // ---------------------------------------------------------------------------
 // ErrorBoundary — critical for Tauri transparent/vibrancy windows.
@@ -72,12 +74,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: R
               padding: 24,
             }}
           >
-            <div style={{ maxWidth: 720, width: "100%" }}>
+            <div style={{ maxWidth: 520, width: "100%" }}>
               <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "#fa520f" }}>
-                Euclide — UI error (black screen prevented)
+                Euclide — erreur d’affichage
               </div>
-              <div style={{ opacity: 0.85, marginBottom: 12 }}>
-                An error occurred while rendering. The transparent window would have been black; this boundary forced a visible report.
+              <div style={{ opacity: 0.85, marginBottom: 12, lineHeight: 1.45 }}>
+                Une erreur a interrompu l’écran. Rechargez l’application. Le détail est dans la console.
               </div>
               <pre
                 style={{
@@ -91,12 +93,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: R
                 }}
               >
                 {err?.message || String(err)}
-                {"\n\n"}
-                {err?.stack || ""}
               </pre>
-              <div style={{ marginTop: 12, fontSize: 11, opacity: 0.6 }}>
-                Check console (or window.__EUCLIDE_LAST_ERROR__) for full details. Fix the key/path in src/locales/strings.json or the access site.
-              </div>
             </div>
           </div>
         )
@@ -109,6 +106,25 @@ export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: R
 // ---------------------------------------------------------------------------
 // Modal
 // ---------------------------------------------------------------------------
+
+const FOCUSABLE = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+
+function trapFocus(container: HTMLElement, e: KeyboardEvent) {
+  if (e.key !== "Tab") return;
+  const items = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1 && el.offsetParent !== null
+  );
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
 
 export function Modal({
   open,
@@ -123,10 +139,26 @@ export function Modal({
   children: ReactNode;
   width?: string;
 }) {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const restoreRef = React.useRef<HTMLElement | null>(null);
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    if (!open) return;
+    restoreRef.current = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (panelRef.current) trapFocus(panelRef.current, e);
+    };
+    window.addEventListener("keydown", onKey);
+    const t = window.setTimeout(() => {
+      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+      first?.focus();
+    }, 20);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(t);
+      restoreRef.current?.focus?.();
+    };
   }, [open, onClose]);
 
   return (
@@ -142,6 +174,10 @@ export function Modal({
             onClick={onClose}
           />
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             className={`relative w-full ${width} new-card p-6`}
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -154,6 +190,152 @@ export function Modal({
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+export type ConfirmAskOpts = {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+};
+
+export type ConfirmDirtyOpts = {
+  title: string;
+  message: string;
+};
+
+export type ConfirmApi = {
+  ask: (opts: ConfirmAskOpts) => Promise<boolean>;
+  dirty: (opts: ConfirmDirtyOpts) => Promise<"save" | "discard" | "cancel">;
+};
+
+const ConfirmCtx = createContext<ConfirmApi | null>(null);
+export const useConfirm = (): ConfirmApi => {
+  const c = useContext(ConfirmCtx);
+  if (!c) throw new Error("useConfirm: no provider");
+  return c;
+};
+
+type ConfirmState =
+  | { mode: "ask"; opts: ConfirmAskOpts; resolve: (v: boolean) => void }
+  | { mode: "dirty"; opts: ConfirmDirtyOpts; resolve: (v: "save" | "discard" | "cancel") => void }
+  | null;
+
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<ConfirmState>(null);
+  const stateRef = React.useRef<ConfirmState>(null);
+  stateRef.current = state;
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const restoreRef = React.useRef<HTMLElement | null>(null);
+
+  const ask = useCallback((opts: ConfirmAskOpts) => {
+    return new Promise<boolean>((resolve) => {
+      setState({ mode: "ask", opts, resolve });
+    });
+  }, []);
+
+  const dirty = useCallback((opts: ConfirmDirtyOpts) => {
+    return new Promise<"save" | "discard" | "cancel">((resolve) => {
+      setState({ mode: "dirty", opts, resolve });
+    });
+  }, []);
+
+  const api = useMemo<ConfirmApi>(() => ({ ask, dirty }), [ask, dirty]);
+
+  const closeAsk = useCallback((value: boolean) => {
+    const s = stateRef.current;
+    if (s?.mode === "ask") s.resolve(value);
+    setState(null);
+  }, []);
+  const closeDirty = useCallback((value: "save" | "discard" | "cancel") => {
+    const s = stateRef.current;
+    if (s?.mode === "dirty") s.resolve(value);
+    setState(null);
+  }, []);
+
+  useEffect(() => {
+    if (!state) return;
+    restoreRef.current = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        const s = stateRef.current;
+        if (s?.mode === "ask") closeAsk(false);
+        else if (s?.mode === "dirty") closeDirty("cancel");
+      }
+      if (panelRef.current) trapFocus(panelRef.current, e);
+    };
+    window.addEventListener("keydown", onKey);
+    const t = window.setTimeout(() => {
+      const buttons = panelRef.current?.querySelectorAll<HTMLElement>("button");
+      const primary = buttons?.[buttons.length - 1];
+      primary?.focus();
+    }, 20);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(t);
+      restoreRef.current?.focus?.();
+    };
+  }, [state, closeAsk, closeDirty]);
+
+  return (
+    <ConfirmCtx.Provider value={api}>
+      {children}
+      <AnimatePresence>
+        {state && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-6">
+            <motion.div
+              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.1 }}
+              onClick={() => (state.mode === "ask" ? closeAsk(false) : closeDirty("cancel"))}
+            />
+            <motion.div
+              ref={panelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={state.opts.title}
+              className="relative w-full max-w-md new-card p-6"
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 6 }}
+              transition={{ type: "spring", stiffness: 480, damping: 32, mass: 0.9 }}
+            >
+              <h2 className="text-on-surface font-semibold tracking-tight text-lg mb-2">{state.opts.title}</h2>
+              <p className="text-sm text-mute mb-5">{state.opts.message}</p>
+              {state.mode === "ask" ? (
+                <div className="flex justify-end gap-2">
+                  <button className="new-btn-ghost" onClick={() => closeAsk(false)}>
+                    {state.opts.cancelLabel || "Annuler"}
+                  </button>
+                  <button
+                    className={state.opts.danger ? "new-btn-primary bg-tui-danger border-tui-danger" : "new-btn-primary"}
+                    onClick={() => closeAsk(true)}
+                  >
+                    {state.opts.confirmLabel || "Confirmer"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2 flex-wrap">
+                  <button className="new-btn-ghost" onClick={() => closeDirty("cancel")}>
+                    {get("confirm.cancel", "Annuler")}
+                  </button>
+                  <button className="new-btn-ghost" onClick={() => closeDirty("discard")}>
+                    {get("confirm.discard", "Ne pas enregistrer")}
+                  </button>
+                  <button className="new-btn-primary" onClick={() => closeDirty("save")}>
+                    {get("confirm.save", "Enregistrer")}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </ConfirmCtx.Provider>
   );
 }
 

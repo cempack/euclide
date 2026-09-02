@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Course } from "../lib/api";
 import { useTabs } from "../lib/tabs";
-import { useToast } from "./ui";
+import { useToast, useConfirm } from "./ui";
 import { DownloadIcon, TrashIcon, UndoIcon, PenIcon, EraserIcon, LineIcon, RectIcon, EllipseIcon, TextIcon } from "./icons";
 import { get } from "../lib/i18n";
 
@@ -14,8 +14,8 @@ interface Shape { type: 'line'|'rect'|'ellipse'; x1:number; y1:number; x2:number
 interface TextItem { x:number; y:number; text:string; color:string; size:number; opacity?:number; }
 interface BoardDoc { version:1|2; strokes:Stroke[]; shapes?:Shape[]; texts?:TextItem[]; }
 
-export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: number }) {
-  const toast = useToast(); const tabs = useTabs();
+export default function Whiteboard({ tabId, fileId, visible = true }: { tabId: string; fileId?: number; visible?: boolean }) {
+  const toast = useToast(); const tabs = useTabs(); const confirm = useConfirm();
   const wrapRef = useRef<HTMLDivElement>(null); const canvasRef = useRef<HTMLCanvasElement>(null); const ctxRef = useRef<CanvasRenderingContext2D|null>(null);
   const strokes = useRef<Stroke[]>([]); const shapes = useRef<Shape[]>([]); const texts = useRef<TextItem[]>([]);
   const current = useRef<Stroke|null>(null); const drawing = useRef(false); const startPoint = useRef<Point|null>(null); const currentPos = useRef<Point>({x:0,y:0});
@@ -57,6 +57,21 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
   },[]);
 
   useEffect(()=>{ const w=wrapRef.current; if(w){ const r=w.getBoundingClientRect(); if(r.width>0) updateCanvasSize(r.width,r.height,zoom); } },[zoom]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const w = wrapRef.current;
+    if (!w) return;
+    requestAnimationFrame(() => {
+      const r = w.getBoundingClientRect();
+      if (r.width > 0) updateCanvasSize(r.width, r.height, zoomRef.current);
+    });
+  }, [visible]);
+
+  useEffect(() => {
+    tabs.setTabDirty(tabId, dirty);
+    return () => tabs.setTabDirty(tabId, false);
+  }, [tabId, dirty, tabs]);
 
   useEffect(()=>{
     api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(()=>{}); if(fileId) api.readBoard(fileId).then(raw=>{ try{ if(typeof raw !== "string" || !raw) return; const d=JSON.parse(raw) as BoardDoc; if(!d || typeof d !== "object") return; if(pendingText||pendingTextRef.current||editingTextOriginal.current){ editingTextOriginal.current=null; setPendingText(null); pendingTextRef.current=null; } strokes.current=d.strokes??[]; shapes.current=d.shapes??[]; texts.current=d.texts??[]; history.current=[]; setItemCount(strokes.current.length+shapes.current.length+texts.current.length); const rr=wrapRef.current?.getBoundingClientRect(); if(rr&&rr.width>0)updateCanvasSize(rr.width,rr.height,zoomRef.current); redraw(); }catch{} }).catch(()=>{});
@@ -127,14 +142,20 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
   };
 
   const undo=()=>{ if(!history.current.length)return; const l=history.current.pop()!; if(l==='stroke'&&strokes.current.length)strokes.current.pop(); else if(l==='shape'&&shapes.current.length)shapes.current.pop(); else if(l==='text'&&texts.current.length)texts.current.pop(); setItemCount(getItemCount()); setDirty(true); redraw(); };
-  const clear=()=>{ if(pendingText||pendingTextRef.current){ editingTextOriginal.current = null; setPendingText(null);pendingTextRef.current=null;} strokes.current=[];shapes.current=[];texts.current=[];history.current=[];setItemCount(0);setDirty(true);redraw(); };
+  const clear=async()=>{ if(itemCount===0)return; const ok = await confirm.ask({ title: get("whiteboard.clearAll","Effacer"), message: get("whiteboard.clearConfirm","Effacer tout le tableau ?"), confirmLabel: get("whiteboard.clearAll","Effacer"), danger: true }); if(!ok) return; if(pendingText||pendingTextRef.current){ editingTextOriginal.current = null; setPendingText(null);pendingTextRef.current=null;} strokes.current=[];shapes.current=[];texts.current=[];history.current=[];setItemCount(0);setDirty(true);redraw(); };
   const save=async()=>{
     try {
       if(pendingText||pendingTextRef.current)commitPendingText();
       const doc:BoardDoc={version:2,strokes:strokes.current,shapes:shapes.current,texts:texts.current};
       const f=await api.saveBoard({file_id:currentFileId??null,course_id:courseId,json:JSON.stringify(doc)});
       if(!f?.id){ toast(get("messages.genericError","Erreur"),"error"); return; }
-      setCurrentFileId(f.id); tabs.rename(tabId,f.name); api.logEvent('whiteboard_save',f.name,courseId); setDirty(false); toast(get("whiteboard.saved","Enregistré"),"success"); window.dispatchEvent(new CustomEvent('eu:library-changed'));
+      setCurrentFileId(f.id);
+      if (!currentFileId && f.id) {
+        tabs.retarget(tabId, `whiteboard:${f.id}`, f.name, { fileId: f.id, isNew: false });
+      } else {
+        tabs.rename(tabId,f.name);
+      }
+      api.logEvent('whiteboard_save',f.name,courseId); setDirty(false); toast(get("whiteboard.saved","Enregistré"),"success"); window.dispatchEvent(new CustomEvent('eu:library-changed'));
       api.ensureOriginalVersion(f.id).catch(()=>{}).then(() => { api.getFileVersions(f.id).then(setVersions).catch(()=>{}); });
     } catch {
       toast(get("messages.genericError","Erreur"),"error");
@@ -151,6 +172,10 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
       toast(get("messages.genericError","Erreur"),"error");
     }
   };
+
+  useEffect(() => {
+    return tabs.registerFlush(tabId, save);
+  }, [tabId, tabs, currentFileId, courseId, dirty]);
   const zoomIn=()=>setZoom(z=>Math.min(4,z*1.25)); const zoomOut=()=>setZoom(z=>Math.max(.25,z/1.25)); const resetZoom=()=>setZoom(1);
 
   const cancelPendingText = () => {
@@ -278,9 +303,9 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
                 }
               }}
             >
-              <option value="" disabled>Versions ({versions.length})</option>
+              <option value="" disabled>{get("pdf.versions", "Versions")} ({versions.length})</option>
               {versions.length === 0 ? (
-                <option value="" disabled>(no previous yet - save to create)</option>
+                <option value="" disabled>{get("pdf.noVersionsYet", "Aucune version — enregistrez pour créer")}</option>
               ) : (
                 versions.slice().reverse().map((v: any, i: number) => {
                   const isOrig = v.timestamp === "original" || (typeof v.backup_name === "string" && v.backup_name.includes("original"));
@@ -291,7 +316,7 @@ export default function Whiteboard({ tabId, fileId }: { tabId: string; fileId?: 
             </select>
           </div>
         </div>
-        <div className="shrink-0 flex items-center gap-1.5 pl-2 border-l border-hairline text-xs"><div className="relative"><select value={courseId??''} onChange={e=>setCourseId(e.target.value?Number(e.target.value):null)} className="new-input w-auto py-0.5 text-xs min-w-[78px] appearance-none pr-4 pl-1.5 eu-no-drag"><option value="">Sans cours</option>{courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><span className="absolute right-[1px] top-1/2 -translate-y-1/2 text-[10px] text-body-mute pointer-events-none select-none">▾</span></div><button onClick={exportPng} className="new-btn-ghost px-1 py-0.5"><DownloadIcon className="w-3.5 h-3.5"/></button><button onClick={save} className="bg-tui-accent hover:brightness-110 active:brightness-90 text-white px-3 py-0.5 rounded-[12px] text-xs font-medium min-w-[72px]">Enregistrer{dirty&&<span className="text-[10px] ml-0.5">*</span>}</button></div>
+        <div className="shrink-0 flex items-center gap-1.5 pl-2 border-l border-hairline text-xs"><div className="relative"><select value={courseId??''} onChange={e=>setCourseId(e.target.value?Number(e.target.value):null)} className="new-input w-auto py-0.5 text-xs min-w-[78px] appearance-none pr-4 pl-1.5 eu-no-drag"><option value="">Sans cours</option>{courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><span className="absolute right-[1px] top-1/2 -translate-y-1/2 text-[10px] text-body-mute pointer-events-none select-none">▾</span></div><button onClick={exportPng} className="new-btn-ghost px-1 py-0.5"><DownloadIcon className="w-3.5 h-3.5"/></button><button onClick={save} className="new-btn-primary px-3 py-0.5 text-xs min-w-[72px]">Enregistrer{dirty&&<span className="text-[10px] ml-0.5">*</span>}</button></div>
       </div>
       <div ref={wrapRef} className="flex-1 min-h-0 bg-[#f8f7f4] border-t border-hairline overflow-auto eu-no-drag" onWheel={e=>{if((e.ctrlKey||e.metaKey)&&wrapRef.current){e.preventDefault();const f=e.deltaY<0?1.1:0.9;setZoom(z=>Math.max(0.25,Math.min(4,z*f)));}}}>
         <div style={{position:'relative',width:`${pageSize.w}px`,height:`${pageSize.h}px`}}>

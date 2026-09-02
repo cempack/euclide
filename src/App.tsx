@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
-import { api, type AppInfo, isTauri } from "./lib/api";
+import { api, type AppInfo, type FileItem, isTauri } from "./lib/api";
 import { get } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 
-import { TabsProvider, useTabs, type TabKind } from "./lib/tabs";
-import { ToastProvider, useToast, Loading, COURSE_ICONS } from "./components/ui";
+import { TabsProvider, useTabs, type Tab, type TabKind } from "./lib/tabs";
+import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import ShortcutsHelp from "./components/ShortcutsHelp";
 import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
@@ -27,6 +27,7 @@ import {
  ImageIcon,
  FolderIcon,
  SparkleIcon,
+ ClockIcon,
 } from "./components/icons";
 import Dashboard from "./screens/Dashboard";
 import Courses from "./screens/Courses";
@@ -66,10 +67,28 @@ const NAV: { kind: TabKind; label: string; icon: React.ReactNode }[] = [
  { kind: "settings", label: get("nav.settings", "Réglages"), icon: <GearIcon className="w-[18px] h-[18px]" /> },
 ];
 
-const Sidebar = memo(function Sidebar() {
+function navKindActive(navKind: TabKind, activeKind?: TabKind): boolean {
+ if (!activeKind) return false;
+ if (navKind === activeKind) return true;
+ if (navKind === "courses" && (activeKind === "course" || activeKind === "class-content")) return true;
+ if (navKind === "documents" && activeKind === "pdf") return true;
+ if (navKind === "note" && activeKind === "note") return true;
+ if (navKind === "whiteboard" && activeKind === "whiteboard") return true;
+ return false;
+}
 
+async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "success" | "error") => void) {
+ if (!added.length) return;
+ added.forEach((f) => api.logEvent("file_import", f.name, null));
+ toast(get("messages.indexing", "Indexation…"), "info");
+ await api.indexImportedPdfs(added).catch(() => {});
+ window.dispatchEvent(new CustomEvent("eu:library-changed"));
+ toast(get("messages.imported", "{count} importé(s)").replace("{count}", String(added.length)), "success");
+}
+
+const Sidebar = memo(function Sidebar() {
  const tabs = useTabs();
- const isActive = (kind: TabKind) => tabs.active?.kind === kind;
+ const isActive = (kind: TabKind) => navKindActive(kind, tabs.active?.kind);
 
  return (
  <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono pt-10`}>
@@ -111,10 +130,48 @@ const Sidebar = memo(function Sidebar() {
  );
 });
 
-const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; onSearch: () => void }) {
+function formatTimer(sec: number) {
+ const m = Math.floor(Math.max(0, sec) / 60);
+ const s = Math.max(0, sec) % 60;
+ return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function beep() {
+ try {
+ const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+ const ctx = new Ctx();
+ const osc = ctx.createOscillator();
+ const g = ctx.createGain();
+ osc.frequency.value = 880;
+ osc.connect(g);
+ g.connect(ctx.destination);
+ g.gain.setValueAtTime(0.08, ctx.currentTime);
+ osc.start();
+ osc.stop(ctx.currentTime + 0.28);
+ } catch {
+ // ignore
+ }
+}
+
+const TopBar = memo(function TopBar({
+ onHelp,
+ onSearch,
+ onCloseTab,
+ timerSec,
+ timerRunning,
+ onToggleTimer,
+ onStopTimer,
+}: {
+ onHelp: () => void;
+ onSearch: () => void;
+ onCloseTab: (id: string) => void;
+ timerSec: number | null;
+ timerRunning: boolean;
+ onToggleTimer: () => void;
+ onStopTimer: () => void;
+}) {
  const tabs = useTabs();
 
- // Cache for per-course tab icons (key + color) so course tabs show the user-chosen SVG icon instead of generic BookIcon
  const [courseIconMap, setCourseIconMap] = useState<Record<number, { key: string; color: string }>>({});
 
  useEffect(() => {
@@ -139,25 +196,24 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
  .catch(() => {
  setCourseIconMap({});
  });
- }, [tabs.tabs.length]); // refresh icon map when course tabs change (listCourses is cached)
+ }, [tabs.tabs.length]);
 
  return (
  <div
  className="eu-topbar h-14 shrink-0 flex items-center bg-transparent font-mono overflow-hidden border-b border-hairline"
  style={{ paddingLeft: 12 }}
  >
- {/* Tab strip group (content-sized when few tabs; shrinks + scrolls internally when many).
- The + lives right after the scroller (inside the group, before the big spacer) so it is
- always visible at the end of the tabs area — never scrolls away and is easy to spot. */}
  <div className="h-full flex items-stretch min-w-0">
  <div className="h-full flex items-stretch gap-0.5 overflow-x-auto text-xs min-w-0 pr-1">
  {tabs.tabs.map((tab) => {
  const active = tab.id === tabs.activeId;
+ const dirty = tabs.isDirty(tab.id);
  return (
- <div
+ <button
  key={tab.id}
+ type="button"
  onClick={() => tabs.setActive(tab.id)}
- className={`group h-full flex items-center gap-1.5 px-4 cursor-default select-none whitespace-nowrap rounded-t-sm transition-all border-b-2 ${active
+ className={`group h-full flex items-center gap-1.5 px-4 select-none whitespace-nowrap rounded-t-sm transition-all border-b-2 ${active
  ? "border-tui-accent text-primary bg-surface-soft/60 font-medium"
  : "border-transparent text-ash hover:text-primary hover:bg-surface-soft/40 hover:border-hairline/60"
  }`}
@@ -190,30 +246,31 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
  if (tab.kind === "documents") {
  return <FolderIcon className="w-4 h-4" />;
  }
+ if (tab.kind === "recap") {
+ return <SparkleIcon className="w-4 h-4" />;
+ }
  return TAB_ICONS[tab.kind];
  })()}
  </span>
  <span className="truncate max-w-[140px] tracking-[-0.1px]">{tab.title}</span>
+ {dirty && <span className="w-1.5 h-1.5 rounded-full bg-tui-accent shrink-0" title="Non enregistré" />}
  {tabs.tabs.length > 1 && (
- <button
- onClick={(e) => { e.stopPropagation(); tabs.close(tab.id); }}
+ <span
+ role="button"
+ tabIndex={0}
+ onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
+ onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onCloseTab(tab.id); } }}
  className={`shrink-0 w-4 h-4 ml-0.5 -mr-0.5 flex items-center justify-center rounded-sm transition-all ${active ? "opacity-40" : "opacity-0"} group-hover:opacity-60 hover:opacity-100 hover:bg-red-100 hover:text-red-600`}
  >
  <XIcon className="w-3 h-3" />
- </button>
+ </span>
  )}
- </div>
+ </button>
  );
  })}
  </div>
- {/* New tab "+" — placed immediately after the tabs scroller (with small gap) so it is always
- visible and clearly associated with the tab strip, even when the tab list scrolls. */}
  <button
  onClick={() => {
- // Nouvel onglet (dashboard). Matches the ⌘T shortcut and the original
- // "new tab" affordance. Since dashboard is a singleton, this just
- // activates it (or creates if somehow closed). The tabs provider
- // handles maxTabs eviction for non-singletons.
  if (tabs.active?.kind !== "dashboard") {
  tabs.open({ kind: "dashboard" });
  }
@@ -231,11 +288,34 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
  </button>
  </div>
 
- {/* Spacer so left (logo + tabs) hugs left and right tools hug right; avoids sparse empty inside tab strip when few tabs open */}
  <div className="flex-1" />
 
- {/* Right-side actions (search + icon tools). Cleaner, fewer borders on icon buttons. */}
  <div className="flex items-center gap-1.5 shrink-0 pl-2 pr-2 h-full">
+ {timerSec != null && (
+ <div className="flex items-center gap-1 mr-1">
+ <button
+ onClick={onToggleTimer}
+ className={`flex items-center gap-1.5 h-8 px-2.5 text-xs rounded border font-mono tabular-nums ${
+ timerSec <= 0
+ ? "border-tui-danger text-tui-danger bg-red-50"
+ : timerRunning
+ ? "border-tui-accent text-primary bg-surface-soft"
+ : "border-hairline text-mute bg-surface-soft/40"
+ }`}
+ title={timerRunning ? "Pause" : "Reprendre"}
+ >
+ <ClockIcon className="w-3.5 h-3.5" />
+ {timerSec <= 0 ? "00:00" : formatTimer(timerSec)}
+ </button>
+ <button
+ onClick={onStopTimer}
+ className="w-7 h-7 grid place-items-center rounded border border-hairline text-mute hover:text-primary"
+ title="Arrêter le minuteur"
+ >
+ <XIcon className="w-3 h-3" />
+ </button>
+ </div>
+ )}
  <button
  onClick={onSearch}
  title={`Rechercher (${isMac ? "⌘" : "Ctrl"}K)`}
@@ -246,7 +326,6 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
  <span className="inline-flex items-center justify-center px-1 py-px rounded border border-hairline/50 bg-surface text-[8px] font-mono text-ash/70 tabular-nums">{isMac ? "⌘K" : "Ctrl+K"}</span>
  </button>
 
- {/* Icon cluster: help + account. Borderless for cleaner titlebar look. */}
  <div className="flex items-center gap-0.5 pl-1">
  <button
  onClick={onHelp}
@@ -268,23 +347,29 @@ const TopBar = memo(function TopBar({ onHelp, onSearch }: { onHelp: () => void; 
  );
 });
 
-
-const MainContent = memo(function MainContent({ info, activeId }: { info: AppInfo | null; activeId: string | null }) {
+const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }) {
+ const tabs = useTabs();
+ return (
+ <div className="flex-1 min-h-0 relative bg-[rgb(var(--eu-bg))]">
+ {tabs.tabs.map((tab) => {
+ const visible = tab.id === tabs.activeId;
  return (
  <div
- key={activeId}
- className="flex-1 min-h-0 bg-[rgb(var(--eu-bg))] animate-fade-in"
+ key={tab.mountId}
+ className="absolute inset-0 flex flex-col min-h-0"
+ style={{ display: visible ? "flex" : "none" }}
+ aria-hidden={!visible}
+ {...(!visible ? ({ inert: "" } as Record<string, string>) : {})}
  >
- <TabContent info={info} />
+ <TabPane info={info} tab={tab} visible={visible} />
+ </div>
+ );
+ })}
  </div>
  );
 });
 
-function TabContent({ info }: { info: AppInfo | null }) {
- const tabs = useTabs();
- const tab = tabs.active;
- if (!tab) return null;
-
+function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
  switch (tab.kind) {
  case "dashboard":
  return <Scroll><Dashboard info={info} /></Scroll>;
@@ -311,7 +396,7 @@ function TabContent({ info }: { info: AppInfo | null }) {
  </Scroll>
  );
  case "documents":
- return <Scroll><Documents /></Scroll>;
+ return <Scroll><Documents filterHint={tab.params.filter} /></Scroll>;
  case "tools":
  return <Scroll><Tools /></Scroll>;
  case "python":
@@ -335,7 +420,7 @@ function TabContent({ info }: { info: AppInfo | null }) {
  case "whiteboard":
  return (
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
- <Whiteboard tabId={tab.id} fileId={tab.params.fileId} />
+ <Whiteboard tabId={tab.id} fileId={tab.params.fileId} visible={visible} />
  </Suspense>
  );
  case "pdf":
@@ -347,7 +432,7 @@ function TabContent({ info }: { info: AppInfo | null }) {
  case "note":
  return (
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
- <NoteEditor noteId={tab.params.noteId} isNew={!!tab.params.isNew} initialCourseId={tab.params.courseId} />
+ <NoteEditor tabId={tab.id} noteId={tab.params.noteId} isNew={!!tab.params.isNew} initialCourseId={tab.params.courseId} />
  </Suspense>
  );
  default:
@@ -371,8 +456,13 @@ function Shell() {
  const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
  const tabs = useTabs();
  const toast = useToast();
+ const confirm = useConfirm();
 
- // For activity time tracking (Bilan / Recap).
+ const [timerSec, setTimerSec] = useState<number | null>(null);
+ const [timerRunning, setTimerRunning] = useState(false);
+ const timerRunningRef = useRef(false);
+ useEffect(() => { timerRunningRef.current = timerRunning; }, [timerRunning]);
+
  const activityContextRef = useRef<{ area: string; courseId: number | null }>({ area: "dashboard", courseId: null });
  const [appFocused, setAppFocused] = useState(true);
  const appFocusedRef = useRef(appFocused);
@@ -388,14 +478,56 @@ function Shell() {
  };
  }, [tabs.activeId, tabs.active?.kind, tabs.active?.params?.courseId]);
 
- // (Vibrancy removed – using standard native decorations for window controls.)
-
  const handleHelp = useCallback(() => setHelp(true), []);
  const handleSearch = useCallback(() => setPalette(true), []);
+
+ const requestClose = useCallback(async (id: string) => {
+ if (tabs.isDirty(id)) {
+ const choice = await confirm.dirty({
+ title: get("confirm.unsavedTitle", "Modifications non enregistrées"),
+ message: get("confirm.unsavedMessage", "Enregistrer avant de fermer cet onglet ?"),
+ });
+ if (choice === "cancel") return;
+ if (choice === "save") {
+ try {
+ await tabs.flush(id);
+ } catch {
+ toast(get("messages.genericError", "Erreur"), "error");
+ return;
+ }
+ }
+ }
+ tabs.close(id);
+ }, [tabs, confirm, toast]);
 
  useEffect(() => {
  api.appInfo().then(setInfo).catch(() => {});
  }, []);
+
+ useEffect(() => {
+ const onStart = (e: Event) => {
+ const minutes = Number((e as CustomEvent).detail?.minutes) || 5;
+ setTimerSec(minutes * 60);
+ setTimerRunning(true);
+ };
+ window.addEventListener("eu:timer-start", onStart as EventListener);
+ return () => window.removeEventListener("eu:timer-start", onStart as EventListener);
+ }, []);
+
+ useEffect(() => {
+ if (!timerRunning) return;
+ const id = window.setInterval(() => {
+ setTimerSec((s) => (s == null || s <= 0 ? s : s - 1));
+ }, 1000);
+ return () => clearInterval(id);
+ }, [timerRunning]);
+
+ useEffect(() => {
+ if (timerSec !== 0 || !timerRunning) return;
+ setTimerRunning(false);
+ beep();
+ toast(get("timer.done", "Minuteur terminé"), "success");
+ }, [timerSec, timerRunning, toast]);
 
  useEffect(() => {
  const onAvailable = (e: Event) => {
@@ -427,7 +559,6 @@ function Shell() {
  };
  }, []);
 
- // Global drag-and-drop file import into the documents library.
  useEffect(() => {
  let unlisten: (() => void) | undefined;
  let active = true;
@@ -442,13 +573,9 @@ function Shell() {
  const paths = p.paths ?? [];
  if (!paths.length) return;
  try {
+ toast(get("messages.importing", "Import…"), "info");
  const added = await api.importPaths(paths, null);
- if (added.length) {
- added.forEach((f) => api.logEvent("file_import", f.name, null));
- await api.reindexDocuments();
- window.dispatchEvent(new CustomEvent("eu:library-changed"));
- toast(get("messages.imported", "{count} importé(s)").replace("{count}", String(added.length)), "success");
- }
+ await afterImport(added, toast);
  } catch {
  toast(get("messages.genericError", "Erreur"), "error");
  }
@@ -484,7 +611,6 @@ function Shell() {
  };
  }, []);
 
- // Window focus/blur tracking (Tauri) + seeds to ensure time recording starts/credits immediately on use.
  useEffect(() => {
  if (!isTauri()) return;
  let unlistenFocus: (() => void) | undefined;
@@ -495,7 +621,6 @@ function Shell() {
  const win = getCurrentWindow();
  unlistenFocus = await win.listen("tauri://focus", () => {
  setAppFocused(true);
- // seed a tick shortly after gaining focus
  setTimeout(() => {
  if (document.visibilityState === "visible") {
  const ctx = activityContextRef.current;
@@ -505,7 +630,7 @@ function Shell() {
  });
  unlistenBlur = await win.listen("tauri://blur", () => setAppFocused(false));
  } catch {
- // ignore in non-tauri or error
+ // ignore
  }
  })();
  return () => {
@@ -516,21 +641,18 @@ function Shell() {
 
  useEffect(() => {
  const onKey = (e: KeyboardEvent) => {
- // Cross-platform modifier: Cmd on macOS, Ctrl on Windows/Linux.
- // Matches the dynamic labels in SHORTCUTS (MOD) and the help UI.
  const mod = isMac ? e.metaKey : e.ctrlKey;
  if (mod && e.key.toLowerCase() === "k") {
  e.preventDefault();
  setPalette((p) => !p);
  } else if (mod && e.key.toLowerCase() === "t") {
  e.preventDefault();
- // Nouvel onglet (matches the topbar + button and the shortcuts doc)
  if (tabs.active?.kind !== "dashboard") {
  tabs.open({ kind: "dashboard" });
  }
  } else if (mod && e.key.toLowerCase() === "w") {
  e.preventDefault();
- if (tabs.activeId) tabs.close(tabs.activeId);
+ if (tabs.activeId) void requestClose(tabs.activeId);
  } else if (mod && e.key.toLowerCase() === "d") {
  e.preventDefault();
  if (tabs.active?.kind !== "dashboard") {
@@ -538,7 +660,6 @@ function Shell() {
  }
  } else if (mod && e.key.toLowerCase() === "f") {
  e.preventDefault();
- // Rechercher un document (open the documents library / search view)
  tabs.open({ kind: "documents" });
  } else if (mod && e.key.toLowerCase() === "b") {
  e.preventDefault();
@@ -552,27 +673,42 @@ function Shell() {
  } else if (mod && e.key === "/") {
  e.preventDefault();
  setHelp((h) => !h);
- } else if (e.ctrlKey && e.key === "Tab") {
- // "Onglet suivant" is always Ctrl+Tab (even on macOS, per the shortcuts doc),
- // to avoid conflicting with OS-level Cmd+Tab (app switcher).
- // Works on Linux/Windows with Ctrl+Tab too.
+ } else if (e.ctrlKey && (e.key === "Tab" || e.code === "Tab")) {
  e.preventDefault();
- tabs.next();
+ e.stopPropagation();
+ if (e.shiftKey) tabs.prev();
+ else tabs.next();
  } else if (mod && /^[1-9]$/.test(e.key)) {
  e.preventDefault();
  tabs.focusIndex(Number(e.key) - 1);
  }
  };
- window.addEventListener("keydown", onKey);
- return () => window.removeEventListener("keydown", onKey);
- }, [tabs]);
+ window.addEventListener("keydown", onKey, true);
+ return () => window.removeEventListener("keydown", onKey, true);
+ }, [tabs, requestClose]);
 
  return (
  <div className="flex h-full w-full overflow-hidden bg-[rgb(var(--eu-bg))] eu-root">
  <Sidebar />
  <main className="flex-1 h-full flex flex-col min-w-0 bg-[rgb(var(--eu-bg))] eu-main">
- <TopBar onHelp={handleHelp} onSearch={handleSearch} />
- <MainContent info={info} activeId={tabs.activeId} />
+ <TopBar
+ onHelp={handleHelp}
+ onSearch={handleSearch}
+ onCloseTab={(id) => { void requestClose(id); }}
+ timerSec={timerSec}
+ timerRunning={timerRunning}
+ onToggleTimer={() => {
+ if (timerSec == null) return;
+ if (timerSec <= 0) {
+ setTimerSec(null);
+ setTimerRunning(false);
+ return;
+ }
+ setTimerRunning((r) => !r);
+ }}
+ onStopTimer={() => { setTimerSec(null); setTimerRunning(false); }}
+ />
+ <MainContent info={info} />
  </main>
  <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
  <ShortcutsHelp open={help} onClose={() => setHelp(false)} />
@@ -593,9 +729,11 @@ function Shell() {
 export default function App() {
  return (
  <ToastProvider>
+ <ConfirmProvider>
  <TabsProvider>
  <Shell />
  </TabsProvider>
+ </ConfirmProvider>
  </ToastProvider>
  );
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, invalidateCache, type PythonDemo, type PythonResult } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
-import { useToast } from "../components/ui";
+import { useToast, useConfirm } from "../components/ui";
+import { useTabs } from "../lib/tabs";
 import CodeEditor from "../components/CodeEditor";
 import {
   CodeIcon,
@@ -13,6 +14,8 @@ const STARTER_CODE = (t.tools?.starterCode as string) || `# Nouveau script Pytho
 
 export default function Python() {
   const toast = useToast();
+  const confirm = useConfirm();
+  const tabs = useTabs();
   const [demos, setDemos] = useState<PythonDemo[]>([]);
   const [openScript, setOpenScript] = useState<{
     name: string;
@@ -31,6 +34,11 @@ export default function Python() {
     setIsEditingName(false);
     setEditingName("");
   }, [openScript?.path, openScript?.name]);
+
+  useEffect(() => {
+    tabs.setTabDirty("python", !!openScript?.isDirty);
+    return () => tabs.setTabDirty("python", false);
+  }, [openScript?.isDirty, tabs]);
 
   const refresh = async (selectPath?: string): Promise<PythonDemo[]> => {
     const list = await api.listDemos().catch(() => [] as PythonDemo[]);
@@ -87,7 +95,16 @@ export default function Python() {
     }
   }, [demos, openScript?.path]);
 
-  const select = (d: PythonDemo) => {
+  const select = async (d: PythonDemo) => {
+    if (openScript?.isDirty) {
+      const ok = await confirm.ask({
+        title: get("tools.unsavedTitle", "Script non enregistré"),
+        message: get("tools.unsavedSwitch", "Les modifications en cours seront perdues. Continuer ?"),
+        confirmLabel: get("common.open", "Ouvrir"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setOpenScript({
       name: d.name,
       code: d.code,
@@ -97,7 +114,16 @@ export default function Python() {
     setResult(null);
   };
 
-  const create = () => {
+  const create = async () => {
+    if (openScript?.isDirty) {
+      const ok = await confirm.ask({
+        title: get("tools.unsavedTitle", "Script non enregistré"),
+        message: get("tools.unsavedSwitch", "Les modifications en cours seront perdues. Continuer ?"),
+        confirmLabel: get("common.open", "Ouvrir"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     // Create a temporary / unsaved script buffer that immediately appears in the file tree.
     // Clicking Enregistrer on it will persist it (using the name shown in the tree).
     setOpenScript({
@@ -109,6 +135,15 @@ export default function Python() {
   };
 
   const importScript = async () => {
+    if (openScript?.isDirty) {
+      const ok = await confirm.ask({
+        title: get("tools.unsavedTitle", "Script non enregistré"),
+        message: get("tools.unsavedSwitch", "Les modifications en cours seront perdues. Continuer ?"),
+        confirmLabel: get("common.open", "Ouvrir"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     const d = await api.importScript();
     if (d) {
       invalidateCache("listDemos");
@@ -180,6 +215,10 @@ export default function Python() {
     }
   };
 
+  useEffect(() => {
+    return tabs.registerFlush("python", save);
+  }, [tabs, openScript]);
+
   const run = async () => {
     if (!openScript) return;
     setRunning(true);
@@ -201,15 +240,19 @@ export default function Python() {
   const deleteCurrent = async () => {
     if (!openScript) return;
     if (openScript.path) {
-      if (!confirm(fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: openScript.name }))) return;
+      const ok = await confirm.ask({
+        title: fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: openScript.name }),
+        message: fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: openScript.name }),
+        confirmLabel: get("common.delete", "Supprimer"),
+        danger: true,
+      });
+      if (!ok) return;
       await api.deleteScript(openScript.path);
       invalidateCache("listDemos");
     }
     setOpenScript(null);
     setResult(null);
     const list = await refresh();
-    // After clearing (or deleting a persisted one), explicitly pick first real script if any remain.
-    // (The auto-pick useEffect also covers this, but being explicit is reliable.)
     if (list.length > 0) {
       const first = list[0];
       setOpenScript({

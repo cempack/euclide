@@ -519,9 +519,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               }}
               value=""
             >
-              <option value="" disabled>Versions ({versions.length})</option>
+              <option value="" disabled>{get("pdf.versions", "Versions")} ({versions.length})</option>
               {versions.length === 0 ? (
-                <option value="" disabled>(no previous yet - open editor to snapshot original)</option>
+                <option value="" disabled>{get("pdf.noVersionsYet", "Aucune version — ouvrez l'éditeur pour capturer l'original")}</option>
               ) : (
                 versions.slice().reverse().map((v: any, i: number) => {
                   const isOriginal = v.timestamp === "original" || (typeof v.backup_name === "string" && v.backup_name.includes("__original"));
@@ -554,7 +554,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         {!legacyMode && showPages && (
           <div className="w-[150px] flex-shrink-0 border-r border-hairline bg-[#0a0a0a] overflow-y-auto p-1.5 text-[10px]">
             {thumbnails.length === 0 ? (
-              <div className="p-2 text-body-mute">Loading pages…</div>
+              <div className="p-2 text-body-mute">{get("pdf.thumbnailsLoading", "Chargement des pages…")}</div>
             ) : (
               thumbnails.map((t) => (
                 <button
