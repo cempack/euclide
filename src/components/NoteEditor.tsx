@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTabs } from "../lib/tabs";
-import { api, type Course, type Note } from "../lib/api";
+import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
 import { get } from "../lib/i18n";
@@ -51,14 +51,14 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       try {
         const cs = await api.listCourses();
         if (!mounted) return;
-        setCourses(cs);
+        setCourses(Array.isArray(cs) ? cs : []);
 
         if (noteId) {
           if (draftRef.current.id === noteId) {
             if (mounted) setLoading(false);
             return;
           }
-          const all = await api.allNotes();
+          const all = (await api.allNotes()) ?? [];
           const found = all.find((n) => n.id === noteId);
           if (found && mounted) {
             setDraft(found);
@@ -92,6 +92,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       body: d.body || "",
       course_id: d.course_id ?? null,
     });
+    if (!saved?.id) {
+      throw new Error("save failed");
+    }
     setDraft(saved);
     setDirty(false);
     if (wasNew && saved.id) {
@@ -126,6 +129,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
   // Auto save on changes (debounced)
   useEffect(() => {
+    if (!isTauri()) return;
     if (!dirty || !draft.title) return;
     const t = setTimeout(() => {
       persist().catch(() => {
@@ -318,6 +322,11 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     const dataUrl = doc.output("dataurlstring");
     try {
       const f = await api.saveExport(`${title}.pdf`, dataUrl);
+      if (!f?.id) {
+        doc.save(`${title}.pdf`);
+        toast(get("notes.exported", "Exporté : {name}").replace("{name}", `${title}.pdf`), "success");
+        return;
+      }
       toast(get("notes.exported", "Exporté : {name}").replace("{name}", f.name), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
     } catch {

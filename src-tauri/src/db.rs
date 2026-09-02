@@ -21,7 +21,7 @@ PRAGMA temp_store = MEMORY;
     conn
 }
 
-const SCHEMA: &str = r#"
+pub(crate) const SCHEMA: &str = r#"
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
@@ -150,3 +150,116 @@ fn seed_python_demos() {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::SCHEMA;
+    use rusqlite::{params, Connection};
+
+    fn mem() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn
+    }
+
+    #[test]
+    fn schema_course_note_reminder_and_cascade() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO courses (name, emoji, color, description, matiere) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params!["Seconde", "book", "#5B7BE8", "algo", "NSI"],
+        )
+        .unwrap();
+        let course_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO notes (course_id, title, body) VALUES (?1, ?2, ?3)",
+            params![course_id, "Intro", "bonjour"],
+        )
+        .unwrap();
+        let note_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO reminders (title, due_at) VALUES (?1, ?2)",
+            params!["DS vendredi", Option::<String>::None],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO schedule (day_of_week, start_time, end_time, subject, room, course_id, source) VALUES (1, '08:00', '09:00', 'NSI', 'B12', ?1, 'manual')",
+            [course_id],
+        )
+        .unwrap();
+
+        // Retargeting a note to "général" must persist (the previous UPDATE omitted course_id).
+        conn.execute(
+            "UPDATE notes SET title=?1, body=?2, course_id=?3, updated_at=datetime('now') WHERE id=?4",
+            params!["Intro 2", "suite", Option::<i64>::None, note_id],
+        )
+        .unwrap();
+        let course_after: Option<i64> = conn
+            .query_row("SELECT course_id FROM notes WHERE id=?1", [note_id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(course_after, None);
+
+        let n_rem: i64 = conn
+            .query_row("SELECT COUNT(*) FROM reminders", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n_rem, 1);
+
+        // Attach a note back to the course, then deleting the course must cascade-delete it.
+        conn.execute(
+            "UPDATE notes SET course_id=?1 WHERE id=?2",
+            params![course_id, note_id],
+        )
+        .unwrap();
+        conn.execute("DELETE FROM courses WHERE id=?1", [course_id]).unwrap();
+        let notes_left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM notes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(notes_left, 0);
+        let sched_course: Option<i64> = conn
+            .query_row("SELECT course_id FROM schedule LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(sched_course, None);
+    }
+
+    #[test]
+    fn fts_index_matches_unicode_content() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO doc_index (name, content, file_id) VALUES ('exos.pdf', 'théorème de pythagore', 42)",
+            [],
+        )
+        .unwrap();
+        let file_id: i64 = conn
+            .query_row(
+                "SELECT file_id FROM doc_index WHERE doc_index MATCH 'pythagore'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(file_id, 42);
+    }
+
+    #[test]
+    fn course_classes_unique_per_course() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO courses (name, emoji, color, description, matiere) VALUES ('C', 'book', '#000', '', 'NSI')",
+            [],
+        )
+        .unwrap();
+        let id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO course_classes (course_id, class_name) VALUES (?1, '1G1')",
+            [id],
+        )
+        .unwrap();
+        let dup = conn.execute(
+            "INSERT INTO course_classes (course_id, class_name) VALUES (?1, '1G1')",
+            [id],
+        );
+        assert!(dup.is_err());
+    }
+}
+

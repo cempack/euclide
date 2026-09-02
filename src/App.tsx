@@ -2,11 +2,13 @@ import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "
 import { api, type AppInfo, type FileItem, isTauri } from "./lib/api";
 import { get } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
+import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 
 import { TabsProvider, useTabs, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import ShortcutsHelp from "./components/ShortcutsHelp";
+import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
 import {
  BookIcon,
  DocIcon,
@@ -35,11 +37,11 @@ import Tools from "./screens/Tools";
 const Python = lazy(() => import("./screens/Python"));
 import Settings from "./screens/Settings";
 import Reminders from "./screens/Reminders";
+const Recap = lazy(() => import("./screens/Recap"));
 const ClassContent = lazy(() => import("./screens/ClassContent"));
 const Whiteboard = lazy(() => import("./components/Whiteboard"));
 const PdfViewer = lazy(() => import("./components/PdfViewer"));
 const NoteEditor = lazy(() => import("./components/NoteEditor"));
-const Recap = lazy(() => import("./screens/Recap"));
 
 const TAB_ICONS: Partial<Record<TabKind, React.ReactNode>> = {
  dashboard: <HomeIcon className="w-4 h-4" />,
@@ -451,6 +453,7 @@ function Shell() {
  const [palette, setPalette] = useState(false);
  const [help, setHelp] = useState(false);
  const [dragging, setDragging] = useState(false);
+ const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
  const tabs = useTabs();
  const toast = useToast();
  const confirm = useConfirm();
@@ -468,11 +471,12 @@ function Shell() {
  }, [appFocused]);
 
  useEffect(() => {
+ const tab = tabs.active;
  activityContextRef.current = {
- area: tabs.active?.kind ?? "dashboard",
- courseId: typeof tabs.active?.params?.courseId === "number" ? tabs.active.params.courseId : null,
+ area: tab?.kind ?? "dashboard",
+ courseId: typeof tab?.params?.courseId === "number" ? tab.params.courseId : null,
  };
- }, [tabs.active]);
+ }, [tabs.activeId, tabs.active?.kind, tabs.active?.params?.courseId]);
 
  const handleHelp = useCallback(() => setHelp(true), []);
  const handleSearch = useCallback(() => setPalette(true), []);
@@ -526,6 +530,36 @@ function Shell() {
  }, [timerSec, timerRunning, toast]);
 
  useEffect(() => {
+ const onAvailable = (e: Event) => {
+ const detail = (e as CustomEvent<AppUpdateInfo>).detail;
+ if (!detail?.version) return;
+ if (wasUpdateDismissed(detail.version)) return;
+ setAvailableUpdate(detail);
+ };
+ window.addEventListener("eu:update-available", onAvailable);
+ return () => window.removeEventListener("eu:update-available", onAvailable);
+ }, []);
+
+ useEffect(() => {
+ if (!isTauri()) return;
+ let cancelled = false;
+ const timer = window.setTimeout(async () => {
+ try {
+ const update = await checkForAppUpdate();
+ if (cancelled || !update) return;
+ if (wasUpdateDismissed(update.version)) return;
+ window.dispatchEvent(new CustomEvent("eu:update-available", { detail: update }));
+ } catch {
+ // Draft-only GitHub releases, offline, etc. Stay quiet.
+ }
+ }, 4000);
+ return () => {
+ cancelled = true;
+ window.clearTimeout(timer);
+ };
+ }, []);
+
+ useEffect(() => {
  let unlisten: (() => void) | undefined;
  let active = true;
  import("@tauri-apps/api/webview")
@@ -563,6 +597,22 @@ function Shell() {
 
  useEffect(() => {
  if (!isTauri()) return;
+ const tick = () => {
+ if (!appFocusedRef.current) return;
+ if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+ const ctx = activityContextRef.current;
+ api.logEvent("active_tick", ctx.area, ctx.courseId).catch(() => {});
+ };
+ const seed = window.setTimeout(tick, 2500);
+ const interval = window.setInterval(tick, 60_000);
+ return () => {
+ window.clearTimeout(seed);
+ window.clearInterval(interval);
+ };
+ }, []);
+
+ useEffect(() => {
+ if (!isTauri()) return;
  let unlistenFocus: (() => void) | undefined;
  let unlistenBlur: (() => void) | undefined;
  (async () => {
@@ -587,16 +637,6 @@ function Shell() {
  unlistenFocus?.();
  unlistenBlur?.();
  };
- }, []);
-
- useEffect(() => {
- const tick = () => {
- if (!appFocusedRef.current || document.visibilityState !== "visible") return;
- const ctx = activityContextRef.current;
- api.logEvent("active_tick", ctx.area, ctx.courseId).catch(() => {});
- };
- const id = window.setInterval(tick, 60_000);
- return () => clearInterval(id);
  }, []);
 
  useEffect(() => {
@@ -672,6 +712,7 @@ function Shell() {
  </main>
  <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
  <ShortcutsHelp open={help} onClose={() => setHelp(false)} />
+ <UpdateAvailablePopup update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} />
  {dragging && (
  <div className="fixed inset-0 z-[80] grid place-items-center bg-tui-accent/10 backdrop-blur-sm pointer-events-none">
  <div className="eu-card px-8 py-6 border-2 border-dashed border-tui-accent text-center">

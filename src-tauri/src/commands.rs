@@ -22,6 +22,7 @@ pub struct AppInfo {
     author: String,
     version: String,
     data_dir: String,
+    windows_portable: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -196,6 +197,7 @@ pub fn get_app_info() -> AppInfo {
         author: "Elliot Moreau".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         data_dir: crate::paths::data_dir().to_string_lossy().to_string(),
+        windows_portable: crate::portable_update::is_windows_portable(),
     }
 }
 
@@ -2003,100 +2005,133 @@ pub fn log_event(state: State<Db>, kind: String, label: String, course_id: Optio
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
-    let conn = state.0.lock().unwrap();
-    let _ = conn.execute(
-        "DELETE FROM usage_events WHERE created_at < datetime('now', '-30 days')",
-        [],
-    );
+fn recap_day_sql(column: &str, period: &str) -> String {
+    match period {
+        "week" => format!(
+            "date({column}, 'localtime') >= date('now', 'localtime', '-6 days')"
+        ),
+        _ => format!("date({column}, 'localtime') = date('now', 'localtime')"),
+    }
+}
 
-    let since = match period.as_str() {
-        "week" => "datetime('now', '-7 days')",
-        "month" => "datetime('now', '-30 days')",
-        _ => "datetime('now', 'start of day')",
-    };
+fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
+    let day_events = recap_day_sql("created_at", period);
+    let day_events_u = recap_day_sql("u.created_at", period);
+    let day_notes = recap_day_sql("updated_at", period);
 
-    let files_opened: i64 = conn.query_row(
-        &format!("SELECT COUNT(*) FROM usage_events WHERE kind IN ('file_open', 'file_import') AND created_at >= {since}"),
-        [],
-        |r| r.get(0),
-    ).unwrap_or(0);
+    let files_opened: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM usage_events WHERE kind IN ('file_open', 'file_import') AND {day_events}"
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
-    let notes_written: i64 = conn.query_row(
-        &format!("SELECT COUNT(*) FROM usage_events WHERE kind = 'note_write' AND created_at >= {since}"),
-        [],
-        |r| r.get(0),
-    ).unwrap_or(0);
+    // Count notes actually edited today (autosave would inflate usage_events).
+    let notes_written: i64 = conn
+        .query_row(
+            &format!("SELECT COUNT(*) FROM notes WHERE {day_notes}"),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
-    let demos_run: i64 = conn.query_row(
-        &format!("SELECT COUNT(*) FROM usage_events WHERE kind = 'demo_run' AND created_at >= {since}"),
-        [],
-        |r| r.get(0),
-    ).unwrap_or(0);
+    let demos_run: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM usage_events WHERE kind = 'demo_run' AND {day_events}"
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
-    let reminders_done: i64 = conn.query_row(
-        &format!("SELECT COUNT(*) FROM usage_events WHERE kind = 'reminder_done' AND created_at >= {since}"),
-        [],
-        |r| r.get(0),
-    ).unwrap_or(0);
+    let reminders_done: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM usage_events WHERE kind = 'reminder_done' AND {day_events}"
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
-    let active_minutes: i64 = conn.query_row(
-        &format!("SELECT COUNT(*) FROM usage_events WHERE kind = 'active_tick' AND created_at >= {since}"),
-        [],
-        |r| r.get(0),
-    ).unwrap_or(0);
+    let active_minutes: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM usage_events WHERE kind = 'active_tick' AND {day_events}"
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
-    // Top courses by event count (for courses that have events)
     let mut top_courses: Vec<TopCourse> = Vec::new();
-    {
-        let mut stmt = conn.prepare(
-            &format!("SELECT c.name, c.emoji, COUNT(*) as cnt FROM usage_events u JOIN courses c ON u.course_id = c.id WHERE u.created_at >= {since} GROUP BY c.id ORDER BY cnt DESC LIMIT 5")
-        ).map_err(e)?;
-        let rows = stmt.query_map([], |r| {
-            Ok(TopCourse { name: r.get(0)?, emoji: r.get(1)?, count: r.get(2)? })
-        }).map_err(e)?;
-        for r in rows { if let Ok(tc) = r { top_courses.push(tc); } }
+    if let Ok(mut stmt) = conn.prepare(&format!(
+        "SELECT c.name, c.emoji, COUNT(*) as cnt FROM usage_events u \
+         JOIN courses c ON u.course_id = c.id WHERE {day_events_u} GROUP BY c.id ORDER BY cnt DESC LIMIT 5"
+    )) {
+        if let Ok(rows) = stmt.query_map([], |r| {
+            Ok(TopCourse {
+                name: r.get(0)?,
+                emoji: r.get(1)?,
+                count: r.get(2)?,
+            })
+        }) {
+            for r in rows {
+                if let Ok(tc) = r {
+                    top_courses.push(tc);
+                }
+            }
+        }
     }
 
-    // Top documents
     let mut top_documents: Vec<TopItem> = Vec::new();
-    {
-        let mut stmt = conn.prepare(
-            &format!("SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind IN ('file_open','file_import') AND created_at >= {since} GROUP BY label ORDER BY cnt DESC LIMIT 5")
-        ).map_err(e)?;
-        let rows = stmt.query_map([], |r| {
-            Ok(TopItem { name: r.get(0)?, count: r.get(1)? })
-        }).map_err(e)?;
-        for r in rows { if let Ok(ti) = r { top_documents.push(ti); } }
+    if let Ok(mut stmt) = conn.prepare(&format!(
+        "SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind IN ('file_open','file_import') AND {day_events} \
+         GROUP BY label ORDER BY cnt DESC LIMIT 5"
+    )) {
+        if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
+            for r in rows {
+                if let Ok(ti) = r {
+                    top_documents.push(ti);
+                }
+            }
+        }
     }
 
-    // Top tools
     let mut top_tools: Vec<TopItem> = Vec::new();
-    {
-        let mut stmt = conn.prepare(
-            &format!("SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind IN ('demo_run','whiteboard_save') AND created_at >= {since} GROUP BY label ORDER BY cnt DESC LIMIT 5")
-        ).map_err(e)?;
-        let rows = stmt.query_map([], |r| {
-            Ok(TopItem { name: r.get(0)?, count: r.get(1)? })
-        }).map_err(e)?;
-        for r in rows { if let Ok(ti) = r { top_tools.push(ti); } }
+    if let Ok(mut stmt) = conn.prepare(&format!(
+        "SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind IN ('demo_run','whiteboard_save') AND {day_events} \
+         GROUP BY label ORDER BY cnt DESC"
+    )) {
+        if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
+            for r in rows {
+                if let Ok(ti) = r {
+                    top_tools.push(ti);
+                }
+            }
+        }
     }
 
-    // time_by_area from active ticks per label (area)
     let mut time_by_area: Vec<TopItem> = Vec::new();
-    {
-        let mut stmt = conn.prepare(
-            &format!("SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind = 'active_tick' AND created_at >= {since} GROUP BY label ORDER BY cnt DESC")
-        ).map_err(e)?;
-        let rows = stmt.query_map([], |r| {
-            Ok(TopItem { name: r.get(0)?, count: r.get(1)? })
-        }).map_err(e)?;
-        for r in rows { if let Ok(ti) = r { time_by_area.push(ti); } }
+    if let Ok(mut stmt) = conn.prepare(&format!(
+        "SELECT label, COUNT(*) as cnt FROM usage_events WHERE kind = 'active_tick' AND {day_events} \
+         GROUP BY label ORDER BY cnt DESC"
+    )) {
+        if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
+            for r in rows {
+                if let Ok(ti) = r {
+                    time_by_area.push(ti);
+                }
+            }
+        }
     }
 
-    Ok(RecapData {
-        period_label: Some(period),
+    RecapData {
+        period_label: Some(period.to_string()),
         files_opened,
         notes_written,
         demos_run,
@@ -2106,7 +2141,17 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
         top_documents,
         top_tools,
         time_by_area,
-    })
+    }
+}
+
+#[tauri::command]
+pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
+    let conn = state.0.lock().unwrap();
+    let _ = conn.execute(
+        "DELETE FROM usage_events WHERE created_at < datetime('now', '-30 days')",
+        [],
+    );
+    Ok(recap_from_conn(&conn, &period))
 }
 
 // ---------------------------------------------------------------------------
@@ -2465,4 +2510,60 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
 
 fn e<T: std::fmt::Display>(err: T) -> String {
     err.to_string()
+}
+
+#[cfg(test)]
+mod recap_tests {
+    use super::recap_from_conn;
+    use rusqlite::Connection;
+
+    fn mem() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(crate::db::SCHEMA).unwrap();
+        conn
+    }
+
+    #[test]
+    fn recap_today_ignores_old_events_and_counts_notes() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO usage_events (kind, label, course_id, created_at) VALUES ('file_open', 'old.pdf', NULL, '2020-01-01 12:00:00')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO usage_events (kind, label, created_at) VALUES ('file_open', 'today.pdf', datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO usage_events (kind, label, created_at) VALUES ('active_tick', 'python', datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO usage_events (kind, label, created_at) VALUES ('active_tick', 'dashboard', '2020-01-01 12:00:00')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes (title, body, updated_at) VALUES ('n1', 'x', datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes (title, body, updated_at) VALUES ('n2', 'y', '2020-01-01 12:00:00')",
+            [],
+        )
+        .unwrap();
+
+        let today = recap_from_conn(&conn, "today");
+        assert_eq!(today.files_opened, 1);
+        assert_eq!(today.notes_written, 1);
+        assert_eq!(today.active_minutes, 1);
+        assert_eq!(today.time_by_area.len(), 1);
+        assert_eq!(today.time_by_area[0].name, "python");
+        assert_eq!(today.top_documents.len(), 1);
+        assert_eq!(today.top_documents[0].name, "today.pdf");
+    }
 }

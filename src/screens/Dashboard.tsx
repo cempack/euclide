@@ -45,11 +45,11 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const refresh = () => {
     api.getTodayClasses().then(setClasses).catch(() => {});
     api.listReminders().then(setReminders).catch(() => {});
-    api.allNotes().then(setNotes).catch(() => {});
-    api.listCourses().then(setCourses).catch(() => {});
-    api.listFiles(null).then((f) => setDocCount(f.length)).catch(() => {});
-    api.listLinks().then(setLinks).catch(() => {});
-    api.recentFiles(5).then(setRecentFiles).catch(() => {});
+    api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
+    api.listFiles(null).then((f) => setDocCount(Array.isArray(f) ? f.length : 0)).catch(() => {});
+    api.listLinks().then((l) => setLinks(Array.isArray(l) ? l : [])).catch(() => {});
+    api.recentFiles(5).then((f) => setRecentFiles(Array.isArray(f) ? f : [])).catch(() => {});
     api.pronoteStatus().then(setPronoteStatus).catch(() => {});
     api.keepAwakeStatus().then((s) => setKeepAwakeOn(!!s)).catch(() => {});
     api.getRecap("today").then(setRecap).catch(() => {});
@@ -310,6 +310,10 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
                 toast(get("messages.importing", "Import…"), "info");
                 const added = await api.importFiles(null);
                 const count = Array.isArray(added) ? added.length : 0;
+                if (count === 0) {
+                  toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+                  return;
+                }
                 toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
                 await api.indexImportedPdfs(Array.isArray(added) ? added : []).catch(() => {});
                 window.dispatchEvent(new CustomEvent("eu:library-changed"));
@@ -513,7 +517,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
 
             {/* Keep awake toggle (from Tools) */}
             <div className="mt-2 pt-2 border-t border-[#f0f0f0] flex items-center justify-between text-xs">
-              <span className="text-mute">Veille écran</span>
+              <span className="text-mute">{t.tools?.keepAwake || "Veille écran"}</span>
               <button
                 onClick={toggleKeepAwake}
                 className={`px-2 py-0.5 rounded border text-[10px] transition ${keepAwakeOn ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#e5e5e5] hover:bg-[#f8fafc]"}`}
@@ -527,14 +531,14 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
               <button
                 type="button"
                 onClick={() => tabs.open({ kind: "recap", title: get("nav.recap", "Bilan") })}
-                className="mt-2 pt-2 border-t border-[#f0f0f0] text-[10px] text-[#666] flex flex-wrap gap-x-3 gap-y-0.5 w-full text-left hover:text-primary"
+                className="mt-2 pt-2 border-t border-[#f0f0f0] text-[10px] text-[#666] flex flex-wrap items-center gap-x-3 gap-y-0.5 w-full text-left hover:text-primary"
                 title="Ouvrir le bilan"
               >
                 <span>{recap.files_opened || 0} fichiers</span>
                 <span>{recap.notes_written || 0} notes</span>
                 <span>{recap.reminders_done || 0} rappels</span>
                 <span>{recap.demos_run || 0} scripts</span>
-                <span className="ml-auto">bilan →</span>
+                <span className="ml-auto">{get("nav.recap", "Bilan")} →</span>
               </button>
             )}
           </div>

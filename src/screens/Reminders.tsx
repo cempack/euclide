@@ -3,7 +3,7 @@ import { api, type Reminder } from "../lib/api";
 import { t, get } from "../lib/i18n";
 import { useToast, useConfirm, Loading } from "../components/ui";
 import { BellIcon, CheckIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
-import { formatDueLabel } from "../lib/format";
+import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
 
 // Hoisted memo row for snappier list updates (filter/search/parent state changes)
 const MemoReminderRow = memo(function MemoReminderRow({ r, onToggle, onDelete, due }: { r: Reminder; onToggle: (r: Reminder) => void; onDelete: (id: number) => void; due: ReturnType<typeof formatDueLabel> }) {
@@ -54,7 +54,7 @@ export default function Reminders() {
     if (!opts?.silent) setLoading(true);
     try {
       const list = await api.listReminders();
-      setReminders(list);
+      setReminders(Array.isArray(list) ? list : []);
     } catch {
       // silent
     }
@@ -71,8 +71,12 @@ export default function Reminders() {
   const addReminder = async () => {
     if (!newTitle.trim()) return;
     try {
-      const due = newDue ? new Date(newDue).toISOString() : null;
-      await api.createReminder(newTitle.trim(), due);
+      const due = newDue ? localYmdToIso(newDue) : null;
+      const created = await api.createReminder(newTitle.trim(), due);
+      if (!created?.id) {
+        toast(t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel", "error");
+        return;
+      }
       toast(t.dashboard?.toastReminderAdded || "Rappel ajouté", "success");
       setNewTitle("");
       setNewDue("");
@@ -88,9 +92,7 @@ export default function Reminders() {
       setNewDue("");
       return;
     }
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    setNewDue(d.toISOString().slice(0, 10));
+    setNewDue(localYmd(new Date(), days));
   };
 
   const toggle = useCallback(async (r: Reminder) => {

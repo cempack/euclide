@@ -74,7 +74,7 @@ export default function Whiteboard({ tabId, fileId, visible = true }: { tabId: s
   }, [tabId, dirty, tabs]);
 
   useEffect(()=>{
-    api.listCourses().then(setCourses).catch(()=>{}); if(fileId) api.readBoard(fileId).then(raw=>{ try{ const d=JSON.parse(raw) as BoardDoc; if(pendingText||pendingTextRef.current||editingTextOriginal.current){ editingTextOriginal.current=null; setPendingText(null); pendingTextRef.current=null; } strokes.current=d.strokes??[]; shapes.current=d.shapes??[]; texts.current=d.texts??[]; history.current=[]; setItemCount(strokes.current.length+shapes.current.length+texts.current.length); const rr=wrapRef.current?.getBoundingClientRect(); if(rr&&rr.width>0)updateCanvasSize(rr.width,rr.height,zoomRef.current); redraw(); }catch{} }).catch(()=>{});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(()=>{}); if(fileId) api.readBoard(fileId).then(raw=>{ try{ if(typeof raw !== "string" || !raw) return; const d=JSON.parse(raw) as BoardDoc; if(!d || typeof d !== "object") return; if(pendingText||pendingTextRef.current||editingTextOriginal.current){ editingTextOriginal.current=null; setPendingText(null); pendingTextRef.current=null; } strokes.current=d.strokes??[]; shapes.current=d.shapes??[]; texts.current=d.texts??[]; history.current=[]; setItemCount(strokes.current.length+shapes.current.length+texts.current.length); const rr=wrapRef.current?.getBoundingClientRect(); if(rr&&rr.width>0)updateCanvasSize(rr.width,rr.height,zoomRef.current); redraw(); }catch{} }).catch(()=>{});
   },[fileId]);
 
   // load + ensure original version snapshot for this board (so default counts as version, like PDF)
@@ -143,8 +143,35 @@ export default function Whiteboard({ tabId, fileId, visible = true }: { tabId: s
 
   const undo=()=>{ if(!history.current.length)return; const l=history.current.pop()!; if(l==='stroke'&&strokes.current.length)strokes.current.pop(); else if(l==='shape'&&shapes.current.length)shapes.current.pop(); else if(l==='text'&&texts.current.length)texts.current.pop(); setItemCount(getItemCount()); setDirty(true); redraw(); };
   const clear=async()=>{ if(itemCount===0)return; const ok = await confirm.ask({ title: get("whiteboard.clearAll","Effacer"), message: get("whiteboard.clearConfirm","Effacer tout le tableau ?"), confirmLabel: get("whiteboard.clearAll","Effacer"), danger: true }); if(!ok) return; if(pendingText||pendingTextRef.current){ editingTextOriginal.current = null; setPendingText(null);pendingTextRef.current=null;} strokes.current=[];shapes.current=[];texts.current=[];history.current=[];setItemCount(0);setDirty(true);redraw(); };
-  const save=async()=>{ if(pendingText||pendingTextRef.current)commitPendingText(); const doc:BoardDoc={version:2,strokes:strokes.current,shapes:shapes.current,texts:texts.current}; const f=await api.saveBoard({file_id:currentFileId??null,course_id:courseId,json:JSON.stringify(doc)}); setCurrentFileId(f.id); if (!currentFileId && f.id) { tabs.retarget(tabId, `whiteboard:${f.id}`, f.name, { fileId: f.id, isNew: false }); } else { tabs.rename(tabId,f.name); } api.logEvent('whiteboard_save',f.name,courseId); setDirty(false); toast(get("whiteboard.saved","Enregistré"),"success"); window.dispatchEvent(new CustomEvent('eu:library-changed')); if (f.id) { api.ensureOriginalVersion(f.id).catch(()=>{}).then(() => { api.getFileVersions(f.id).then(setVersions).catch(()=>{}); }); } };
-  const exportPng=async()=>{ if(pendingText||pendingTextRef.current)commitPendingText(); redraw(); const c=canvasRef.current!, o=document.createElement('canvas'); o.width=c.width;o.height=c.height; const oc=o.getContext('2d')!; oc.fillStyle='#fff'; oc.fillRect(0,0,o.width,o.height); oc.drawImage(c,0,0); await api.exportBoardPng(courseId,tabs.tabs.find(t=>t.id===tabId)?.title??'Tableau',o.toDataURL('image/png')); toast(get("whiteboard.exported","Exporté"),"success"); };
+  const save=async()=>{
+    try {
+      if(pendingText||pendingTextRef.current)commitPendingText();
+      const doc:BoardDoc={version:2,strokes:strokes.current,shapes:shapes.current,texts:texts.current};
+      const f=await api.saveBoard({file_id:currentFileId??null,course_id:courseId,json:JSON.stringify(doc)});
+      if(!f?.id){ toast(get("messages.genericError","Erreur"),"error"); return; }
+      setCurrentFileId(f.id);
+      if (!currentFileId && f.id) {
+        tabs.retarget(tabId, `whiteboard:${f.id}`, f.name, { fileId: f.id, isNew: false });
+      } else {
+        tabs.rename(tabId,f.name);
+      }
+      api.logEvent('whiteboard_save',f.name,courseId); setDirty(false); toast(get("whiteboard.saved","Enregistré"),"success"); window.dispatchEvent(new CustomEvent('eu:library-changed'));
+      api.ensureOriginalVersion(f.id).catch(()=>{}).then(() => { api.getFileVersions(f.id).then(setVersions).catch(()=>{}); });
+    } catch {
+      toast(get("messages.genericError","Erreur"),"error");
+    }
+  };
+  const exportPng=async()=>{
+    try {
+      if(pendingText||pendingTextRef.current)commitPendingText(); redraw();
+      const c=canvasRef.current!, o=document.createElement('canvas'); o.width=c.width;o.height=c.height; const oc=o.getContext('2d')!; oc.fillStyle='#fff'; oc.fillRect(0,0,o.width,o.height); oc.drawImage(c,0,0);
+      const exported = await api.exportBoardPng(courseId,tabs.tabs.find(t=>t.id===tabId)?.title??'Tableau',o.toDataURL('image/png'));
+      if(!exported?.id){ toast(get("messages.genericError","Erreur"),"error"); return; }
+      toast(get("whiteboard.exported","Exporté"),"success");
+    } catch {
+      toast(get("messages.genericError","Erreur"),"error");
+    }
+  };
 
   useEffect(() => {
     return tabs.registerFlush(tabId, save);

@@ -160,9 +160,9 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
   const [renameValue, setRenameValue] = useState("");
 
   const refresh = () => {
-    api.listFiles(null).then(setDocs).catch(() => {});
-    api.allNotes().then(setNotes).catch(() => {});
-    api.listCourses().then(setCourses).catch(() => {});
+    api.listFiles(null).then((f) => setDocs(Array.isArray(f) ? f : [])).catch(() => {});
+    api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
   };
   useEffect(() => {
     refresh();
@@ -184,15 +184,21 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
   const courseName = useCallback((id: number | null) => courses.find((c) => c.id === id)?.name, [courses]);
 
   const importDocs = async () => {
-    toast(get("messages.importing", "Import…"), "info");
-    const added = await api.importFiles(null);
-    if (added.length) {
-      added.forEach((f) => api.logEvent("file_import", f.name, null));
-      toast(fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }), "success");
-      await api.indexImportedPdfs(added).catch(() => {});
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    try {
+      toast(get("messages.importing", "Import…"), "info");
+      const added = (await api.importFiles(null)) ?? [];
+      if (added.length) {
+        added.forEach((f) => api.logEvent("file_import", f.name, null));
+        toast(fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }), "success");
+        await api.indexImportedPdfs(added).catch(() => {});
+        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      } else {
+        toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+      }
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
     }
-    refresh();
   };
 
   const openFile = (f: FileItem) => {
@@ -277,7 +283,11 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
     }
     try {
       if (renameTarget.kind === "note") {
-        await api.renameNote(renameTarget.id, newName);
+        const renamed = await api.renameNote(renameTarget.id, newName);
+        if (!renamed?.id) {
+          toast(get("messages.genericError", "Erreur"), "error");
+          return;
+        }
         const tid = `note:${renameTarget.id}`;
         if (tabs.tabs.some((t) => t.id === tid)) {
           tabs.rename(tid, newName);
@@ -285,6 +295,10 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
         api.logEvent("note_rename", newName, null);
       } else {
         const updated = await api.renameFile(renameTarget.id, newName);
+        if (!updated?.id) {
+          toast(get("messages.genericError", "Erreur"), "error");
+          return;
+        }
         const tid =
           updated.kind === "board"
             ? `whiteboard:${updated.id}`

@@ -7,13 +7,27 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Create/update a draft release (tagged dev-build) so you can easily download the portable files from the Releases page. Replaces previous dev-build each time.'
+        description: 'Create/update a GitHub release. Version tags (v*) publish a real release so the in-app updater can read latest.json. Manual runs use a draft prerelease tagged dev-build (replaced each time).'
         required: false
         default: true
         type: boolean
 
+# tauri-action creates/updates the GitHub Release from the matrix (including latest.json).
+permissions:
+  contents: write
+
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drop previous manual draft
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete dev-build --yes --repo "${{ github.repository }}" || true
+
   publish-tauri:
+    needs: prepare-release
     strategy:
       fail-fast: false
       matrix:
@@ -26,7 +40,7 @@ jobs:
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
             args: '--target x86_64-unknown-linux-gnu --bundles appimage'
-          - platform: 'windows-latest' # Windows - portable (no installer setups, see post-build zip)
+          - platform: 'windows-latest' # Windows - NSIS for installed copies + portable zip for USB in-place updates
             target: 'x86_64-pc-windows-msvc'
             arch: 'x86_64'
             args: '--target x86_64-pc-windows-msvc'
@@ -105,13 +119,71 @@ jobs:
         with:
           workspaces: 'src-tauri -> target'
 
-      # Build manually so we can control bundling (no setups on Windows, only portable/standard apps)
-      - name: Build Tauri application
-        run: npx tauri build ${{ matrix.args }}
+      - name: Release metadata
+        id: rel
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "name=Euclide ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.create_release }}" = "true" ]; then
+            echo "tag=dev-build" >> "$GITHUB_OUTPUT"
+            echo "name=Euclide dev-build (manual)" >> "$GITHUB_OUTPUT"
+            echo "draft=true" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "name=" >> "$GITHUB_OUTPUT"
+            echo "draft=true" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      # Post-build: create portable/standard app packages (zips for easy download, no "setup" installers)
-      # These are the "standard apps" that are portable (run from any folder/USB without installation).
-      # Only Apple Silicon macOS is built (remove non-ARM macOS).
+      - name: Require updater signing key
+        if: steps.rel.outputs.upload == 'true'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. Generate keys with \`npx tauri signer generate\`, put the public key in src-tauri/tauri.conf.json (plugins.updater.pubkey), and add the private key as a GitHub Actions secret. See README."
+            exit 1
+          fi
+
+      # Official Tauri publish path: build, sign updater artifacts, merge latest.json across the matrix.
+      # Sidecar must already be in src-tauri/resources (steps above). Do not delete the release between jobs.
+      - uses: tauri-apps/tauri-action@v1
+        if: steps.rel.outputs.upload == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ steps.rel.outputs.tag }}
+          releaseName: ${{ steps.rel.outputs.name }}
+          releaseBody: |
+            Installateurs et archives USB portables.
+
+            L’application vérifie `latest.json` sur GitHub Releases. Windows portable met à jour `Euclide-windows-portable.zip` **dans le dossier courant** (Euclide-Data intact). Les copies NSIS utilisent l’installateur.
+          releaseDraft: ${{ steps.rel.outputs.draft == 'true' }}
+          prerelease: ${{ steps.rel.outputs.prerelease == 'true' }}
+          args: ${{ matrix.args }}
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          retryAttempts: 3
+
+      - name: Build without publishing
+        if: steps.rel.outputs.upload != 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build ${{ matrix.args }} --config src-tauri/tauri.usb.conf.json
+
+      # Post-build: USB-friendly extras (zips / renamed AppImage). Updater assets stay as tauri-action uploaded them.
       - name: Package portable/standard apps
         run: |
           mkdir -p dist-portable
@@ -145,11 +217,27 @@ jobs:
             cp "src-tauri/target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/${{ matrix.target }}/release/Euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/Euclide.exe" Euclide-portable/ 2>/dev/null || true
             # Copy the whole onedir folder (euclide-sidecar/ with .exe + support files for fast startup, no console)
             cp -r sidecar/dist/euclide-sidecar Euclide-portable/ 2>/dev/null || cp -r src-tauri/resources/euclide-sidecar Euclide-portable/ 2>/dev/null || true
+            : > Euclide-portable/euclide.portable
             echo "Portable Euclide for Windows. Extract the folder and run euclide.exe (or Euclide.exe)." > Euclide-portable/README.txt
-            echo "The euclide-sidecar/ folder next to the exe is the Python sidecar (required; do not delete)." >> Euclide-portable/README.txt
-            echo "Data folder (Euclide-Data) will be created next to the exe for full portability on USB." >> Euclide-portable/README.txt
+            echo "Keep euclide.exe and the euclide-sidecar/ folder together. Do not delete the sidecar." >> Euclide-portable/README.txt
+            echo "Data folder (Euclide-Data) is created next to the exe (USB / flash drive)." >> Euclide-portable/README.txt
+            echo "In-app updates overlay new program files in THIS folder only. Euclide-Data and other files are never deleted." >> Euclide-portable/README.txt
             powershell -Command "Compress-Archive -Path 'Euclide-portable/*' -DestinationPath 'dist-portable/Euclide-windows-portable.zip' -Force"
           fi
+        shell: bash
+
+      - name: Upload portable extras to the GitHub release
+        if: steps.rel.outputs.upload == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(dist-portable/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No portable files to upload."
+            exit 0
+          fi
+          gh release upload "${{ steps.rel.outputs.tag }}" "${files[@]}" --clobber --repo "${{ github.repository }}"
         shell: bash
 
       - name: Upload portable artifact
@@ -160,60 +248,58 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  release:
-    # Create the GitHub Release (with all platform portable artifacts attached) on:
-    # - Real version tag pushes (v*)
-    # - Manual "Run workflow" when create_release input is true (uses a "dev-build" tag that gets replaced each time)
-    # This ensures the release step never skips when you want the files, and you get them in the Releases page.
-    if: |
-      always() &&
-      ( (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release) ) &&
-      (needs.publish-tauri.result == 'success' || needs.publish-tauri.result == 'failure')
+  # After every matrix leg has merged latest.json, point windows-x86_64 at the
+  # signed USB zip. Keep the NSIS installer under windows-x86_64-nsis so installed
+  # copies still update via the plugin. Must run last so tauri-action cannot overwrite it.
+  windows-portable-manifest:
+    name: Point Windows updater at portable zip
     needs: publish-tauri
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
     steps:
-      - name: Download all portable artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v6
         with:
-          pattern: portable-*
-          path: dist-portable
-          merge-multiple: true
-
-      - name: List artifacts
-        run: ls -la dist-portable/ || true
-
-      - name: Determine release tag
-        run: |
-          if [ "${{ github.event_name }}" = "push" ] && echo "${{ github.ref }}" | grep -q '^refs/tags/'; then
-            RELEASE_TAG="${{ github.ref_name }}"
-            RELEASE_NAME="${{ github.ref_name }}"
-            echo "Real tag push: will create/update release for $RELEASE_TAG"
-          else
-            RELEASE_TAG="dev-build"
-            RELEASE_NAME="dev-build (manual)"
-            echo "Manual/dispatch run: will create/update dev-build release (replaces previous)"
-          fi
-          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
-          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
-
-      - name: Delete existing release (if any) for this tag to allow replace/re-release with same tag
-        run: |
-          gh release delete "$RELEASE_TAG" --yes || true
+          node-version: lts/*
+      - name: Sign Euclide-windows-portable.zip and rewrite latest.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAG: ${{ github.event_name == 'push' && github.ref_name || 'dev-build' }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set."
+            exit 1
+          fi
+          mkdir -p /tmp/euclide-updater
+          cd /tmp/euclide-updater
+          gh release download "$TAG" --pattern 'Euclide-windows-portable.zip' --repo "$REPO"
+          gh release download "$TAG" --pattern 'latest.json' --repo "$REPO"
+          test -f Euclide-windows-portable.zip
+          test -f latest.json
+          npx --yes @tauri-apps/cli@2 signer sign Euclide-windows-portable.zip
+          python3 <<'PY'
+          import json, os, pathlib
+          tag = os.environ["TAG"]
+          repo = os.environ["REPO"]
+          sig = pathlib.Path("Euclide-windows-portable.zip.sig").read_text().strip()
+          if not sig:
+              raise SystemExit("empty signature file")
+          data = json.loads(pathlib.Path("latest.json").read_text())
+          platforms = data.setdefault("platforms", {})
+          win = platforms.get("windows-x86_64") or {}
+          url = str(win.get("url") or "")
+          if "windows-x86_64-nsis" not in platforms and "portable" not in url.lower():
+              platforms["windows-x86_64-nsis"] = win
+          portable_url = f"https://github.com/{repo}/releases/download/{tag}/Euclide-windows-portable.zip"
+          platforms["windows-x86_64"] = {"signature": sig, "url": portable_url}
+          pathlib.Path("latest.json").write_text(json.dumps(data, indent=2) + "\n")
+          print("windows-x86_64 ->", portable_url)
+          print("windows-x86_64-nsis ->", (platforms.get("windows-x86_64-nsis") or {}).get("url"))
+          PY
+          gh release upload "$TAG" latest.json --clobber --repo "$REPO"
 
-      - name: Create GitHub Release and upload portable artifacts
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: 'Euclide ${{ env.RELEASE_NAME }}'
-          body: 'Download the standard portable app for your platform below (no installers/setups). All builds are fully portable (USB-friendly). For manual runs this is the "dev-build" tag (replaced each time).'
-          draft: true
-          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
-          overwrite_files: true
-          files: dist-portable/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

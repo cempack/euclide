@@ -54,9 +54,9 @@ export default function Recap() {
     documents: { label: "Documents", icon: <DocIcon className="w-4 h-4" /> },
     tools: { label: "Outils & démos", icon: <ToolIcon className="w-4 h-4" /> },
     recap: { label: "Bilan", icon: <SparkleIcon className="w-4 h-4" /> },
+    python: { label: "Python", icon: <CodeIcon className="w-4 h-4" /> },
     whiteboard: { label: "Tableau blanc", icon: <PenIcon className="w-4 h-4" /> },
     pdf: { label: "PDFs", icon: <DocIcon className="w-4 h-4" /> },
-    python: { label: "Python", icon: <CodeIcon className="w-4 h-4" /> },
     note: { label: "Notes", icon: <PenIcon className="w-4 h-4" /> },
     reminders: { label: "Rappels", icon: <BellIcon className="w-4 h-4" /> },
     settings: { label: "Réglages", icon: <GearIcon className="w-4 h-4" /> },
@@ -107,7 +107,7 @@ export default function Recap() {
   return (
     <div className="flex flex-col gap-7">
       <header>
-        <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.recap}</h1>
+        <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav?.recap || "Bilan"}</h1>
         <p className="text-body-mute text-sm mt-1">{t.recap?.subtitle || "Temps passé dans l'application."}</p>
       </header>
 

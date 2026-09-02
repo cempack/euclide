@@ -126,6 +126,10 @@
     "starterCode": "# Script Python\n\nprint(\"Bonjour\")\n"
   },
 
+  "courses": {
+    "subtitle": "Classes, séquences et casiers."
+  },
+
   "documents": {
     "subtitle": "Documents et notes.",
     "searchPlaceholder": "Rechercher...",
@@ -378,6 +382,27 @@
 
   "about": {
     "title": "À propos"
+  },
+
+  "updater": {
+    "check": "Vérifier les mises à jour",
+    "checking": "Recherche…",
+    "upToDate": "Euclide est à jour.",
+    "available": "Version {version} disponible (actuelle : {current}).",
+    "notes": "Notes",
+    "install": "Installer et redémarrer",
+    "installing": "Téléchargement… {percent} %",
+    "confirmInstall": "Installer la version {version} et redémarrer Euclide ?",
+    "error": "Impossible de vérifier les mises à jour.",
+    "noChannel": "Aucune version publiée pour le moment.",
+    "availableToast": "Mise à jour {version} disponible — Réglages › À propos.",
+    "popupTitle": "Mise à jour {version}",
+    "popupBody": "Une nouvelle version est disponible.",
+    "popupDismiss": "Fermer",
+    "popupLater": "Plus tard",
+    "popupInstall": "Installer",
+    "hint": "Windows installé : mise à jour via l’installateur. Linux et macOS se mettent à jour en place.",
+    "hintPortable": "Windows portable : la mise à jour remplace uniquement le programme dans ce dossier (clé USB comprise). Euclide-Data et vos fichiers restent en place."
   },
 
   "classContent": {
