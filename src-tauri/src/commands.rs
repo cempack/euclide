@@ -1930,7 +1930,7 @@ pub async fn choose_data_dir(app: AppHandle) -> R<Option<String>> {
 
 #[tauri::command]
 pub fn reset_data_dir() -> R<()> {
-    let _ = fs::remove_file(crate::paths::data_root_config_path());
+    crate::paths::clear_configured_data_dir();
     Ok(())
 }
 
