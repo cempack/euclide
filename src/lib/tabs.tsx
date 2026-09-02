@@ -22,7 +22,6 @@ export type TabKind =
   | "whiteboard"
   | "pdf"
   | "reminders"
-  | "help"
   | "note"
   | "recap";
 
@@ -45,6 +44,8 @@ export interface Tab {
   params: TabParams;
   /** Immutable for the life of the pane — used as React key so retarget does not remount. */
   mountId: string;
+  /** Pinned tabs are never evicted when the tab limit is reached. */
+  pinned?: boolean;
 }
 
 export interface OpenSpec {
@@ -62,7 +63,6 @@ const SINGLETONS: TabKind[] = [
   "python",
   "settings",
   "reminders",
-  "help",
   "recap",
 ];
 
@@ -80,7 +80,6 @@ const DEFAULT_TITLES: Record<TabKind, string> = {
   whiteboard: "Tableau",
   pdf: "Document",
   reminders: "Rappels",
-  help: "Raccourcis",
   note: "Note",
   recap: "Bilan",
 };
@@ -109,7 +108,6 @@ function isRestorable(t: { kind: TabKind; params: TabParams }): boolean {
   if (t.kind === "course" && typeof t.params.courseId !== "number") return false;
   if (t.kind === "class-content" && (typeof t.params.courseId !== "number" || !t.params.className))
     return false;
-  if (t.kind === "help") return false;
   return true;
 }
 
@@ -125,6 +123,9 @@ type TabsCtx = {
   next: () => void;
   prev: () => void;
   focusIndex: (i: number) => void;
+  /** Drag-and-drop reordering of the tab strip. */
+  move: (fromIndex: number, toIndex: number) => void;
+  togglePin: (id: string) => void;
   maxTabs: number;
   updateMaxTabs: (n: number) => void;
   isDirty: (id: string) => boolean;
@@ -194,7 +195,13 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         if (cancelled || !raw) return;
         const parsed = JSON.parse(raw) as {
           activeId?: string;
-          tabs?: Array<{ id: string; kind: TabKind; title: string; params?: TabParams }>;
+          tabs?: Array<{
+            id: string;
+            kind: TabKind;
+            title: string;
+            params?: TabParams;
+            pinned?: boolean;
+          }>;
         };
         const restored: Tab[] = (parsed.tabs || [])
           .filter((t) => t && t.kind && t.id && isRestorable({ kind: t.kind, params: t.params || {} }))
@@ -204,6 +211,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
             title: t.title || DEFAULT_TITLES[t.kind] || t.kind,
             params: t.params || {},
             mountId: t.id,
+            pinned: !!t.pinned,
           }));
         if (!restored.length) return;
         if (!restored.some((t) => t.kind === "dashboard")) {
@@ -236,6 +244,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           kind: t.kind,
           title: t.title,
           params: t.params,
+          pinned: t.pinned,
         })),
       };
       api.setSetting("open_tabs", JSON.stringify(payload)).catch(() => {});
@@ -321,7 +330,9 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         let nextTabs = prev;
         if (maxTabs > 0 && prev.length >= maxTabs) {
           const curActive = activeIdRef.current;
-          const evictIdx = prev.findIndex((t) => t.id !== curActive && !dirtyMapRef.current[t.id]);
+          const evictIdx = prev.findIndex(
+            (t) => t.id !== curActive && !t.pinned && !dirtyMapRef.current[t.id]
+          );
           if (evictIdx !== -1) {
             nextTabs = prev.filter((_, i) => i !== evictIdx);
           }
@@ -348,7 +359,9 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         const curActive = activeIdRef.current;
         let next = [...prev];
         while (next.length > val) {
-          const evictIdx = next.findIndex((t) => t.id !== curActive && !dirtyMapRef.current[t.id]);
+          const evictIdx = next.findIndex(
+            (t) => t.id !== curActive && !t.pinned && !dirtyMapRef.current[t.id]
+          );
           if (evictIdx !== -1) next.splice(evictIdx, 1);
           else break;
         }
@@ -441,6 +454,28 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const move = useCallback((fromIndex: number, toIndex: number) => {
+    setTabs((prev) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const togglePin = useCallback((id: string) => {
+    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
+  }, []);
+
   const step = useCallback((dir: 1 | -1) => {
     setTabs((prev) => {
       setActiveId((cur) => {
@@ -466,6 +501,8 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       next: () => step(1),
       prev: () => step(-1),
       focusIndex,
+      move,
+      togglePin,
       maxTabs,
       updateMaxTabs,
       isDirty,
@@ -483,6 +520,8 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       retarget,
       step,
       focusIndex,
+      move,
+      togglePin,
       maxTabs,
       updateMaxTabs,
       dirtyMap,

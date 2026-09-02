@@ -4,6 +4,9 @@ import { useTabs } from "../lib/tabs";
 import { t, fmt, get } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
+import { Field, MetaDot, PageHeader, Panel } from "../components/layout";
+import { courseVisual } from "../lib/color";
+import { useAppearance } from "../lib/theme";
 import { DocIcon, NoteIcon, PenIcon, PlusIcon, SearchIcon, FileKindIcon, TrashIcon } from "../components/icons";
 
 type Filter = { kind: "all" } | { kind: "type"; value: string } | { kind: "class"; courseId: number };
@@ -43,53 +46,80 @@ function getTimeBucket(iso: string): string {
   return `${month.charAt(0).toUpperCase() + month.slice(1)} ${d.getFullYear()}`;
 }
 
-// Hoisted memoized item components (defined at module scope so React.memo works across parent re-renders for snappier lists)
+// Hoisted memoized rows (module scope so React.memo survives parent renders).
+// Dense rows instead of the previous 4-column card grid: a document library is
+// a list, and the cards forced the name to truncate at ~18 characters.
+
+type RowProps = {
+  onOpen: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  icon: React.ReactNode;
+  title: string;
+  meta: React.ReactNode;
+  accent?: string;
+};
+
+function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowProps) {
+  return (
+    <div className="eu-row-hover group">
+      <button onClick={onOpen} className="flex items-center gap-2.5 flex-1 min-w-0 text-left" title={title}>
+        <span className="shrink-0" style={accent ? { color: accent } : undefined}>
+          {icon}
+        </span>
+        <span className="eu-t-body text-ink truncate">{title}</span>
+      </button>
+      <span className="eu-t-label normal-case tracking-normal shrink-0 hidden sm:block">{meta}</span>
+      <button
+        onClick={onRename}
+        aria-label={`${get("common.rename", "Renommer")} — ${title}`}
+        title={get("common.rename", "Renommer")}
+        className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm"
+      >
+        <PenIcon className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={onDelete}
+        aria-label={`${get("common.delete", "Supprimer")} — ${title}`}
+        title={get("common.delete", "Supprimer")}
+        className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 const MemoFileItem = memo(function MemoFileItem({
   f,
   onOpen,
   onRename,
   onDelete,
   courseName,
+  accent,
 }: {
   f: FileItem;
   onOpen: (f: FileItem) => void;
   onRename: (f: FileItem) => void;
   onDelete: (f: FileItem) => void;
   courseName: (id: number | null) => string | undefined;
+  accent?: string;
 }) {
   return (
-    <div
-      className="new-card p-4 text-left relative group hover:border-tui-accent/40 hover:-translate-y-0.5 active:scale-[0.995] transition-all duration-150 cursor-pointer"
-      onClick={() => onOpen(f)}
-    >
-      <FileKindIcon kind={f.kind} className="w-7 h-7 mb-2 text-mute" />
-      <p className="text-sm font-medium text-primary truncate pr-6">{f.name}</p>
-      <p className="text-[11px] text-body-mute mt-0.5 truncate">
-        {f.course_id ? courseName(f.course_id) : `${fileKindLabel(f.kind)} · ${humanSize(f.size)}`}
-        {" · "}
-        {relativeTime(f.added_at)}
-      </p>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRename(f);
-        }}
-        className="absolute top-2 right-8 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-primary hover:bg-surface-container transition-all"
-        title="Renommer"
-      >
-        <PenIcon className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(f);
-        }}
-        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 hover:bg-red-50 transition-all"
-        title="Supprimer"
-      >
-        <TrashIcon className="w-3.5 h-3.5" />
-      </button>
-    </div>
+    <DocRow
+      icon={<FileKindIcon kind={f.kind} className="w-4 h-4" />}
+      accent={accent}
+      title={f.name}
+      meta={
+        <>
+          {f.course_id ? `${courseName(f.course_id)} · ` : ""}
+          {fileKindLabel(f.kind)} · {humanSize(f.size)} · {relativeTime(f.added_at)}
+        </>
+      }
+      onOpen={() => onOpen(f)}
+      onRename={() => onRename(f)}
+      onDelete={() => onDelete(f)}
+    />
   );
 });
 
@@ -99,49 +129,31 @@ const MemoNoteItem = memo(function MemoNoteItem({
   onRename,
   onDelete,
   courseName,
+  accent,
 }: {
   n: Note;
   onOpen: (n: Note) => void;
   onRename: (n: Note) => void;
   onDelete: (n: Note) => void;
   courseName: (id: number | null) => string | undefined;
+  accent?: string;
 }) {
-  const displayTitle = n.title || (t.documents?.noteFallbackTitle || "Note");
+  const displayTitle = n.title || t.documents?.noteFallbackTitle || "Note";
   return (
-    <div
-      className="new-card p-4 text-left relative group hover:border-tui-accent/40 hover:-translate-y-0.5 active:scale-[0.995] transition-all duration-150 cursor-pointer"
-      onClick={() => onOpen(n)}
-    >
-      <div className="text-tui-accent mb-2">
-        <NoteIcon className="w-7 h-7" />
-      </div>
-      <p className="text-sm font-medium text-primary truncate pr-6">{displayTitle}</p>
-      <p className="text-[11px] text-body-mute mt-0.5 truncate">
-        {n.course_id ? `${courseName(n.course_id)} · Note` : "Note"}
-        {" · "}
-        {relativeTime(n.updated_at)}
-      </p>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRename(n);
-        }}
-        className="absolute top-2 right-8 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-primary hover:bg-surface-container transition-all"
-        title="Renommer"
-      >
-        <PenIcon className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(n);
-        }}
-        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 text-mute hover:text-red-600 hover:bg-red-50 transition-all"
-        title="Supprimer"
-      >
-        <TrashIcon className="w-3.5 h-3.5" />
-      </button>
-    </div>
+    <DocRow
+      icon={<NoteIcon className="w-4 h-4" />}
+      accent={accent}
+      title={displayTitle}
+      meta={
+        <>
+          {n.course_id ? `${courseName(n.course_id)} · ` : ""}
+          {get("documents.noteKind", "Note")} · {relativeTime(n.updated_at)}
+        </>
+      }
+      onOpen={() => onOpen(n)}
+      onRename={() => onRename(n)}
+      onDelete={() => onDelete(n)}
+    />
   );
 });
 
@@ -367,125 +379,200 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
     return Array.from(m.entries()).map(([label, its]) => ({ label, its }));
   }, [filteredItems]);
 
-  const chip = (active: boolean) =>
-    `px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors whitespace-nowrap ${
-      active
-        ? "bg-surface-container text-primary border-hairline"
-        : "bg-surface text-body-mute border-hairline hover:text-primary"
-    }`;
+  const { resolved } = useAppearance();
+  const accentFor = useCallback(
+    (courseId: number | null) => {
+      const c = courses.find((x) => x.id === courseId);
+      return c ? courseVisual(c.color, resolved === "dark").fg : undefined;
+    },
+    [courses, resolved]
+  );
+
+  const chipClass = (active: boolean) =>
+    `eu-btn-sm eu-btn ${active ? "eu-btn-primary" : "eu-btn-ghost"}`;
+
+  const totalSize = docs.reduce((sum, d) => sum + (d.size || 0), 0);
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.documents}</h1>
-          <p className="text-body-mute text-sm mt-1">{t.documents?.subtitle || "Tous vos supports et notes, au même endroit."}</p>
+    <>
+      <PageHeader
+        title={t.nav.documents}
+        meta={
+          <>
+            <span>{fmt(get("documents.metaFiles", "{count} fichiers"), { count: docs.length })}</span>
+            <MetaDot />
+            <span>{fmt(get("documents.metaNotes", "{count} notes"), { count: notes.length })}</span>
+            {totalSize > 0 && (
+              <>
+                <MetaDot />
+                <span>{humanSize(totalSize)}</span>
+              </>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <button
+              onClick={() =>
+                tabs.open({
+                  kind: "note",
+                  title: t.common?.newNote || "Nouvelle note",
+                  params: { isNew: true },
+                })
+              }
+              className="eu-btn-ghost eu-btn-sm"
+            >
+              <NoteIcon className="w-3.5 h-3.5" /> {t.common?.newNote || "Nouvelle note"}
+            </button>
+            <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
+              <PlusIcon className="w-3.5 h-3.5" /> {t.common?.importFiles || "Importer"}
+            </button>
+          </>
+        }
+      />
+
+      {/* Local search filters names; ⌘K also searches inside PDF content. */}
+      <div className="flex flex-col gap-3">
+        <div className="relative">
+          <input
+            className="eu-input pl-8"
+            placeholder={t.documents?.searchPlaceholder || "Rechercher un document…"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={get("common.search", "Rechercher")}
+          />
+          <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
+          {(search.trim() || filter.kind !== "all") && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setFilter({ kind: "all" });
+              }}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 eu-btn-quiet eu-btn-sm"
+            >
+              {get("common.clear", "Effacer")}
+            </button>
+          )}
         </div>
-        <button onClick={importDocs} className="new-btn-primary">
-          <PlusIcon className="w-4 h-4" /> {t.common?.importFiles || "Importer des fichiers"}
-        </button>
-      </header>
 
-      {/* Local search (name/title filter) — complements the global ⌘K palette which also searches PDF content */}
-      <div className="relative">
-        <input
-          className="new-input w-full pl-9 text-sm"
-          placeholder={t.documents?.searchPlaceholder || "Rechercher un document..."}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-body-mute pointer-events-none" />
-        {(search.trim() || filter.kind !== "all") && (
-          <button
-            onClick={() => {
-              setSearch("");
-              setFilter({ kind: "all" });
-            }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] px-2 py-0.5 rounded bg-surface-container hover:bg-hairline text-body-mute"
-          >
-            Effacer
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <button onClick={() => setFilter({ kind: "all" })} className={chipClass(filter.kind === "all")}>
+            {get("documents.filterAll", "Tout")}
           </button>
-        )}
-      </div>
-
-      {/* filter tags */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        <button onClick={() => setFilter({ kind: "all" })} className={chip(filter.kind === "all")}>
-          Tout
-        </button>
-        {TYPE_CHIPS.map((c) => (
-          <button
-            key={c.value}
-            onClick={() => setFilter({ kind: "type", value: c.value })}
-            className={chip(filter.kind === "type" && filter.value === c.value)}
-          >
-            {c.label}
-          </button>
-        ))}
-        {courses.length > 0 && <span className="w-px h-5 bg-hairline shrink-0" />}
-        {courses.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setFilter({ kind: "class", courseId: c.id })}
-            className={chip(filter.kind === "class" && filter.courseId === c.id)}
-          >
-            {c.name}
-          </button>
-        ))}
+          {TYPE_CHIPS.map((c) => (
+            <button
+              key={c.value}
+              onClick={() => setFilter({ kind: "type", value: c.value })}
+              className={chipClass(filter.kind === "type" && filter.value === c.value)}
+            >
+              {c.label}
+            </button>
+          ))}
+          {courses.length > 0 && <span className="w-px h-5 bg-line shrink-0 mx-1" />}
+          {courses.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setFilter({ kind: "class", courseId: c.id })}
+              className={chipClass(filter.kind === "class" && filter.courseId === c.id)}
+            >
+              <span
+                className="w-2 h-2 rounded-sm shrink-0"
+                style={{ background: courseVisual(c.color, resolved === "dark").fg }}
+              />
+              {c.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       {filteredItems.length === 0 ? (
-        <div className="new-card">
+        <Panel>
           <EmptyState
-            icon={<DocIcon className="w-9 h-9" />}
-            title={search.trim() || filter.kind !== "all" ? "Aucun résultat" : (t.documents?.nothingHere || "Rien ici pour l'instant")}
+            icon={<DocIcon className="w-4 h-4" />}
+            title={
+              search.trim() || filter.kind !== "all"
+                ? get("documents.noResult", "Aucun résultat")
+                : t.documents?.nothingHere || "Rien ici pour l'instant"
+            }
             hint={
               search.trim() || filter.kind !== "all"
-                ? "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents."
-                : (t.documents?.nothingHint || "Importez des fichiers (ou glissez-les dans la fenêtre), ou écrivez des notes dans vos cours.")
+                ? get(
+                    "documents.noResultHint",
+                    "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents."
+                  )
+                : t.documents?.nothingHint ||
+                  "Importez des fichiers (ou glissez-les dans la fenêtre), ou écrivez des notes dans vos cours."
+            }
+            action={
+              <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
+                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.importFiles || "Importer"}
+              </button>
             }
           />
-        </div>
+        </Panel>
       ) : (
         <div className="flex flex-col gap-4">
           {grouped.map((g) => (
-            <div key={g.label}>
-              <div className="text-[10px] font-semibold tracking-[0.5px] text-body-mute uppercase mb-1.5 px-0.5">{g.label}</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {g.its.map((it) =>
-                  it.t === "file" ? (
-                    <MemoFileItem key={`f${it.f.id}`} f={it.f} onOpen={handleOpenFile} onRename={handleRenameFile} onDelete={deleteFileItem} courseName={courseName} />
-                  ) : (
-                    <MemoNoteItem key={`n${it.n.id}`} n={it.n} onOpen={handleOpenNote} onRename={handleRenameNote} onDelete={deleteNoteItem} courseName={courseName} />
-                  )
-                )}
-              </div>
+            <div key={g.label} className="flex flex-col gap-2">
+              <p className="eu-t-label">
+                {g.label} · {g.its.length}
+              </p>
+              <Panel>
+                <div className="eu-divide">
+                  {g.its.map((it) =>
+                    it.t === "file" ? (
+                      <MemoFileItem
+                        key={`f${it.f.id}`}
+                        f={it.f}
+                        onOpen={handleOpenFile}
+                        onRename={handleRenameFile}
+                        onDelete={deleteFileItem}
+                        courseName={courseName}
+                        accent={accentFor(it.f.course_id)}
+                      />
+                    ) : (
+                      <MemoNoteItem
+                        key={`n${it.n.id}`}
+                        n={it.n}
+                        onOpen={handleOpenNote}
+                        onRename={handleRenameNote}
+                        onDelete={deleteNoteItem}
+                        courseName={courseName}
+                        accent={accentFor(it.n.course_id)}
+                      />
+                    )
+                  )}
+                </div>
+              </Panel>
             </div>
           ))}
         </div>
       )}
-      {/* Rename modal for any document type (note or file of any kind) */}
+
+      {/* Rename works for notes and for every file kind. */}
       {renameTarget && (
         <Modal open={!!renameTarget} onClose={closeRename} title={get("common.rename", "Renommer")}>
           <div className="flex flex-col gap-4">
-            <input
-              autoFocus
-              className="new-input"
-              placeholder="Nouveau nom"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") doRename();
-                if (e.key === "Escape") closeRename();
-              }}
-            />
+            <Field label={get("documents.newName", "Nouveau nom")}>
+              <input
+                autoFocus
+                className="eu-input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") doRename();
+                  if (e.key === "Escape") closeRename();
+                }}
+                aria-label={get("documents.newName", "Nouveau nom")}
+              />
+            </Field>
             <div className="flex gap-2 justify-end">
-              <button onClick={closeRename} className="new-btn-ghost">
+              <button onClick={closeRename} className="eu-btn-ghost">
                 {get("common.cancel", "Annuler")}
               </button>
               <button
                 onClick={doRename}
-                className="new-btn-primary"
+                className="eu-btn-primary"
                 disabled={!renameValue.trim() || renameValue.trim() === renameTarget.current}
               >
                 {get("common.rename", "Renommer")}
@@ -494,6 +581,6 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
           </div>
         </Modal>
       )}
-    </div>
+    </>
   );
 }

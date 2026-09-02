@@ -436,11 +436,11 @@ export default function CodeEditor({
   }, [value]);
 
   return (
-    <div className={`code-editor flex h-full rounded-lg border border-hairline bg-surface overflow-hidden eu-no-drag ${className || ''}`}>
+    <div className={`code-editor flex h-full rounded-lg border border-line bg-panel overflow-hidden eu-no-drag ${className || ''}`}>
       {/* gutter */}
       <div
         ref={gutterRef}
-        className="select-none overflow-hidden py-3 pl-3 pr-2 text-right text-body-mute/70 opacity-50 bg-surface text-[12.5px] leading-[1.55]"
+        className="select-none overflow-hidden py-3 pl-3 pr-2 text-right text-ink-muted/70 opacity-50 bg-panel text-[12.5px] leading-[1.55]"
         style={{ minWidth: 42 }}
       >
         {Array.from({ length: lines }).map((_, i) => (
@@ -452,7 +452,7 @@ export default function CodeEditor({
       <div ref={containerRef} className="relative flex-1 h-full min-h-[260px]">
         <pre
           ref={preRef}
-          className="absolute inset-0 m-0 py-3 px-3 overflow-auto pointer-events-none whitespace-pre text-on-surface select-none"
+          className="absolute inset-0 m-0 py-3 px-3 overflow-auto pointer-events-none whitespace-pre text-ink select-none"
           aria-hidden
         >
           {tokens.map((tok, idx) => (
@@ -476,13 +476,13 @@ export default function CodeEditor({
           placeholder={placeholder}
           spellCheck={false}
           wrap="off"
-          className="absolute inset-0 py-3 px-3 resize-none bg-transparent outline-none text-transparent caret-[rgb(var(--eu-text))] placeholder:text-body-mute placeholder:opacity-50 selectable eu-no-drag"
+          className="absolute inset-0 py-3 px-3 resize-none bg-transparent outline-none text-transparent caret-[rgb(var(--eu-ink))] placeholder:text-ink-muted placeholder:opacity-50 selectable eu-no-drag"
         />
 
         {/* intelligent autocomplete popup (Jedi-powered when available) */}
         {suggestions.length > 0 && (
           <div
-            className="absolute z-30 min-w-[160px] max-w-[320px] rounded-md border border-hairline bg-surface shadow text-xs py-0.5"
+            className="absolute z-30 min-w-[160px] max-w-[320px] rounded-md border border-line bg-panel shadow text-xs py-0.5"
             style={{ top: popupPos.top, left: popupPos.left }}
           >
             {suggestions.map((s, i) => {
@@ -496,21 +496,21 @@ export default function CodeEditor({
                     e.preventDefault();
                     acceptSuggestion(s);
                   }}
-                  className={`px-2.5 py-1 cursor-pointer flex flex-col gap-0.5 ${isSel ? "bg-surface-container text-tui-accent" : "hover:bg-surface-container/60"}`}
+                  className={`px-2.5 py-1 cursor-pointer flex flex-col gap-0.5 ${isSel ? "bg-panel-alt text-accent" : "hover:bg-panel-alt/60"}`}
                 >
                   <div className="flex items-baseline gap-1.5">
                     <span className="font-medium tabular-nums">{label}</span>
-                    {extra && <span className={`text-[10px] ${isSel ? "text-tui-accent/80" : "text-mute"} truncate`}>{extra}</span>}
+                    {extra && <span className={`text-[10px] ${isSel ? "text-accent/80" : "text-ink-muted"} truncate`}>{extra}</span>}
                   </div>
                   {isSel && s.doc && (
-                    <div className="text-[9px] text-mute/80 pl-0.5 pr-2 line-clamp-2 border-l border-hairline/60 ml-0.5">
+                    <div className="text-[9px] text-ink-muted/80 pl-0.5 pr-2 line-clamp-2 border-l border-line/60 ml-0.5">
                       {s.doc.split("\n")[0]}
                     </div>
                   )}
                 </div>
               );
             })}
-            <div className="px-2 pt-0.5 pb-1 text-[9px] text-mute border-t border-hairline mt-0.5">
+            <div className="px-2 pt-0.5 pb-1 text-[9px] text-ink-muted border-t border-line mt-0.5">
               Tab / ⏎ accepte • Esc ferme • Ctrl+Space force
               {suggestions[0]?.type ? "" : " • (local keywords)"}
             </div>

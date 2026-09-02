@@ -1,160 +1,91 @@
 /** @type {import('tailwindcss').Config} */
+
+/**
+ * Euclide design system — direction « Atelier ».
+ *
+ * Rule: this file never *defines* a colour value. Every colour is a reference
+ * to a CSS custom property declared in src/styles.css, so that
+ *   - light and dark themes are a ten-line variable swap,
+ *   - alpha variants (`bg-panel/60`, `border-line/25`) actually work,
+ *   - there is exactly one place to look when a colour is wrong.
+ *
+ * Typography lives in the `.eu-t-*` component classes (src/styles.css): seven
+ * roles, no ad-hoc pixel sizes.
+ */
+const ref = (name) => `rgb(var(--eu-${name}) / <alpha-value>)`;
+
 export default {
-  darkMode: "class",
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // === OpenCode Terminal-Aesthetic (Stitch Design System Redesign) ===
-        // Exact tokens from design-system.md for "ink-on-paper", monospaced, flat, low-fi pro terminal look.
-        // High contrast primary ink on warm cream. TUI-* reserved for status/tech indicators.
-        primary: "#050404",
-        "on-primary": "#ffffff",
-        "primary-container": "#201d1d",
-        "on-primary-container": "#8a8484",
-        "primary-fixed": "#e8e1e0",
-        "primary-fixed-dim": "#ccc5c4",
-        "on-primary-fixed": "#1e1b1b",
-        "on-primary-fixed-variant": "#4a4646",
-        secondary: "#5f5e5e",
-        "on-secondary": "#ffffff",
-        "secondary-container": "#e2dfdf",
-        "on-secondary-container": "#636263",
-        "secondary-fixed": "#e5e2e2",
-        "secondary-fixed-dim": "#c8c6c6",
-        "on-secondary-fixed": "#1b1b1c",
-        "on-secondary-fixed-variant": "#474647",
-        tertiary: "#050404",
-        "on-tertiary": "#ffffff",
-        "tertiary-container": "#201d1d",
-        "on-tertiary-container": "#8a8484",
-        "tertiary-fixed": "#e9e1e0",
-        "tertiary-fixed-dim": "#ccc5c4",
-        "on-tertiary-fixed": "#1e1b1b",
-        "on-tertiary-fixed-variant": "#4a4646",
-        background: "#faf9f9",
-        "on-background": "#1a1c1c",
-        surface: "#faf9f9",
-        "surface-dim": "#dadada",
-        "surface-bright": "#faf9f9",
-        "surface-container-lowest": "#ffffff",
-        "surface-container-low": "#f4f3f3",
-        "surface-container": "#eeeeee",
-        "surface-container-high": "#e9e8e8",
-        "surface-container-highest": "#e3e2e2",
-        "surface-soft": "#f8f7f7",
-        "surface-variant": "#e3e2e2",
-        "surface-tint": "#625d5d",
-        "on-surface": "#1a1c1c",
-        "on-surface-variant": "#4d4545",
-        "inverse-surface": "#2f3131",
-        "inverse-on-surface": "#f1f0f0",
-        "inverse-primary": "#ccc5c4",
-        outline: "#7f7575",
-        "outline-variant": "#d0c4c3",
-        "hairline": "rgba(15,0,0,0.12)",
-        "hairline-strong": "#646262",
-        ink: "#050404",
-        "ink-deep": "#0f0000",
-        mute: "#646262",
-        ash: "#9a9898",
-        // Semantic / TUI (terminal) accents - high contrast, for status, progress, tech UI only
-        error: "#ba1a1a",
-        "on-error": "#ffffff",
-        "error-container": "#ffdad6",
-        "on-error-container": "#93000a",
-        // Dynamic via theme.tsx + --eu-accent (set by accent picker + applyVars)
-        "tui-accent": "#007aff",
-        "tui-danger": "#ff3b30",
-        "tui-success": "#30d158",
-        // legacy / transition aliases (map old warm paper names to closest new equivalents)
-        "body-mute": "#646262",
-        canvas: "#faf9f9",
-        "canvas-soft": "#f8f7f7",
-        // eu legacy for any remaining hardcoded
-        eu: {
-          bg: "#faf9f9",
-          surface: "#faf9f9",
-          card: "#ffffff",
-          border: "rgba(15,0,0,0.12)",
-          text: "#1a1c1c",
-          muted: "#646262",
-          accent: "#007aff",
-          "accent-soft": "#e6f0ff",
-        },
-      },
-      "borderRadius": {
-        "DEFAULT": "0.25rem",
-        "lg": "0.5rem",
-        "xl": "0.75rem",
-        "full": "9999px"
+        // Surfaces
+        canvas: ref("canvas"),
+        panel: ref("panel"),
+        "panel-alt": ref("panel-alt"),
+        // Ink
+        ink: ref("ink"),
+        "ink-muted": ref("ink-muted"),
+        "ink-faint": ref("ink-faint"),
+        // Structure
+        line: `rgb(var(--eu-line) / var(--eu-line-a))`,
+        "line-strong": `rgb(var(--eu-line) / var(--eu-line-a-strong))`,
+        // State (text-safe: all ≥ 6:1 on the canvas)
+        accent: ref("accent"),
+        "accent-soft": ref("accent-soft"),
+        ok: ref("ok"),
+        "ok-soft": ref("ok-soft"),
+        warn: ref("warn"),
+        "warn-soft": ref("warn-soft"),
+        danger: ref("danger"),
+        "danger-soft": ref("danger-soft"),
+        // State (vivid: fills, dots and gauges only — never small text)
+        "ok-solid": ref("ok-solid"),
+        "warn-solid": ref("warn-solid"),
+        "danger-solid": ref("danger-solid"),
+        // Always-dark chrome (PDF stage, Python terminal)
+        stage: ref("stage"),
+        "stage-alt": ref("stage-alt"),
+        "stage-ink": ref("stage-ink"),
       },
       fontFamily: {
-        // Terminal aesthetic: IBM Plex Mono as primary for headings, body, UI, captions. Geist as fallback/display.
-        "display-xl-mobile": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "display-md": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "display-xl": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "body-md": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "display-lg": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "display-sm": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "caption-mono-sm": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "caption-mono": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "body-lg": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "button-label": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "body-strong": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "body-tight": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        "heading-md": ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"],
-        sans: ["IBM Plex Mono", "Geist Mono", "ui-monospace", "monospace"], // make mono the default "sans" for this redesign
-      },
-      fontSize: {
-        // Adapted from design-system.md (16px base, mono rhythm, generous line-heights for breathing room)
-        "display-xl-mobile": ["28px", { "lineHeight": "1.5", "fontWeight": "700" }],
-        "display-md": ["32px", { "lineHeight": "1.5", "fontWeight": "700" }],
-        "display-xl": ["38px", { "lineHeight": "1.5", "fontWeight": "700" }],
-        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
-        "display-lg": ["48px", { "lineHeight": "1.5", "fontWeight": "700" }],
-        "display-sm": ["20px", { "lineHeight": "1.5", "fontWeight": "700" }],
-        "caption-mono-sm": ["12px", { "lineHeight": "2.0", "fontWeight": "400", "letterSpacing": "1.2px" }],
-        "caption-mono": ["14px", { "lineHeight": "2.0", "fontWeight": "400", "letterSpacing": "1.4px" }],
-        "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
-        "button-md": ["16px", { "lineHeight": "2.0", "fontWeight": "500" }],
-        "body-strong": ["16px", { "lineHeight": "1.5", "fontWeight": "500" }],
-        "body-tight": ["16px", { "lineHeight": "1.0", "fontWeight": "500" }],
-        "heading-md": ["16px", { "lineHeight": "1.5", "fontWeight": "700" }],
+        // Mono carries data, labels, keys and code; sans carries prose.
+        sans: ["IBM Plex Sans", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        mono: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       borderRadius: {
-        DEFAULT: "0.25rem", // 4px - for interactive affordance (buttons, inputs, chips)
-        none: "0px", // sharp for containers, cards, nav (brutalist/terminal grid feel)
-        sm: "0.125rem",
-        md: "0.25rem",
-        lg: "0.5rem",
-        xl: "0.75rem",
+        // Two values. Containers 6 px, interactive 4 px.
+        none: "0px",
+        sm: "3px",
+        DEFAULT: "4px",
+        md: "6px",
+        lg: "8px",
         full: "9999px",
       },
-      spacing: {
-        // 8px base grid + exact from design system
-        unit: "4px",
-        xxs: "1px",
-        xs: "4px",
-        sm: "8px",
-        md: "12px",
-        lg: "16px",
-        xl: "24px",
-        gutter: "24px",
-        "2xl": "32px",
-        "3xl": "48px",
-        "4xl": "64px",
-        "section-desktop": "96px",
-        "section-tablet": "64px",
-        "section-mobile": "48px",
-        "margin-desktop": "64px",
-        "margin-mobile": "24px",
+      transitionDuration: {
+        fast: "120ms",
+        DEFAULT: "180ms",
+        base: "180ms",
+        slow: "260ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.2, 0, 0.2, 1)",
+        out: "cubic-bezier(0.2, 0, 0.2, 1)",
+        "in-out": "cubic-bezier(0.4, 0, 0.2, 1)",
       },
       boxShadow: {
-        // Strictly flat: minimal or none. Use for very subtle depth only on interactive.
-        card: "none",
-        soft: "0 1px 2px 0 rgb(0 0 0 / 0.04)",
+        // Nearly flat: one hairline lift for popovers and overlays only.
         none: "none",
+        pop: "0 1px 2px rgb(0 0 0 / 0.05), 0 8px 24px -12px rgb(0 0 0 / 0.22)",
+      },
+      maxWidth: {
+        col: "1080px",
+      },
+      zIndex: {
+        overlay: "60",
+        palette: "70",
+        confirm: "90",
       },
     },
   },

@@ -5,6 +5,8 @@ import { useToast } from "./ui";
 import { DownloadIcon, PenIcon, TrashIcon, GridIcon } from "./icons";
 import { OpenWithButton } from "./OpenWithButton";
 import { get } from "../lib/i18n";
+import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
+import { MOD } from "../lib/shortcuts";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 
@@ -319,34 +321,34 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center gap-2 px-5 py-2.5 border-b border-hairline flex-wrap bg-surface">
+        <div className="flex items-center gap-2 px-5 py-2.5 border-b border-line flex-wrap bg-panel">
           {(["pen","eraser"] as const).map((t) => (
             <button key={t} onClick={() => setLegacyTool(t)}
-              className={`new-btn-ghost text-sm ${legacyTool===t ? "bg-surface-container text-tui-accent" : ""}`}>
+              className={`eu-btn-ghost text-sm ${legacyTool===t ? "bg-panel-alt text-accent" : ""}`}>
               {t === "pen" ? "Stylo" : "Gomme"}
             </button>
           ))}
           <div className="flex items-center gap-1.5 ml-2">
             {PALETTE.map((c) => (
               <button key={c} onClick={() => setLegacyColor(c)}
-                className={`w-6 h-6 rounded-full border border-hairline transition-all ${legacyColor===c ? "ring-2 ring-tui-accent" : "hover:ring-1 hover:ring-hairline"}`}
+                className={`w-6 h-6 rounded-full border border-line transition-all ${legacyColor===c ? "ring-2 ring-accent" : "hover:ring-1 hover:ring-hairline"}`}
                 style={{ background: c }} />
             ))}
-            <div className="w-3.5 h-3.5 rounded border border-hairline" style={{ background: legacyColor }} title={`Couleur active : ${legacyColor}`} />
+            <div className="w-3.5 h-3.5 rounded border border-line" style={{ background: legacyColor }} title={`Couleur active : ${legacyColor}`} />
           </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => setLegacyZoom(z => Math.max(0.5, z-0.1))} className="new-btn-ghost px-2.5">−</button>
-              <span className="text-xs text-body-mute w-10 text-center tabular-nums">{Math.round(legacyZoom*100)}%</span>
-              <button onClick={() => setLegacyZoom(z => Math.min(3, z+0.1))} className="new-btn-ghost px-2.5">+</button>
+              <button onClick={() => setLegacyZoom(z => Math.max(0.5, z-0.1))} className="eu-btn-ghost px-2.5">−</button>
+              <span className="text-xs text-ink-muted w-10 text-center tabular-nums">{Math.round(legacyZoom*100)}%</span>
+              <button onClick={() => setLegacyZoom(z => Math.min(3, z+0.1))} className="eu-btn-ghost px-2.5">+</button>
             </div>
-            <OpenWithButton fileId={fileId} className="new-btn-ghost" />
-            <button onClick={legacyExport} className="new-btn-ghost"><DownloadIcon className="w-4 h-4" /></button>
-            <button onClick={legacySave} className="new-btn-primary">Enregistrer</button>
+            <OpenWithButton fileId={fileId} className="eu-btn-ghost" />
+            <button onClick={legacyExport} className="eu-btn-ghost"><DownloadIcon className="w-4 h-4" /></button>
+            <button onClick={legacySave} className="eu-btn-primary">Enregistrer</button>
           </div>
         </div>
-        <div ref={legacyContainerRef} className="flex-1 overflow-auto bg-[#1a1a1a] p-6" style={{ zoom: legacyZoom }}>
-          <div className="relative mx-auto shadow-card bg-[#f8f7f4] inline-block border border-hairline rounded">
+        <div ref={legacyContainerRef} className="flex-1 overflow-auto bg-stage p-6" style={{ zoom: legacyZoom }}>
+          <div className="relative mx-auto shadow-pop bg-white inline-block rounded">
             <canvas ref={(el) => (legacyPageCanvas.current = el)} className="block" />
             <canvas
               ref={(el) => (legacyOverlay.current = el)}
@@ -357,7 +359,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               className="absolute inset-0 touch-none"
               style={{ cursor: "crosshair" }}
             />
-            <button onClick={legacyClear} className="absolute top-2 right-2 text-xs new-btn-ghost bg-surface/80">Effacer</button>
+            <button onClick={legacyClear} className="absolute top-2 right-2 text-xs eu-btn-ghost bg-panel/80">Effacer</button>
           </div>
         </div>
       </div>
@@ -432,73 +434,93 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
   return (
     <div className="h-full flex flex-col">
-      {/* Custom toolbar. Only Sélection + Stylo (Ink) for drawing. */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-hairline flex-wrap bg-surface text-sm">
-        {/* Mode selector + sidebar toggle */}
-        <div className="flex items-center gap-1 border-r border-hairline pr-2 mr-1">
+      {/* Toolbar: view mode, pen, colour, zoom, versions, save. */}
+      <Toolbar className="h-9 py-0">
+        <ToolGroup label={get("pdf.mode", "Affichage")}>
           <button
             onClick={() => setEditorMode(0)}
-            className={`new-btn-ghost text-xs px-2 py-1 ${currentEditorMode === 0 ? "bg-surface-container text-primary" : ""}`}
+            aria-pressed={currentEditorMode === 0}
+            className={`eu-btn-sm ${currentEditorMode === 0 ? "eu-btn-primary" : "eu-btn-quiet"}`}
             disabled={!canControlEditor}
-            title="Sélection : visualiser (annotations statiques)"
+            title={get("pdf.selectTitle", "Sélection : visualiser sans annoter")}
           >
-            Sélection
+            {get("pdf.select", "Sélection")}
+          </button>
+          <button
+            onClick={() => setEditorMode(15)}
+            aria-pressed={currentEditorMode === 15}
+            className={`eu-btn-sm ${currentEditorMode === 15 ? "eu-btn-primary" : "eu-btn-quiet"}`}
+            disabled={!canControlEditor}
+            title={get("pdf.penTitle", "Stylo : dessin à main levée")}
+          >
+            <PenIcon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{get("pdf.pen", "Stylo")}</span>
           </button>
           <button
             onClick={togglePagesSidebar}
-            className={`new-btn-ghost flex items-center justify-center w-7 h-7 text-sm ${showPages ? "bg-surface-container text-primary" : ""}`}
+            aria-pressed={showPages}
+            aria-label={get("pdf.pages", "Pages")}
+            className={`eu-btn-icon eu-btn-sm ${showPages ? "eu-btn-primary" : "eu-btn-quiet"}`}
             disabled={!canControlEditor}
-            title="Pages / Vignettes (retractable à gauche)"
+            title={get("pdf.pagesTitle", "Vignettes des pages")}
           >
             <GridIcon className="w-4 h-4" />
           </button>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* Annotation tools - only Stylo now */}
-          <button
-            onClick={() => setEditorMode(15)}
-            className={`new-btn-ghost flex items-center gap-1 text-sm px-2 ${currentEditorMode === 15 ? "bg-surface-container text-primary" : ""}`}
-            disabled={!canControlEditor}
-            title="Stylo / Dessin à main levée (Ink)"
-          >
-            <PenIcon className="w-4 h-4" /> <span className="text-xs hidden sm:inline">Stylo</span>
-          </button>
           <button
             onClick={deleteSelected}
-            className="new-btn-ghost flex items-center gap-1 text-sm px-2"
+            aria-label={get("pdf.deleteAnnotation", "Supprimer l'annotation")}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
             disabled={!canControlEditor}
-            title="Supprimer l'annotation sélectionnée (ou touche Suppr)"
+            title={get("pdf.deleteAnnotationTitle", "Supprimer l'annotation sélectionnée (Suppr)")}
           >
             <TrashIcon className="w-4 h-4" />
           </button>
-        </div>
+        </ToolGroup>
 
-        <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-hairline">
+        <ToolSep />
+
+        <ToolGroup label={get("whiteboard.colors", "Couleurs")}>
           {PALETTE.map((c) => (
             <button
               key={c}
               onClick={() => setEditorColor(c)}
-              className={`w-5 h-5 rounded-full border border-hairline transition-all ${currentColor === c ? 'ring-2 ring-tui-accent' : 'hover:ring-1 hover:ring-hairline'}`}
+              aria-label={c}
+              aria-pressed={currentColor === c}
+              className={`w-5 h-5 rounded-full border transition-transform duration-fast ${
+                currentColor === c ? "border-ink scale-110" : "border-line hover:scale-105"
+              }`}
               style={{ background: c }}
               disabled={!canControlEditor}
-              title={`Couleur ${c}`}
+              title={c}
             />
           ))}
-          {/* explicit current color swatch, like whiteboard's active color indicator */}
-          <div className="w-3.5 h-3.5 rounded border border-hairline" style={{ background: currentColor }} title={`Couleur active : ${currentColor}`} />
-        </div>
+        </ToolGroup>
 
-        <div className="flex items-center gap-1 ml-2 pl-2 border-l border-hairline">
-          <button onClick={() => doZoom(-1)} className="new-btn-ghost px-2" title="Zoom -">−</button>
-          <button onClick={() => doZoom(1)} className="new-btn-ghost px-2" title="Zoom +">+</button>
-        </div>
+        <ToolSep />
 
-        {/* simple versioning: load previous baked states into the viewer; saving will update the main doc. Always visible for PDFs. */}
+        <ToolGroup label={get("whiteboard.zoom", "Zoom")}>
+          <button
+            onClick={() => doZoom(-1)}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            aria-label={get("whiteboard.zoomOut", "Réduire")}
+          >
+            −
+          </button>
+          <button
+            onClick={() => doZoom(1)}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            aria-label={get("whiteboard.zoomIn", "Agrandir")}
+          >
+            +
+          </button>
+        </ToolGroup>
+
         {!legacyMode && (
-          <div className="flex items-center gap-1 ml-2 pl-2 border-l border-hairline text-xs">
+          <>
+            <ToolSep />
             <select
-              className="new-btn-ghost text-xs px-1 py-0.5"
+              className="eu-select h-7 w-[130px] text-[11.5px]"
+              aria-label={get("pdf.versions", "Versions")}
               onChange={async (e) => {
                 const name = e.target.value;
                 if (!name) return;
@@ -519,42 +541,59 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               }}
               value=""
             >
-              <option value="" disabled>{get("pdf.versions", "Versions")} ({versions.length})</option>
+              <option value="" disabled>
+                {get("pdf.versions", "Versions")} ({versions.length})
+              </option>
               {versions.length === 0 ? (
-                <option value="" disabled>{get("pdf.noVersionsYet", "Aucune version — ouvrez l'éditeur pour capturer l'original")}</option>
+                <option value="" disabled>
+                  {get("pdf.noVersionsYet", "Aucune version")}
+                </option>
               ) : (
-                versions.slice().reverse().map((v: any, i: number) => {
-                  const isOriginal = v.timestamp === "original" || (typeof v.backup_name === "string" && v.backup_name.includes("__original"));
-                  const label = isOriginal ? "Original" : `v${v.version} ${v.timestamp}`;
-                  return (
-                    <option key={i} value={v.backup_name}>
-                      {label}
-                    </option>
-                  );
-                })
+                versions
+                  .slice()
+                  .reverse()
+                  .map((v: any, i: number) => {
+                    const isOriginal =
+                      v.timestamp === "original" ||
+                      (typeof v.backup_name === "string" && v.backup_name.includes("__original"));
+                    const label = isOriginal
+                      ? get("pdf.original", "Original")
+                      : `v${v.version} ${v.timestamp}`;
+                    return (
+                      <option key={i} value={v.backup_name}>
+                        {label}
+                      </option>
+                    );
+                  })
               )}
             </select>
-          </div>
+          </>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
-          <OpenWithButton fileId={fileId} className="new-btn-ghost text-xs" label="Ouvrir dehors" />
+        <ToolSpacer />
+
+        <ToolGroup>
+          <OpenWithButton
+            fileId={fileId}
+            className="eu-btn-quiet eu-btn-sm"
+            label={get("openWith.label", "Ouvrir dehors")}
+          />
           <button
             onClick={triggerViewerSave}
-            className="new-btn-primary text-sm"
+            className="eu-btn-primary eu-btn-sm"
             disabled={!canControlEditor}
-            title="Enregistrer le PDF avec les annotations intégrées (format PDF standard, portable)"
+            title={`${get("common.save", "Enregistrer")} (${MOD}S)`}
           >
-            Enregistrer
+            {get("common.save", "Enregistrer")}
           </button>
-        </div>
-      </div>
+        </ToolGroup>
+      </Toolbar>
 
-      <div className="flex-1 min-h-0 bg-[#111] relative flex">
+      <div className="flex-1 min-h-0 bg-stage relative flex">
         {!legacyMode && showPages && (
-          <div className="w-[150px] flex-shrink-0 border-r border-hairline bg-[#0a0a0a] overflow-y-auto p-1.5 text-[10px]">
+          <div className="w-[150px] flex-shrink-0 border-r border-white/10 bg-stage-alt overflow-y-auto p-1.5">
             {thumbnails.length === 0 ? (
-              <div className="p-2 text-body-mute">{get("pdf.thumbnailsLoading", "Chargement des pages…")}</div>
+              <div className="p-2 font-mono text-[10px] text-white/50">{get("pdf.thumbnailsLoading", "Chargement des pages…")}</div>
             ) : (
               thumbnails.map((t) => (
                 <button
@@ -566,11 +605,11 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                     }
                     setCurrentPage(t.page);
                   }}
-                  className={`w-full mb-2 overflow-hidden border-2 bg-[#111] ${currentPage === t.page ? "border-tui-accent ring-1 ring-inset ring-tui-accent/40" : "border-hairline"}`}
+                  className={`w-full mb-2 overflow-hidden rounded-sm border-2 bg-stage ${currentPage === t.page ? "border-accent" : "border-white/10 hover:border-white/25"}`}
                   title={`Page ${t.page}`}
                 >
                   <img src={t.dataUrl} className="w-full h-auto block" alt={`p${t.page}`} />
-                  <div className="text-center text-[10px] leading-none py-0.5 text-body-mute bg-[#0a0a0a]">{t.page}</div>
+                  <div className="text-center font-mono text-[10px] leading-none py-1 text-white/50 bg-stage-alt">{t.page}</div>
                 </button>
               ))
             )}
@@ -578,19 +617,19 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         )}
         <div className="flex-1 relative min-w-0">
           {!legacyMode && !pdfLoaded && !error && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#111]/90">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-stage/90">
               <div className="flex flex-col items-center gap-3">
-                <div className="w-5 h-5 border-2 border-white/20 border-t-[#007aff] rounded-full animate-spin" />
-                <p className="text-body-mute text-sm">Chargement du PDF…</p>
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
+                <p className="text-white/60 text-[13px]">{get("pdf.loading", "Chargement du PDF…")}</p>
               </div>
             </div>
           )}
-          {error && <p className="text-center text-red-400 py-10">{error}</p>}
+          {error && <p className="text-center text-danger py-10">{error}</p>}
           {viewerUrl && !error && (
             <iframe
               ref={iframeRef}
               src={viewerUrl}
-              className="absolute inset-0 w-full h-full border-0 bg-[#111]"
+              className="absolute inset-0 w-full h-full border-0 bg-stage"
               title="PDF viewer"
               allow="clipboard-read; clipboard-write"
               onLoad={() => {

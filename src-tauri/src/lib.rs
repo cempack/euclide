@@ -44,7 +44,11 @@ pub fn run() {
                 let val = crate::commands::get_setting_raw(&conn, "keep_awake");
                 let should_on = val.as_deref() != Some("0");
                 // Always ensure the preference is saved (defaults to on/"1" for first run).
-                crate::commands::set_setting_raw(&conn, "keep_awake", if should_on { "1" } else { "0" });
+                crate::commands::set_setting_raw(
+                    &conn,
+                    "keep_awake",
+                    if should_on { "1" } else { "0" },
+                );
                 crate::keepawake::set(&ka, should_on);
             }
 
@@ -110,8 +114,19 @@ pub fn run() {
             commands::index_files,
             commands::list_reminders,
             commands::create_reminder,
+            commands::update_reminder,
             commands::toggle_reminder,
             commands::delete_reminder,
+            commands::list_sequences,
+            commands::list_sequence_items,
+            commands::create_sequence,
+            commands::rename_sequence,
+            commands::delete_sequence,
+            commands::move_sequence,
+            commands::create_sequence_item,
+            commands::update_sequence_item,
+            commands::delete_sequence_item,
+            commands::move_sequence_item,
             commands::list_links,
             commands::create_link,
             commands::delete_link,
@@ -141,6 +156,7 @@ pub fn run() {
             commands::python_complete,
             commands::choose_data_dir,
             commands::reset_data_dir,
+            commands::backup_data_dir,
             commands::set_keep_awake,
             commands::keep_awake_status,
             commands::get_setting,
@@ -157,6 +173,7 @@ pub fn run() {
             commands::attach_class_to_course,
             commands::detach_course_class,
             commands::set_course_class_progress,
+            commands::set_course_class_item,
             commands::update_course_class_notes,
             commands::pronote_classes,
             portable_update::apply_windows_portable_update,

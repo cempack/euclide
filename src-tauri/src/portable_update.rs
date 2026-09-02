@@ -33,9 +33,13 @@ const MAX_UPDATE_BYTES: u64 = 400 * 1024 * 1024;
 #[allow(dead_code)] // constructed while downloading on Windows
 pub enum PortableDownloadEvent {
     #[serde(rename_all = "camelCase")]
-    Started { content_length: Option<u64> },
+    Started {
+        content_length: Option<u64>,
+    },
     #[serde(rename_all = "camelCase")]
-    Progress { chunk_length: usize },
+    Progress {
+        chunk_length: usize,
+    },
     Finished,
 }
 
@@ -83,7 +87,11 @@ fn updater_pubkey() -> Result<String, String> {
 }
 
 /// Minisign check matching `tauri-plugin-updater` (`verify_signature`).
-pub fn verify_update_signature(data: &[u8], release_signature: &str, pub_key: &str) -> Result<(), String> {
+pub fn verify_update_signature(
+    data: &[u8],
+    release_signature: &str,
+    pub_key: &str,
+) -> Result<(), String> {
     use base64::Engine;
     use minisign_verify::{PublicKey, Signature};
 
@@ -94,8 +102,8 @@ pub fn verify_update_signature(data: &[u8], release_signature: &str, pub_key: &s
         String::from_utf8(bytes).map_err(|_| format!("{what}: UTF-8 invalide"))
     };
 
-    let public_key = PublicKey::decode(&decode(pub_key, "pubkey")?)
-        .map_err(|e| format!("pubkey: {e}"))?;
+    let public_key =
+        PublicKey::decode(&decode(pub_key, "pubkey")?).map_err(|e| format!("pubkey: {e}"))?;
     let signature = Signature::decode(&decode(release_signature, "signature")?)
         .map_err(|e| format!("signature: {e}"))?;
     public_key
@@ -128,7 +136,9 @@ fn normalize_zip_entry(raw: &str) -> Option<PathBuf> {
 }
 
 fn top_name_lower(path: &Path) -> Option<String> {
-    path.components().next().map(|c| c.as_os_str().to_string_lossy().to_ascii_lowercase())
+    path.components()
+        .next()
+        .map(|c| c.as_os_str().to_string_lossy().to_ascii_lowercase())
 }
 
 fn is_app_root_name(name_lower: &str) -> bool {
@@ -157,10 +167,7 @@ fn detect_wrapper(paths: &[PathBuf]) -> Option<String> {
     if paths.is_empty() {
         return None;
     }
-    let firsts: Vec<String> = paths
-        .iter()
-        .filter_map(|p| top_name_lower(p))
-        .collect();
+    let firsts: Vec<String> = paths.iter().filter_map(|p| top_name_lower(p)).collect();
     if firsts.len() != paths.len() {
         return None;
     }
@@ -383,14 +390,19 @@ async fn download_update(
 }
 
 #[cfg(windows)]
-fn spawn_overlay_helper(dest: &Path, staging: &Path, exe_name: &std::ffi::OsStr) -> Result<(), String> {
+fn spawn_overlay_helper(
+    dest: &Path,
+    staging: &Path,
+    exe_name: &std::ffi::OsStr,
+) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
 
-    let helper = std::env::temp_dir().join(format!("euclide-apply-update-{}.ps1", std::process::id()));
+    let helper =
+        std::env::temp_dir().join(format!("euclide-apply-update-{}.ps1", std::process::id()));
     let script = r#"param(
   [Parameter(Mandatory=$true)][string]$Dest,
   [Parameter(Mandatory=$true)][string]$Stage,
@@ -453,7 +465,8 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut zw = zip::ZipWriter::new(&mut cursor);
-            let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            let opts =
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
             for (name, data) in files {
                 zw.start_file(*name, opts).unwrap();
                 zw.write_all(data).unwrap();
@@ -468,9 +481,15 @@ mod tests {
         assert!(is_allowed_overlay_rel(Path::new("euclide.exe")));
         assert!(is_allowed_overlay_rel(Path::new("Euclide.exe")));
         assert!(is_allowed_overlay_rel(Path::new("euclide.portable")));
-        assert!(is_allowed_overlay_rel(Path::new("euclide-sidecar/euclide-sidecar.exe")));
-        assert!(is_allowed_overlay_rel(Path::new("euclide-sidecar/internal/foo.pyd")));
-        assert!(!is_allowed_overlay_rel(Path::new("Euclide-Data/euclide.db")));
+        assert!(is_allowed_overlay_rel(Path::new(
+            "euclide-sidecar/euclide-sidecar.exe"
+        )));
+        assert!(is_allowed_overlay_rel(Path::new(
+            "euclide-sidecar/internal/foo.pyd"
+        )));
+        assert!(!is_allowed_overlay_rel(Path::new(
+            "Euclide-Data/euclide.db"
+        )));
         assert!(!is_allowed_overlay_rel(Path::new("euclide-data.json")));
         assert!(!is_allowed_overlay_rel(Path::new("notes.txt")));
         assert!(!is_allowed_overlay_rel(Path::new("unrelated/euclide.exe")));
@@ -481,7 +500,8 @@ mod tests {
 
     #[test]
     fn portable_dir_detects_marker_and_sidecar_without_uninstaller() {
-        let tmp = std::env::temp_dir().join(format!("euclide-portable-detect-{}", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("euclide-portable-detect-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(tmp.join("euclide-sidecar")).unwrap();
         assert!(is_windows_portable_dir(&tmp));
@@ -501,7 +521,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(tmp.join("Euclide-Data/courses")).unwrap();
         std::fs::write(tmp.join("Euclide-Data/euclide.db"), b"KEEP-DB").unwrap();
-        std::fs::write(tmp.join("euclide-data.json"), br#"{"dataDir":"Euclide-Data"}"#).unwrap();
+        std::fs::write(
+            tmp.join("euclide-data.json"),
+            br#"{"dataDir":"Euclide-Data"}"#,
+        )
+        .unwrap();
         std::fs::write(tmp.join("mes-cours.pdf"), b"KEEP-PDF").unwrap();
         std::fs::create_dir_all(tmp.join("euclide-sidecar")).unwrap();
         std::fs::write(tmp.join("euclide-sidecar/old.dat"), b"OLD-SIDECAR-EXTRA").unwrap();
@@ -523,12 +547,18 @@ mod tests {
             std::fs::read(tmp.join("euclide-sidecar/euclide-sidecar.exe")).unwrap(),
             b"NEW-SIDECAR"
         );
-        assert_eq!(std::fs::read(tmp.join("Euclide-Data/euclide.db")).unwrap(), b"KEEP-DB");
+        assert_eq!(
+            std::fs::read(tmp.join("Euclide-Data/euclide.db")).unwrap(),
+            b"KEEP-DB"
+        );
         assert_eq!(
             std::fs::read_to_string(tmp.join("euclide-data.json")).unwrap(),
             r#"{"dataDir":"Euclide-Data"}"#
         );
-        assert_eq!(std::fs::read(tmp.join("mes-cours.pdf")).unwrap(), b"KEEP-PDF");
+        assert_eq!(
+            std::fs::read(tmp.join("mes-cours.pdf")).unwrap(),
+            b"KEEP-PDF"
+        );
         assert_eq!(
             std::fs::read(tmp.join("euclide-sidecar/old.dat")).unwrap(),
             b"OLD-SIDECAR-EXTRA"
@@ -550,7 +580,10 @@ mod tests {
             ("Euclide-portable/euclide-sidecar/run.exe", b"WRAPPED-SC"),
         ]);
         extract_allowed_overlay(&zip, &tmp).unwrap();
-        assert_eq!(std::fs::read(tmp.join("euclide.exe")).unwrap(), b"WRAPPED-EXE");
+        assert_eq!(
+            std::fs::read(tmp.join("euclide.exe")).unwrap(),
+            b"WRAPPED-EXE"
+        );
         assert_eq!(
             std::fs::read(tmp.join("euclide-sidecar/run.exe")).unwrap(),
             b"WRAPPED-SC"
@@ -567,8 +600,9 @@ mod tests {
 
     #[test]
     fn verify_rejects_garbage_signature() {
-        let err = verify_update_signature(b"hello", "not-valid-signature", &updater_pubkey().unwrap())
-            .unwrap_err();
+        let err =
+            verify_update_signature(b"hello", "not-valid-signature", &updater_pubkey().unwrap())
+                .unwrap_err();
         assert!(!err.is_empty());
     }
 
@@ -579,7 +613,8 @@ mod tests {
 
     #[test]
     fn overlay_reads_deflate_zip() {
-        let tmp = std::env::temp_dir().join(format!("euclide-overlay-deflate-{}", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("euclide-overlay-deflate-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
         std::fs::write(tmp.join("keep.txt"), b"KEEP").unwrap();
@@ -587,13 +622,17 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut zw = zip::ZipWriter::new(&mut cursor);
-            let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+            let opts =
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
             zw.start_file("euclide.exe", opts).unwrap();
             zw.write_all(b"DEFLATED-EXE").unwrap();
             zw.finish().unwrap();
         }
         extract_allowed_overlay(&cursor.into_inner(), &tmp).unwrap();
-        assert_eq!(std::fs::read(tmp.join("euclide.exe")).unwrap(), b"DEFLATED-EXE");
+        assert_eq!(
+            std::fs::read(tmp.join("euclide.exe")).unwrap(),
+            b"DEFLATED-EXE"
+        );
         assert_eq!(std::fs::read(tmp.join("keep.txt")).unwrap(), b"KEEP");
         let _ = std::fs::remove_dir_all(&tmp);
     }

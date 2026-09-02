@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { XIcon } from "./icons";
+import { useConfirm } from "./ui";
 import { fmt, get } from "../lib/i18n";
 import {
   dismissAvailableUpdate,
@@ -15,6 +16,7 @@ export function UpdateAvailablePopup({
   update: AppUpdateInfo | null;
   onDismiss: () => void;
 }) {
+  const confirmDlg = useConfirm();
   const [busy, setBusy] = useState(false);
   const [percent, setPercent] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -40,11 +42,15 @@ export function UpdateAvailablePopup({
 
   const install = async () => {
     if (!update || busy) return;
-    const ok = confirm(
-      fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
+    // In-app dialog rather than the native window.confirm(), which looked
+    // foreign inside the Tauri window.
+    const ok = await confirmDlg.ask({
+      title: get("updater.install", "Installer et redémarrer"),
+      message: fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
         version: update.version,
-      })
-    );
+      }),
+      confirmLabel: get("updater.install", "Installer et redémarrer"),
+    });
     if (!ok) return;
     setBusy(true);
     setError("");
@@ -71,14 +77,14 @@ export function UpdateAvailablePopup({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
           transition={{ type: "spring", stiffness: 420, damping: 30 }}
-          className="fixed bottom-5 right-5 z-[70] w-[min(calc(100vw-2.5rem),300px)] new-card p-3.5 font-mono"
+          className="fixed bottom-9 right-5 z-overlay w-[min(calc(100vw-2.5rem),320px)] eu-panel shadow-pop p-3.5"
         >
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-primary leading-snug">
+              <p className="eu-t-section text-ink">
                 {fmt(get("updater.popupTitle", "Mise à jour {version}"), { version: update.version })}
               </p>
-              <p className="text-[11px] text-mute mt-1 leading-snug">
+              <p className="eu-t-meta mt-1">
                 {get("updater.popupBody", "Une nouvelle version est disponible.")}
               </p>
             </div>
@@ -87,32 +93,29 @@ export function UpdateAvailablePopup({
               onClick={dismiss}
               disabled={busy}
               title={get("updater.popupDismiss", "Fermer")}
-              className="shrink-0 w-7 h-7 grid place-items-center rounded text-mute hover:text-primary hover:bg-surface-soft disabled:opacity-40"
+              className="shrink-0 eu-btn-quiet eu-btn-icon eu-btn-sm"
             >
               <XIcon className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {error && <p className="text-[11px] text-tui-danger mt-2 leading-snug">{error}</p>}
+          {error && <p className="eu-t-meta text-danger mt-2">{error}</p>}
 
           {busy && (
-            <div className="h-1 rounded-full bg-hairline overflow-hidden mt-3">
-              <div
-                className="h-full bg-primary transition-[width] duration-150"
-                style={{ width: `${percent ?? 0}%` }}
-              />
+            <div className="eu-gauge mt-3">
+              <i style={{ width: `${percent ?? 0}%` }} />
             </div>
           )}
 
           <div className="flex justify-end gap-2 mt-3">
-            <button type="button" onClick={dismiss} disabled={busy} className="new-btn-ghost text-xs py-0.5">
+            <button type="button" onClick={dismiss} disabled={busy} className="eu-btn-quiet eu-btn-sm">
               {get("updater.popupLater", "Plus tard")}
             </button>
             <button
               type="button"
               onClick={() => void install()}
               disabled={busy}
-              className="new-btn-primary bg-primary text-white text-xs py-0.5"
+              className="eu-btn-primary eu-btn-sm"
             >
               {busy
                 ? fmt(get("updater.installing", "Téléchargement… {percent} %"), { percent: percent ?? 0 })

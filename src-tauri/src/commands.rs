@@ -50,6 +50,13 @@ pub struct CourseClass {
     last_file_name: Option<String>,
     #[serde(default)]
     last_file_kind: Option<String>,
+    /// Step of a sequence this class has reached (see `sequence_items`).
+    #[serde(default)]
+    last_item_id: Option<i64>,
+    #[serde(default)]
+    last_item_title: Option<String>,
+    #[serde(default)]
+    last_sequence_title: Option<String>,
     #[serde(default)]
     progress_updated_at: String,
     #[serde(default)]
@@ -87,6 +94,32 @@ pub struct Reminder {
     due_at: Option<String>,
     done: bool,
     created_at: String,
+    /// Course this reminder belongs to, if any.
+    course_id: Option<i64>,
+    /// "none" | "daily" | "weekly" | "monthly".
+    repeat_rule: String,
+}
+
+/// A chapter of a course's progression.
+#[derive(Serialize)]
+pub struct Sequence {
+    id: i64,
+    course_id: i64,
+    title: String,
+    position: i64,
+    created_at: String,
+}
+
+/// A step inside a sequence, optionally bound to a document of the locker.
+#[derive(Serialize)]
+pub struct SequenceItem {
+    id: i64,
+    sequence_id: i64,
+    title: String,
+    position: i64,
+    file_id: Option<i64>,
+    file_name: Option<String>,
+    file_kind: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -270,7 +303,14 @@ pub fn update_course(state: State<Db>, course: Course) -> R<()> {
     let conn = state.0.lock().unwrap();
     conn.execute(
         "UPDATE courses SET name=?1, emoji=?2, color=?3, description=?4, matiere=?5 WHERE id=?6",
-        params![course.name, course.emoji, course.color, course.description, course.matiere, course.id],
+        params![
+            course.name,
+            course.emoji,
+            course.color,
+            course.description,
+            course.matiere,
+            course.id
+        ],
     )
     .map_err(e)?;
     Ok(())
@@ -280,7 +320,8 @@ pub fn update_course(state: State<Db>, course: Course) -> R<()> {
 pub fn delete_course(state: State<Db>, id: i64) -> R<()> {
     {
         let conn = state.0.lock().unwrap();
-        conn.execute("DELETE FROM courses WHERE id=?1", [id]).map_err(e)?;
+        conn.execute("DELETE FROM courses WHERE id=?1", [id])
+            .map_err(e)?;
     }
     let _ = fs::remove_dir_all(crate::paths::courses_dir().join(id.to_string()));
     Ok(())
@@ -296,9 +337,12 @@ pub fn list_course_classes(state: State<Db>, course_id: i64) -> R<Vec<CourseClas
     let mut stmt = conn
         .prepare_cached(
             "SELECT cc.id, cc.course_id, cc.class_name, cc.last_file_id, \
-                    f.name, f.kind, cc.progress_updated_at, cc.notes \
+                    f.name, f.kind, cc.last_item_id, si.title, sq.title, \
+                    cc.progress_updated_at, cc.notes \
              FROM course_classes cc \
              LEFT JOIN files f ON f.id = cc.last_file_id \
+             LEFT JOIN sequence_items si ON si.id = cc.last_item_id \
+             LEFT JOIN sequences sq ON sq.id = si.sequence_id \
              WHERE cc.course_id = ?1 \
              ORDER BY cc.class_name",
         )
@@ -312,8 +356,11 @@ pub fn list_course_classes(state: State<Db>, course_id: i64) -> R<Vec<CourseClas
                 last_file_id: r.get(3)?,
                 last_file_name: r.get(4)?,
                 last_file_kind: r.get(5)?,
-                progress_updated_at: r.get(6)?,
-                notes: r.get(7)?,
+                last_item_id: r.get(6)?,
+                last_item_title: r.get(7)?,
+                last_sequence_title: r.get(8)?,
+                progress_updated_at: r.get(9)?,
+                notes: r.get(10)?,
             })
         })
         .map_err(e)?;
@@ -321,7 +368,11 @@ pub fn list_course_classes(state: State<Db>, course_id: i64) -> R<Vec<CourseClas
 }
 
 #[tauri::command]
-pub fn attach_class_to_course(state: State<Db>, course_id: i64, class_name: String) -> R<CourseClass> {
+pub fn attach_class_to_course(
+    state: State<Db>,
+    course_id: i64,
+    class_name: String,
+) -> R<CourseClass> {
     let conn = state.0.lock().unwrap();
     let class_name = class_name.trim().to_string();
     if class_name.is_empty() {
@@ -335,9 +386,12 @@ pub fn attach_class_to_course(state: State<Db>, course_id: i64, class_name: Stri
     // Return the (possibly just created) row with join for last file info
     conn.query_row(
         "SELECT cc.id, cc.course_id, cc.class_name, cc.last_file_id, \
-                f.name, f.kind, cc.progress_updated_at, cc.notes \
+                f.name, f.kind, cc.last_item_id, si.title, sq.title, \
+                cc.progress_updated_at, cc.notes \
          FROM course_classes cc \
          LEFT JOIN files f ON f.id = cc.last_file_id \
+         LEFT JOIN sequence_items si ON si.id = cc.last_item_id \
+         LEFT JOIN sequences sq ON sq.id = si.sequence_id \
          WHERE cc.course_id = ?1 AND cc.class_name = ?2",
         params![course_id, class_name],
         |r| {
@@ -348,8 +402,11 @@ pub fn attach_class_to_course(state: State<Db>, course_id: i64, class_name: Stri
                 last_file_id: r.get(3)?,
                 last_file_name: r.get(4)?,
                 last_file_kind: r.get(5)?,
-                progress_updated_at: r.get(6)?,
-                notes: r.get(7)?,
+                last_item_id: r.get(6)?,
+                last_item_title: r.get(7)?,
+                last_sequence_title: r.get(8)?,
+                progress_updated_at: r.get(9)?,
+                notes: r.get(10)?,
             })
         },
     )
@@ -359,7 +416,8 @@ pub fn attach_class_to_course(state: State<Db>, course_id: i64, class_name: Stri
 #[tauri::command]
 pub fn detach_course_class(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM course_classes WHERE id=?1", [id]).map_err(e)?;
+    conn.execute("DELETE FROM course_classes WHERE id=?1", [id])
+        .map_err(e)?;
     Ok(())
 }
 
@@ -376,6 +434,27 @@ pub fn set_course_class_progress(
          SET last_file_id = ?1, progress_updated_at = datetime('now') \
          WHERE course_id = ?2 AND class_name = ?3",
         params![file_id, course_id, class_name],
+    )
+    .map_err(e)?;
+    Ok(())
+}
+
+/// Where a class has got to in the course progression (a step of a sequence).
+/// Independent from `last_file_id`: one answers "which document", the other
+/// "which point of the chapter".
+#[tauri::command]
+pub fn set_course_class_item(
+    state: State<Db>,
+    course_id: i64,
+    class_name: String,
+    item_id: Option<i64>,
+) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "UPDATE course_classes \
+         SET last_item_id = ?1, progress_updated_at = datetime('now') \
+         WHERE course_id = ?2 AND class_name = ?3",
+        params![item_id, course_id, class_name],
     )
     .map_err(e)?;
     Ok(())
@@ -483,7 +562,8 @@ pub fn save_note(state: State<Db>, note: Note) -> R<Note> {
 #[tauri::command]
 pub fn delete_note(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM notes WHERE id=?1", [id]).map_err(e)?;
+    conn.execute("DELETE FROM notes WHERE id=?1", [id])
+        .map_err(e)?;
     Ok(())
 }
 
@@ -755,8 +835,6 @@ pub fn list_openers(_state: State<Db>, _id: i64) -> R<Vec<Opener>> {
     ])
 }
 
-
-
 #[tauri::command]
 pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
@@ -778,8 +856,10 @@ pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
     }
     let _ = conn.execute("DELETE FROM settings WHERE key=?1", [&versions_key]);
     let _ = conn.execute("DELETE FROM settings WHERE key=?1", [&annot_key]);
-    conn.execute("DELETE FROM files WHERE id=?1", [id]).map_err(e)?;
-    conn.execute("DELETE FROM doc_index WHERE file_id=?1", [id]).map_err(e)?;
+    conn.execute("DELETE FROM files WHERE id=?1", [id])
+        .map_err(e)?;
+    conn.execute("DELETE FROM doc_index WHERE file_id=?1", [id])
+        .map_err(e)?;
     if let Some(rel) = rel {
         let _ = fs::remove_file(abs_path(&rel));
     }
@@ -787,7 +867,12 @@ pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
 }
 
 #[tauri::command]
-pub async fn rename_file(app: AppHandle, state: State<'_, Db>, id: i64, new_name: String) -> R<FileItem> {
+pub async fn rename_file(
+    app: AppHandle,
+    state: State<'_, Db>,
+    id: i64,
+    new_name: String,
+) -> R<FileItem> {
     let trimmed = new_name.trim().to_string();
     if trimmed.is_empty() {
         return Err("Le nom ne peut pas être vide.".into());
@@ -806,7 +891,9 @@ pub async fn rename_file(app: AppHandle, state: State<'_, Db>, id: i64, new_name
             .query_row("SELECT kind FROM files WHERE id=?1", [id], |r| r.get(0))
             .map_err(e)?;
         let c: Option<i64> = conn
-            .query_row("SELECT course_id FROM files WHERE id=?1", [id], |r| r.get(0))
+            .query_row("SELECT course_id FROM files WHERE id=?1", [id], |r| {
+                r.get(0)
+            })
             .map_err(e)?;
         (rel, nm, k, c)
     };
@@ -842,13 +929,17 @@ pub async fn rename_file(app: AppHandle, state: State<'_, Db>, id: i64, new_name
     };
 
     let abs_candidate = dir.join(&candidate);
-    let (abs_new, final_name): (PathBuf, String) = if abs_candidate == old_abs || !abs_candidate.exists() {
-        (abs_candidate, candidate)
-    } else {
-        // collision with a *different* file: uniquify (like import)
-        let dest = unique_dest(&dir, &candidate);
-        (dest.clone(), dest.file_name().unwrap().to_string_lossy().to_string())
-    };
+    let (abs_new, final_name): (PathBuf, String) =
+        if abs_candidate == old_abs || !abs_candidate.exists() {
+            (abs_candidate, candidate)
+        } else {
+            // collision with a *different* file: uniquify (like import)
+            let dest = unique_dest(&dir, &candidate);
+            (
+                dest.clone(),
+                dest.file_name().unwrap().to_string_lossy().to_string(),
+            )
+        };
 
     if abs_new != old_abs {
         fs::rename(&old_abs, &abs_new).map_err(e)?;
@@ -903,15 +994,18 @@ pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
             let emoji: String = r.get(2)?;
             let s = match_score(&name, q);
             if s > 5.0 {
-                Ok(Some((s, SearchResult {
-                    kind: "course".into(),
-                    id,
-                    title: name,
-                    subtitle: emoji,
-                    snippet: String::new(),
-                    course_id: Some(id),
-                    file_kind: String::new(),
-                })))
+                Ok(Some((
+                    s,
+                    SearchResult {
+                        kind: "course".into(),
+                        id,
+                        title: name,
+                        subtitle: emoji,
+                        snippet: String::new(),
+                        course_id: Some(id),
+                        file_kind: String::new(),
+                    },
+                )))
             } else {
                 Ok(None)
             }
@@ -933,15 +1027,18 @@ pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
             let course_id: Option<i64> = r.get(3)?;
             let s = match_score(&name, q);
             if s > 5.0 {
-                Ok(Some((s, SearchResult {
-                    kind: "file".into(),
-                    id,
-                    title: name,
-                    subtitle: "document".into(),
-                    snippet: String::new(),
-                    course_id,
-                    file_kind: kind,
-                })))
+                Ok(Some((
+                    s,
+                    SearchResult {
+                        kind: "file".into(),
+                        id,
+                        title: name,
+                        subtitle: "document".into(),
+                        snippet: String::new(),
+                        course_id,
+                        file_kind: kind,
+                    },
+                )))
             } else {
                 Ok(None)
             }
@@ -964,15 +1061,22 @@ pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
             let s = match_score(&title, q).max(match_score(&body, q));
             if s > 5.0 {
                 let snippet: String = body.chars().take(120).collect();
-                Ok(Some((s, SearchResult {
-                    kind: "note".into(),
-                    id,
-                    title: if title.is_empty() { "Note".into() } else { title },
-                    subtitle: "note".into(),
-                    snippet,
-                    course_id,
-                    file_kind: String::new(),
-                })))
+                Ok(Some((
+                    s,
+                    SearchResult {
+                        kind: "note".into(),
+                        id,
+                        title: if title.is_empty() {
+                            "Note".into()
+                        } else {
+                            title
+                        },
+                        subtitle: "note".into(),
+                        snippet,
+                        course_id,
+                        file_kind: String::new(),
+                    },
+                )))
             } else {
                 Ok(None)
             }
@@ -1000,15 +1104,18 @@ pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
                 // give content matches a solid but not top score unless name also good
                 let name_s = match_score(&name, q);
                 let s = if name_s > 0.0 { name_s } else { 52.0 };
-                Ok(Some((s, SearchResult {
-                    kind: "file".into(),
-                    id,
-                    title: name,
-                    subtitle: "contenu".into(),
-                    snippet: snip,
-                    course_id,
-                    file_kind: kind,
-                })))
+                Ok(Some((
+                    s,
+                    SearchResult {
+                        kind: "file".into(),
+                        id,
+                        title: name,
+                        subtitle: "contenu".into(),
+                        snippet: snip,
+                        course_id,
+                        file_kind: kind,
+                    },
+                )))
             }) {
                 for r in rows.flatten().flatten() {
                     // dedup later
@@ -1060,8 +1167,12 @@ fn levenshtein(a: &str, b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();
     let len_a = a.len();
     let len_b = b.len();
-    if len_a == 0 { return len_b; }
-    if len_b == 0 { return len_a; }
+    if len_a == 0 {
+        return len_b;
+    }
+    if len_b == 0 {
+        return len_a;
+    }
     let mut prev: Vec<usize> = (0..=len_b).collect();
     let mut curr = vec![0usize; len_b + 1];
     for i in 1..=len_a {
@@ -1078,14 +1189,26 @@ fn levenshtein(a: &str, b: &str) -> usize {
 fn match_score(text: &str, query: &str) -> f32 {
     let t = normalize(text);
     let q = normalize(query);
-    if q.is_empty() { return 0.0; }
-    if t == q { return 100.0; }
-    if t.starts_with(&q) { return 95.0; }
-    if t.contains(&q) { return 80.0; }
+    if q.is_empty() {
+        return 0.0;
+    }
+    if t == q {
+        return 100.0;
+    }
+    if t.starts_with(&q) {
+        return 95.0;
+    }
+    if t.contains(&q) {
+        return 80.0;
+    }
     // small edit distance tolerates typos (replace/insert/delete)
     let d = levenshtein(&t, &q);
-    if d <= 1 { return 85.0; }
-    if d <= 2 && q.len() >= 4 { return 72.0; }
+    if d <= 1 {
+        return 85.0;
+    }
+    if d <= 2 && q.len() >= 4 {
+        return 72.0;
+    }
     // subsequence (good for partial typing "docu" in "document-foo.pdf")
     let mut qi = 0usize;
     let qchars: Vec<char> = q.chars().collect();
@@ -1094,8 +1217,12 @@ fn match_score(text: &str, query: &str) -> f32 {
             qi += 1;
         }
     }
-    if qi == qchars.len() { return 62.0; }
-    if qi >= qchars.len().saturating_mul(2) / 3 && qi >= 2 { return 45.0; }
+    if qi == qchars.len() {
+        return 62.0;
+    }
+    if qi >= qchars.len().saturating_mul(2) / 3 && qi >= 2 {
+        return 45.0;
+    }
     0.0
 }
 
@@ -1123,7 +1250,13 @@ fn build_fts_query(query: &str) -> String {
         .join(" ")
 }
 
-async fn index_pdf(app: &AppHandle, state: &State<'_, Db>, file_id: i64, name: &str, path: &PathBuf) {
+async fn index_pdf(
+    app: &AppHandle,
+    state: &State<'_, Db>,
+    file_id: i64,
+    name: &str,
+    path: &PathBuf,
+) {
     let text = crate::sidecar::call(
         app,
         "extract_pdf",
@@ -1166,9 +1299,8 @@ pub async fn index_files(app: AppHandle, state: State<'_, Db>, ids: Vec<i64>) ->
         return Ok(0);
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!(
-        "SELECT id, name, rel_path FROM files WHERE kind='pdf' AND id IN ({placeholders})"
-    );
+    let sql =
+        format!("SELECT id, name, rel_path FROM files WHERE kind='pdf' AND id IN ({placeholders})");
     let pdfs: Vec<(i64, String, String)> = {
         let conn = state.0.lock().unwrap();
         let mut stmt = conn.prepare(&sql).map_err(e)?;
@@ -1190,57 +1322,147 @@ pub async fn index_files(app: AppHandle, state: State<'_, Db>, ids: Vec<i64>) ->
 // Reminders
 // ---------------------------------------------------------------------------
 
+const REMINDER_COLS: &str =
+    "id, title, due_at, done, created_at, course_id, COALESCE(repeat_rule, 'none')";
+
+fn map_reminder(r: &rusqlite::Row) -> rusqlite::Result<Reminder> {
+    Ok(Reminder {
+        id: r.get(0)?,
+        title: r.get(1)?,
+        due_at: r.get(2)?,
+        done: r.get::<_, i64>(3)? != 0,
+        created_at: r.get(4)?,
+        course_id: r.get(5)?,
+        repeat_rule: r.get(6)?,
+    })
+}
+
+fn normalize_repeat(rule: Option<String>) -> String {
+    match rule.as_deref() {
+        Some("daily") => "daily".into(),
+        Some("weekly") => "weekly".into(),
+        Some("monthly") => "monthly".into(),
+        _ => "none".into(),
+    }
+}
+
+/// Next occurrence of a recurring reminder, from its own due date so the series
+/// keeps its time of day. Returns None when there is nothing to repeat.
+fn next_occurrence(due_at: &str, rule: &str) -> Option<String> {
+    use chrono::{DateTime, Datelike, Duration, Utc};
+    let parsed: DateTime<Utc> = due_at.parse().ok()?;
+    let next = match rule {
+        "daily" => parsed + Duration::days(1),
+        "weekly" => parsed + Duration::weeks(1),
+        "monthly" => {
+            // Same day next month, clamped to the length of that month.
+            let (y, m) = if parsed.month() == 12 {
+                (parsed.year() + 1, 1)
+            } else {
+                (parsed.year(), parsed.month() + 1)
+            };
+            let last_day = match m {
+                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                4 | 6 | 9 | 11 => 30,
+                _ => {
+                    if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 {
+                        29
+                    } else {
+                        28
+                    }
+                }
+            };
+            parsed
+                .with_day(parsed.day().min(last_day))?
+                .with_month(m)?
+                .with_year(y)?
+        }
+        _ => return None,
+    };
+    Some(next.to_rfc3339())
+}
+
 #[tauri::command]
 pub fn list_reminders(state: State<Db>) -> R<Vec<Reminder>> {
     let conn = state.0.lock().unwrap();
-    let mut stmt = conn
-        .prepare_cached(
-            "SELECT id, title, due_at, done, created_at FROM reminders \
-             ORDER BY done, COALESCE(due_at, created_at)",
-        )
-        .map_err(e)?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(Reminder {
-                id: r.get(0)?,
-                title: r.get(1)?,
-                due_at: r.get(2)?,
-                done: r.get::<_, i64>(3)? != 0,
-                created_at: r.get(4)?,
-            })
-        })
-        .map_err(e)?;
+    let sql = format!(
+        "SELECT {REMINDER_COLS} FROM reminders ORDER BY done, COALESCE(due_at, created_at)"
+    );
+    let mut stmt = conn.prepare_cached(&sql).map_err(e)?;
+    let rows = stmt.query_map([], map_reminder).map_err(e)?;
     rows.collect::<Result<_, _>>().map_err(e)
 }
 
 #[tauri::command]
-pub fn create_reminder(state: State<Db>, title: String, due_at: Option<String>) -> R<Reminder> {
+pub fn create_reminder(
+    state: State<Db>,
+    title: String,
+    due_at: Option<String>,
+    course_id: Option<i64>,
+    repeat_rule: Option<String>,
+) -> R<Reminder> {
     let conn = state.0.lock().unwrap();
+    let rule = normalize_repeat(repeat_rule);
     conn.execute(
-        "INSERT INTO reminders (title, due_at) VALUES (?1, ?2)",
-        params![title, due_at],
+        "INSERT INTO reminders (title, due_at, course_id, repeat_rule) VALUES (?1, ?2, ?3, ?4)",
+        params![title, due_at, course_id, rule],
     )
     .map_err(e)?;
     let id = conn.last_insert_rowid();
-    conn.query_row(
-        "SELECT id, title, due_at, done, created_at FROM reminders WHERE id=?1",
-        [id],
-        |r| {
-            Ok(Reminder {
-                id: r.get(0)?,
-                title: r.get(1)?,
-                due_at: r.get(2)?,
-                done: r.get::<_, i64>(3)? != 0,
-                created_at: r.get(4)?,
-            })
-        },
-    )
-    .map_err(e)
+    let sql = format!("SELECT {REMINDER_COLS} FROM reminders WHERE id=?1");
+    conn.query_row(&sql, [id], map_reminder).map_err(e)
 }
 
 #[tauri::command]
+pub fn update_reminder(
+    state: State<Db>,
+    id: i64,
+    title: String,
+    due_at: Option<String>,
+    course_id: Option<i64>,
+    repeat_rule: Option<String>,
+) -> R<Reminder> {
+    let conn = state.0.lock().unwrap();
+    let rule = normalize_repeat(repeat_rule);
+    conn.execute(
+        "UPDATE reminders SET title=?1, due_at=?2, course_id=?3, repeat_rule=?4 WHERE id=?5",
+        params![title, due_at, course_id, rule, id],
+    )
+    .map_err(e)?;
+    let sql = format!("SELECT {REMINDER_COLS} FROM reminders WHERE id=?1");
+    conn.query_row(&sql, [id], map_reminder).map_err(e)
+}
+
+/// Ticking a reminder done.
+///
+/// For a recurring reminder with a due date, this rolls the due date forward
+/// instead of ending the series: the row stays open and reappears at its next
+/// occurrence. That is what makes "chaque mardi" useful.
+#[tauri::command]
 pub fn toggle_reminder(state: State<Db>, id: i64, done: bool) -> R<()> {
     let conn = state.0.lock().unwrap();
+    if done {
+        let row: Option<(Option<String>, String)> = conn
+            .query_row(
+                "SELECT due_at, COALESCE(repeat_rule, 'none') FROM reminders WHERE id=?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(e)?;
+        if let Some((Some(due), rule)) = row {
+            if rule != "none" {
+                if let Some(next) = next_occurrence(&due, &rule) {
+                    conn.execute(
+                        "UPDATE reminders SET due_at=?1, done=0 WHERE id=?2",
+                        params![next, id],
+                    )
+                    .map_err(e)?;
+                    return Ok(());
+                }
+            }
+        }
+    }
     conn.execute(
         "UPDATE reminders SET done=?1 WHERE id=?2",
         params![done as i64, id],
@@ -1252,11 +1474,262 @@ pub fn toggle_reminder(state: State<Db>, id: i64, done: bool) -> R<()> {
 #[tauri::command]
 pub fn delete_reminder(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM reminders WHERE id=?1", [id]).map_err(e)?;
+    conn.execute("DELETE FROM reminders WHERE id=?1", [id])
+        .map_err(e)?;
     Ok(())
 }
 
- // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Sequences: the teaching progression of a course
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn list_sequences(state: State<Db>, course_id: i64) -> R<Vec<Sequence>> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT id, course_id, title, position, created_at FROM sequences \
+             WHERE course_id = ?1 ORDER BY position, id",
+        )
+        .map_err(e)?;
+    let rows = stmt
+        .query_map([course_id], |r| {
+            Ok(Sequence {
+                id: r.get(0)?,
+                course_id: r.get(1)?,
+                title: r.get(2)?,
+                position: r.get(3)?,
+                created_at: r.get(4)?,
+            })
+        })
+        .map_err(e)?;
+    rows.collect::<Result<_, _>>().map_err(e)
+}
+
+#[tauri::command]
+pub fn list_sequence_items(state: State<Db>, course_id: i64) -> R<Vec<SequenceItem>> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT si.id, si.sequence_id, si.title, si.position, si.file_id, f.name, f.kind \
+             FROM sequence_items si \
+             JOIN sequences sq ON sq.id = si.sequence_id \
+             LEFT JOIN files f ON f.id = si.file_id \
+             WHERE sq.course_id = ?1 \
+             ORDER BY sq.position, sq.id, si.position, si.id",
+        )
+        .map_err(e)?;
+    let rows = stmt
+        .query_map([course_id], |r| {
+            Ok(SequenceItem {
+                id: r.get(0)?,
+                sequence_id: r.get(1)?,
+                title: r.get(2)?,
+                position: r.get(3)?,
+                file_id: r.get(4)?,
+                file_name: r.get(5)?,
+                file_kind: r.get(6)?,
+            })
+        })
+        .map_err(e)?;
+    rows.collect::<Result<_, _>>().map_err(e)
+}
+
+#[tauri::command]
+pub fn create_sequence(state: State<Db>, course_id: i64, title: String) -> R<Sequence> {
+    let conn = state.0.lock().unwrap();
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err("Titre vide".into());
+    }
+    let next_pos: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM sequences WHERE course_id = ?1",
+            [course_id],
+            |r| r.get(0),
+        )
+        .map_err(e)?;
+    conn.execute(
+        "INSERT INTO sequences (course_id, title, position) VALUES (?1, ?2, ?3)",
+        params![course_id, title, next_pos],
+    )
+    .map_err(e)?;
+    let id = conn.last_insert_rowid();
+    conn.query_row(
+        "SELECT id, course_id, title, position, created_at FROM sequences WHERE id = ?1",
+        [id],
+        |r| {
+            Ok(Sequence {
+                id: r.get(0)?,
+                course_id: r.get(1)?,
+                title: r.get(2)?,
+                position: r.get(3)?,
+                created_at: r.get(4)?,
+            })
+        },
+    )
+    .map_err(e)
+}
+
+#[tauri::command]
+pub fn rename_sequence(state: State<Db>, id: i64, title: String) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err("Titre vide".into());
+    }
+    conn.execute(
+        "UPDATE sequences SET title = ?1 WHERE id = ?2",
+        params![title, id],
+    )
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_sequence(state: State<Db>, id: i64) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM sequences WHERE id = ?1", [id])
+        .map_err(e)?;
+    Ok(())
+}
+
+/// Move a sequence up (-1) or down (+1) by swapping positions with its
+/// neighbour. Positions are normalized first so older rows created before this
+/// feature (all at 0) get a stable order.
+#[tauri::command]
+pub fn move_sequence(state: State<Db>, course_id: i64, id: i64, delta: i64) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    let ids: Vec<i64> = conn
+        .prepare("SELECT id FROM sequences WHERE course_id = ?1 ORDER BY position, id")
+        .map_err(e)?
+        .query_map([course_id], |r| r.get(0))
+        .map_err(e)?
+        .collect::<Result<_, _>>()
+        .map_err(e)?;
+    let Some(from) = ids.iter().position(|x| *x == id) else {
+        return Ok(());
+    };
+    let to = from as i64 + delta;
+    if to < 0 || to as usize >= ids.len() {
+        return Ok(());
+    }
+    let mut order = ids.clone();
+    let moved = order.remove(from);
+    order.insert(to as usize, moved);
+    for (pos, seq_id) in order.iter().enumerate() {
+        conn.execute(
+            "UPDATE sequences SET position = ?1 WHERE id = ?2",
+            params![pos as i64, seq_id],
+        )
+        .map_err(e)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn create_sequence_item(
+    state: State<Db>,
+    sequence_id: i64,
+    title: String,
+    file_id: Option<i64>,
+) -> R<SequenceItem> {
+    let conn = state.0.lock().unwrap();
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err("Titre vide".into());
+    }
+    let next_pos: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position) + 1, 0) FROM sequence_items WHERE sequence_id = ?1",
+            [sequence_id],
+            |r| r.get(0),
+        )
+        .map_err(e)?;
+    conn.execute(
+        "INSERT INTO sequence_items (sequence_id, title, file_id, position) VALUES (?1, ?2, ?3, ?4)",
+        params![sequence_id, title, file_id, next_pos],
+    )
+    .map_err(e)?;
+    let id = conn.last_insert_rowid();
+    conn.query_row(
+        "SELECT si.id, si.sequence_id, si.title, si.position, si.file_id, f.name, f.kind \
+         FROM sequence_items si LEFT JOIN files f ON f.id = si.file_id WHERE si.id = ?1",
+        [id],
+        |r| {
+            Ok(SequenceItem {
+                id: r.get(0)?,
+                sequence_id: r.get(1)?,
+                title: r.get(2)?,
+                position: r.get(3)?,
+                file_id: r.get(4)?,
+                file_name: r.get(5)?,
+                file_kind: r.get(6)?,
+            })
+        },
+    )
+    .map_err(e)
+}
+
+#[tauri::command]
+pub fn update_sequence_item(
+    state: State<Db>,
+    id: i64,
+    title: String,
+    file_id: Option<i64>,
+) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err("Titre vide".into());
+    }
+    conn.execute(
+        "UPDATE sequence_items SET title = ?1, file_id = ?2 WHERE id = ?3",
+        params![title, file_id, id],
+    )
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_sequence_item(state: State<Db>, id: i64) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM sequence_items WHERE id = ?1", [id])
+        .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn move_sequence_item(state: State<Db>, sequence_id: i64, id: i64, delta: i64) -> R<()> {
+    let conn = state.0.lock().unwrap();
+    let ids: Vec<i64> = conn
+        .prepare("SELECT id FROM sequence_items WHERE sequence_id = ?1 ORDER BY position, id")
+        .map_err(e)?
+        .query_map([sequence_id], |r| r.get(0))
+        .map_err(e)?
+        .collect::<Result<_, _>>()
+        .map_err(e)?;
+    let Some(from) = ids.iter().position(|x| *x == id) else {
+        return Ok(());
+    };
+    let to = from as i64 + delta;
+    if to < 0 || to as usize >= ids.len() {
+        return Ok(());
+    }
+    let mut order = ids.clone();
+    let moved = order.remove(from);
+    order.insert(to as usize, moved);
+    for (pos, item_id) in order.iter().enumerate() {
+        conn.execute(
+            "UPDATE sequence_items SET position = ?1 WHERE id = ?2",
+            params![pos as i64, item_id],
+        )
+        .map_err(e)?;
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Quick links
 // ---------------------------------------------------------------------------
 
@@ -1288,13 +1761,19 @@ pub fn create_link(state: State<Db>, label: String, url: String, icon: String) -
     )
     .map_err(e)?;
     let id = conn.last_insert_rowid();
-    Ok(QuickLink { id, label, url, icon })
+    Ok(QuickLink {
+        id,
+        label,
+        url,
+        icon,
+    })
 }
 
 #[tauri::command]
 pub fn delete_link(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM links WHERE id=?1", [id]).map_err(e)?;
+    conn.execute("DELETE FROM links WHERE id=?1", [id])
+        .map_err(e)?;
     Ok(())
 }
 
@@ -1379,7 +1858,8 @@ pub fn save_schedule_entry(state: State<Db>, entry: ScheduleEntry) -> R<Schedule
 #[tauri::command]
 pub fn delete_schedule_entry(state: State<Db>, id: i64) -> R<()> {
     let conn = state.0.lock().unwrap();
-    conn.execute("DELETE FROM schedule WHERE id=?1", [id]).map_err(e)?;
+    conn.execute("DELETE FROM schedule WHERE id=?1", [id])
+        .map_err(e)?;
     Ok(())
 }
 
@@ -1405,8 +1885,12 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
     if let Some(id) = save.file_id {
         let (rel, current_name) = {
             let conn = state.0.lock().unwrap();
-            let rel: String = conn.query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0)).map_err(e)?;
-            let name: String = conn.query_row("SELECT name FROM files WHERE id=?1", [id], |r| r.get(0)).map_err(e)?;
+            let rel: String = conn
+                .query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
+                .map_err(e)?;
+            let name: String = conn
+                .query_row("SELECT name FROM files WHERE id=?1", [id], |r| r.get(0))
+                .map_err(e)?;
             (rel, name)
         };
         let abs = abs_path(&rel);
@@ -1415,7 +1899,10 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
         let _ = fs::create_dir_all(&vdir);
         if abs.exists() {
             let ts = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-            let base = current_name.rsplit_once('.').map(|(b, _)| b.to_string()).unwrap_or_else(|| current_name.clone());
+            let base = current_name
+                .rsplit_once('.')
+                .map(|(b, _)| b.to_string())
+                .unwrap_or_else(|| current_name.clone());
             let backup_name = format!("{}_{base}__v{ts}.euboard", id);
             let backup_path = vdir.join(&backup_name);
             let _ = fs::copy(&abs, &backup_path);
@@ -1436,14 +1923,21 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
             }));
             {
                 let conn = state.0.lock().unwrap();
-                set_setting_raw(&conn, &versions_key, &serde_json::to_string(&versions).unwrap_or("[]".into()));
+                set_setting_raw(
+                    &conn,
+                    &versions_key,
+                    &serde_json::to_string(&versions).unwrap_or("[]".into()),
+                );
             }
         }
         fs::write(&abs, save.json).map_err(e)?;
         let size = fs::metadata(&abs).map(|m| m.len() as i64).unwrap_or(0);
         let conn = state.0.lock().unwrap();
-        conn.execute("UPDATE files SET size=?1, added_at=datetime('now') WHERE id=?2", params![size, id])
-            .map_err(e)?;
+        conn.execute(
+            "UPDATE files SET size=?1, added_at=datetime('now') WHERE id=?2",
+            params![size, id],
+        )
+        .map_err(e)?;
         return conn
             .query_row(
                 "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files WHERE id=?1",
@@ -1456,9 +1950,7 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
     let base = save
         .name
         .filter(|n| !n.trim().is_empty())
-        .unwrap_or_else(|| {
-            format!("Tableau {}", chrono::Local::now().format("%d-%m %H-%M"))
-        });
+        .unwrap_or_else(|| format!("Tableau {}", chrono::Local::now().format("%d-%m %H-%M")));
     let file_name = if base.ends_with(".euboard") {
         base
     } else {
@@ -1513,8 +2005,16 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         .map_err(e)?;
     let (rel, current_name) = {
         let conn = state.0.lock().unwrap();
-        let rel: String = conn.query_row("SELECT rel_path FROM files WHERE id=?1", [file_id], |r| r.get(0)).map_err(e)?;
-        let name: String = conn.query_row("SELECT name FROM files WHERE id=?1", [file_id], |r| r.get(0)).map_err(e)?;
+        let rel: String = conn
+            .query_row("SELECT rel_path FROM files WHERE id=?1", [file_id], |r| {
+                r.get(0)
+            })
+            .map_err(e)?;
+        let name: String = conn
+            .query_row("SELECT name FROM files WHERE id=?1", [file_id], |r| {
+                r.get(0)
+            })
+            .map_err(e)?;
         (rel, name)
     };
     let abs = abs_path(&rel);
@@ -1523,7 +2023,10 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
     let _ = fs::create_dir_all(&vdir);
     if abs.exists() {
         let ts = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-        let base = current_name.rsplit_once('.').map(|(b, _)| b.to_string()).unwrap_or_else(|| current_name.clone());
+        let base = current_name
+            .rsplit_once('.')
+            .map(|(b, _)| b.to_string())
+            .unwrap_or_else(|| current_name.clone());
         let backup_name = format!("{}_{base}__v{ts}.pdf", file_id);
         let backup_path = vdir.join(&backup_name);
         let _ = fs::copy(&abs, &backup_path);
@@ -1545,7 +2048,11 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         }));
         {
             let conn = state.0.lock().unwrap();
-            set_setting_raw(&conn, &versions_key, &serde_json::to_string(&versions).unwrap_or("[]".into()));
+            set_setting_raw(
+                &conn,
+                &versions_key,
+                &serde_json::to_string(&versions).unwrap_or("[]".into()),
+            );
         }
     }
     // overwrite the main file
@@ -1555,8 +2062,9 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         let conn = state.0.lock().unwrap();
         conn.execute(
             "UPDATE files SET size=?1, added_at=datetime('now') WHERE id=?2",
-            params![new_size, file_id]
-        ).map_err(e)?;
+            params![new_size, file_id],
+        )
+        .map_err(e)?;
     }
     // return refreshed file item
     let conn = state.0.lock().unwrap();
@@ -1564,7 +2072,8 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files WHERE id=?1",
         [file_id],
         map_file,
-    ).map_err(e)
+    )
+    .map_err(e)
 }
 
 #[tauri::command]
@@ -1583,7 +2092,11 @@ pub fn get_file_versions(state: State<Db>, file_id: i64) -> R<Vec<serde_json::Va
         let v: Vec<serde_json::Value> = serde_json::from_str(&vstr).unwrap_or_default();
         if !v.is_empty() {
             // migrate for future
-            set_setting_raw(&conn, &new_key, &serde_json::to_string(&v).unwrap_or("[]".into()));
+            set_setting_raw(
+                &conn,
+                &new_key,
+                &serde_json::to_string(&v).unwrap_or("[]".into()),
+            );
             return Ok(v);
         }
     }
@@ -1620,8 +2133,16 @@ pub fn read_board(state: State<Db>, id: i64) -> R<String> {
 pub fn ensure_original_version(state: State<Db>, file_id: i64) -> R<()> {
     let (rel, current_name) = {
         let conn = state.0.lock().unwrap();
-        let rel: String = conn.query_row("SELECT rel_path FROM files WHERE id=?1", [file_id], |r| r.get(0)).map_err(e)?;
-        let name: String = conn.query_row("SELECT name FROM files WHERE id=?1", [file_id], |r| r.get(0)).map_err(e)?;
+        let rel: String = conn
+            .query_row("SELECT rel_path FROM files WHERE id=?1", [file_id], |r| {
+                r.get(0)
+            })
+            .map_err(e)?;
+        let name: String = conn
+            .query_row("SELECT name FROM files WHERE id=?1", [file_id], |r| {
+                r.get(0)
+            })
+            .map_err(e)?;
         (rel, name)
     };
     let abs = abs_path(&rel);
@@ -1642,8 +2163,14 @@ pub fn ensure_original_version(state: State<Db>, file_id: i64) -> R<()> {
     }
     let vdir = crate::paths::documents_dir().join(".versions");
     let _ = fs::create_dir_all(&vdir);
-    let base = current_name.rsplit_once('.').map(|(b, _)| b.to_string()).unwrap_or_else(|| current_name.clone());
-    let ext = current_name.rsplit_once('.').map(|(_, e)| e.to_string()).unwrap_or_else(|| "bin".to_string());
+    let base = current_name
+        .rsplit_once('.')
+        .map(|(b, _)| b.to_string())
+        .unwrap_or_else(|| current_name.clone());
+    let ext = current_name
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_string())
+        .unwrap_or_else(|| "bin".to_string());
     let backup_name = format!("{}_{base}__original.{}", file_id, ext);
     let backup_path = vdir.join(&backup_name);
     if !backup_path.exists() {
@@ -1656,14 +2183,23 @@ pub fn ensure_original_version(state: State<Db>, file_id: i64) -> R<()> {
     }));
     {
         let conn = state.0.lock().unwrap();
-        set_setting_raw(&conn, &versions_key, &serde_json::to_string(&versions).unwrap_or("[]".into()));
+        set_setting_raw(
+            &conn,
+            &versions_key,
+            &serde_json::to_string(&versions).unwrap_or("[]".into()),
+        );
     }
     Ok(())
 }
 
 /// Optional PNG export of a board (e.g. to attach elsewhere).
 #[tauri::command]
-pub fn export_board_png(state: State<Db>, course_id: Option<i64>, name: String, data_url: String) -> R<FileItem> {
+pub fn export_board_png(
+    state: State<Db>,
+    course_id: Option<i64>,
+    name: String,
+    data_url: String,
+) -> R<FileItem> {
     let b64 = data_url
         .split(',')
         .nth(1)
@@ -1721,7 +2257,11 @@ fn slugify(name: &str) -> String {
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
         .collect();
     let s = s.trim_matches('_').to_string();
-    if s.is_empty() { "script".into() } else { s }
+    if s.is_empty() {
+        "script".into()
+    } else {
+        s
+    }
 }
 
 #[tauri::command]
@@ -1844,8 +2384,16 @@ pub async fn run_python_demo(app: AppHandle, path: String) -> R<PythonResult> {
     let v = crate::sidecar::call(&app, "run_demo", &json!({ "path": path })).await?;
     Ok(PythonResult {
         ok: v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
-        stdout: v.get("stdout").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-        stderr: v.get("stderr").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+        stdout: v
+            .get("stdout")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
+        stderr: v
+            .get("stderr")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 
@@ -1868,8 +2416,16 @@ pub async fn run_python_code(app: AppHandle, code: String) -> R<PythonResult> {
     let _ = fs::remove_file(&tmp);
     Ok(PythonResult {
         ok: v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
-        stdout: v.get("stdout").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-        stderr: v.get("stderr").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+        stdout: v
+            .get("stdout")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
+        stderr: v
+            .get("stderr")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 
@@ -1892,10 +2448,23 @@ pub async fn python_complete(
     if let Some(arr) = v.get("completions").and_then(|c| c.as_array()) {
         for c in arr {
             out.push(PythonCompletion {
-                name: c.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-                complete: c.get("complete").and_then(|x| x.as_str()).map(|s| s.to_string()),
-                type_: c.get("type").and_then(|x| x.as_str()).map(|s| s.to_string()),
-                signature: c.get("signature").and_then(|x| x.as_str()).map(|s| s.to_string()),
+                name: c
+                    .get("name")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                complete: c
+                    .get("complete")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string()),
+                type_: c
+                    .get("type")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string()),
+                signature: c
+                    .get("signature")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string()),
                 doc: c.get("doc").and_then(|x| x.as_str()).map(|s| s.to_string()),
             });
         }
@@ -1934,6 +2503,86 @@ pub fn reset_data_dir() -> R<()> {
     Ok(())
 }
 
+/// Zip `src` into `../Euclide-Sauvegardes/euclide-YYYYMMDD-HHMM.zip`.
+fn write_data_dir_backup(src: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    use std::io::{Read, Write};
+    use zip::write::SimpleFileOptions;
+
+    if !src.is_dir() {
+        return Err("Dossier de données introuvable".to_string());
+    }
+    let parent = src
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| src.to_path_buf());
+    let out_dir = parent.join("Euclide-Sauvegardes");
+    fs::create_dir_all(&out_dir).map_err(|err| format!("Dossier de sauvegarde : {err}"))?;
+
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M").to_string();
+    let dest = out_dir.join(format!("euclide-{stamp}.zip"));
+
+    let file = fs::File::create(&dest).map_err(|err| format!("Écriture archive : {err}"))?;
+    let mut zw = zip::ZipWriter::new(file);
+    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    // Iterative walk: no recursion limits, and we can skip our own output
+    // folder plus SQLite's transient WAL files.
+    let mut stack = vec![src.to_path_buf()];
+    let mut buf = Vec::new();
+    while let Some(dir) = stack.pop() {
+        let entries = match fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(rel) = path.strip_prefix(src) else {
+                continue;
+            };
+            let name = rel.to_string_lossy().replace('\\', "/");
+            if name.is_empty() || name.starts_with("Euclide-Sauvegardes") {
+                continue;
+            }
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            // The -wal/-shm siblings are meaningless without a live
+            // connection; the .db itself is checkpointed on close.
+            if name.ends_with("-wal") || name.ends_with("-shm") {
+                continue;
+            }
+            let Ok(mut f) = fs::File::open(&path) else {
+                continue;
+            };
+            buf.clear();
+            if f.read_to_end(&mut buf).is_err() {
+                continue;
+            }
+            zw.start_file(name, opts)
+                .map_err(|err| format!("Archive : {err}"))?;
+            zw.write_all(&buf)
+                .map_err(|err| format!("Archive : {err}"))?;
+        }
+    }
+    zw.finish().map_err(|err| format!("Archive : {err}"))?;
+    Ok(dest)
+}
+
+/// Zip the whole data folder next to itself, in `Euclide-Sauvegardes/`.
+///
+/// A USB key that lives in a pocket has no other safety net: the database, the
+/// documents, the whiteboards and the Python scripts all sit in one folder, so
+/// one archive is a complete backup. Returns the path of the archive.
+#[tauri::command]
+pub async fn backup_data_dir() -> R<String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        write_data_dir_backup(&crate::paths::data_dir()).map(|p| p.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|err| format!("Sauvegarde interrompue : {err}"))?
+}
+
 // ---------------------------------------------------------------------------
 // Keep awake
 // ---------------------------------------------------------------------------
@@ -1956,10 +2605,12 @@ pub fn keep_awake_status(ka: State<KeepAwake>) -> bool {
 // ---------------------------------------------------------------------------
 
 pub(crate) fn get_setting_raw(conn: &rusqlite::Connection, key: &str) -> Option<String> {
-    conn.query_row("SELECT value FROM settings WHERE key=?1", [key], |r| r.get(0))
-        .optional()
-        .ok()
-        .flatten()
+    conn.query_row("SELECT value FROM settings WHERE key=?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
+    .ok()
+    .flatten()
 }
 
 pub(crate) fn set_setting_raw(conn: &rusqlite::Connection, key: &str, value: &str) {
@@ -1998,11 +2649,12 @@ pub fn log_event(state: State<Db>, kind: String, label: String, course_id: Optio
     Ok(())
 }
 
+/// Time window for the recap. Events are pruned after 30 days, so "month"
+/// covers everything we keep.
 fn recap_day_sql(column: &str, period: &str) -> String {
     match period {
-        "week" => format!(
-            "date({column}, 'localtime') >= date('now', 'localtime', '-6 days')"
-        ),
+        "week" => format!("date({column}, 'localtime') >= date('now', 'localtime', '-6 days')"),
+        "month" => format!("date({column}, 'localtime') >= date('now', 'localtime', '-29 days')"),
         _ => format!("date({column}, 'localtime') = date('now', 'localtime')"),
     }
 }
@@ -2033,9 +2685,7 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
 
     let demos_run: i64 = conn
         .query_row(
-            &format!(
-                "SELECT COUNT(*) FROM usage_events WHERE kind = 'demo_run' AND {day_events}"
-            ),
+            &format!("SELECT COUNT(*) FROM usage_events WHERE kind = 'demo_run' AND {day_events}"),
             [],
             |r| r.get(0),
         )
@@ -2163,7 +2813,12 @@ pub fn pronote_status(state: State<Db>) -> R<PronoteStatus> {
 }
 
 #[tauri::command]
-pub async fn pronote_qr_login(app: AppHandle, state: State<'_, Db>, qr_json: String, pin: String) -> R<PronoteStatus> {
+pub async fn pronote_qr_login(
+    app: AppHandle,
+    state: State<'_, Db>,
+    qr_json: String,
+    pin: String,
+) -> R<PronoteStatus> {
     // Stable UUID must never change between logins.
     let uuid = {
         let conn = state.0.lock().unwrap();
@@ -2195,7 +2850,11 @@ pub async fn pronote_qr_login(app: AppHandle, state: State<'_, Db>, qr_json: Str
         return Err(err.to_string());
     }
 
-    let account = res.get("account_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let account = res
+        .get("account_name")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string();
     {
         let conn = state.0.lock().unwrap();
         set_setting_raw(&conn, "pronote_connected", "1");
@@ -2269,7 +2928,11 @@ pub async fn pronote_password_login(
         return Err(err.to_string());
     }
 
-    let account = res.get("account_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let account = res
+        .get("account_name")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string();
     {
         let conn = state.0.lock().unwrap();
         set_setting_raw(&conn, "pronote_connected", "1");
@@ -2313,7 +2976,10 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
 
     let res = crate::sidecar::call(&app, "pronote_sync", &creds).await?;
     if res.get("ok").and_then(|x| x.as_bool()) != Some(true) {
-        let err = res.get("error").and_then(|x| x.as_str()).unwrap_or("synchronisation echouee");
+        let err = res
+            .get("error")
+            .and_then(|x| x.as_str())
+            .unwrap_or("synchronisation echouee");
         return Err(err.to_string());
     }
 
@@ -2338,7 +3004,8 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
     }
 
     let tx = conn.unchecked_transaction().map_err(e)?;
-    tx.execute("DELETE FROM schedule WHERE source='pronote'", []).map_err(e)?;
+    tx.execute("DELETE FROM schedule WHERE source='pronote'", [])
+        .map_err(e)?;
     let mut count = 0i64;
     if let Some(lessons) = res.get("lessons").and_then(|x| x.as_array()) {
         for l in lessons {
@@ -2388,7 +3055,8 @@ pub fn pronote_logout(state: State<Db>) -> R<()> {
     ] {
         let _ = conn.execute("DELETE FROM settings WHERE key=?1", [key]);
     }
-    conn.execute("DELETE FROM schedule WHERE source='pronote'", []).map_err(e)?;
+    conn.execute("DELETE FROM schedule WHERE source='pronote'", [])
+        .map_err(e)?;
     Ok(())
 }
 
@@ -2558,5 +3226,331 @@ mod recap_tests {
         assert_eq!(today.time_by_area[0].name, "python");
         assert_eq!(today.top_documents.len(), 1);
         assert_eq!(today.top_documents[0].name, "today.pdf");
+    }
+}
+
+#[cfg(test)]
+mod reminder_tests {
+    use super::{next_occurrence, normalize_repeat};
+    use rusqlite::{params, Connection, OptionalExtension};
+
+    fn mem() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(crate::db::SCHEMA).unwrap();
+        conn
+    }
+
+    /// Same roll-forward as `toggle_reminder` so the classroom recurrence
+    /// contract is tested without spinning up Tauri state.
+    fn complete_like_app(conn: &Connection, id: i64) {
+        let row: Option<(Option<String>, String)> = conn
+            .query_row(
+                "SELECT due_at, COALESCE(repeat_rule, 'none') FROM reminders WHERE id=?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .unwrap();
+        if let Some((Some(due), rule)) = row {
+            if rule != "none" {
+                if let Some(next) = next_occurrence(&due, &rule) {
+                    conn.execute(
+                        "UPDATE reminders SET due_at=?1, done=0 WHERE id=?2",
+                        params![next, id],
+                    )
+                    .unwrap();
+                    return;
+                }
+            }
+        }
+        conn.execute("UPDATE reminders SET done=1 WHERE id=?1", [id])
+            .unwrap();
+    }
+
+    #[test]
+    fn next_occurrence_keeps_time_of_day() {
+        assert_eq!(
+            next_occurrence("2026-03-10T08:15:00+00:00", "daily").unwrap(),
+            "2026-03-11T08:15:00+00:00"
+        );
+        assert_eq!(
+            next_occurrence("2026-03-10T08:15:00+00:00", "weekly").unwrap(),
+            "2026-03-17T08:15:00+00:00"
+        );
+        assert_eq!(
+            next_occurrence("2026-01-31T21:59:59+00:00", "monthly").unwrap(),
+            "2026-02-28T21:59:59+00:00"
+        );
+        assert_eq!(next_occurrence("2026-03-10T08:15:00+00:00", "none"), None);
+        assert_eq!(normalize_repeat(Some("weekly".into())), "weekly");
+        assert_eq!(normalize_repeat(Some("yearly".into())), "none");
+    }
+
+    #[test]
+    fn completing_recurring_reminder_rolls_forward() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO reminders (title, due_at, repeat_rule) VALUES (?1, ?2, ?3)",
+            params!["Photocopies", "2026-03-10T08:15:00+00:00", "weekly"],
+        )
+        .unwrap();
+        complete_like_app(&conn, 1);
+        let (due, done): (String, i64) = conn
+            .query_row("SELECT due_at, done FROM reminders WHERE id=1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(due, "2026-03-17T08:15:00+00:00");
+        assert_eq!(done, 0);
+    }
+
+    #[test]
+    fn completing_one_shot_reminder_marks_done() {
+        let conn = mem();
+        conn.execute(
+            "INSERT INTO reminders (title, due_at, repeat_rule) VALUES (?1, ?2, ?3)",
+            params!["DS", "2026-03-10T08:15:00+00:00", "none"],
+        )
+        .unwrap();
+        complete_like_app(&conn, 1);
+        let done: i64 = conn
+            .query_row("SELECT done FROM reminders WHERE id=1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(done, 1);
+    }
+}
+
+#[cfg(test)]
+mod classroom_flow_tests {
+    use super::write_data_dir_backup;
+    use rusqlite::{params, Connection};
+    use std::fs;
+    use std::io::Read;
+
+    fn mem() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(crate::db::SCHEMA).unwrap();
+        conn
+    }
+
+    fn seed_course(conn: &Connection) -> i64 {
+        conn.execute(
+            "INSERT INTO courses (name, emoji, color) VALUES ('NSI', '💻', '#5B7BE8')",
+            [],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn sequences_create_rename_reorder_and_delete() {
+        let conn = mem();
+        let course_id = seed_course(&conn);
+        for title in ["A", "B", "C"] {
+            let next_pos: i64 = conn
+                .query_row(
+                    "SELECT COALESCE(MAX(position) + 1, 0) FROM sequences WHERE course_id = ?1",
+                    [course_id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            conn.execute(
+                "INSERT INTO sequences (course_id, title, position) VALUES (?1, ?2, ?3)",
+                params![course_id, title, next_pos],
+            )
+            .unwrap();
+        }
+        conn.execute(
+            "UPDATE sequences SET title = ?1 WHERE id = ?2",
+            params!["B-renamed", 2],
+        )
+        .unwrap();
+
+        let ids: Vec<i64> = conn
+            .prepare("SELECT id FROM sequences WHERE course_id = ?1 ORDER BY position, id")
+            .unwrap()
+            .query_map([course_id], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        let from = ids.iter().position(|x| *x == 1).unwrap();
+        let mut order = ids.clone();
+        let moved = order.remove(from);
+        order.insert(from + 1, moved);
+        for (pos, seq_id) in order.iter().enumerate() {
+            conn.execute(
+                "UPDATE sequences SET position = ?1 WHERE id = ?2",
+                params![pos as i64, seq_id],
+            )
+            .unwrap();
+        }
+
+        let titles: Vec<String> = conn
+            .prepare("SELECT title FROM sequences WHERE course_id = ?1 ORDER BY position, id")
+            .unwrap()
+            .query_map([course_id], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(titles, vec!["B-renamed", "A", "C"]);
+
+        conn.execute("DELETE FROM sequences WHERE id = ?1", [3])
+            .unwrap();
+        let remaining: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sequences", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(remaining, 2);
+    }
+
+    #[test]
+    fn sequence_item_link_and_per_class_progress() {
+        let conn = mem();
+        let course_id = seed_course(&conn);
+        conn.execute(
+            "INSERT INTO sequences (course_id, title, position) VALUES (?1, 'Listes', 0)",
+            [course_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files (course_id, name, rel_path, kind) VALUES (?1, 'cours.pdf', 'courses/1/cours.pdf', 'pdf')",
+            [course_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sequence_items (sequence_id, title, file_id, position) VALUES (1, 'Intro', 1, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sequence_items (sequence_id, title, file_id, position) VALUES (1, 'TP', NULL, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO course_classes (course_id, class_name) VALUES (?1, '2NDE4')",
+            [course_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO course_classes (course_id, class_name) VALUES (?1, '2NDE7')",
+            [course_id],
+        )
+        .unwrap();
+
+        conn.execute(
+            "UPDATE course_classes SET last_item_id = ?1, progress_updated_at = datetime('now') \
+             WHERE course_id = ?2 AND class_name = ?3",
+            params![1, course_id, "2NDE4"],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE course_classes SET last_item_id = ?1, progress_updated_at = datetime('now') \
+             WHERE course_id = ?2 AND class_name = ?3",
+            params![2, course_id, "2NDE7"],
+        )
+        .unwrap();
+
+        let a: i64 = conn
+            .query_row(
+                "SELECT last_item_id FROM course_classes WHERE class_name='2NDE4'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let b: i64 = conn
+            .query_row(
+                "SELECT last_item_id FROM course_classes WHERE class_name='2NDE7'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(a, 1);
+        assert_eq!(b, 2);
+        assert_ne!(a, b);
+
+        let file_name: String = conn
+            .query_row(
+                "SELECT f.name FROM sequence_items si JOIN files f ON f.id = si.file_id WHERE si.id=1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(file_name, "cours.pdf");
+    }
+
+    #[test]
+    fn backup_zip_includes_db_and_docs_skips_wal() {
+        let tmp = std::env::temp_dir().join(format!("euclide-backup-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let src = tmp.join("Euclide-Data");
+        fs::create_dir_all(src.join("documents")).unwrap();
+        fs::write(src.join("euclide.db"), b"db-bytes").unwrap();
+        fs::write(src.join("euclide.db-wal"), b"wal").unwrap();
+        fs::write(src.join("euclide.db-shm"), b"shm").unwrap();
+        fs::write(src.join("documents/note.txt"), b"hello").unwrap();
+        fs::create_dir_all(src.join("Euclide-Sauvegardes")).unwrap();
+        fs::write(src.join("Euclide-Sauvegardes/old.zip"), b"old").unwrap();
+
+        let dest = write_data_dir_backup(&src).unwrap();
+        assert!(dest.exists());
+        assert!(dest
+            .to_string_lossy()
+            .contains("Euclide-Sauvegardes/euclide-"));
+
+        let mut archive = zip::ZipArchive::new(fs::File::open(&dest).unwrap()).unwrap();
+        let mut names = Vec::new();
+        for i in 0..archive.len() {
+            names.push(archive.by_index(i).unwrap().name().to_string());
+        }
+        names.sort();
+        assert!(names.iter().any(|n| n == "euclide.db"));
+        assert!(names.iter().any(|n| n == "documents/note.txt"));
+        assert!(!names
+            .iter()
+            .any(|n| n.ends_with("-wal") || n.ends_with("-shm")));
+        assert!(!names.iter().any(|n| n.contains("Euclide-Sauvegardes")));
+
+        let mut db = archive.by_name("euclide.db").unwrap();
+        let mut buf = String::new();
+        db.read_to_string(&mut buf).unwrap();
+        assert_eq!(buf, "db-bytes");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn week_grid_add_edit_delete_and_settings_persist() {
+        let conn = mem();
+        let course_id = seed_course(&conn);
+        conn.execute(
+            "INSERT INTO schedule (day_of_week, start_time, end_time, subject, room, course_id, source) \
+             VALUES (4, '08:00', '09:00', 'NSI', 'Salle 12', ?1, 'manual')",
+            [course_id],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE schedule SET end_time='09:55', room='Salle 14' WHERE id=1",
+            [],
+        )
+        .unwrap();
+        let (end, room): (String, String) = conn
+            .query_row("SELECT end_time, room FROM schedule WHERE id=1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(end, "09:55");
+        assert_eq!(room, "Salle 14");
+        conn.execute("DELETE FROM schedule WHERE id=1", []).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM schedule", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 0);
+
+        crate::commands::set_setting_raw(&conn, "theme", "dark");
+        crate::commands::set_setting_raw(&conn, "density", "compact");
+        let theme = crate::commands::get_setting_raw(&conn, "theme").unwrap();
+        let density = crate::commands::get_setting_raw(&conn, "density").unwrap();
+        assert_eq!(theme, "dark");
+        assert_eq!(density, "compact");
     }
 }

@@ -82,6 +82,14 @@ function asList<T>(data: unknown): T[] {
   return Array.isArray(data) ? (data as T[]).filter((x) => x != null) : [];
 }
 
+/** Sequence mutations all invalidate the same two caches. */
+function afterSequenceChange<T>(data: T): T {
+  invalidateCache("listSequences");
+  invalidateCache("listSequenceItems");
+  invalidateCache("listCourseClasses");
+  return data;
+}
+
 function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
   const listCmds = new Set([
     "all_notes",
@@ -168,6 +176,10 @@ export interface CourseClass {
   last_file_id: number | null;
   last_file_name?: string | null;
   last_file_kind?: string | null;
+  /** Step of a sequence this class has reached (course progression). */
+  last_item_id: number | null;
+  last_item_title?: string | null;
+  last_sequence_title?: string | null;
   progress_updated_at: string;
   notes: string;
 }
@@ -214,12 +226,36 @@ export interface RecapData {
   time_by_area: TopItem[];
 }
 
+export type RepeatRule = "none" | "daily" | "weekly" | "monthly";
+
+/** A chapter of a course's teaching progression. */
+export interface Sequence {
+  id: number;
+  course_id: number;
+  title: string;
+  position: number;
+  created_at: string;
+}
+
+/** A step inside a sequence, optionally bound to a document of the locker. */
+export interface SequenceItem {
+  id: number;
+  sequence_id: number;
+  title: string;
+  position: number;
+  file_id: number | null;
+  file_name: string | null;
+  file_kind: string | null;
+}
+
 export interface Reminder {
   id: number;
   title: string;
   due_at: string | null;
   done: boolean;
   created_at: string;
+  course_id: number | null;
+  repeat_rule: RepeatRule;
 }
 
 export interface QuickLink {
@@ -284,6 +320,7 @@ export const api = {
   // Storage / data root (USB portable)
   chooseDataDir: () => invoke<string | null>("choose_data_dir"),
   resetDataDir: () => invoke<void>("reset_data_dir"),
+  backupDataDir: () => invoke<string>("backup_data_dir"),
 
   // Courses
   listCourses: () => {
@@ -345,6 +382,51 @@ export const api = {
       invalidateCache("listCourseClasses");
       return data;
     }),
+  setCourseClassItem: (courseId: number, className: string, itemId: number | null) =>
+    invoke<void>("set_course_class_item", { courseId, className, itemId }).then((data) => {
+      invalidateCache("listCourseClasses");
+      return data;
+    }),
+
+  // Sequences: the course progression (chapters -> steps -> documents)
+  listSequences: (courseId: number) => {
+    const key = `listSequences:${courseId}`;
+    const cached = getCached<Sequence[]>(key);
+    if (cached) return Promise.resolve(cached);
+    return invoke<Sequence[]>("list_sequences", { courseId }).then((data) => {
+      const list = asList<Sequence>(data);
+      setCached(key, list);
+      return list;
+    });
+  },
+  listSequenceItems: (courseId: number) => {
+    const key = `listSequenceItems:${courseId}`;
+    const cached = getCached<SequenceItem[]>(key);
+    if (cached) return Promise.resolve(cached);
+    return invoke<SequenceItem[]>("list_sequence_items", { courseId }).then((data) => {
+      const list = asList<SequenceItem>(data);
+      setCached(key, list);
+      return list;
+    });
+  },
+  createSequence: (courseId: number, title: string) =>
+    invoke<Sequence>("create_sequence", { courseId, title }).then(afterSequenceChange),
+  renameSequence: (id: number, title: string) =>
+    invoke<void>("rename_sequence", { id, title }).then(afterSequenceChange),
+  deleteSequence: (id: number) =>
+    invoke<void>("delete_sequence", { id }).then(afterSequenceChange),
+  moveSequence: (courseId: number, id: number, delta: number) =>
+    invoke<void>("move_sequence", { courseId, id, delta }).then(afterSequenceChange),
+  createSequenceItem: (sequenceId: number, title: string, fileId: number | null) =>
+    invoke<SequenceItem>("create_sequence_item", { sequenceId, title, fileId }).then(
+      afterSequenceChange
+    ),
+  updateSequenceItem: (id: number, title: string, fileId: number | null) =>
+    invoke<void>("update_sequence_item", { id, title, fileId }).then(afterSequenceChange),
+  deleteSequenceItem: (id: number) =>
+    invoke<void>("delete_sequence_item", { id }).then(afterSequenceChange),
+  moveSequenceItem: (sequenceId: number, id: number, delta: number) =>
+    invoke<void>("move_sequence_item", { sequenceId, id, delta }).then(afterSequenceChange),
   updateCourseClassNotes: (courseId: number, className: string, notes: string) =>
     invoke<void>("update_course_class_notes", { courseId, className, notes }).then((data) => {
       invalidateCache("listCourseClasses");
@@ -426,8 +508,19 @@ export const api = {
       return list;
     });
   },
-  createReminder: (title: string, dueAt: string | null) =>
-    invoke<Reminder>("create_reminder", { title, dueAt }),
+  createReminder: (
+    title: string,
+    dueAt: string | null,
+    courseId: number | null = null,
+    repeatRule: RepeatRule = "none"
+  ) => invoke<Reminder>("create_reminder", { title, dueAt, courseId, repeatRule }),
+  updateReminder: (
+    id: number,
+    title: string,
+    dueAt: string | null,
+    courseId: number | null,
+    repeatRule: RepeatRule
+  ) => invoke<Reminder>("update_reminder", { id, title, dueAt, courseId, repeatRule }),
   toggleReminder: (id: number, done: boolean) => invoke<void>("toggle_reminder", { id, done }),
   deleteReminder: (id: number) => invoke<void>("delete_reminder", { id }),
 

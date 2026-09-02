@@ -7,7 +7,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command as TokioCommand};
 use tokio::sync::Mutex;
 
-
 /// Persistent "warm" sidecar manager.
 /// The Python process is started once (at app launch) and kept alive.
 /// Commands are sent over stdin/stdout as JSON lines for very low latency
@@ -180,11 +179,7 @@ impl Drop for InnerSidecar {
 
 /// Public helper so call sites stay almost identical:
 ///   crate::sidecar::call(&app, "pronote_sync", &creds).await?
-pub async fn call(
-    app: &AppHandle,
-    command: &str,
-    payload: &Value,
-) -> Result<Value, String> {
+pub async fn call(app: &AppHandle, command: &str, payload: &Value) -> Result<Value, String> {
     let state: tauri::State<Sidecar> = app.state();
     state.call(command, payload).await
 }
@@ -198,9 +193,8 @@ fn resolve(app: &AppHandle) -> Result<(String, Vec<String>), String> {
     }
 
     // 2. Dev fallback: a Python interpreter + the sidecar script.
-    let script = sidecar_script(app).ok_or_else(|| {
-        "Script du sidecar (euclide_sidecar.py) introuvable.".to_string()
-    })?;
+    let script = sidecar_script(app)
+        .ok_or_else(|| "Script du sidecar (euclide_sidecar.py) introuvable.".to_string())?;
     let python = dev_python(&script);
     Ok((python, vec![script.to_string_lossy().to_string()]))
 }
@@ -233,11 +227,19 @@ fn dev_python(script: &PathBuf) -> String {
         }
     }
 
-    if cfg!(windows) { "python".to_string() } else { "python3".to_string() }
+    if cfg!(windows) {
+        "python".to_string()
+    } else {
+        "python3".to_string()
+    }
 }
 
 fn frozen_binary(app: &AppHandle) -> Option<PathBuf> {
-    let name = if cfg!(windows) { "euclide-sidecar.exe" } else { "euclide-sidecar" };
+    let name = if cfg!(windows) {
+        "euclide-sidecar.exe"
+    } else {
+        "euclide-sidecar"
+    };
     let onedir = "euclide-sidecar"; // layout from `pyinstaller --onedir --name euclide-sidecar`
     let mut candidates: Vec<PathBuf> = vec![];
     if let Ok(exe) = std::env::current_exe() {

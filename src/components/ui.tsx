@@ -166,7 +166,7 @@ export function Modal({
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <motion.div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            className="eu-scrim"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -178,13 +178,13 @@ export function Modal({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className={`relative w-full ${width} new-card p-6`}
+            className={`relative w-full ${width} eu-panel shadow-pop p-5`}
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 6 }}
             transition={{ type: "spring", stiffness: 480, damping: 32, mass: 0.9 }}
           >
-            <h2 className="text-on-surface font-semibold tracking-tight text-lg mb-4">{title}</h2>
+            <h2 className="eu-t-section text-ink text-[16px] mb-4">{title}</h2>
             {children}
           </motion.div>
         </div>
@@ -286,7 +286,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         {state && (
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-6">
             <motion.div
-              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              className="eu-scrim"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -298,21 +298,21 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               role="dialog"
               aria-modal="true"
               aria-label={state.opts.title}
-              className="relative w-full max-w-md new-card p-6"
+              className="relative w-full max-w-md eu-panel shadow-pop p-5"
               initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: 6 }}
               transition={{ type: "spring", stiffness: 480, damping: 32, mass: 0.9 }}
             >
-              <h2 className="text-on-surface font-semibold tracking-tight text-lg mb-2">{state.opts.title}</h2>
-              <p className="text-sm text-mute mb-5">{state.opts.message}</p>
+              <h2 className="eu-t-section text-ink text-[16px] mb-1.5">{state.opts.title}</h2>
+              <p className="eu-t-body text-ink-muted mb-5">{state.opts.message}</p>
               {state.mode === "ask" ? (
                 <div className="flex justify-end gap-2">
-                  <button className="new-btn-ghost" onClick={() => closeAsk(false)}>
+                  <button className="eu-btn-ghost" onClick={() => closeAsk(false)}>
                     {state.opts.cancelLabel || "Annuler"}
                   </button>
                   <button
-                    className={state.opts.danger ? "new-btn-primary bg-tui-danger border-tui-danger" : "new-btn-primary"}
+                    className={state.opts.danger ? "eu-btn-danger" : "eu-btn-primary"}
                     onClick={() => closeAsk(true)}
                   >
                     {state.opts.confirmLabel || "Confirmer"}
@@ -320,13 +320,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 </div>
               ) : (
                 <div className="flex justify-end gap-2 flex-wrap">
-                  <button className="new-btn-ghost" onClick={() => closeDirty("cancel")}>
+                  <button className="eu-btn-ghost" onClick={() => closeDirty("cancel")}>
                     {get("confirm.cancel", "Annuler")}
                   </button>
-                  <button className="new-btn-ghost" onClick={() => closeDirty("discard")}>
+                  <button className="eu-btn-ghost" onClick={() => closeDirty("discard")}>
                     {get("confirm.discard", "Ne pas enregistrer")}
                   </button>
-                  <button className="new-btn-primary" onClick={() => closeDirty("save")}>
+                  <button className="eu-btn-primary" onClick={() => closeDirty("save")}>
                     {get("confirm.save", "Enregistrer")}
                   </button>
                 </div>
@@ -353,8 +353,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback((message: string, tone: Toast["tone"] = "info") => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, message, tone }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+    // Cap the stack: a burst of imports used to push toasts off-screen.
+    setToasts((t) => [...t, { id, message, tone }].slice(-4));
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
   }, []);
 
   const dismiss = useCallback((id: number) => {
@@ -364,37 +365,48 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center">
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed bottom-9 left-1/2 -translate-x-1/2 z-overlay flex flex-col gap-2 items-center pointer-events-none"
+      >
         <AnimatePresence>
           {toasts.map((toast) => {
             const toneClass =
               toast.tone === "error"
-                ? "text-tui-danger border-l-2 border-tui-danger"
+                ? "border-l-2 border-l-danger"
                 : toast.tone === "success"
-                ? "text-tui-success border-l-2 border-tui-success"
-                : "text-on-surface";
+                ? "border-l-2 border-l-ok"
+                : "";
+            const iconClass =
+              toast.tone === "error"
+                ? "text-danger"
+                : toast.tone === "success"
+                ? "text-ok"
+                : "text-ink-faint";
             const Icon =
               toast.tone === "success" ? (
-                <CheckCircleIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                <CheckCircleIcon className="w-4 h-4 shrink-0" />
               ) : toast.tone === "error" ? (
-                <XIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                <XIcon className="w-4 h-4 shrink-0" />
               ) : (
-                <div className="w-2 h-2 rounded-full bg-current mt-1.5 shrink-0 opacity-60" />
+                <div className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
               );
             return (
-              <motion.div
+              <motion.button
+                type="button"
                 key={toast.id}
                 initial={{ opacity: 0, y: 10, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 6, scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 420, damping: 28 }}
                 onClick={() => dismiss(toast.id)}
-                className={`new-card px-3 py-2 text-sm flex items-start gap-2 cursor-pointer max-w-[min(92vw,380px)] ${toneClass}`}
-                title="Cliquer pour fermer"
+                className={`eu-panel shadow-pop pointer-events-auto pl-3 pr-3.5 py-2.5 eu-t-body text-ink flex items-center gap-2.5 text-left max-w-[min(92vw,400px)] ${toneClass}`}
+                title={get("common.close", "Fermer")}
               >
-                {Icon}
+                <span className={`grid place-items-center ${iconClass}`}>{Icon}</span>
                 <span className="break-words">{toast.message}</span>
-              </motion.div>
+              </motion.button>
             );
           })}
         </AnimatePresence>
@@ -404,67 +416,62 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Empty state
+// Empty state — left aligned, height-capped, and it offers the next action.
+// The previous centred version produced 200 px voids on Cours / Outils /
+// Réglages and never told the user what to do.
 // ---------------------------------------------------------------------------
 
 export function EmptyState({
   icon,
   title,
   hint,
+  action,
 }: {
   icon?: ReactNode;
   title: string;
   hint?: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-      {icon && <div className="text-mute/70 mb-1">{icon}</div>}
-      <p className="text-on-surface font-medium font-mono">{title}</p>
-      {hint && <p className="text-mute text-sm max-w-sm font-mono">{hint}</p>}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Section header
-// ---------------------------------------------------------------------------
-
-export function SectionHeader({
-  title,
-  action,
-}: {
-  title: string;
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-on-surface font-semibold text-[15px] tracking-tight">{title}</h2>
-      {action}
+    <div className="flex items-start gap-3.5 p-[14px]">
+      {icon && (
+        <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line text-ink-faint">
+          {icon}
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="eu-t-section text-ink">{title}</p>
+        {hint && <p className="eu-t-body text-ink-muted mt-1 max-w-[58ch]">{hint}</p>}
+        {action && <div className="flex items-center gap-2 flex-wrap mt-3">{action}</div>}
+      </div>
     </div>
   );
 }
 
+/**
+ * Palette proposed when creating or editing a course.
+ *
+ * Twelve mid-tones instead of the previous twenty: the pastels it contained
+ * (#a5b4fc, #fbbf24, #a3e635…) fell under 2:1 on paper, so a course spine or
+ * icon painted with them was invisible. These all clear 4.9:1 on the light
+ * canvas and are lifted automatically in dark mode by `courseVisual()`.
+ *
+ * Colours already stored on existing courses keep rendering — nothing is
+ * migrated, `courseVisual()` simply corrects them at display time.
+ */
 export const COURSE_COLORS = [
-  "#6366F1",
-  "#818cf8",
-  "#a5b4fc",
-  "#4f46e5",
-  "#2a9d8f",
-  "#264653",
-  "#6a6a6a",
-  "#4a4a4a",
-  "#f87171",
-  "#fb923c",
-  "#fbbf24",
-  "#a3e635",
-  "#4ade80",
-  "#34d399",
-  "#22d3ee",
-  "#60a5fa",
-  "#c084fc",
-  "#f472b6",
-  "#fb7185",
-  "#14b8a6",
+  "#1f6f65", // sarcelle
+  "#2f6f3f", // vert
+  "#3f6f8f", // bleu acier
+  "#2c62a8", // bleu
+  "#3a4fa8", // indigo
+  "#7a3fa0", // violet
+  "#a03c78", // magenta
+  "#a4262c", // rouge
+  "#8f3a3a", // brique
+  "#a15c07", // orange
+  "#7a6a12", // olive
+  "#5a5a62", // ardoise
 ];
 
 // Icons for courses using lucide-react (clean, professional, recognizable SVGs for subjects)
@@ -501,7 +508,7 @@ export function Loading({ label = "Chargement…", size = "default" }: { label?:
       <div className={`relative ${isSmall ? "w-5 h-5" : "w-9 h-9"}`}>
         {/* track */}
         <div
-          className={`absolute inset-0 rounded-full border ${isSmall ? "border-2" : "border-[3px]"} border-primary/15`}
+          className={`absolute inset-0 rounded-full border ${isSmall ? "border-2" : "border-[3px]"} border-ink/15`}
         />
         {/* spinning arc */}
         <motion.div
@@ -511,7 +518,7 @@ export function Loading({ label = "Chargement…", size = "default" }: { label?:
         />
       </div>
       {label && (
-        <p className={`${isSmall ? "text-[11px]" : "text-sm"} text-mute font-mono tracking-tight`}>{label}</p>
+        <p className={`${isSmall ? "text-[11px]" : "text-sm"} text-ink-muted font-mono tracking-tight`}>{label}</p>
       )}
     </motion.div>
   );

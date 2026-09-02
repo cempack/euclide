@@ -4,6 +4,8 @@ import { useTabs } from "../lib/tabs";
 import { useToast, useConfirm } from "./ui";
 import { DownloadIcon, TrashIcon, UndoIcon, PenIcon, EraserIcon, LineIcon, RectIcon, EllipseIcon, TextIcon } from "./icons";
 import { get } from "../lib/i18n";
+import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
+import { MOD } from "../lib/shortcuts";
 
 const BASIC_COLORS = ["#000000","#f44336","#e91e63","#9c27b0","#2196f3","#3f51b5","#e0e0e0","#ffffff","#00bcd4","#009688","#4caf50","#8bc34a","#cddc39","#ffeb3b","#ffc107","#ff9800","#ff5722","#795548","#607d8b","#90a4ae"];
 const SIZES = [3,6,12,18,24,30];
@@ -241,87 +243,207 @@ export default function Whiteboard({ tabId, fileId, visible = true }: { tabId: s
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-hairline flex-wrap bg-surface text-sm">
-        <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap pl-1">
-          <div className="flex items-center gap-0.5" title="Couleurs">{colorPresets.map(c=><button key={c} onClick={()=>{setColor(c);if(tool==='eraser')setTool('pen');}} className={`w-5 h-5 rounded-full border border-hairline transition-all eu-no-drag ${color===c&&tool!=='eraser'?'ring-2 ring-tui-accent':'hover:ring-1 hover:ring-hairline'}`} style={{background:c}}/>)}<div className={`relative w-5 h-5 rounded border border-hairline overflow-hidden cursor-pointer transition-all eu-no-drag ${!colorPresets.includes(color)&&tool!=='eraser'?'ring-2 ring-tui-accent':'hover:ring-1 hover:ring-hairline'}`}><input type="color" value={color} onChange={e=>{const c=e.target.value;setColor(c);if(tool==='eraser')setTool('pen');}} className="absolute inset-0 opacity-0 w-full h-full eu-no-drag"/><div className="w-full h-full" style={{background:color}}/></div></div>
-          <div className="w-px h-5 bg-hairline"/>
-          <div className="flex items-center gap-0.5" title="Tailles">{SIZES.slice(0,5).map(s=><button key={s} onClick={()=>setSize(s)} className={`w-5 h-5 border flex items-center justify-center transition-all eu-no-drag ${size===s?'border-tui-accent ring-1 ring-tui-accent bg-tui-accent/5':'border-hairline bg-[#f4f3f3] hover:border-hairline/80'}`} title={s+'px'}><div className="bg-[#111] rounded-sm" style={{width:10,height:Math.max(2,Math.min(s,8))}}/></button>)}</div>
-          <div className="w-px h-5 bg-hairline"/>
-          <div className="flex items-center gap-1.5 text-xs text-body-mute shrink-0 select-none" title="Opacité">
-            <span className="text-[10px]">Opac</span>
-            <div
-              onClick={() => setOpacity(opacity === 1 ? 0.35 : 1)}
-              className={`w-9 h-[18px] rounded-full relative cursor-pointer transition-colors flex-shrink-0 eu-no-drag ${opacity < 1 ? 'bg-tui-accent' : 'bg-[#e2dfdf]'}`}
+      <Toolbar className="h-9 py-0">
+        {/* Tools */}
+        <ToolGroup label={get("whiteboard.tools", "Outils")}>
+          {(['pen','eraser','line','rect','ellipse','text'] as const).map((t) => {
+            const Icon = t === 'pen' ? PenIcon : t === 'eraser' ? EraserIcon : t === 'line' ? LineIcon : t === 'rect' ? RectIcon : t === 'ellipse' ? EllipseIcon : TextIcon;
+            const label = get(`whiteboard.tool_${t}`, t);
+            return (
+              <button
+                key={t}
+                onClick={() => { if (pendingText && t !== 'text') commitPendingText(); setTool(t); }}
+                aria-pressed={tool === t}
+                aria-label={label}
+                title={label}
+                className={`eu-btn-icon eu-btn-sm eu-no-drag ${tool === t ? 'eu-btn-primary' : 'eu-btn-quiet'}`}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            );
+          })}
+        </ToolGroup>
+
+        <ToolSep />
+
+        {/* Colours */}
+        <ToolGroup label={get("whiteboard.colors", "Couleurs")}>
+          {colorPresets.map((c) => (
+            <button
+              key={c}
+              onClick={() => { setColor(c); if (tool === 'eraser') setTool('pen'); }}
+              aria-label={c}
+              aria-pressed={color === c && tool !== 'eraser'}
+              className={`w-5 h-5 rounded-full border eu-no-drag transition-transform duration-fast ${color === c && tool !== 'eraser' ? 'border-ink scale-110' : 'border-line hover:scale-105'}`}
+              style={{ background: c }}
+            />
+          ))}
+          <span
+            className={`relative w-5 h-5 rounded-full border overflow-hidden cursor-pointer eu-no-drag ${!colorPresets.includes(color) && tool !== 'eraser' ? 'border-ink' : 'border-line'}`}
+            title={get("whiteboard.customColor", "Couleur personnalisée")}
+          >
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => { const c = e.target.value; setColor(c); if (tool === 'eraser') setTool('pen'); }}
+              className="absolute inset-0 opacity-0 w-full h-full eu-no-drag cursor-pointer"
+              aria-label={get("whiteboard.customColor", "Couleur personnalisée")}
+            />
+            <span className="block w-full h-full" style={{ background: color }} />
+          </span>
+        </ToolGroup>
+
+        <ToolSep />
+
+        {/* Stroke width */}
+        <ToolGroup label={get("whiteboard.sizes", "Épaisseurs")}>
+          {SIZES.slice(0, 5).map((s) => (
+            <button
+              key={s}
+              onClick={() => setSize(s)}
+              aria-pressed={size === s}
+              aria-label={`${s} px`}
+              title={`${s} px`}
+              className={`w-6 h-6 grid place-items-center rounded border eu-no-drag transition-colors duration-fast ${size === s ? 'border-ink bg-panel-alt' : 'border-line hover:bg-panel-alt'}`}
             >
-              <div
-                className="absolute w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-all"
-                style={{ top: '2px', left: opacity < 1 ? '20px' : '2px' }}
-              />
-            </div>
-          </div>
-          <div className="w-px h-5 bg-hairline"/>
-          <div className="flex items-center gap-0.5" title={get("whiteboard.tools", "Outils")}>
-            {(['pen','eraser','line','rect','ellipse','text'] as const).map((t) => {
-              const Icon = t === 'pen' ? PenIcon : t === 'eraser' ? EraserIcon : t === 'line' ? LineIcon : t === 'rect' ? RectIcon : t === 'ellipse' ? EllipseIcon : TextIcon;
-              return (
-                <button key={t} onClick={() => { if (pendingText && t !== 'text') commitPendingText(); setTool(t); }} className={`w-7 h-7 flex items-center justify-center rounded-sm transition-all eu-no-drag ${tool===t ? 'border border-tui-accent bg-tui-accent/10 text-primary' : 'border border-transparent hover:bg-surface-container/60'}`}>
-                  <Icon className="w-4 h-4" />
-                </button>
-              );
-            })}
-          </div>
-          <div className="w-px h-5 bg-hairline"/>
-          <div className="flex items-center text-[11px] border border-hairline rounded-sm overflow-hidden bg-[#f4f3f3]"><button onClick={zoomOut} className="px-1.5 py-0.5 hover:bg-surface-soft active:bg-surface-container/60 border-r border-hairline eu-no-drag">−</button><span className="tabular-nums w-9 text-center cursor-pointer py-0.5 hover:bg-surface-soft eu-no-drag" onClick={resetZoom}>{Math.round(zoom*100)}%</span><button onClick={zoomIn} className="px-1.5 py-0.5 hover:bg-surface-soft active:bg-surface-container/60 border-l border-hairline eu-no-drag">+</button></div>
-          <div className="w-px h-5 bg-hairline"/>
-          <div className="flex items-center gap-0.5"><button onClick={undo} disabled={itemCount===0} className="new-btn-ghost px-1.5 py-0.5"><UndoIcon className="w-3.5 h-3.5"/></button><button onClick={clear} disabled={itemCount===0} className="new-btn-ghost px-1.5 py-0.5"><TrashIcon className="w-3.5 h-3.5"/></button></div>
-          {/* versioning like PDF: original default + prior saves; load snapshot then Enregistrer to promote */}
-          <div className="flex items-center gap-1 ml-1 pl-1 border-l border-hairline text-xs">
-            <select
-              className="new-btn-ghost text-xs px-1 py-0.5"
-              value=""
-              onChange={async (e) => {
-                const name = e.target.value;
-                if (!name) return;
-                try {
-                  const dataUrl = await api.readVersionData(name);
-                  const res = await fetch(dataUrl);
-                  const txt = await res.text();
-                  const d = JSON.parse(txt) as BoardDoc;
-                  if (pendingText || pendingTextRef.current) { editingTextOriginal.current = null; setPendingText(null); pendingTextRef.current = null; }
-                  strokes.current = d.strokes ?? [];
-                  shapes.current = d.shapes ?? [];
-                  texts.current = d.texts ?? [];
-                  history.current = [];
-                  setItemCount(strokes.current.length + shapes.current.length + texts.current.length);
-                  const rr = wrapRef.current?.getBoundingClientRect();
-                  if (rr && rr.width > 0) updateCanvasSize(rr.width, rr.height, zoomRef.current);
-                  redraw();
-                  setDirty(true);
-                  toast(get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"), "success");
-                } catch {
-                  toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
-                }
+              <span className="rounded-full bg-ink block" style={{ width: Math.max(3, Math.min(s, 9)), height: Math.max(3, Math.min(s, 9)) }} />
+            </button>
+          ))}
+        </ToolGroup>
+
+        <ToolSep />
+
+        {/* Opacity */}
+        <button
+          onClick={() => setOpacity(opacity === 1 ? 0.35 : 1)}
+          role="switch"
+          aria-checked={opacity < 1}
+          aria-label={get("whiteboard.opacity", "Semi-transparent")}
+          title={get("whiteboard.opacity", "Semi-transparent")}
+          className={`eu-btn-sm eu-no-drag ${opacity < 1 ? 'eu-btn-primary' : 'eu-btn-quiet'}`}
+        >
+          {get("whiteboard.opacityShort", "Opacité")}
+        </button>
+
+        <ToolSep />
+
+        {/* Zoom */}
+        <ToolGroup label={get("whiteboard.zoom", "Zoom")}>
+          <button onClick={zoomOut} aria-label={get("whiteboard.zoomOut", "Réduire")} className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag">−</button>
+          <button onClick={resetZoom} className="eu-btn-quiet eu-btn-sm eu-no-drag font-mono tabular-nums w-12" title={get("whiteboard.zoomReset", "Réinitialiser le zoom")}>
+            {Math.round(zoom * 100)}%
+          </button>
+          <button onClick={zoomIn} aria-label={get("whiteboard.zoomIn", "Agrandir")} className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag">+</button>
+        </ToolGroup>
+
+        <ToolSep />
+
+        {/* History */}
+        <ToolGroup label={get("whiteboard.history", "Historique")}>
+          <button onClick={undo} disabled={itemCount === 0} aria-label={get("whiteboard.undo", "Annuler")} title={get("whiteboard.undo", "Annuler")} className="eu-btn-quiet eu-btn-icon eu-btn-sm">
+            <UndoIcon className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={clear} disabled={itemCount === 0} aria-label={get("whiteboard.clear", "Tout effacer")} title={get("whiteboard.clear", "Tout effacer")} className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger">
+            <TrashIcon className="w-3.5 h-3.5" />
+          </button>
+        </ToolGroup>
+
+        <ToolSep />
+
+        {/* Versions: load an earlier snapshot, then Enregistrer to promote it. */}
+        <select
+          className="eu-select h-7 w-[130px] text-[11.5px] eu-no-drag"
+          value=""
+          aria-label={get("pdf.versions", "Versions")}
+          onChange={async (e) => {
+              const name = e.target.value;
+              if (!name) return;
+              try {
+                const dataUrl = await api.readVersionData(name);
+                const res = await fetch(dataUrl);
+                const txt = await res.text();
+                const d = JSON.parse(txt) as BoardDoc;
+                if (pendingText || pendingTextRef.current) { editingTextOriginal.current = null; setPendingText(null); pendingTextRef.current = null; }
+                strokes.current = d.strokes ?? [];
+                shapes.current = d.shapes ?? [];
+                texts.current = d.texts ?? [];
+                history.current = [];
+                setItemCount(strokes.current.length + shapes.current.length + texts.current.length);
+                const rr = wrapRef.current?.getBoundingClientRect();
+                if (rr && rr.width > 0) updateCanvasSize(rr.width, rr.height, zoomRef.current);
+                redraw();
+                setDirty(true);
+                toast(get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"), "success");
+              } catch {
+                toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
+              }
               }}
-            >
-              <option value="" disabled>{get("pdf.versions", "Versions")} ({versions.length})</option>
-              {versions.length === 0 ? (
-                <option value="" disabled>{get("pdf.noVersionsYet", "Aucune version — enregistrez pour créer")}</option>
-              ) : (
-                versions.slice().reverse().map((v: any, i: number) => {
-                  const isOrig = v.timestamp === "original" || (typeof v.backup_name === "string" && v.backup_name.includes("original"));
-                  const label = isOrig ? "Original" : `v${v.version} ${v.timestamp}`;
-                  return <option key={i} value={v.backup_name}>{label}</option>;
-                })
-              )}
-            </select>
-          </div>
-        </div>
-        <div className="shrink-0 flex items-center gap-1.5 pl-2 border-l border-hairline text-xs"><div className="relative"><select value={courseId??''} onChange={e=>setCourseId(e.target.value?Number(e.target.value):null)} className="new-input w-auto py-0.5 text-xs min-w-[78px] appearance-none pr-4 pl-1.5 eu-no-drag"><option value="">Sans cours</option>{courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><span className="absolute right-[1px] top-1/2 -translate-y-1/2 text-[10px] text-body-mute pointer-events-none select-none">▾</span></div><button onClick={exportPng} className="new-btn-ghost px-1 py-0.5"><DownloadIcon className="w-3.5 h-3.5"/></button><button onClick={save} className="new-btn-primary px-3 py-0.5 text-xs min-w-[72px]">Enregistrer{dirty&&<span className="text-[10px] ml-0.5">*</span>}</button></div>
-      </div>
-      <div ref={wrapRef} className="flex-1 min-h-0 bg-[#f8f7f4] border-t border-hairline overflow-auto eu-no-drag" onWheel={e=>{if((e.ctrlKey||e.metaKey)&&wrapRef.current){e.preventDefault();const f=e.deltaY<0?1.1:0.9;setZoom(z=>Math.max(0.25,Math.min(4,z*f)));}}}>
+        >
+          <option value="" disabled>
+            {get("pdf.versions", "Versions")} ({versions.length})
+          </option>
+          {versions.length === 0 ? (
+            <option value="" disabled>
+              {get("pdf.noVersionsYet", "Aucune version")}
+            </option>
+          ) : (
+            versions
+              .slice()
+              .reverse()
+              .map((v: any, i: number) => {
+                const isOrig =
+                  v.timestamp === "original" ||
+                  (typeof v.backup_name === "string" && v.backup_name.includes("original"));
+                const label = isOrig ? get("pdf.original", "Original") : `v${v.version} ${v.timestamp}`;
+                return (
+                  <option key={i} value={v.backup_name}>
+                    {label}
+                  </option>
+                );
+              })
+          )}
+        </select>
+
+        <ToolSpacer />
+
+        {/* Destination course + export + save */}
+        <ToolGroup>
+          <select
+            value={courseId ?? ""}
+            onChange={(e) => setCourseId(e.target.value ? Number(e.target.value) : null)}
+            className="eu-select h-7 w-[130px] text-[11.5px] eu-no-drag"
+            aria-label={get("whiteboard.course", "Cours")}
+          >
+            <option value="">{get("whiteboard.noCourse", "Sans cours")}</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={exportPng}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag"
+            aria-label={get("whiteboard.exportPng", "Exporter en PNG")}
+            title={get("whiteboard.exportPng", "Exporter en PNG")}
+          >
+            <DownloadIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={save}
+            className="eu-btn-primary eu-btn-sm eu-no-drag"
+            title={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+          >
+            {get("common.save", "Enregistrer")}
+            {dirty && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
+          </button>
+        </ToolGroup>
+      </Toolbar>
+
+      <div ref={wrapRef} className="flex-1 min-h-0 bg-panel-alt overflow-auto eu-no-drag" onWheel={e=>{if((e.ctrlKey||e.metaKey)&&wrapRef.current){e.preventDefault();const f=e.deltaY<0?1.1:0.9;setZoom(z=>Math.max(0.25,Math.min(4,z*f)));}}}>
         <div style={{position:'relative',width:`${pageSize.w}px`,height:`${pageSize.h}px`}}>
           <canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} className="absolute top-0 left-0 touch-none block eu-no-drag" style={{zIndex: 1}} />
-          {pendingText && <input ref={textInputRef} autoFocus value={pendingText.value} onChange={e=>setPendingText(p=>p?{...p,value:e.target.value}:null)} onKeyDown={e=>{if(e.key==='Enter')commitPendingText();else if(e.key==='Escape'){cancelPendingText();}}} onBlur={commitPendingText} onFocus={e=>e.target.select()} className="absolute bg-[#ffffff] text-black border-2 border-tui-accent px-1.5 py-0.5 text-sm outline-none shadow-md" style={{left:`${pendingText.normX*pageSize.w}px`,top:`${pendingText.normY*pageSize.h}px`,minWidth:'120px',width:`${Math.max(120, (pendingText.value.length || 8) * 8 + 16)}px`,height:'28px',zIndex:20,fontFamily:'system-ui,sans-serif',boxSizing:'border-box'}}/>}
+          {pendingText && <input ref={textInputRef} autoFocus value={pendingText.value} onChange={e=>setPendingText(p=>p?{...p,value:e.target.value}:null)} onKeyDown={e=>{if(e.key==='Enter')commitPendingText();else if(e.key==='Escape'){cancelPendingText();}}} onBlur={commitPendingText} onFocus={e=>e.target.select()} className="absolute bg-white text-black border-2 border-accent px-1.5 py-0.5 text-sm outline-none shadow-pop" style={{left:`${pendingText.normX*pageSize.w}px`,top:`${pendingText.normY*pageSize.h}px`,minWidth:'120px',width:`${Math.max(120, (pendingText.value.length || 8) * 8 + 16)}px`,height:'28px',zIndex:20,fontFamily:'system-ui,sans-serif',boxSizing:'border-box'}}/>}
         </div>
       </div>
     </div>

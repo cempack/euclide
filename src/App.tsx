@@ -1,25 +1,43 @@
-import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
-import { api, type AppInfo, type FileItem, isTauri } from "./lib/api";
-import { get } from "./lib/i18n";
-import { isMac } from "./lib/shortcuts";
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense, memo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+ api,
+ type AppInfo,
+ type FileItem,
+ type PronoteStatus,
+ type ScheduleEntry,
+ isTauri,
+} from "./lib/api";
+import { get, fmt } from "./lib/i18n";
+import { isMac, MOD } from "./lib/shortcuts";
+import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "./lib/format";
+import { courseVisual } from "./lib/color";
+import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 
 import { TabsProvider, useTabs, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
+import { Segmented } from "./components/layout";
 import CommandPalette from "./components/CommandPalette";
 import ShortcutsHelp from "./components/ShortcutsHelp";
 import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
 import {
  BookIcon,
+ CoffeeIcon,
  DocIcon,
  GearIcon,
  HelpIcon,
  HomeIcon,
+ MoonIcon,
+ PauseIcon,
  PenIcon,
+ PinIcon,
+ PlayIcon,
  PlusIcon,
+ ProjectorIcon,
  SearchIcon,
+ SunIcon,
  ToolIcon,
- UserIcon,
  XIcon,
  BellIcon,
  CodeIcon,
@@ -55,16 +73,22 @@ const TAB_ICONS: Partial<Record<TabKind, React.ReactNode>> = {
  recap: <SparkleIcon className="w-4 h-4" />,
 };
 
-const NAV: { kind: TabKind; label: string; icon: React.ReactNode }[] = [
- { kind: "dashboard", label: get("nav.dashboard", "Tableau de bord"), icon: <HomeIcon className="w-[18px] h-[18px]" /> },
- { kind: "courses", label: get("nav.courses", "Cours"), icon: <BookIcon className="w-[18px] h-[18px]" /> },
- { kind: "documents", label: get("nav.documents", "Documents"), icon: <DocIcon className="w-[18px] h-[18px]" /> },
- { kind: "note", label: get("nav.notes", "Notes"), icon: <NoteIcon className="w-[18px] h-[18px]" /> },
- { kind: "whiteboard", label: get("nav.whiteboard", "Tableau blanc"), icon: <PenIcon className="w-[18px] h-[18px]" /> },
- { kind: "reminders", label: get("nav.reminders", "Rappels"), icon: <BellIcon className="w-[18px] h-[18px]" /> },
- { kind: "tools", label: get("nav.tools", "Outils"), icon: <ToolIcon className="w-[18px] h-[18px]" /> },
- { kind: "python", label: get("nav.python", "Python"), icon: <CodeIcon className="w-[18px] h-[18px]" /> },
- { kind: "settings", label: get("nav.settings", "Réglages"), icon: <GearIcon className="w-[18px] h-[18px]" /> },
+/** Sidebar navigation, grouped: what you work on, then what you work with. */
+type NavItem = { kind: TabKind; label: string; icon: React.ReactNode; hint?: string };
+
+const NAV_WORK: NavItem[] = [
+ { kind: "dashboard", label: get("nav.dashboard", "Tableau de bord"), icon: <HomeIcon className="w-4 h-4" />, hint: `${MOD}D` },
+ { kind: "courses", label: get("nav.courses", "Cours"), icon: <BookIcon className="w-4 h-4" /> },
+ { kind: "documents", label: get("nav.documents", "Documents"), icon: <DocIcon className="w-4 h-4" />, hint: `${MOD}F` },
+ { kind: "reminders", label: get("nav.reminders", "Rappels"), icon: <BellIcon className="w-4 h-4" /> },
+];
+
+const NAV_TOOLS: NavItem[] = [
+ { kind: "note", label: get("nav.notes", "Nouvelle note"), icon: <NoteIcon className="w-4 h-4" />, hint: `${MOD}N` },
+ { kind: "whiteboard", label: get("nav.whiteboard", "Tableau blanc"), icon: <PenIcon className="w-4 h-4" />, hint: `${MOD}B` },
+ { kind: "python", label: get("nav.python", "Python"), icon: <CodeIcon className="w-4 h-4" /> },
+ { kind: "tools", label: get("nav.tools", "Outils"), icon: <ToolIcon className="w-4 h-4" /> },
+ { kind: "recap", label: get("nav.recap", "Bilan"), icon: <SparkleIcon className="w-4 h-4" /> },
 ];
 
 function navKindActive(navKind: TabKind, activeKind?: TabKind): boolean {
@@ -77,6 +101,9 @@ function navKindActive(navKind: TabKind, activeKind?: TabKind): boolean {
  return false;
 }
 
+/** Screens that manage their own full-bleed chrome instead of the text column. */
+const FULL_BLEED: TabKind[] = ["python", "whiteboard", "pdf", "note"];
+
 async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "success" | "error") => void) {
  if (!added.length) return;
  added.forEach((f) => api.logEvent("file_import", f.name, null));
@@ -86,24 +113,61 @@ async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "s
  toast(get("messages.imported", "{count} importé(s)").replace("{count}", String(added.length)), "success");
 }
 
-const Sidebar = memo(function Sidebar() {
+const NavButton = memo(function NavButton({
+ item,
+ active,
+ onOpen,
+}: {
+ item: NavItem;
+ active: boolean;
+ onOpen: (item: NavItem) => void;
+}) {
+ return (
+ <button
+ type="button"
+ onClick={() => onOpen(item)}
+ aria-current={active ? "page" : undefined}
+ className={`group flex items-center gap-2.5 h-8 px-2.5 rounded text-left transition-colors duration-fast ${
+ active
+ ? "bg-ink text-panel font-medium"
+ : "text-ink-muted hover:text-ink hover:bg-panel-alt"
+ }`}
+ >
+ <span className={`shrink-0 ${active ? "" : "opacity-75"}`}>{item.icon}</span>
+ <span className="eu-t-body truncate">{item.label}</span>
+ {item.hint && (
+ <span
+ className={`ml-auto font-mono text-[9.5px] tabular-nums ${
+ active ? "text-panel/60" : "text-ink-faint"
+ }`}
+ >
+ {item.hint}
+ </span>
+ )}
+ </button>
+ );
+});
+
+const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
  const tabs = useTabs();
+ const { pref, resolved, setPref } = useAppearance();
+ const [pronote, setPronote] = useState<PronoteStatus | null>(null);
  const isActive = (kind: TabKind) => navKindActive(kind, tabs.active?.kind);
 
- return (
- <aside className={`eu-sidebar w-64 shrink-0 h-full flex flex-col px-lg pb-4 bg-surface border-r border-hairline font-mono pt-10`}>
- <div className="flex items-center gap-3 px-3 mb-10 ">
- <img src="/euclide-logo.png" alt="Euclide" className="w-10 h-10 rounded-2xl object-contain" />
- <div className="leading-none">
- <h1 className="font-display-xl text-body-strong text-primary tracking-tight">EUCLIDE</h1>
- </div>
- </div>
+ useEffect(() => {
+ api.pronoteStatus().then(setPronote).catch(() => {});
+ const onChange = () => {
+ api.pronoteStatus().then(setPronote).catch(() => {});
+ };
+ window.addEventListener("eu:pronote-changed", onChange);
+ return () => window.removeEventListener("eu:pronote-changed", onChange);
+ }, []);
 
- <nav className="flex-1 flex flex-col gap-1 text-sm font-body-strong">
- {NAV.map((item) => (
- <button
- key={item.kind}
- onClick={() => {
+ const accountName = (pronote?.connected && pronote.account_name ? pronote.account_name : "").trim();
+ const showAccount = !!pronote?.connected;
+
+ const onOpen = useCallback(
+ (item: NavItem) => {
  if (item.kind === "whiteboard") {
  tabs.open({ kind: "whiteboard", title: get("app.tabWhiteboard", "Tableau"), params: { isNew: true } });
  } else if (item.kind === "note") {
@@ -111,21 +175,91 @@ const Sidebar = memo(function Sidebar() {
  } else {
  tabs.open({ kind: item.kind });
  }
- }}
- className={`flex items-center px-4 py-2 my-0.5 transition-all text-left border-l-[3px] ${
- isActive(item.kind)
- ? "text-white bg-primary-container border-tui-accent"
- : "text-mute hover:text-primary hover:bg-surface-soft border-transparent hover:border-hairline"
- }`}
- >
- <span className="mr-3 opacity-80">{item.icon}</span>
- <span>{item.label}</span>
- {(item.kind === "whiteboard" || item.kind === "note") && (
- <span className="ml-auto text-[10px] opacity-40 font-mono">+</span>
- )}
- </button>
+ },
+ [tabs]
+ );
+
+ const cycleTheme = () => {
+ setPref(pref === "auto" ? "light" : pref === "light" ? "dark" : "auto");
+ };
+ const themeLabel =
+ pref === "auto"
+ ? get("appearance.auto", "Auto")
+ : pref === "light"
+ ? get("appearance.light", "Clair")
+ : get("appearance.dark", "Sombre");
+
+ return (
+ <aside className="eu-sidebar w-[232px] shrink-0 h-full flex flex-col gap-1 px-3 py-3 bg-canvas border-r border-line">
+ <div className="flex items-center gap-2.5 px-1.5 pb-1">
+ <img src="/euclide-logo.png" alt="" className="w-7 h-7 rounded object-contain" />
+ <div className="min-w-0 leading-tight">
+ <div className="font-mono text-[12px] font-semibold tracking-[0.16em] text-ink">EUCLIDE</div>
+ <div className="font-mono text-[9px] tracking-[0.12em] text-ink-faint uppercase truncate">
+ {get("app.tagline", "Bureau d'enseignement")}
+ </div>
+ </div>
+ </div>
+
+ <p className="eu-t-label px-2.5 mt-4 mb-1">{get("nav.groupWork", "Travail")}</p>
+ <nav className="flex flex-col gap-0.5" aria-label={get("nav.groupWork", "Travail")}>
+ {NAV_WORK.map((item) => (
+ <NavButton key={item.kind} item={item} active={isActive(item.kind)} onOpen={onOpen} />
  ))}
  </nav>
+
+ <p className="eu-t-label px-2.5 mt-4 mb-1">{get("nav.groupTools", "Outils")}</p>
+ <nav className="flex flex-col gap-0.5" aria-label={get("nav.groupTools", "Outils")}>
+ {NAV_TOOLS.map((item) => (
+ <NavButton key={item.kind} item={item} active={isActive(item.kind)} onOpen={onOpen} />
+ ))}
+ </nav>
+
+ <div className="mt-auto pt-2 border-t border-line flex flex-col gap-0.5">
+ <div className="flex items-center gap-1.5 px-1 py-1">
+ {showAccount ? (
+ <>
+ <span className="w-7 h-7 shrink-0 grid place-items-center rounded-full bg-ink text-panel font-mono text-[10.5px] font-semibold">
+ {(accountName || "P").charAt(0).toUpperCase()}
+ </span>
+ <div className="min-w-0 flex-1 leading-tight">
+ <div className="eu-t-body font-medium text-ink truncate">
+ {accountName || get("status.pronoteOn", "pronote connecté")}
+ </div>
+ <div className="font-mono text-[9px] tracking-[0.1em] text-ink-faint uppercase">
+ v{info?.version ?? "…"}
+ </div>
+ </div>
+ </>
+ ) : (
+ <div className="min-w-0 flex-1 px-1.5 leading-tight">
+ <div className="font-mono text-[9px] tracking-[0.1em] text-ink-faint uppercase">
+ v{info?.version ?? "…"}
+ </div>
+ </div>
+ )}
+ <button
+ type="button"
+ onClick={cycleTheme}
+ title={`${get("appearance.theme", "Apparence")} : ${themeLabel}`}
+ aria-label={`${get("appearance.theme", "Apparence")} : ${themeLabel}`}
+ className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+ >
+ {resolved === "dark" ? <MoonIcon className="w-4 h-4" /> : <SunIcon className="w-4 h-4" />}
+ </button>
+ <button
+ type="button"
+ onClick={() => tabs.open({ kind: "settings" })}
+ title={`${get("nav.settings", "Réglages")} (${MOD},)`}
+ aria-label={get("nav.settings", "Réglages")}
+ className={`eu-btn-icon eu-btn-sm ${
+ isActive("settings") ? "eu-btn-ghost" : "eu-btn-quiet"
+ }`}
+ >
+ <GearIcon className="w-4 h-4" />
+ </button>
+ </div>
+ </div>
  </aside>
  );
 });
@@ -136,43 +270,92 @@ function formatTimer(sec: number) {
  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function beep() {
+/**
+ * Two-note chime with a soft attack and release.
+ * The previous version was a bare 880 Hz square burst — startling in a quiet
+ * classroom. This is deliberately gentle: a fifth, fading out.
+ */
+function chime(volume = 0.07) {
  try {
- const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+ const Ctx =
+ window.AudioContext ||
+ (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
  const ctx = new Ctx();
+ const now = ctx.currentTime;
+ const notes: Array<[number, number]> = [
+ [660, 0],
+ [990, 0.16],
+ ];
+ for (const [freq, delay] of notes) {
  const osc = ctx.createOscillator();
- const g = ctx.createGain();
- osc.frequency.value = 880;
- osc.connect(g);
- g.connect(ctx.destination);
- g.gain.setValueAtTime(0.08, ctx.currentTime);
- osc.start();
- osc.stop(ctx.currentTime + 0.28);
- } catch {
- // ignore
+ const gain = ctx.createGain();
+ osc.type = "sine";
+ osc.frequency.value = freq;
+ osc.connect(gain);
+ gain.connect(ctx.destination);
+ const t = now + delay;
+ gain.gain.setValueAtTime(0, t);
+ gain.gain.linearRampToValueAtTime(volume, t + 0.03);
+ gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+ osc.start(t);
+ osc.stop(t + 0.8);
  }
+ window.setTimeout(() => ctx.close().catch(() => {}), 1400);
+ } catch {
+ // no audio device / autoplay blocked: silence is an acceptable outcome
+ }
+}
+
+/** Icon shown on a tab, including the course colour when we know it. */
+function TabIcon({
+ tab,
+ courseIconMap,
+}: {
+ tab: Tab;
+ courseIconMap: Record<number, { key: string; color: string }>;
+}) {
+ const { resolved } = useAppearance();
+ if (
+ (tab.kind === "course" || tab.kind === "class-content") &&
+ typeof tab.params?.courseId === "number"
+ ) {
+ const info = courseIconMap[tab.params.courseId];
+ const found = COURSE_ICONS.find((i) => i.key === (info?.key || "book"));
+ const IconComp = found ? found.Icon : BookIcon;
+ const visual = courseVisual(info?.color, resolved === "dark");
+ return (
+ <span style={{ color: info ? visual.fg : undefined }}>
+ <IconComp className="w-3.5 h-3.5" strokeWidth={1.8} />
+ </span>
+ );
+ }
+ if (tab.kind === "pdf") {
+ const fn = (tab.params?.fileName || "").toLowerCase();
+ if (/\.(png|jpe?g|gif|webp|bmp|svg)$/.test(fn)) return <ImageIcon className="w-3.5 h-3.5" />;
+ return <DocIcon className="w-3.5 h-3.5" />;
+ }
+ if (tab.kind === "whiteboard") return <PenIcon className="w-3.5 h-3.5" />;
+ if (tab.kind === "note") return <NoteIcon className="w-3.5 h-3.5" />;
+ if (tab.kind === "documents") return <FolderIcon className="w-3.5 h-3.5" />;
+ if (tab.kind === "recap") return <SparkleIcon className="w-3.5 h-3.5" />;
+ return TAB_ICONS[tab.kind] ?? <DocIcon className="w-3.5 h-3.5" />;
 }
 
 const TopBar = memo(function TopBar({
  onHelp,
  onSearch,
  onCloseTab,
- timerSec,
- timerRunning,
- onToggleTimer,
- onStopTimer,
+ timer,
 }: {
  onHelp: () => void;
  onSearch: () => void;
  onCloseTab: (id: string) => void;
- timerSec: number | null;
- timerRunning: boolean;
- onToggleTimer: () => void;
- onStopTimer: () => void;
+ timer: TimerApi;
 }) {
  const tabs = useTabs();
-
  const [courseIconMap, setCourseIconMap] = useState<Record<number, { key: string; color: string }>>({});
+ const [dragIndex, setDragIndex] = useState<number | null>(null);
+ const [overIndex, setOverIndex] = useState<number | null>(null);
 
  useEffect(() => {
  const courseTabs = tabs.tabs.filter(
@@ -187,170 +370,246 @@ const TopBar = memo(function TopBar({
  .then((courses) => {
  const map: Record<number, { key: string; color: string }> = {};
  for (const c of courses) {
- if (typeof c.id === "number") {
- map[c.id] = { key: c.emoji || "book", color: c.color };
- }
+ if (typeof c.id === "number") map[c.id] = { key: c.emoji || "book", color: c.color };
  }
  setCourseIconMap(map);
  })
- .catch(() => {
- setCourseIconMap({});
- });
+ .catch(() => setCourseIconMap({}));
  }, [tabs.tabs.length]);
 
+ const atLimit = tabs.maxTabs > 0 && tabs.tabs.length >= tabs.maxTabs;
+
  return (
+ <div className="eu-topbar h-10 shrink-0 flex items-stretch bg-canvas border-b border-line">
  <div
- className="eu-topbar h-14 shrink-0 flex items-center bg-transparent font-mono overflow-hidden border-b border-hairline"
- style={{ paddingLeft: 12 }}
+ role="tablist"
+ aria-label={get("app.openTabs", "Onglets ouverts")}
+ className="flex items-stretch overflow-x-auto min-w-0"
  >
- <div className="h-full flex items-stretch min-w-0">
- <div className="h-full flex items-stretch gap-0.5 overflow-x-auto text-xs min-w-0 pr-1">
- {tabs.tabs.map((tab) => {
+ {tabs.tabs.map((tab, index) => {
  const active = tab.id === tabs.activeId;
  const dirty = tabs.isDirty(tab.id);
+ const dropTarget = overIndex === index && dragIndex !== null && dragIndex !== index;
  return (
- <button
+ <div
  key={tab.id}
- type="button"
- onClick={() => tabs.setActive(tab.id)}
- className={`group h-full flex items-center gap-1.5 px-4 select-none whitespace-nowrap rounded-t-sm transition-all border-b-2 ${active
- ? "border-tui-accent text-primary bg-surface-soft/60 font-medium"
- : "border-transparent text-ash hover:text-primary hover:bg-surface-soft/40 hover:border-hairline/60"
- }`}
- title={tab.title}
+ draggable
+ onDragStart={(e) => {
+ setDragIndex(index);
+ e.dataTransfer.effectAllowed = "move";
+ // Firefox/WebKit need some payload for the drag to start.
+ e.dataTransfer.setData("text/plain", tab.id);
+ }}
+ onDragOver={(e) => {
+ if (dragIndex === null) return;
+ e.preventDefault();
+ setOverIndex(index);
+ }}
+ onDrop={(e) => {
+ e.preventDefault();
+ if (dragIndex !== null) tabs.move(dragIndex, index);
+ setDragIndex(null);
+ setOverIndex(null);
+ }}
+ onDragEnd={() => {
+ setDragIndex(null);
+ setOverIndex(null);
+ }}
+ className={`group relative flex items-center border-b-2 border-r border-r-line/60 transition-colors duration-fast ${
+ active
+ ? "border-b-ink bg-panel"
+ : "border-b-transparent hover:bg-panel-alt/60"
+ } ${dropTarget ? "bg-accent-soft" : ""} ${dragIndex === index ? "opacity-45" : ""}`}
  >
- <span className="shrink-0 opacity-75 text-sm">
- {(() => {
- if ((tab.kind === "course" || tab.kind === "class-content") && typeof tab.params?.courseId === "number") {
- const cid = tab.params.courseId;
- const info = courseIconMap[cid] || { key: "book", color: "#666" };
- const found = COURSE_ICONS.find((i) => i.key === info.key);
- const IconComp = found ? found.Icon : BookIcon;
- return <span style={{ color: info.color }}><IconComp className="w-4 h-4" strokeWidth={1.8} /></span>;
- }
- if (tab.kind === "pdf") {
- if (tab.params?.fileName) {
- const fn = tab.params.fileName.toLowerCase();
- if (/\.(png|jpe?g|gif|webp|bmp|svg)$/.test(fn)) {
- return <ImageIcon className="w-4 h-4" />;
- }
- }
- return <DocIcon className="w-4 h-4" />;
- }
- if (tab.kind === "whiteboard") {
- return <PenIcon className="w-4 h-4" />;
- }
- if (tab.kind === "note") {
- return <NoteIcon className="w-4 h-4" />;
- }
- if (tab.kind === "documents") {
- return <FolderIcon className="w-4 h-4" />;
- }
- if (tab.kind === "recap") {
- return <SparkleIcon className="w-4 h-4" />;
- }
- return TAB_ICONS[tab.kind];
- })()}
- </span>
- <span className="truncate max-w-[140px] tracking-[-0.1px]">{tab.title}</span>
- {dirty && <span className="w-1.5 h-1.5 rounded-full bg-tui-accent shrink-0" title="Non enregistré" />}
- {tabs.tabs.length > 1 && (
- <span
- role="button"
- tabIndex={0}
- onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
- onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onCloseTab(tab.id); } }}
- className={`shrink-0 w-4 h-4 ml-0.5 -mr-0.5 flex items-center justify-center rounded-sm transition-all ${active ? "opacity-40" : "opacity-0"} group-hover:opacity-60 hover:opacity-100 hover:bg-red-100 hover:text-red-600`}
- >
- <XIcon className="w-3 h-3" />
- </span>
- )}
- </button>
- );
- })}
- </div>
  <button
- onClick={() => {
- if (tabs.active?.kind !== "dashboard") {
- tabs.open({ kind: "dashboard" });
+ type="button"
+ role="tab"
+ aria-selected={active}
+ onClick={() => tabs.setActive(tab.id)}
+ onAuxClick={(e) => {
+ // Middle click closes, as in a browser.
+ if (e.button === 1 && tabs.tabs.length > 1) {
+ e.preventDefault();
+ onCloseTab(tab.id);
  }
  }}
- title={
- tabs.maxTabs > 0 && tabs.tabs.length >= tabs.maxTabs
- ? get("app.newTab", "Nouvel onglet") + " (remplace l'ancien)"
- : get("app.newTab", "Nouvel onglet")
- }
- className={`shrink-0 ml-1 w-7 h-7 grid place-items-center rounded-md border border-hairline/50 hover:border-hairline text-mute hover:text-primary hover:bg-surface-soft/70 active:bg-surface-soft transition-all self-center ${
- tabs.maxTabs > 0 && tabs.tabs.length >= tabs.maxTabs ? "opacity-40" : ""
+ onDoubleClick={() => tabs.togglePin(tab.id)}
+ title={`${tab.title}${tab.pinned ? ` · ${get("app.pinned", "Épinglé")}` : ""}`}
+ className={`flex items-center gap-2 h-full pl-3 pr-2 max-w-[190px] select-none ${
+ active ? "text-ink" : "text-ink-muted"
  }`}
+ >
+ <span className="shrink-0 opacity-80">
+ <TabIcon tab={tab} courseIconMap={courseIconMap} />
+ </span>
+ <span className={`eu-t-meta truncate ${active ? "text-ink font-medium" : ""}`}>
+ {tab.title}
+ </span>
+ {tab.pinned && <PinIcon className="w-3 h-3 shrink-0 text-ink-faint" />}
+ {dirty && (
+ <span
+ className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0"
+ title={get("app.unsaved", "Non enregistré")}
+ />
+ )}
+ </button>
+ {tabs.tabs.length > 1 && (
+ <button
+ type="button"
+ onClick={() => onCloseTab(tab.id)}
+ aria-label={`${get("common.close", "Fermer")} — ${tab.title}`}
+ title={`${get("common.close", "Fermer")} (${MOD}W)`}
+ className={`shrink-0 w-6 h-6 mr-1 grid place-items-center rounded-sm text-ink-faint transition-opacity duration-fast hover:bg-danger-soft hover:text-danger ${
+ active ? "opacity-70" : "opacity-0 group-hover:opacity-70"
+ } focus-visible:opacity-100`}
+ >
+ <XIcon className="w-3 h-3" />
+ </button>
+ )}
+ </div>
+ );
+ })}
+ <button
+ type="button"
+ onClick={() => {
+ if (tabs.active?.kind !== "dashboard") tabs.open({ kind: "dashboard" });
+ }}
+ aria-label={get("app.newTab", "Nouvel onglet")}
+ title={
+ atLimit
+ ? `${get("app.newTab", "Nouvel onglet")} · ${get("app.tabLimitHint", "la limite est atteinte : le plus ancien sera fermé")}`
+ : `${get("app.newTab", "Nouvel onglet")} (${MOD}T)`
+ }
+ className="shrink-0 self-center ml-1.5 eu-btn-quiet eu-btn-icon eu-btn-sm"
  >
  <PlusIcon className="w-4 h-4" strokeWidth={2.2} />
  </button>
  </div>
 
- <div className="flex-1" />
+ <div className="flex-1 min-w-2" />
 
- <div className="flex items-center gap-1.5 shrink-0 pl-2 pr-2 h-full">
- {timerSec != null && (
- <div className="flex items-center gap-1 mr-1">
+ <div className="flex items-center gap-1 shrink-0 pl-2 pr-2">
+ {timer.sec != null && <TimerControl timer={timer} />}
+
  <button
- onClick={onToggleTimer}
- className={`flex items-center gap-1.5 h-8 px-2.5 text-xs rounded border font-mono tabular-nums ${
- timerSec <= 0
- ? "border-tui-danger text-tui-danger bg-red-50"
- : timerRunning
- ? "border-tui-accent text-primary bg-surface-soft"
- : "border-hairline text-mute bg-surface-soft/40"
- }`}
- title={timerRunning ? "Pause" : "Reprendre"}
- >
- <ClockIcon className="w-3.5 h-3.5" />
- {timerSec <= 0 ? "00:00" : formatTimer(timerSec)}
- </button>
- <button
- onClick={onStopTimer}
- className="w-7 h-7 grid place-items-center rounded border border-hairline text-mute hover:text-primary"
- title="Arrêter le minuteur"
- >
- <XIcon className="w-3 h-3" />
- </button>
- </div>
- )}
- <button
+ type="button"
  onClick={onSearch}
- title={`Rechercher (${isMac ? "⌘" : "Ctrl"}K)`}
- className="flex items-center gap-1.5 pl-3 pr-2.5 h-8 text-xs rounded-full border border-hairline bg-surface-soft/10 hover:bg-surface-soft hover:border-hairline text-ash hover:text-primary transition-all self-center"
+ title={`${get("common.search", "Rechercher")} (${MOD}K)`}
+ className="flex items-center gap-2 h-7 pl-2.5 pr-1.5 rounded-full border border-line bg-panel text-ink-muted hover:text-ink hover:bg-panel-alt transition-colors duration-fast"
  >
- <SearchIcon className="w-3.5 h-3.5 opacity-80" />
- <span className="hidden sm:inline tracking-[-0.1px]">{get("common.search", "Rechercher")}</span>
- <span className="inline-flex items-center justify-center px-1 py-px rounded border border-hairline/50 bg-surface text-[8px] font-mono text-ash/70 tabular-nums">{isMac ? "⌘K" : "Ctrl+K"}</span>
+ <SearchIcon className="w-3.5 h-3.5" />
+ <span className="eu-t-meta hidden sm:inline">{get("common.search", "Rechercher")}</span>
+ <span className="eu-kbd">{isMac ? "⌘K" : "^K"}</span>
  </button>
 
- <div className="flex items-center gap-0.5 pl-1">
  <button
+ type="button"
  onClick={onHelp}
- title={get("app.shortcutsTitle", "Raccourcis")}
- className="w-8 h-8 grid place-items-center rounded-lg text-ash hover:text-primary hover:bg-surface-soft transition-colors"
+ aria-label={get("app.shortcutsTitle", "Raccourcis")}
+ title={`${get("app.shortcutsTitle", "Raccourcis")} (${MOD}/)`}
+ className="eu-btn-quiet eu-btn-icon eu-btn-sm"
  >
  <HelpIcon className="w-4 h-4" />
  </button>
- <button
- onClick={() => tabs.open({ kind: "settings" })}
- className="w-8 h-8 grid place-items-center rounded-lg text-ash hover:text-primary hover:bg-surface-soft transition-colors"
- title={get("app.settingsTitle", "Réglages")}
- >
- <UserIcon className="w-4 h-4" />
- </button>
- </div>
  </div>
  </div>
  );
 });
 
+// ---------------------------------------------------------------------------
+// Class timer — free duration, +1 min, reset, gentle chime, projection view.
+// ---------------------------------------------------------------------------
+
+type TimerApi = {
+ sec: number | null;
+ running: boolean;
+ start: (minutes: number) => void;
+ toggle: () => void;
+ add: (minutes: number) => void;
+ stop: () => void;
+};
+
+function TimerControl({ timer }: { timer: TimerApi }) {
+ const done = (timer.sec ?? 0) <= 0;
+ return (
+ <div
+ className={`flex items-center rounded border overflow-hidden ${
+ done ? "border-danger bg-danger-soft" : "border-line bg-panel"
+ }`}
+ >
+ <button
+ type="button"
+ onClick={timer.toggle}
+ title={timer.running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre")}
+ aria-label={timer.running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre")}
+ className={`flex items-center gap-1.5 h-7 px-2 font-mono text-[12px] tabular-nums ${
+ done ? "text-danger" : "text-ink hover:bg-panel-alt"
+ }`}
+ >
+ {timer.running ? <PauseIcon className="w-3.5 h-3.5" /> : <PlayIcon className="w-3.5 h-3.5" />}
+ {formatTimer(timer.sec ?? 0)}
+ </button>
+ <button
+ type="button"
+ onClick={() => timer.add(1)}
+ title={get("timer.addMinute", "+1 minute")}
+ aria-label={get("timer.addMinute", "+1 minute")}
+ className="h-7 px-1.5 border-l border-line font-mono text-[11px] text-ink-muted hover:text-ink hover:bg-panel-alt"
+ >
+ +1
+ </button>
+ <button
+ type="button"
+ onClick={timer.stop}
+ title={get("timer.stop", "Arrêter le minuteur")}
+ aria-label={get("timer.stop", "Arrêter le minuteur")}
+ className="h-7 px-1.5 border-l border-line text-ink-faint hover:text-danger hover:bg-danger-soft"
+ >
+ <XIcon className="w-3 h-3" />
+ </button>
+ </div>
+ );
+}
+
+/** Big countdown for the classroom, shown while projection mode is on. */
+function TimerStage({ timer }: { timer: TimerApi }) {
+ if (timer.sec == null) return null;
+ const done = timer.sec <= 0;
+ return (
+ <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-overlay">
+ <div
+ className={`eu-panel shadow-pop px-7 py-4 flex items-center gap-5 ${
+ done ? "border-danger" : ""
+ }`}
+ >
+ <span
+ className={`font-mono text-[64px] leading-none font-semibold tabular-nums tracking-[-0.03em] ${
+ done ? "text-danger" : "text-ink"
+ }`}
+ >
+ {formatTimer(timer.sec)}
+ </span>
+ <div className="flex flex-col gap-1.5">
+ <button type="button" onClick={timer.toggle} className="eu-btn-ghost eu-btn-sm">
+ {timer.running ? <PauseIcon className="w-3.5 h-3.5" /> : <PlayIcon className="w-3.5 h-3.5" />}
+ {timer.running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre")}
+ </button>
+ <button type="button" onClick={() => timer.add(1)} className="eu-btn-ghost eu-btn-sm">
+ +1 min
+ </button>
+ <button type="button" onClick={timer.stop} className="eu-btn-quiet eu-btn-sm">
+ {get("timer.stop", "Arrêter")}
+ </button>
+ </div>
+ </div>
+ </div>
+ );
+}
+
 const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }) {
  const tabs = useTabs();
  return (
- <div className="flex-1 min-h-0 relative bg-[rgb(var(--eu-bg))]">
+ <div className="flex-1 min-h-0 relative bg-canvas">
  {tabs.tabs.map((tab) => {
  const visible = tab.id === tabs.activeId;
  return (
@@ -361,7 +620,17 @@ const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }
  aria-hidden={!visible}
  {...(!visible ? ({ inert: "" } as Record<string, string>) : {})}
  >
+ {FULL_BLEED.includes(tab.kind) ? (
+ // Tool screens own their whole surface; wrapping them in the
+ // reading column is what pushed the Python pane off-screen.
+ <div className="flex-1 min-h-0 flex flex-col">
  <TabPane info={info} tab={tab} visible={visible} />
+ </div>
+ ) : (
+ <Scroll>
+ <TabPane info={info} tab={tab} visible={visible} />
+ </Scroll>
+ )}
  </div>
  );
  })}
@@ -372,20 +641,17 @@ const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }
 function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
  switch (tab.kind) {
  case "dashboard":
- return <Scroll><Dashboard info={info} /></Scroll>;
+ return <Dashboard info={info} />;
  case "courses":
- return <Scroll><Courses /></Scroll>;
+ return <Courses />;
  case "course":
  return (
- <Scroll>
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
  <CourseDetail courseId={tab.params.courseId!} />
  </Suspense>
- </Scroll>
  );
  case "class-content":
  return (
- <Scroll>
  <Suspense fallback={<Loading label={get("classContent.loading", "Chargement…")} />}>
  <ClassContent
  courseId={tab.params.courseId!}
@@ -393,12 +659,11 @@ function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visib
  matiere={tab.params.matiere || ""}
  />
  </Suspense>
- </Scroll>
  );
  case "documents":
- return <Scroll><Documents filterHint={tab.params.filter} /></Scroll>;
+ return <Documents filterHint={tab.params.filter} />;
  case "tools":
- return <Scroll><Tools /></Scroll>;
+ return <Tools />;
  case "python":
  return (
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
@@ -406,16 +671,14 @@ function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visib
  </Suspense>
  );
  case "settings":
- return <Scroll><Settings info={info} /></Scroll>;
+ return <Settings info={info} />;
  case "reminders":
- return <Scroll><Reminders /></Scroll>;
+ return <Reminders />;
  case "recap":
  return (
- <Scroll>
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
  <Recap />
  </Suspense>
- </Scroll>
  );
  case "whiteboard":
  return (
@@ -440,11 +703,269 @@ function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visib
  }
 }
 
+/**
+ * The reading column for content screens: one place that owns the max width,
+ * the gutters and the vertical rhythm. Screens no longer re-wrap themselves
+ * (Dashboard and Rappels used to add a second `max-w` + padding, which is why
+ * their headers sat at a different height from every other screen).
+ */
 function Scroll({ children }: { children: React.ReactNode }) {
  return (
  <div className="h-full overflow-y-auto">
- <div className="mx-auto max-w-[960px] px-6 lg:px-8 py-6 font-mono">{children}</div>
+ <div className="mx-auto max-w-col px-7 lg:px-9 py-6 pb-16 flex flex-col gap-6">{children}</div>
  </div>
+ );
+}
+
+// ---------------------------------------------------------------------------
+// Window status bar — the state that used to be scattered across dashboard
+// widgets, available from every screen instead of only from the home page.
+// ---------------------------------------------------------------------------
+
+const StatusBar = memo(function StatusBar({ info, timer }: { info: AppInfo | null; timer: TimerApi }) {
+ const tabs = useTabs();
+ const { resolved, pref } = useAppearance();
+ const [classes, setClasses] = useState<ScheduleEntry[]>([]);
+ const [pronote, setPronote] = useState<PronoteStatus | null>(null);
+ const [keepAwake, setKeepAwake] = useState<boolean | null>(null);
+ const [now, setNow] = useState(() => new Date());
+
+ const refresh = useCallback(() => {
+ api.getTodayClasses().then(setClasses).catch(() => {});
+ api.pronoteStatus().then(setPronote).catch(() => {});
+ api.keepAwakeStatus().then((s) => setKeepAwake(!!s)).catch(() => {});
+ }, []);
+
+ useEffect(() => {
+ refresh();
+ const onChange = () => refresh();
+ window.addEventListener("eu:schedule-changed", onChange);
+ window.addEventListener("eu:pronote-changed", onChange);
+ window.addEventListener("eu:keepawake-changed", onChange);
+ const id = window.setInterval(() => setNow(new Date()), 20_000);
+ return () => {
+ window.removeEventListener("eu:schedule-changed", onChange);
+ window.removeEventListener("eu:pronote-changed", onChange);
+ window.removeEventListener("eu:keepawake-changed", onChange);
+ window.clearInterval(id);
+ };
+ }, [refresh]);
+
+ const focus = useMemo(() => focusClass(classes, now), [classes, now]);
+ const remaining = focus?.state === "current" ? minutesRemaining(focus.entry, now) : null;
+ const until = focus?.state === "next" ? minutesUntil(focus.entry.start_time, now) : null;
+
+ const themeLabel =
+ pref === "auto"
+ ? `${get("appearance.auto", "Auto")} · ${resolved === "dark" ? get("appearance.dark", "Sombre") : get("appearance.light", "Clair")}`
+ : resolved === "dark"
+ ? get("appearance.dark", "Sombre")
+ : get("appearance.light", "Clair");
+
+ return (
+ <div className="eu-statusbar h-6 shrink-0 flex items-stretch border-t border-line bg-panel-alt font-mono text-[10.5px] text-ink-faint select-none">
+ {focus ? (
+ <button
+ type="button"
+ onClick={() => tabs.open({ kind: "dashboard" })}
+ title={get("status.openDashboard", "Ouvrir le tableau de bord")}
+ className={`flex items-center gap-2 px-2.5 border-r border-line hover:bg-panel ${
+ focus.state === "current" ? "text-warn" : "text-ink-muted"
+ }`}
+ >
+ <span className="truncate max-w-[240px]">{focus.entry.subject}</span>
+ {focus.state === "current" ? (
+ <span className="tabular-nums">
+ {remaining != null
+ ? fmt(get("status.remaining", "reste {time}"), { time: humanMinutes(remaining) })
+ : get("status.ending", "fin")}
+ </span>
+ ) : (
+ <span className="tabular-nums">
+ {until != null
+ ? fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(until) })
+ : focus.entry.start_time}
+ </span>
+ )}
+ </button>
+ ) : (
+ <span className="flex items-center px-2.5 border-r border-line">
+ {get("status.noClass", "aucun cours en cours")}
+ </span>
+ )}
+
+ {timer.sec != null && (
+ <span className="flex items-center gap-1.5 px-2.5 border-r border-line text-ink-muted tabular-nums">
+ <ClockIcon className="w-3 h-3" />
+ {formatTimer(timer.sec)}
+ </span>
+ )}
+
+ <button
+ type="button"
+ onClick={() => tabs.open({ kind: "settings" })}
+ title={get("status.pronoteHint", "État de la connexion Pronote")}
+ className="flex items-center gap-1.5 px-2.5 border-r border-line hover:bg-panel"
+ >
+ <span
+ className={`w-1.5 h-1.5 rounded-full ${pronote?.connected ? "bg-ok-solid" : "bg-line-strong"}`}
+ />
+ <span className={pronote?.connected ? "text-ok" : ""}>
+ {pronote?.connected
+ ? get("status.pronoteOn", "pronote connecté")
+ : get("status.pronoteOff", "pronote hors ligne")}
+ </span>
+ </button>
+
+ {keepAwake && (
+ <span className="flex items-center gap-1.5 px-2.5 border-r border-line text-warn">
+ <CoffeeIcon className="w-3 h-3" />
+ {get("status.awake", "écran maintenu")}
+ </span>
+ )}
+
+ <span className="flex-1" />
+
+ <span className="hidden lg:flex items-center px-2.5 border-l border-line">
+ {tabs.tabs.length}
+ {tabs.maxTabs > 0 ? ` / ${tabs.maxTabs}` : ""} {get("status.tabs", "onglets")}
+ </span>
+ <span
+ className="hidden xl:flex items-center px-2.5 border-l border-line max-w-[300px] truncate selectable"
+ title={info?.data_dir || ""}
+ >
+ {info?.data_dir}
+ </span>
+ <span className="flex items-center px-2.5 border-l border-line">{themeLabel}</span>
+ <span className="flex items-center px-2.5 border-l border-line">v{info?.version ?? "…"}</span>
+ </div>
+ );
+});
+
+// ---------------------------------------------------------------------------
+// Quick capture — one line, saved as a reminder or a note.
+// ---------------------------------------------------------------------------
+
+function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void }) {
+ const toast = useToast();
+ const tabs = useTabs();
+ const [text, setText] = useState("");
+ const [mode, setMode] = useState<"reminder" | "note">("reminder");
+ const inputRef = useRef<HTMLInputElement>(null);
+
+ useEffect(() => {
+ if (!open) return;
+ setText("");
+ setMode("reminder");
+ const t = window.setTimeout(() => inputRef.current?.focus(), 30);
+ const onKey = (e: KeyboardEvent) => {
+ if (e.key === "Escape") onClose();
+ };
+ window.addEventListener("keydown", onKey);
+ return () => {
+ window.clearTimeout(t);
+ window.removeEventListener("keydown", onKey);
+ };
+ }, [open, onClose]);
+
+ // Prefix shortcuts: `!` forces a reminder, `#` forces a note.
+ const effectiveMode = text.startsWith("!") ? "reminder" : text.startsWith("#") ? "note" : mode;
+ const payload = text.replace(/^[!#]\s*/, "").trim();
+
+ const submit = async () => {
+ if (!payload) return;
+ try {
+ if (effectiveMode === "note") {
+ const saved = await api.saveNote({ title: payload, body: "", course_id: null });
+ api.logEvent("note_write", payload, null);
+ window.dispatchEvent(new CustomEvent("eu:library-changed"));
+ toast(get("capture.noteSaved", "Note créée"), "success");
+ onClose();
+ if (saved?.id) tabs.open({ kind: "note", title: payload, params: { noteId: saved.id } });
+ } else {
+ const created = await api.createReminder(payload, null);
+ if (!created?.id) throw new Error("no id");
+ window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
+ toast(get("capture.reminderSaved", "Rappel ajouté"), "success");
+ onClose();
+ }
+ } catch {
+ toast(get("messages.genericError", "Erreur"), "error");
+ }
+ };
+
+ return (
+ <AnimatePresence>
+ {open && (
+ <div className="fixed inset-0 z-palette flex items-start justify-center pt-[18vh] px-6">
+ <motion.div
+ className="eu-scrim"
+ initial={{ opacity: 0 }}
+ animate={{ opacity: 1 }}
+ exit={{ opacity: 0 }}
+ transition={{ duration: 0.1 }}
+ onClick={onClose}
+ />
+ <motion.div
+ role="dialog"
+ aria-modal="true"
+ aria-label={get("capture.title", "Capture rapide")}
+ className="relative w-full max-w-lg eu-panel shadow-pop overflow-hidden"
+ initial={{ opacity: 0, scale: 0.97, y: -6 }}
+ animate={{ opacity: 1, scale: 1, y: 0 }}
+ exit={{ opacity: 0, scale: 0.985 }}
+ transition={{ type: "spring", stiffness: 500, damping: 30 }}
+ >
+ <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-line">
+ <PlusIcon className="w-4 h-4 text-ink-faint shrink-0" />
+ <input
+ ref={inputRef}
+ value={text}
+ onChange={(e) => setText(e.target.value)}
+ onKeyDown={(e) => {
+ if (e.key === "Enter") {
+ e.preventDefault();
+ void submit();
+ }
+ }}
+ placeholder={get("capture.placeholder", "Noter quelque chose… (! rappel · # note)")}
+ className="flex-1 bg-transparent outline-none eu-t-body text-ink placeholder:text-ink-faint"
+ />
+ </div>
+ <div className="flex items-center gap-2 px-3.5 py-2.5">
+ <Segmented
+ value={effectiveMode}
+ onChange={(v) => {
+ setMode(v);
+ setText((t) => t.replace(/^[!#]\s*/, ""));
+ }}
+ label={get("capture.target", "Enregistrer comme")}
+ options={[
+ { value: "reminder", label: get("capture.asReminder", "Rappel") },
+ { value: "note", label: get("capture.asNote", "Note") },
+ ]}
+ />
+ <span className="flex-1" />
+ <span className="eu-t-meta hidden sm:flex items-center gap-1.5">
+ <span className="eu-kbd">↵</span>
+ {get("capture.save", "enregistrer")}
+ </span>
+ <button type="button" onClick={onClose} className="eu-btn-quiet eu-btn-sm">
+ {get("common.cancel", "Annuler")}
+ </button>
+ <button
+ type="button"
+ onClick={() => void submit()}
+ disabled={!payload}
+ className="eu-btn-primary eu-btn-sm"
+ >
+ {get("common.add", "Ajouter")}
+ </button>
+ </div>
+ </motion.div>
+ </div>
+ )}
+ </AnimatePresence>
  );
 }
 
@@ -458,10 +979,44 @@ function Shell() {
  const toast = useToast();
  const confirm = useConfirm();
 
+ const [captureOpen, setCaptureOpen] = useState(false);
+ const { projection, toggleProjection } = useAppearance();
+
  const [timerSec, setTimerSec] = useState<number | null>(null);
  const [timerRunning, setTimerRunning] = useState(false);
  const timerRunningRef = useRef(false);
  useEffect(() => { timerRunningRef.current = timerRunning; }, [timerRunning]);
+
+ const timer = useMemo<TimerApi>(
+ () => ({
+ sec: timerSec,
+ running: timerRunning,
+ start: (minutes: number) => {
+ setTimerSec(Math.max(1, Math.round(minutes * 60)));
+ setTimerRunning(true);
+ },
+ toggle: () => {
+ setTimerSec((s) => {
+ if (s == null) return s;
+ if (s <= 0) {
+ setTimerRunning(false);
+ return null;
+ }
+ setTimerRunning((r) => !r);
+ return s;
+ });
+ },
+ add: (minutes: number) => {
+ setTimerSec((s) => (s == null ? s : Math.max(0, s) + minutes * 60));
+ setTimerRunning(true);
+ },
+ stop: () => {
+ setTimerSec(null);
+ setTimerRunning(false);
+ },
+ }),
+ [timerSec, timerRunning]
+ );
 
  const activityContextRef = useRef<{ area: string; courseId: number | null }>({ area: "dashboard", courseId: null });
  const [appFocused, setAppFocused] = useState(true);
@@ -507,12 +1062,69 @@ function Shell() {
  useEffect(() => {
  const onStart = (e: Event) => {
  const minutes = Number((e as CustomEvent).detail?.minutes) || 5;
- setTimerSec(minutes * 60);
+ setTimerSec(Math.max(1, Math.round(minutes * 60)));
  setTimerRunning(true);
  };
  window.addEventListener("eu:timer-start", onStart as EventListener);
  return () => window.removeEventListener("eu:timer-start", onStart as EventListener);
  }, []);
+
+ // « Fin de cours annoncée »: one discreet notice a few minutes before the bell,
+ // driven by the schedule. Off / silent / with a chime, from Réglages.
+ useEffect(() => {
+ if (!isTauri()) return;
+ let cancelled = false;
+ let mode: "off" | "toast" | "sound" = "toast";
+ let lead = 5;
+ const notified = new Set<string>();
+
+ const readPrefs = async () => {
+ const [m, l] = await Promise.all([
+ api.getSetting("class_end_notice").catch(() => null),
+ api.getSetting("class_end_lead").catch(() => null),
+ ]);
+ if (cancelled) return;
+ if (m === "off" || m === "toast" || m === "sound") mode = m;
+ const n = l ? parseInt(l, 10) : NaN;
+ if (!Number.isNaN(n) && n >= 1 && n <= 15) lead = n;
+ };
+ void readPrefs();
+ const onPrefs = () => void readPrefs();
+ window.addEventListener("eu:settings-changed", onPrefs);
+
+ const tick = async () => {
+ if (mode === "off") return;
+ try {
+ const classes = await api.getTodayClasses();
+ const now = new Date();
+ for (const c of classes) {
+ const left = minutesRemaining(c, now);
+ if (left == null || left > lead || left < 1) continue;
+ const key = `${c.id}:${c.end_time}`;
+ if (notified.has(key)) continue;
+ notified.add(key);
+ toast(
+ fmt(get("classEnd.notice", "{subject} : fin dans {minutes} min"), {
+ subject: c.subject,
+ minutes: left,
+ }),
+ "info"
+ );
+ if (mode === "sound") chime(0.05);
+ }
+ } catch {
+ // offline / no schedule: nothing to announce
+ }
+ };
+ const interval = window.setInterval(tick, 60_000);
+ const seed = window.setTimeout(tick, 8_000);
+ return () => {
+ cancelled = true;
+ window.removeEventListener("eu:settings-changed", onPrefs);
+ window.clearInterval(interval);
+ window.clearTimeout(seed);
+ };
+ }, [toast]);
 
  useEffect(() => {
  if (!timerRunning) return;
@@ -525,7 +1137,7 @@ function Shell() {
  useEffect(() => {
  if (timerSec !== 0 || !timerRunning) return;
  setTimerRunning(false);
- beep();
+ chime();
  toast(get("timer.done", "Minuteur terminé"), "success");
  }, [timerSec, timerRunning, toast]);
 
@@ -642,7 +1254,25 @@ function Shell() {
  useEffect(() => {
  const onKey = (e: KeyboardEvent) => {
  const mod = isMac ? e.metaKey : e.ctrlKey;
- if (mod && e.key.toLowerCase() === "k") {
+ // Save the active editor. The tab system already knows how: notes, the
+ // whiteboard and the Python editor each register a flush function, which
+ // is what the « unsaved changes » prompt uses when closing a tab.
+ if (mod && !e.shiftKey && e.key.toLowerCase() === "s") {
+ e.preventDefault();
+ const id = tabs.activeId;
+ if (!id) return;
+ if (!tabs.isDirty(id)) return;
+ void tabs
+ .flush(id)
+ .then(() => toast(get("messages.saved", "Enregistré"), "success"))
+ .catch(() => toast(get("messages.genericError", "Erreur"), "error"));
+ } else if (mod && e.shiftKey && e.key.toLowerCase() === "k") {
+ e.preventDefault();
+ setCaptureOpen((c) => !c);
+ } else if (mod && e.shiftKey && e.key.toLowerCase() === "p") {
+ e.preventDefault();
+ toggleProjection();
+ } else if (mod && e.key.toLowerCase() === "k") {
  e.preventDefault();
  setPalette((p) => !p);
  } else if (mod && e.key.toLowerCase() === "t") {
@@ -673,6 +1303,12 @@ function Shell() {
  } else if (mod && e.key === "/") {
  e.preventDefault();
  setHelp((h) => !h);
+ } else if (e.key === "Escape" && projection) {
+ // Escape is the way out of projection mode; overlays handle their own.
+ if (!palette && !help && !captureOpen) {
+ e.preventDefault();
+ toggleProjection();
+ }
  } else if (e.ctrlKey && (e.key === "Tab" || e.code === "Tab")) {
  e.preventDefault();
  e.stopPropagation();
@@ -685,40 +1321,56 @@ function Shell() {
  };
  window.addEventListener("keydown", onKey, true);
  return () => window.removeEventListener("keydown", onKey, true);
- }, [tabs, requestClose]);
+ }, [tabs, requestClose, toast, toggleProjection, projection, palette, help, captureOpen]);
 
  return (
- <div className="flex h-full w-full overflow-hidden bg-[rgb(var(--eu-bg))] eu-root">
- <Sidebar />
- <main className="flex-1 h-full flex flex-col min-w-0 bg-[rgb(var(--eu-bg))] eu-main">
+ <div className="flex h-full w-full overflow-hidden bg-canvas eu-root">
+ {/* Projection mode hides the chrome so the content fills the beamer. */}
+ {!projection && <Sidebar info={info} />}
+ <main className="flex-1 h-full flex flex-col min-w-0 bg-canvas eu-main">
+ {!projection && (
  <TopBar
  onHelp={handleHelp}
  onSearch={handleSearch}
- onCloseTab={(id) => { void requestClose(id); }}
- timerSec={timerSec}
- timerRunning={timerRunning}
- onToggleTimer={() => {
- if (timerSec == null) return;
- if (timerSec <= 0) {
- setTimerSec(null);
- setTimerRunning(false);
- return;
- }
- setTimerRunning((r) => !r);
+ onCloseTab={(id) => {
+ void requestClose(id);
  }}
- onStopTimer={() => { setTimerSec(null); setTimerRunning(false); }}
+ timer={timer}
  />
+ )}
  <MainContent info={info} />
+ {!projection && <StatusBar info={info} timer={timer} />}
  </main>
+
+ {projection && (
+ <>
+ <button
+ type="button"
+ onClick={toggleProjection}
+ className="fixed top-3 right-3 z-overlay eu-btn-ghost eu-btn-sm shadow-pop"
+ title={`${get("appearance.leaveProjection", "Quitter le mode projection")} (Échap)`}
+ >
+ <ProjectorIcon className="w-4 h-4" />
+ {get("appearance.leaveProjection", "Quitter la projection")}
+ </button>
+ <TimerStage timer={timer} />
+ </>
+ )}
+
  <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
+ <QuickCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
  <ShortcutsHelp open={help} onClose={() => setHelp(false)} />
  <UpdateAvailablePopup update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} />
  {dragging && (
- <div className="fixed inset-0 z-[80] grid place-items-center bg-tui-accent/10 backdrop-blur-sm pointer-events-none">
- <div className="eu-card px-8 py-6 border-2 border-dashed border-tui-accent text-center">
- <DocIcon className="w-10 h-10 mx-auto text-tui-accent mb-2" />
- <p className="font-semibold text-eu-text">{get("dragDrop.drop", "Déposez vos fichiers")}</p>
- <p className="eu-sub">{get("dragDrop.hint", "Ils rejoindront votre bibliothèque.")}</p>
+ <div className="fixed inset-0 z-[80] grid place-items-center bg-accent/10 pointer-events-none">
+ <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
+ <DocIcon className="w-7 h-7 text-accent shrink-0" />
+ <div>
+ <p className="eu-t-section text-ink">{get("dragDrop.drop", "Déposez vos fichiers")}</p>
+ <p className="eu-t-meta mt-0.5">
+ {get("dragDrop.hint", "Ils rejoindront votre bibliothèque.")}
+ </p>
+ </div>
  </div>
  </div>
  )}

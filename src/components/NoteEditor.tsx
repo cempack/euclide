@@ -3,7 +3,10 @@ import { useTabs } from "../lib/tabs";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
-import { get } from "../lib/i18n";
+import { get, fmt } from "../lib/i18n";
+import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
+import { MOD } from "../lib/shortcuts";
+import { relativeTime } from "../lib/format";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -342,147 +345,188 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const selectedCourse = courses.find((c) => c.id === draft.course_id);
 
   return (
-    <div className="h-full flex flex-col bg-surface p-4 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3">
+    <div className="h-full flex flex-col min-h-0 bg-canvas">
+      {/* Title + destination + actions */}
+      <Toolbar className="h-11 py-0 gap-2">
         <input
-          className="bg-transparent border-none text-xl font-semibold flex-1 min-w-0 px-1 -mx-1 py-0.5 focus:outline-none focus-visible:ring-1 focus-visible:ring-tui-accent rounded"
+          className="flex-1 min-w-0 bg-transparent border-none eu-t-section text-[17px] text-ink px-1 -mx-1 py-1 rounded outline-none placeholder:text-ink-faint"
           value={draft.title || ""}
-          placeholder="Titre de la note"
+          placeholder={get("notes.titlePlaceholder", "Titre de la note")}
           onChange={(e) => onTitleChange(e.target.value)}
+          aria-label={get("notes.titlePlaceholder", "Titre de la note")}
         />
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          <select
-            className="new-input text-xs py-1 pr-5"
-            value={draft.course_id ?? ""}
-            onChange={(e) => onCourseChange(e.target.value ? Number(e.target.value) : null)}
-            title="Affecter à un cours (ou Général)"
+        {dirty && (
+          <span
+            className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0"
+            title={get("app.unsaved", "Non enregistré")}
+          />
+        )}
+        <ToolSep />
+        <select
+          className="eu-select h-7 w-[140px] text-[11.5px]"
+          value={draft.course_id ?? ""}
+          onChange={(e) => onCourseChange(e.target.value ? Number(e.target.value) : null)}
+          title={get("notes.courseTitle", "Affecter à un cours")}
+          aria-label={get("notes.courseTitle", "Affecter à un cours")}
+        >
+          <option value="">{get("notes.general", "Général")}</option>
+          {courses.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <ToolGroup>
+          <button
+            onClick={exportPdf}
+            className="eu-btn-quiet eu-btn-sm"
+            title={get("notes.exportPdf", "Exporter en PDF")}
           >
-            <option value="">Général</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          {dirty && (
-            <button onClick={doSave} className="new-btn-primary text-sm flex items-center gap-1">
-              <span>Enregistrer</span>
-            </button>
-          )}
+            <DownloadIcon className="w-3.5 h-3.5" /> PDF
+          </button>
           {draft.id && (
-            <button onClick={doDelete} className="new-btn-ghost text-sm flex items-center gap-1 text-red-400 hover:text-red-500">
-              <TrashIcon className="w-4 h-4" /> Supprimer
+            <button
+              onClick={doDelete}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+              aria-label={get("common.delete", "Supprimer")}
+              title={get("common.delete", "Supprimer")}
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
             </button>
           )}
-          <button onClick={exportPdf} className="new-btn-ghost text-sm flex items-center gap-1" title={get("notes.exportPdf", "Exporter en PDF")}>
-            <DownloadIcon className="w-4 h-4" /> PDF
+          <button
+            onClick={doSave}
+            disabled={!dirty}
+            className="eu-btn-primary eu-btn-sm"
+            title={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+          >
+            {get("common.save", "Enregistrer")}
           </button>
-        </div>
-      </div>
+        </ToolGroup>
+      </Toolbar>
 
-      {/* Toolbar + link popup container */}
-      <div className="relative mb-2">
-        <div className="flex items-center gap-1 px-2 py-1 bg-surface-soft border border-hairline rounded">
-          <button onClick={insertBold} className="p-1.5 hover:bg-surface rounded" title="Gras">
-            <span className="font-bold text-sm">B</span>
-          </button>
-          <button onClick={insertItalic} className="p-1.5 hover:bg-surface rounded" title="Italique">
-            <span className="italic text-sm">I</span>
-          </button>
-          <button onClick={insertCode} className="p-1.5 hover:bg-surface rounded" title="Code">
-            <CodeIcon className="w-4 h-4" />
-          </button>
-          <button onClick={insertTitle} className="p-1.5 hover:bg-surface rounded" title="Titre">
-            <span className="font-semibold text-sm">H</span>
-          </button>
-          <button onClick={insertList} className="p-1.5 hover:bg-surface rounded" title="Liste">
-            <span className="text-sm">•</span>
-          </button>
-          <button onClick={openLinkPopup} className="p-1.5 hover:bg-surface rounded" title="Lien">
-            <LinkIcon className="w-4 h-4" />
-          </button>
-          <div className="ml-auto text-[10px] text-mute px-2">Markdown • les boutons insèrent la syntaxe</div>
-        </div>
+      {/* Markdown toolbar */}
+      <div className="relative shrink-0">
+        <Toolbar className="h-8 py-0">
+          <ToolGroup label={get("notes.format", "Mise en forme")}>
+            <button onClick={insertBold} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.bold", "Gras")} aria-label={get("notes.bold", "Gras")}>
+              <span className="font-bold text-[13px]">B</span>
+            </button>
+            <button onClick={insertItalic} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.italic", "Italique")} aria-label={get("notes.italic", "Italique")}>
+              <span className="italic text-[13px]">I</span>
+            </button>
+            <button onClick={insertTitle} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.heading", "Titre")} aria-label={get("notes.heading", "Titre")}>
+              <span className="font-semibold text-[13px]">H</span>
+            </button>
+            <button onClick={insertList} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.list", "Liste")} aria-label={get("notes.list", "Liste")}>
+              <span className="text-[13px]">•</span>
+            </button>
+            <button onClick={insertCode} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.code", "Code")} aria-label={get("notes.code", "Code")}>
+              <CodeIcon className="w-4 h-4" />
+            </button>
+            <button onClick={openLinkPopup} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.link", "Lien")} aria-label={get("notes.link", "Lien")}>
+              <LinkIcon className="w-4 h-4" />
+            </button>
+          </ToolGroup>
+          <ToolSpacer />
+          <span className="eu-t-label normal-case tracking-normal">
+            {get("notes.markdownHint", "Markdown · formules LaTeX entre $…$")}
+          </span>
+        </Toolbar>
 
-        {/* Little popup for link */}
         {linkPopupOpen && (
-          <div className="absolute top-full left-0 mt-1 z-30 w-[300px] bg-surface border border-hairline rounded p-3 shadow-card text-sm">
-            <div className="text-xs font-medium mb-2 text-mute">Ajouter un lien</div>
-            <div className="space-y-2">
+          <div className="absolute top-full left-2 mt-1 z-30 w-[300px] eu-panel shadow-pop p-3">
+            <p className="eu-t-label mb-2">{get("notes.addLink", "Ajouter un lien")}</p>
+            <div className="flex flex-col gap-2">
               <input
-                className="new-input text-sm w-full"
-                placeholder="Texte du lien"
+                className="eu-input"
+                placeholder={get("notes.linkText", "Texte affiché")}
                 value={linkTextInput}
                 onChange={(e) => setLinkTextInput(e.target.value)}
+                autoFocus
+                aria-label={get("notes.linkText", "Texte affiché")}
               />
               <input
-                className="new-input text-sm w-full"
-                placeholder="URL https://..."
+                className="eu-input"
+                placeholder={get("notes.linkUrl", "https://…")}
                 value={linkUrlInput}
                 onChange={(e) => setLinkUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") insertLinkFromPopup();
+                  if (e.key === "Escape") closeLinkPopup();
+                }}
+                aria-label={get("notes.linkUrl", "Adresse")}
               />
             </div>
             <div className="flex gap-2 mt-3 justify-end">
-              <button onClick={closeLinkPopup} className="new-btn-ghost text-xs">Annuler</button>
-              <button onClick={insertLinkFromPopup} className="new-btn-primary text-xs">Insérer</button>
+              <button onClick={closeLinkPopup} className="eu-btn-quiet eu-btn-sm">
+                {get("common.cancel", "Annuler")}
+              </button>
+              <button onClick={insertLinkFromPopup} className="eu-btn-primary eu-btn-sm">
+                {get("notes.insert", "Insérer")}
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Main editor area: split source + preview */}
-      <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
-        {/* Source (markdown visible) */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="text-xs text-mute mb-1 px-1">Source Markdown</div>
+      {/* Source | preview */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 border-r border-line">
+          <p className="eu-t-label px-3 py-1.5 border-b border-line">
+            {get("notes.source", "Source Markdown")}
+          </p>
           <textarea
             ref={textareaRef}
             value={draft.body || ""}
             onChange={(e) => markDirty({ body: e.target.value })}
-            className="flex-1 new-input p-3 text-sm leading-relaxed font-mono overflow-auto focus:outline-none focus-visible:ring-1 focus-visible:ring-tui-accent"
-            style={{ whiteSpace: "pre-wrap", resize: "none" }}
-            placeholder="Écrivez votre note en Markdown ici..."
+            placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
+            className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-[13px] leading-[1.6] resize-none outline-none selectable"
+            style={{ whiteSpace: "pre-wrap" }}
+            aria-label={get("notes.source", "Source Markdown")}
           />
         </div>
 
-        {/* Preview */}
-        <div className="flex-1 flex flex-col min-w-0 border-l border-hairline pl-3">
-          <div className="text-xs text-mute mb-1 px-1">Aperçu</div>
-          <div className="flex-1 overflow-auto p-3 bg-surface-soft rounded text-sm leading-relaxed">
-            {draft.body?.trim() ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  a: ({ ...props }) => (
-                    <a {...props} className="text-tui-accent underline hover:opacity-80" target="_blank" rel="noopener noreferrer" />
-                  ),
-                  h1: ({ children }) => <h1 className="text-xl font-bold mt-2 mb-1">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-lg font-semibold mt-2 mb-1">{children}</h2>,
-                  code: ({ children, className }) => (
-                    <code className={`bg-surface-soft px-1 py-0.5 rounded text-xs ${className || ""}`}>{children}</code>
-                  ),
-                  pre: ({ children }) => <pre className="bg-surface-soft p-2 rounded overflow-auto text-xs my-2">{children}</pre>,
-                }}
-              >
-                {draft.body}
-              </ReactMarkdown>
+        <div className="flex-1 flex flex-col min-w-0">
+          <p className="eu-t-label px-3 py-1.5 border-b border-line">
+            {get("notes.preview", "Aperçu")}
+          </p>
+          <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
+            {draft.body ? (
+              <div className="eu-prose max-w-[68ch]">
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                  components={{
+                    a: (props) => (
+                      <a {...props} target="_blank" rel="noopener noreferrer" />
+                    ),
+                  }}
+                >
+                  {draft.body}
+                </ReactMarkdown>
+              </div>
             ) : (
-              <span className="text-mute italic">L'aperçu apparaîtra ici quand vous écrirez...</span>
+              <p className="eu-t-body text-ink-faint italic">
+                {get("notes.previewEmpty", "L'aperçu apparaîtra ici pendant que vous écrivez.")}
+              </p>
             )}
           </div>
         </div>
       </div>
 
-      <div className="mt-2 text-[10px] text-mute flex items-center gap-2">
-        <span>Enregistrement automatique • Apparaît dans Documents</span>
-        {selectedCourse && <span className="new-chip text-[9px]">{selectedCourse.name}</span>}
-        {!draft.course_id && <span className="new-chip text-[9px]">Général</span>}
+      {/* Status */}
+      <div className="shrink-0 flex items-center gap-2 px-3 h-6 border-t border-line bg-panel-alt">
+        <span className="eu-t-label normal-case tracking-normal">
+          {draft.updated_at
+            ? fmt(get("notes.savedAt", "enregistré {when}"), { when: relativeTime(draft.updated_at) })
+            : get("notes.neverSaved", "jamais enregistré")}
+        </span>
+        {selectedCourse ? (
+          <span className="eu-chip">{selectedCourse.name}</span>
+        ) : (
+          <span className="eu-chip">{get("notes.general", "Général")}</span>
+        )}
       </div>
     </div>
   );

@@ -2,24 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* OpenCode Terminal-Aesthetic light (ink on warm cream paper) - from Stitch design-system.md */
-  --eu-bg: 250 249 249;
-  --eu-surface: 250 249 249;
-  --eu-card: 255 255 255;
-  --eu-border: 15 0 0 / 0.12; /* hairline */
-  --eu-text: 26 28 28; /* on-surface */
-  --eu-muted: 100 98 98; /* mute / ash */
-  --eu-hairline: 15 0 0 / 0.12;
-  --eu-hairline-strong: 100 98 98;
-  --eu-primary: 5 4 4;
-  --eu-primary-container: 32 29 29;
-  --eu-surface-soft: 248 247 247;
-  --eu-surface-container: 238 232 232;
-  --eu-tui-success: 48 209 88;
-  --eu-tui-danger: 255 59 48;
+/* ===========================================================================
+   Design tokens — THE single source of truth for every colour in Euclide.
+   Values are RGB triples so Tailwind can apply alpha: `bg-panel/60` works.
+   tailwind.config.js only *references* these; it never redefines a value.
+   Direction « Atelier »: encre sur papier, hairlines, mono pour les données.
+   =========================================================================== */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --eu-canvas: 250 249 248; /* application background            */
+  --eu-panel: 255 255 255; /* cards, panels, popovers          */
+  --eu-panel-alt: 247 246 245; /* panel headers, zebra, wells      */
+  --eu-ink: 17 18 19; /* primary text            17.8:1   */
+  --eu-ink-muted: 92 95 99; /* secondary text           6.1:1   */
+  --eu-ink-faint: 110 114 118; /* metadata                 4.6:1   */
+  --eu-line: 16 12 8; /* hairlines, used with an alpha    */
+  --eu-accent: 15 79 168; /* selection / state text   7.4:1   */
+  --eu-accent-soft: 234 240 251;
+  --eu-ok: 17 107 46; /*                          6.3:1   */
+  --eu-ok-soft: 236 246 238;
+  --eu-warn: 138 83 0; /*                          6.0:1   */
+  --eu-warn-soft: 253 244 230;
+  --eu-danger: 164 38 44; /*                          6.9:1   */
+  --eu-danger-soft: 253 238 238;
+
+  /* Vivid variants: fills, dots, gauges, cursors — never small text. */
+  --eu-ok-solid: 47 158 68;
+  --eu-warn-solid: 217 139 11;
+  --eu-danger-solid: 217 59 52;
+
+  /* Chrome that stays dark in both themes (PDF stage, Python terminal). */
+  --eu-stage: 24 24 24;
+  --eu-stage-alt: 16 16 16;
+  --eu-stage-ink: 236 234 230;
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --eu-canvas: 19 19 19;
+  --eu-panel: 25 25 25;
+  --eu-panel-alt: 32 32 32;
+  --eu-ink: 236 234 230;
+  --eu-ink-muted: 168 164 158;
+  --eu-ink-faint: 148 144 137;
+  --eu-line: 255 250 240;
+  --eu-accent: 138 180 248;
+  --eu-accent-soft: 30 41 59;
+  --eu-ok: 143 206 120;
+  --eu-ok-soft: 26 36 24;
+  --eu-warn: 224 175 104;
+  --eu-warn-soft: 41 33 20;
+  --eu-danger: 245 138 150;
+  --eu-danger-soft: 43 24 26;
+
+  --eu-ok-solid: 143 206 120;
+  --eu-warn-solid: 224 175 104;
+  --eu-danger-solid: 245 138 150;
+
+  --eu-stage: 16 16 16;
+  --eu-stage-alt: 10 10 10;
+  --eu-stage-ink: 236 234 230;
+}
+
+/* Hairline opacity differs per theme: 12 % of near-black reads like 16 % of
+   near-white on a dark canvas. One variable keeps every border consistent. */
+:root,
+[data-theme="light"] {
+  --eu-line-a: 0.13;
+  --eu-line-a-strong: 0.28;
+}
+[data-theme="dark"] {
+  --eu-line-a: 0.14;
+  --eu-line-a-strong: 0.3;
+}
+
+/* Density: « confortable » (bureau) vs « compact » (petit portable).
+   Multiplies the vertical rhythm of rows, panels and toolbars. */
+:root {
+  --eu-density: 1;
+  --eu-row-y: calc(8px * var(--eu-density));
+  --eu-pad: calc(14px * var(--eu-density));
+}
+[data-density="compact"] {
+  --eu-density: 0.72;
+}
+
+/* Projection mode: bigger type and thicker strokes for the classroom beamer.
+   Set on <html> by the projection toggle; scales the whole UI typographically. */
+[data-projection="on"] {
+  --eu-type-scale: 1.15;
+  --eu-density: 1.15;
+}
+:root {
+  --eu-type-scale: 1;
+}
 
 * {
   -webkit-font-smoothing: antialiased;
@@ -33,19 +112,21 @@ body,
   margin: 0;
 }
 
+html {
+  font-size: calc(16px * var(--eu-type-scale));
+}
+
 body {
-  background-color: rgb(var(--eu-bg));
-  color: rgb(var(--eu-text));
+  background-color: rgb(var(--eu-canvas));
+  color: rgb(var(--eu-ink));
   font-family: theme("fontFamily.sans");
+  font-size: 14px;
   overflow: hidden;
   user-select: none;
   cursor: default;
 }
 
-
-
-
-/* Hide scrollbar on the tab strip for a clean, modern tab bar look (still fully scrollable with trackpad/mouse) */
+/* Hide scrollbar on the tab strip for a clean tab bar (still fully scrollable). */
 .eu-topbar .overflow-x-auto::-webkit-scrollbar {
   display: none;
 }
@@ -54,8 +135,21 @@ body {
   scrollbar-width: none;
 }
 
+/* Regions the window must not treat as a drag handle (canvas, editors, lists).
+   Referenced in Whiteboard/Python/CodeEditor; previously undefined — a no-op. */
+.eu-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.eu-root,
+.eu-main {
+  isolation: isolate; /* keeps overlays/z-index local to the shell */
+}
+
 input,
 textarea,
+select,
 [contenteditable="true"],
 .selectable {
   user-select: text;
@@ -64,18 +158,29 @@ textarea,
   app-region: no-drag;
 }
 
+/* One focus ring for the whole application. Visible on keyboard only. */
+:focus-visible {
+  outline: 2px solid rgb(var(--eu-accent));
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: rgb(var(--eu-accent) / 0.22);
+}
+
 ::-webkit-scrollbar {
   width: 11px;
   height: 11px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--eu-muted) / 0.32);
+  background: rgb(var(--eu-ink-faint) / 0.34);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--eu-muted) / 0.5);
+  background: rgb(var(--eu-ink-faint) / 0.55);
   background-clip: content-box;
 }
 ::-webkit-scrollbar-track {
@@ -83,86 +188,186 @@ textarea,
 }
 
 @layer components {
-  /* Terminal / brutalist flat aesthetic - sharp containers, 4px interactive affordance, hairlines, mono rhythm */
-  .eu-card {
-    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp, no shadow */
+  /* -------------------------------------------------------------------------
+     Typographic roles. Seven of them, and not one more: every size in the UI
+     must map to one of these, which is what keeps screens consistent.
+     ------------------------------------------------------------------------- */
+  .eu-t-page {
+    @apply text-[26px] leading-[1.18] font-semibold tracking-[-0.02em];
   }
+  .eu-t-metric {
+    @apply font-mono text-[32px] leading-none font-semibold tracking-[-0.02em] tabular-nums;
+  }
+  .eu-t-section {
+    @apply text-[15px] leading-[1.4] font-semibold tracking-[-0.01em];
+  }
+  .eu-t-body {
+    @apply text-[14px] leading-[1.55];
+  }
+  .eu-t-meta {
+    @apply text-[12.5px] leading-[1.45] text-ink-muted;
+  }
+  .eu-t-label {
+    @apply font-mono text-[10.5px] leading-none font-semibold uppercase tracking-[0.12em] text-ink-faint;
+  }
+  .eu-t-num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* -------------------------------------------------------------------------
+     Panels. One container primitive with an optional header / alt surface.
+     ------------------------------------------------------------------------- */
+  .eu-panel {
+    @apply rounded-md bg-panel border border-line;
+  }
+  .eu-panel-head {
+    @apply flex items-center justify-between gap-3 px-[14px] py-2.5 border-b border-line bg-panel-alt;
+  }
+  .eu-panel-pad {
+    @apply p-[14px];
+  }
+  .eu-panel-alt {
+    @apply rounded-md bg-panel-alt border border-line;
+  }
+
+  /* -------------------------------------------------------------------------
+     Buttons. `eu-btn` is the base; add one variant. Height is uniform so
+     toolbars align without per-site tweaking.
+     ------------------------------------------------------------------------- */
   .eu-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium font-mono
-      transition-all duration-100 active:scale-[0.985] focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)] disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded h-8 px-3 text-[12.5px] font-medium
+      whitespace-nowrap border border-transparent transition-colors duration-fast
+      disabled:opacity-45 disabled:pointer-events-none;
   }
   .eu-btn-primary {
-    @apply eu-btn bg-[var(--eu-primary)] text-white border border-[var(--eu-primary)] hover:brightness-95;
+    @apply eu-btn bg-ink text-panel border-ink hover:bg-ink/90 active:bg-ink;
   }
   .eu-btn-ghost {
-    @apply eu-btn text-[var(--eu-text)] hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)];
+    @apply eu-btn bg-panel text-ink border-line hover:bg-panel-alt active:bg-line/10;
   }
-  .eu-btn-soft {
-    @apply eu-btn bg-[rgb(230,240,255)] text-[rgb(0,122,255)] border border-[rgb(0,122,255)]/30 hover:brightness-105;
+  .eu-btn-quiet {
+    @apply eu-btn text-ink-muted hover:text-ink hover:bg-panel-alt active:bg-line/10;
   }
+  .eu-btn-danger {
+    @apply eu-btn bg-danger text-white border-danger hover:bg-danger/90;
+  }
+  .eu-btn-sm {
+    @apply h-7 px-2.5 text-[11.5px] gap-1.5;
+  }
+  .eu-btn-icon {
+    @apply w-8 h-8 p-0 shrink-0;
+  }
+  .eu-btn-icon.eu-btn-sm {
+    @apply w-7 h-7;
+  }
+
+  /* -------------------------------------------------------------------------
+     Form controls.
+     ------------------------------------------------------------------------- */
   .eu-input {
-    @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
-      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[rgb(0,122,255)] focus:border-[rgb(0,122,255)]
-      transition-all;
+    @apply w-full rounded h-8 bg-panel border border-line px-2.5 text-[13px] text-ink
+      placeholder:text-ink-faint transition-colors duration-fast
+      focus:border-accent focus:outline-none focus-visible:outline-none
+      disabled:opacity-50;
   }
+  .eu-textarea {
+    @apply eu-input h-auto py-2 leading-[1.55] resize-y;
+  }
+  .eu-select {
+    @apply eu-input pr-7 appearance-none bg-no-repeat cursor-pointer;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7276' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 8px center;
+  }
+  [data-theme="dark"] .eu-select {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23949089' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+
+  /* -------------------------------------------------------------------------
+     Chips, badges, keys, segmented control.
+     ------------------------------------------------------------------------- */
   .eu-chip {
-    @apply inline-flex items-center gap-1.5 rounded px-2.5 py-0.5 text-xs font-medium font-mono border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)];
+    @apply inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[10.5px]
+      leading-[1.5] border border-line bg-panel-alt text-ink-muted whitespace-nowrap;
   }
-  .eu-title {
-    @apply text-[var(--eu-text)] font-semibold tracking-tight font-mono;
+  .eu-chip-ok {
+    @apply eu-chip bg-ok-soft border-ok/25 text-ok;
   }
-  .eu-sub {
-    @apply text-[var(--eu-muted)] text-sm font-mono;
+  .eu-chip-warn {
+    @apply eu-chip bg-warn-soft border-warn/25 text-warn;
+  }
+  .eu-chip-danger {
+    @apply eu-chip bg-danger-soft border-danger/25 text-danger;
+  }
+  .eu-chip-accent {
+    @apply eu-chip bg-accent-soft border-accent/25 text-accent;
   }
   .eu-kbd {
-    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded border border-[rgba(15,0,0,0.12)]
-      bg-[var(--eu-surface)] text-[11px] font-medium font-mono text-[var(--eu-muted)];
+    @apply inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-sm border border-line
+      bg-panel-alt font-mono text-[9.5px] font-medium text-ink-faint tabular-nums;
+  }
+  .eu-segment {
+    @apply inline-flex items-center gap-0.5 rounded border border-line bg-panel-alt p-0.5;
+  }
+  .eu-segment > button {
+    @apply rounded-sm px-2.5 h-6 text-[12px] font-medium text-ink-muted transition-colors duration-fast
+      hover:text-ink;
+  }
+  .eu-segment > button[aria-selected="true"],
+  .eu-segment > button.active {
+    @apply bg-ink text-panel hover:text-panel;
   }
 
-  /* "new-*" styles for the terminal aesthetic (flat, hairline, mono). Fixed light + fixed accent. */
-  .new-card {
-    @apply rounded-none bg-white border border-[rgba(15,0,0,0.12)] shadow-none; /* sharp containers */
+  /* -------------------------------------------------------------------------
+     Rows: the list primitive used by schedule, reminders, documents, files.
+     Row actions stay reachable: they fade in on hover *and* on focus-within.
+     ------------------------------------------------------------------------- */
+  .eu-row {
+    @apply flex items-center gap-2.5 px-[14px] transition-colors duration-fast;
+    padding-top: var(--eu-row-y);
+    padding-bottom: var(--eu-row-y);
   }
-  .stat-card {
-    @apply rounded-none bg-[#f1eeee] border border-[rgba(15,0,0,0.12)] p-6 flex gap-4 items-center; /* mock-style soft tint */
+  .eu-row-hover {
+    @apply eu-row hover:bg-panel-alt;
   }
-  .new-btn {
-    @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
-      border border-[rgba(15,0,0,0.12)] bg-[#f1eeee] text-primary hover:bg-[var(--eu-surface-soft)]
-      active:scale-[0.985] transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
+  .eu-row-actions {
+    @apply opacity-0 transition-opacity duration-fast;
   }
-  .new-btn-primary {
-    @apply inline-flex items-center gap-2 rounded px-4 py-1 text-sm font-medium font-mono
-      bg-primary text-white border border-primary hover:brightness-95 active:scale-[0.985]
-      transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40;
+  .eu-row:hover .eu-row-actions,
+  .eu-row:focus-within .eu-row-actions,
+  .group:hover .eu-row-actions,
+  .group:focus-within .eu-row-actions {
+    @apply opacity-100;
   }
-  .new-btn-ghost {
-    @apply inline-flex items-center gap-2 rounded px-3 py-1 text-sm font-medium font-mono
-      text-primary hover:bg-[var(--eu-surface-soft)] border border-[rgba(15,0,0,0.12)]
-      active:scale-[0.985] transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-[rgb(0,122,255)];
-  }
-  .new-input {
-    @apply w-full rounded bg-[var(--eu-surface)] border border-[rgba(15,0,0,0.12)] px-3.5 py-2 text-sm text-[var(--eu-text)] font-mono
-      placeholder:text-[var(--eu-muted)] focus:outline-none focus:ring-1 focus:ring-[rgb(0,122,255)] focus:border-[rgb(0,122,255)]
-      transition-all;
-  }
-  .new-segment {
-    @apply inline-flex rounded border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface)] p-1;
-  }
-  .new-segment .active {
-    @apply bg-primary text-white border-primary;
-  }
-  .new-chip {
-    @apply inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium font-mono border border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)];
+  .eu-divide > * + * {
+    @apply border-t border-line;
   }
 
-  /* Terminal chrome helpers for dashboard/widgets */
-  .terminal-header {
-    @apply px-4 py-3 border-b border-[rgba(15,0,0,0.12)] bg-[var(--eu-surface-soft)] flex items-center justify-between font-mono text-sm;
+  /* Gauge / progress bar. */
+  .eu-gauge {
+    @apply h-1 rounded-sm bg-line/15 overflow-hidden;
   }
-  .terminal-card {
-    @apply border border-[rgba(15,0,0,0.12)] rounded-none flex flex-col bg-white;
+  .eu-gauge > i {
+    @apply block h-full rounded-sm bg-ink transition-[width] duration-slow;
   }
+
+  /* Overlay scrim. No backdrop-filter on purpose: it costs a full-screen
+     repaint on the low-end laptops Euclide runs on, and older WebKitGTK
+     composites it incorrectly. A plain scrim reads better in both themes. */
+  .eu-scrim {
+    @apply absolute inset-0;
+    background: rgb(10 8 6 / 0.34);
+  }
+}
+
+[data-theme="dark"] .eu-scrim {
+  background: rgb(0 0 0 / 0.6);
+}
+
+/* Native controls (range, checkbox, radio) follow the accent token. */
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: rgb(var(--eu-accent));
 }
 
 /* Simple fade for list items / entrances - GPU friendly, no JS cost */
@@ -174,6 +379,19 @@ textarea,
   animation: fadeIn 0.16s ease-out forwards;
 }
 
+/* Respect the OS « reduce motion » setting. framer-motion is handled by
+   <MotionConfig reducedMotion="user"> in main.tsx; this covers CSS. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Hide scrollbar on scrollable toolbar containers */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -183,149 +401,27 @@ textarea,
   scrollbar-width: none;
 }
 
-/* Python IDE-like styling */
-.python-ide-frame {
-  border: 1px solid rgba(15, 0, 0, 0.12);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--eu-surface);
-  display: flex;
-  flex-direction: column;
-}
-
-.python-explorer {
-  width: 205px;
-  border-right: 1px solid rgba(15, 0, 0, 0.12);
-  background: var(--eu-surface);
-  display: flex;
-  flex-direction: column;
-  font-size: 13px;
-}
-
-.python-explorer-header {
-  padding: 4px 10px;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--eu-muted);
-  border-bottom: 1px solid rgba(15, 0, 0, 0.12);
-  font-family: ui-monospace, monospace;
-}
-
-.python-file-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  margin: 1px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: ui-monospace, monospace;
-  position: relative;
-}
-
-.python-file-row:hover {
-  background: var(--eu-surface-soft);
-}
-
-.python-file-row.selected {
-  background: var(--eu-surface-container);
-  color: var(--eu-accent);
-}
-
-.python-file-row .accent {
-  position: absolute;
-  left: 0;
-  top: 3px;
-  bottom: 3px;
-  width: 3px;
-  background: var(--eu-accent);
-  border-radius: 0 2px 2px 0;
-}
-
-.python-tabbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-bottom: 1px solid rgba(15, 0, 0, 0.12);
-  background: var(--eu-surface);
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-}
-
-.python-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 8px;
-  background: var(--eu-bg);
-  border: 1px solid rgba(15, 0, 0, 0.12);
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  position: relative;
-}
-
-.python-tab.dirty .dot {
-  color: #f59e0b;
-}
-
-.python-terminal {
-  height: 168px;
-  min-height: 120px;
-  background: #0f0f0f;
-  color: #d1d5db;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 12px;
-  border-top: 1px solid #333;
-  display: flex;
-  flex-direction: column;
-}
-
-.python-terminal-header {
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
-  padding: 3px 10px;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  color: #888;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-family: ui-monospace, monospace;
-}
-
-.python-terminal-body {
-  flex: 1;
-  overflow: auto;
-  padding: 8px 10px;
-  white-space: pre-wrap;
-  line-height: 1.35;
-}
-
-.python-terminal-body .ok { color: #a3e635; }
-.python-terminal-body .err { color: #f87171; }
-
-/* Python syntax coloring for the CodeEditor overlay (pre + transparent textarea) */
-/* NOTE: no font-weight changes on tokens — varying weight shifts char widths and breaks overlay alignment with textarea */
+/* Python syntax colouring for the CodeEditor overlay (pre + transparent textarea).
+   NOTE: no font-weight changes on tokens — varying weight shifts character
+   widths and breaks the overlay alignment with the textarea underneath.
+   Bound to [data-theme], not to prefers-color-scheme: the previous media query
+   flipped tokens to dark-theme colours while the editor stayed white. */
 .tok-keyword { color: #6f42c1; }
-.tok-builtin { color: #005cc5; }
-.tok-string { color: #22863a; }
+.tok-builtin { color: #0550ae; }
+.tok-string { color: #0a6b34; }
 .tok-comment { color: #6a737d; font-style: italic; }
-.tok-number { color: #e36209; }
+.tok-number { color: #b3510a; }
 .tok-plain { color: inherit; }
 
-@media (prefers-color-scheme: dark) {
-  .tok-keyword { color: #c792ea; }
-  .tok-builtin { color: #82aaff; }
-  .tok-string { color: #c3e88d; }
-  .tok-comment { color: #546e7a; }
-  .tok-number { color: #f78c6c; }
-}
+[data-theme="dark"] .tok-keyword { color: #c792ea; }
+[data-theme="dark"] .tok-builtin { color: #82aaff; }
+[data-theme="dark"] .tok-string { color: #c3e88d; }
+[data-theme="dark"] .tok-comment { color: #7c8b94; }
+[data-theme="dark"] .tok-number { color: #f78c6c; }
 
 /* Force identical text metrics for the syntax overlay (pre under transparent textarea) to prevent visual shift/ghosting */
 .code-editor {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 12.5px;
   line-height: 1.55;
   letter-spacing: 0;
@@ -347,12 +443,62 @@ textarea,
 }
 
 /* Selection tint must be visible while textarea text stays transparent so the colored pre shows */
-.relative textarea::selection {
-  background: rgba(91, 123, 232, 0.30);
+.code-editor textarea::selection {
+  background: rgb(var(--eu-accent) / 0.28);
   color: transparent;
 }
-.relative textarea::-moz-selection {
-  background: rgba(91, 123, 232, 0.30);
+.code-editor textarea::-moz-selection {
+  background: rgb(var(--eu-accent) / 0.28);
   color: transparent;
 }
+
+/* ---------------------------------------------------------------------------
+   Markdown preview (note editor). Prose needs its own rhythm; the surrounding
+   UI type roles are too tight for reading.
+   --------------------------------------------------------------------------- */
+.eu-prose {
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgb(var(--eu-ink));
+}
+.eu-prose > * + * { margin-top: 0.7em; }
+.eu-prose h1 { font-size: 1.45em; font-weight: 600; letter-spacing: -0.015em; margin-top: 1.2em; }
+.eu-prose h2 { font-size: 1.2em; font-weight: 600; letter-spacing: -0.01em; margin-top: 1.15em; }
+.eu-prose h3 { font-size: 1.05em; font-weight: 600; margin-top: 1.1em; }
+.eu-prose ul,
+.eu-prose ol { padding-left: 1.35em; }
+.eu-prose ul { list-style: disc; }
+.eu-prose ol { list-style: decimal; }
+.eu-prose li + li { margin-top: 0.2em; }
+.eu-prose a { color: rgb(var(--eu-accent)); text-decoration: underline; text-underline-offset: 2px; }
+.eu-prose code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.87em;
+  background: rgb(var(--eu-panel-alt));
+  border: 1px solid rgb(var(--eu-line) / var(--eu-line-a));
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+}
+.eu-prose pre {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85em;
+  background: rgb(var(--eu-panel-alt));
+  border: 1px solid rgb(var(--eu-line) / var(--eu-line-a));
+  border-radius: 4px;
+  padding: 0.7em 0.8em;
+  overflow-x: auto;
+}
+.eu-prose pre code { background: none; border: 0; padding: 0; font-size: 1em; }
+.eu-prose blockquote {
+  border-left: 2px solid rgb(var(--eu-line) / var(--eu-line-a-strong));
+  padding-left: 0.9em;
+  color: rgb(var(--eu-ink-muted));
+}
+.eu-prose hr { border: 0; border-top: 1px solid rgb(var(--eu-line) / var(--eu-line-a)); margin: 1.4em 0; }
+.eu-prose table { border-collapse: collapse; font-size: 0.93em; }
+.eu-prose th,
+.eu-prose td { border: 1px solid rgb(var(--eu-line) / var(--eu-line-a)); padding: 0.3em 0.6em; text-align: left; }
+.eu-prose th { background: rgb(var(--eu-panel-alt)); font-weight: 600; }
+.eu-prose img { max-width: 100%; border-radius: 4px; }
+.eu-prose strong { font-weight: 600; }
 

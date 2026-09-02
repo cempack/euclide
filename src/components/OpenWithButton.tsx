@@ -6,7 +6,7 @@ import { get } from "../lib/i18n";
 
 export function OpenWithButton({
   fileId,
-  className = "new-btn-ghost",
+  className = "eu-btn-ghost",
   label = "Ouvrir dehors",
 }: {
   fileId: number;
@@ -73,14 +73,14 @@ export function OpenWithButton({
       </button>
       {open && options && (
         <div
-          className="absolute right-0 mt-1 z-[100] min-w-[220px] new-card p-1 text-sm bg-surface border border-hairline shadow-card"
+          className="absolute right-0 mt-1 z-[100] min-w-[220px] eu-panel p-1 text-sm bg-panel border border-line shadow-pop"
           onClick={(e) => e.stopPropagation()}
         >
           {options.map((opt, idx) => (
             <button
               key={idx}
               onClick={() => handle(opt)}
-              className="flex w-full items-center text-left px-3 py-1.5 rounded hover:bg-surface-soft text-primary active:bg-surface-container"
+              className="flex w-full items-center text-left px-3 py-1.5 rounded hover:bg-panel-alt text-ink active:bg-panel-alt"
             >
               <span className="mr-2 text-base">{getIcon(opt)}</span>
               <span>{opt.name}</span>
