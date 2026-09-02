@@ -599,6 +599,26 @@ mod tests {
     }
 
     #[test]
+    fn overlay_accepts_windows_backslash_zip_paths() {
+        let tmp = std::env::temp_dir().join(format!("euclide-overlay-bs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(tmp.join("keep.bin"), b"KEEP").unwrap();
+        let zip = zip_with(&[
+            ("euclide.exe", b"EXE"),
+            ("euclide-sidecar\\internal\\mod.pyd", b"PYD"),
+        ]);
+        extract_allowed_overlay(&zip, &tmp).unwrap();
+        assert_eq!(std::fs::read(tmp.join("euclide.exe")).unwrap(), b"EXE");
+        assert_eq!(
+            std::fs::read(tmp.join("euclide-sidecar/internal/mod.pyd")).unwrap(),
+            b"PYD"
+        );
+        assert_eq!(std::fs::read(tmp.join("keep.bin")).unwrap(), b"KEEP");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn overlay_rejects_non_zip() {
         let tmp = std::env::temp_dir().join(format!("euclide-overlay-nsis-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);

@@ -283,7 +283,7 @@ function PronoteSection() {
               </button>
             </div>
           ) : (
-            <button onClick={() => setOpen(true)} className="new-btn-primary bg-primary text-white bg-primary text-white">
+            <button onClick={() => setOpen(true)} className="new-btn-primary bg-primary text-white">
               {t.common?.connect || "Connecter"}
             </button>
           )}

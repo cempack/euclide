@@ -121,6 +121,10 @@
     "starterCode": "# Script Python\n\nprint(\"Bonjour\")\n"
   },
 
+  "courses": {
+    "subtitle": "Classes, séquences et casiers."
+  },
+
   "documents": {
     "subtitle": "Documents et notes.",
     "searchPlaceholder": "Rechercher...",

@@ -451,8 +451,8 @@ pub fn save_note(state: State<Db>, note: Note) -> R<Note> {
     let conn = state.0.lock().unwrap();
     let id = if note.id > 0 {
         conn.execute(
-            "UPDATE notes SET title=?1, body=?2, updated_at=datetime('now') WHERE id=?3",
-            params![note.title, note.body, note.id],
+            "UPDATE notes SET title=?1, body=?2, course_id=?3, updated_at=datetime('now') WHERE id=?4",
+            params![note.title, note.body, note.course_id, note.id],
         )
         .map_err(e)?;
         note.id

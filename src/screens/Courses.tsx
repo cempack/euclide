@@ -93,7 +93,11 @@ export default function Courses() {
 
   const create = async () => {
     if (!name.trim()) return;
-    await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
+    const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
+    if (!created?.id) {
+      toast(get("messages.genericError", "Erreur"), "error");
+      return;
+    }
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
     window.dispatchEvent(new CustomEvent("eu:course-changed"));
     toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
@@ -163,7 +167,7 @@ export default function Courses() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.courses}</h1>
-          <p className="text-body-mute text-sm mt-1">{get("documents.subtitle", "Documents et notes.")}</p>
+          <p className="text-body-mute text-sm mt-1">{get("courses.subtitle", "Classes, séquences et casiers.")}</p>
         </div>
         <button onClick={() => { setIconKey("book"); setOpen(true); }} className="new-btn-primary">
           <PlusIcon className="w-4 h-4" /> {t.common?.newCourse || "Nouveau cours"}
