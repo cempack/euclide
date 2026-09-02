@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Create/update a GitHub release. Version tags (v*) and merges into main (when app/packaging source changed) publish a real Latest release. Main and manual runs replace the release tagged dev-build.'
+        description: 'Publish a GitHub release. Merges into main (when app/packaging source changed) cut the next v* tag. Version tags and manual runs also publish Latest.'
         required: false
         default: true
         type: boolean
@@ -58,6 +58,13 @@ jobs:
             exit 0
           fi
 
+          msg="$(git log -1 --format=%s "$SHA" 2>/dev/null || true)"
+          if [[ "$msg" == "chore: release v"* ]]; then
+            echo "Version bump commit; skip rebuild."
+            out false
+            exit 0
+          fi
+
           if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             git fetch --no-tags origin "$BEFORE" || { out true; exit 0; }
           fi
@@ -95,44 +102,59 @@ jobs:
           echo "No app/packaging source changes; skip rebuild."
           out false
 
-  # Workflow/docs-only main pushes do not rebuild. Promote the existing
-  # dev-build tag to a full Latest release if it is still a draft/prerelease.
-  start-dev-build:
-    name: Publish existing dev-build
+  version:
+    name: Next v* release
     needs: should-publish
-    if: |
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      needs.should-publish.outputs.run == 'false'
+    if: needs.should-publish.outputs.run == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.cut.outputs.tag }}
+      version: ${{ steps.cut.outputs.version }}
     steps:
-      - name: Mark the last main build as Latest
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ startsWith(github.ref, 'refs/tags/') && github.ref || 'main' }}
+
+      - name: Cut version tag
+        id: cut
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if ! gh release view dev-build --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            echo "No dev-build release yet."
+          git fetch --tags origin
+          git fetch origin main
+          gh release delete dev-build --yes --repo "${{ github.repository }}" || true
+          git push origin :refs/tags/dev-build || true
+
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Using existing $TAG"
             exit 0
           fi
-          gh release edit dev-build --draft=false --prerelease=false --latest --repo "${{ github.repository }}"
-          echo "dev-build is a full Latest release."
 
-  prepare-release:
-    needs: should-publish
-    if: needs.should-publish.outputs.run == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Drop previous dev-build release
-        if: |
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true') ||
-          (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete dev-build --yes --repo "${{ github.repository }}" || true
+          git config user.name "Elliot Moreau"
+          git config user.email "73651345+cempack@users.noreply.github.com"
+          git checkout -B main origin/main
+
+          VERSION="$(python3 scripts/set-release-version.py --next)"
+          python3 scripts/set-release-version.py --set "$VERSION"
+          TAG="v$VERSION"
+
+          git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+          git commit -m "chore: release $TAG" -m "[skip ci]"
+          git tag "$TAG"
+          git push origin HEAD:main
+          git push origin "$TAG"
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   publish-tauri:
-    needs: [should-publish, prepare-release]
+    needs: [should-publish, version]
     if: needs.should-publish.outputs.run == 'true'
     strategy:
       fail-fast: false
@@ -159,6 +181,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.tag }}
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -243,31 +267,11 @@ jobs:
         id: rel
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            echo "name=Euclide ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            echo "draft=false" >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "tag=dev-build" >> "$GITHUB_OUTPUT"
-            echo "name=Euclide main (${{ github.sha }})" >> "$GITHUB_OUTPUT"
-            echo "draft=false" >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.create_release }}" = "true" ]; then
-            echo "tag=dev-build" >> "$GITHUB_OUTPUT"
-            echo "name=Euclide dev-build (manual)" >> "$GITHUB_OUTPUT"
-            echo "draft=false" >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "upload=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=" >> "$GITHUB_OUTPUT"
-            echo "name=" >> "$GITHUB_OUTPUT"
-            echo "draft=true" >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "upload=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "tag=${{ needs.version.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "name=Euclide ${{ needs.version.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "draft=false" >> "$GITHUB_OUTPUT"
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          echo "upload=true" >> "$GITHUB_OUTPUT"
 
       - name: Require updater signing key
         if: steps.rel.outputs.upload == 'true'
@@ -409,14 +413,9 @@ jobs:
   # copies still update via the plugin. Must run last so tauri-action cannot overwrite it.
   windows-portable-manifest:
     name: Point Windows updater at portable zip
-    needs: [should-publish, publish-tauri]
+    needs: [should-publish, version, publish-tauri]
     runs-on: ubuntu-latest
-    if: |
-      needs.should-publish.outputs.run == 'true' && (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
-      )
+    if: needs.should-publish.outputs.run == 'true'
     steps:
       - uses: actions/setup-node@v6
         with:
@@ -426,7 +425,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          TAG: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref_name) || 'dev-build' }}
+          TAG: ${{ needs.version.outputs.tag }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
