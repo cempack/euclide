@@ -22,6 +22,7 @@ pub struct AppInfo {
     author: String,
     version: String,
     data_dir: String,
+    windows_portable: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -196,6 +197,7 @@ pub fn get_app_info() -> AppInfo {
         author: "Elliot Moreau".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         data_dir: crate::paths::data_dir().to_string_lossy().to_string(),
+        windows_portable: crate::portable_update::is_windows_portable(),
     }
 }
 

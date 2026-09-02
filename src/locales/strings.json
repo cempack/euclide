@@ -384,7 +384,8 @@
     "popupDismiss": "Fermer",
     "popupLater": "Plus tard",
     "popupInstall": "Installer",
-    "hint": "Windows : la mise à jour installe le programme officiel (pas l’archive USB). Linux et macOS mettent à jour l’application en place."
+    "hint": "Windows installé : mise à jour via l’installateur. Linux et macOS se mettent à jour en place.",
+    "hintPortable": "Windows portable : la mise à jour remplace uniquement le programme dans ce dossier (clé USB comprise). Euclide-Data et vos fichiers restent en place."
   },
 
   "classContent": {
