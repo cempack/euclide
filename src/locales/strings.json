@@ -379,6 +379,11 @@
     "error": "Impossible de vérifier les mises à jour.",
     "noChannel": "Aucune version publiée pour le moment.",
     "availableToast": "Mise à jour {version} disponible — Réglages › À propos.",
+    "popupTitle": "Mise à jour {version}",
+    "popupBody": "Une nouvelle version est disponible.",
+    "popupDismiss": "Fermer",
+    "popupLater": "Plus tard",
+    "popupInstall": "Installer",
     "hint": "Windows : la mise à jour installe le programme officiel (pas l’archive USB). Linux et macOS mettent à jour l’application en place."
   },
 

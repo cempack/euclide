@@ -1,13 +1,14 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
 import { api, type AppInfo, isTauri } from "./lib/api";
-import { fmt, get } from "./lib/i18n";
+import { get } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
-import { checkForAppUpdate } from "./lib/updater";
+import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 
 import { TabsProvider, useTabs, type TabKind } from "./lib/tabs";
 import { ToastProvider, useToast, Loading, COURSE_ICONS } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import ShortcutsHelp from "./components/ShortcutsHelp";
+import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
 import {
  BookIcon,
  DocIcon,
@@ -356,6 +357,7 @@ function Shell() {
  const [palette, setPalette] = useState(false);
  const [help, setHelp] = useState(false);
  const [dragging, setDragging] = useState(false);
+ const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
  const tabs = useTabs();
  const toast = useToast();
 
@@ -377,21 +379,24 @@ function Shell() {
  }, []);
 
  useEffect(() => {
+ const onAvailable = (e: Event) => {
+ const detail = (e as CustomEvent<AppUpdateInfo>).detail;
+ if (!detail?.version) return;
+ if (wasUpdateDismissed(detail.version)) return;
+ setAvailableUpdate(detail);
+ };
+ window.addEventListener("eu:update-available", onAvailable);
+ return () => window.removeEventListener("eu:update-available", onAvailable);
+ }, []);
+
+ useEffect(() => {
  if (!isTauri()) return;
  let cancelled = false;
  const timer = window.setTimeout(async () => {
  try {
  const update = await checkForAppUpdate();
  if (cancelled || !update) return;
- const seen = sessionStorage.getItem("euclide.updateNotified");
- if (seen === update.version) return;
- sessionStorage.setItem("euclide.updateNotified", update.version);
- toast(
- fmt(get("updater.availableToast", "Mise à jour {version} disponible — Réglages › À propos."), {
- version: update.version,
- }),
- "info"
- );
+ if (wasUpdateDismissed(update.version)) return;
  window.dispatchEvent(new CustomEvent("eu:update-available", { detail: update }));
  } catch {
  // Draft-only GitHub releases, offline, etc. Stay quiet.
@@ -401,7 +406,7 @@ function Shell() {
  cancelled = true;
  window.clearTimeout(timer);
  };
- }, [toast]);
+ }, []);
 
  // Global drag-and-drop file import into the documents library.
  useEffect(() => {
@@ -536,6 +541,7 @@ function Shell() {
  </main>
  <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
  <ShortcutsHelp open={help} onClose={() => setHelp(false)} />
+ <UpdateAvailablePopup update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} />
  {dragging && (
  <div className="fixed inset-0 z-[80] grid place-items-center bg-tui-accent/10 backdrop-blur-sm pointer-events-none">
  <div className="eu-card px-8 py-6 border-2 border-dashed border-tui-accent text-center">
