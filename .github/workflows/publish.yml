@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Create/update a GitHub release. Version tags (v*) publish a real release so the in-app updater can read latest.json. Merges into main and manual runs use a draft prerelease tagged dev-build (replaced each time).'
+        description: 'Create/update a GitHub release. Version tags (v*) publish the Latest release for the in-app updater. Merges into main (when app/packaging source changed) and manual runs replace the published prerelease tagged dev-build.'
         required: false
         default: true
         type: boolean
@@ -23,10 +23,107 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare-release:
+  # Skip the matrix on main when the push is docs/CI-only. Tags and manual
+  # runs always publish. Do not use workflow-level paths-ignore: that would
+  # also filter v* tag pushes.
+  should-publish:
+    name: Should rebuild portables
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          fetch-depth: 0
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          out() { echo "run=$1" >> "$GITHUB_OUTPUT"; echo "should-publish=$1"; }
+
+          if [ "$EVENT_NAME" != "push" ] || [[ "$REF" == refs/tags/* ]]; then
+            out true
+            exit 0
+          fi
+
+          if [ -z "${BEFORE:-}" ] || [[ "$BEFORE" =~ ^0+$ ]]; then
+            out true
+            exit 0
+          fi
+
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BEFORE" || { out true; exit 0; }
+          fi
+
+          if ! changed="$(git diff --name-only "$BEFORE" "$SHA")"; then
+            echo "git diff failed; publish to be safe."
+            out true
+            exit 0
+          fi
+          echo "Changed files:"
+          printf '%s\n' "$changed"
+
+          if [ -z "$changed" ]; then
+            echo "No files changed; skip rebuild."
+            out false
+            exit 0
+          fi
+
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              src/*|src-tauri/*|sidecar/*|scripts/*|public/*)
+                echo "Code change: $f"
+                out true
+                exit 0
+                ;;
+              package.json|package-lock.json|index.html|vite.config.ts|tailwind.config.js|postcss.config.js|tsconfig.json|tsconfig.node.json)
+                echo "Code change: $f"
+                out true
+                exit 0
+                ;;
+            esac
+          done <<< "$changed"
+
+          echo "No app/packaging source changes; skip rebuild."
+          out false
+
+  # Workflow/docs-only main pushes do not rebuild. If a draft from an earlier
+  # run is still sitting unpublished, mark it live so artifacts are downloadable.
+  start-dev-build:
+    name: Publish existing dev-build
+    needs: should-publish
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.should-publish.outputs.run == 'false'
     runs-on: ubuntu-latest
     steps:
-      - name: Drop previous dev-build draft
+      - name: Mark the last main build as published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh release view dev-build --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "No dev-build release yet."
+            exit 0
+          fi
+          gh release edit dev-build --draft=false --prerelease --repo "${{ github.repository }}"
+          echo "dev-build is published (prerelease)."
+
+  prepare-release:
+    needs: should-publish
+    if: needs.should-publish.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drop previous dev-build release
         if: |
           (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true') ||
           (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -35,7 +132,8 @@ jobs:
         run: gh release delete dev-build --yes --repo "${{ github.repository }}" || true
 
   publish-tauri:
-    needs: prepare-release
+    needs: [should-publish, prepare-release]
+    if: needs.should-publish.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -140,13 +238,13 @@ jobs:
           elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "tag=dev-build" >> "$GITHUB_OUTPUT"
             echo "name=Euclide main (${{ github.sha }})" >> "$GITHUB_OUTPUT"
-            echo "draft=true" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "upload=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.create_release }}" = "true" ]; then
             echo "tag=dev-build" >> "$GITHUB_OUTPUT"
             echo "name=Euclide dev-build (manual)" >> "$GITHUB_OUTPUT"
-            echo "draft=true" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "upload=true" >> "$GITHUB_OUTPUT"
           else
@@ -297,12 +395,14 @@ jobs:
   # copies still update via the plugin. Must run last so tauri-action cannot overwrite it.
   windows-portable-manifest:
     name: Point Windows updater at portable zip
-    needs: publish-tauri
+    needs: [should-publish, publish-tauri]
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      needs.should-publish.outputs.run == 'true' && (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      )
     steps:
       - uses: actions/setup-node@v6
         with:
