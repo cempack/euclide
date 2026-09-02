@@ -4,7 +4,13 @@ use std::sync::Mutex;
 pub struct Db(pub Mutex<Connection>);
 
 pub fn open() -> Connection {
-    let conn = Connection::open(crate::paths::db_path()).expect("ouverture base impossible");
+    let path = crate::paths::db_path();
+    let conn = Connection::open(&path).unwrap_or_else(|e| {
+        panic!(
+            "impossible d'ouvrir la base {} : {e}",
+            path.display()
+        )
+    });
     conn.execute_batch(SCHEMA).expect("init schema");
     // Migration for existing DBs: add matiere column to courses (for subject filtering with Pronote)
     let _ = conn.execute("ALTER TABLE courses ADD COLUMN matiere TEXT NOT NULL DEFAULT ''", []);

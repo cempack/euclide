@@ -1924,15 +1924,8 @@ pub async fn choose_data_dir(app: AppHandle) -> R<Option<String>> {
     let Ok(p) = picked.into_path() else {
         return Ok(None);
     };
-    let path_str = p.to_string_lossy().to_string();
-
-    // Always write the config next to the *executable* (never inside the data root itself).
-    let cfg_path = crate::paths::data_root_config_path();
-    let cfg = json!({ "dataDir": path_str });
-    if let Ok(s) = serde_json::to_string_pretty(&cfg) {
-        let _ = fs::write(&cfg_path, s);
-    }
-    Ok(Some(path_str))
+    crate::paths::save_configured_data_dir(&p);
+    Ok(Some(p.to_string_lossy().to_string()))
 }
 
 #[tauri::command]
