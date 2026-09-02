@@ -91,6 +91,7 @@ export interface AppInfo {
   author: string;
   version: string;
   data_dir: string;
+  windows_portable: boolean;
 }
 
 export interface Course {

@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod keepawake;
 mod paths;
+mod portable_update;
 mod sidecar;
 
 use keepawake::KeepAwake;
@@ -146,6 +147,7 @@ pub fn run() {
             commands::set_course_class_progress,
             commands::update_course_class_notes,
             commands::pronote_classes,
+            portable_update::apply_windows_portable_update,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Euclide")

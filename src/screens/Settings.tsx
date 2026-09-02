@@ -815,7 +815,11 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                 />
               </div>
             )}
-            <p className="text-[11px] text-mute leading-snug">{get("updater.hint")}</p>
+            <p className="text-[11px] text-mute leading-snug">
+              {info?.windows_portable
+                ? get("updater.hintPortable")
+                : get("updater.hint")}
+            </p>
           </div>
         )}
       </div>

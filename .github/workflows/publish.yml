@@ -40,7 +40,7 @@ jobs:
             target: 'x86_64-unknown-linux-gnu'
             arch: 'x86_64'
             args: '--target x86_64-unknown-linux-gnu --bundles appimage'
-          - platform: 'windows-latest' # Windows - NSIS for in-app updates + portable zip after
+          - platform: 'windows-latest' # Windows - NSIS for installed copies + portable zip for USB in-place updates
             target: 'x86_64-pc-windows-msvc'
             arch: 'x86_64'
             args: '--target x86_64-pc-windows-msvc'
@@ -166,9 +166,9 @@ jobs:
           tagName: ${{ steps.rel.outputs.tag }}
           releaseName: ${{ steps.rel.outputs.name }}
           releaseBody: |
-            Installateurs (mises à jour in-app) et archives USB portables.
+            Installateurs et archives USB portables.
 
-            L’application vérifie `latest.json` sur GitHub Releases. Les zips `*-portable*` sont le mode USB : extraire et lancer, sans installateur.
+            L’application vérifie `latest.json` sur GitHub Releases. Windows portable met à jour `Euclide-windows-portable.zip` **dans le dossier courant** (Euclide-Data intact). Les copies NSIS utilisent l’installateur.
           releaseDraft: ${{ steps.rel.outputs.draft == 'true' }}
           prerelease: ${{ steps.rel.outputs.prerelease == 'true' }}
           args: ${{ matrix.args }}
@@ -217,10 +217,11 @@ jobs:
             cp "src-tauri/target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/${{ matrix.target }}/release/Euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/euclide.exe" Euclide-portable/ 2>/dev/null || cp "src-tauri/target/release/Euclide.exe" Euclide-portable/ 2>/dev/null || true
             # Copy the whole onedir folder (euclide-sidecar/ with .exe + support files for fast startup, no console)
             cp -r sidecar/dist/euclide-sidecar Euclide-portable/ 2>/dev/null || cp -r src-tauri/resources/euclide-sidecar Euclide-portable/ 2>/dev/null || true
+            : > Euclide-portable/euclide.portable
             echo "Portable Euclide for Windows. Extract the folder and run euclide.exe (or Euclide.exe)." > Euclide-portable/README.txt
-            echo "The euclide-sidecar/ folder next to the exe is the Python sidecar (required; do not delete)." >> Euclide-portable/README.txt
-            echo "Data folder (Euclide-Data) will be created next to the exe for full portability on USB." >> Euclide-portable/README.txt
-            echo "In-app updates use the NSIS installer from GitHub Releases, not this zip." >> Euclide-portable/README.txt
+            echo "Keep euclide.exe and the euclide-sidecar/ folder together. Do not delete the sidecar." >> Euclide-portable/README.txt
+            echo "Data folder (Euclide-Data) is created next to the exe (USB / flash drive)." >> Euclide-portable/README.txt
+            echo "In-app updates overlay new program files in THIS folder only. Euclide-Data and other files are never deleted." >> Euclide-portable/README.txt
             powershell -Command "Compress-Archive -Path 'Euclide-portable/*' -DestinationPath 'dist-portable/Euclide-windows-portable.zip' -Force"
           fi
         shell: bash
@@ -246,3 +247,59 @@ jobs:
           path: dist-portable/*
           if-no-files-found: warn
           retention-days: 7
+
+  # After every matrix leg has merged latest.json, point windows-x86_64 at the
+  # signed USB zip. Keep the NSIS installer under windows-x86_64-nsis so installed
+  # copies still update via the plugin. Must run last so tauri-action cannot overwrite it.
+  windows-portable-manifest:
+    name: Point Windows updater at portable zip
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+      - name: Sign Euclide-windows-portable.zip and rewrite latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAG: ${{ github.event_name == 'push' && github.ref_name || 'dev-build' }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set."
+            exit 1
+          fi
+          mkdir -p /tmp/euclide-updater
+          cd /tmp/euclide-updater
+          gh release download "$TAG" --pattern 'Euclide-windows-portable.zip' --repo "$REPO"
+          gh release download "$TAG" --pattern 'latest.json' --repo "$REPO"
+          test -f Euclide-windows-portable.zip
+          test -f latest.json
+          npx --yes @tauri-apps/cli@2 signer sign Euclide-windows-portable.zip
+          python3 <<'PY'
+          import json, os, pathlib
+          tag = os.environ["TAG"]
+          repo = os.environ["REPO"]
+          sig = pathlib.Path("Euclide-windows-portable.zip.sig").read_text().strip()
+          if not sig:
+              raise SystemExit("empty signature file")
+          data = json.loads(pathlib.Path("latest.json").read_text())
+          platforms = data.setdefault("platforms", {})
+          win = platforms.get("windows-x86_64") or {}
+          url = str(win.get("url") or "")
+          if "windows-x86_64-nsis" not in platforms and "portable" not in url.lower():
+              platforms["windows-x86_64-nsis"] = win
+          portable_url = f"https://github.com/{repo}/releases/download/{tag}/Euclide-windows-portable.zip"
+          platforms["windows-x86_64"] = {"signature": sig, "url": portable_url}
+          pathlib.Path("latest.json").write_text(json.dumps(data, indent=2) + "\n")
+          print("windows-x86_64 ->", portable_url)
+          print("windows-x86_64-nsis ->", (platforms.get("windows-x86_64-nsis") or {}).get("url"))
+          PY
+          gh release upload "$TAG" latest.json --clobber --repo "$REPO"
+
