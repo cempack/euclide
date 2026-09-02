@@ -309,7 +309,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build ${{ matrix.args }} --config src-tauri/tauri.usb.conf.json
 
-      - name: Unbundle host Wayland libs from AppImage
+      - name: Patch AppImage WebKit/Wayland runtime
         id: appimage_wayland
         if: runner.os == 'Linux'
         env:
@@ -339,7 +339,7 @@ jobs:
         shell: bash
 
       # Post-build: USB-friendly extras (zips / renamed AppImage). Linux AppImage
-      # has already had bundled libwayland stripped when present.
+      # has already had the GTK hook patched and bundled libwayland stripped.
       - name: Package portable/standard apps
         run: |
           mkdir -p dist-portable

@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod keepawake;
+mod linux_env;
 mod paths;
 mod portable_update;
 mod sidecar;
@@ -8,8 +9,15 @@ mod sidecar;
 use keepawake::KeepAwake;
 use tauri::Manager;
 
+/// Before GTK/WebKit: drop linuxdeploy's `GDK_BACKEND=x11` on Wayland and skip
+/// the AppImage WebKit GPU path (surfaceless EGL_BAD_ALLOC abort).
+pub fn apply_linux_runtime_env() {
+    linux_env::apply();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    apply_linux_runtime_env();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
