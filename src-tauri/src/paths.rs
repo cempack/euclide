@@ -23,30 +23,49 @@ pub fn exe_dir() -> PathBuf {
 }
 
 fn appimage_file_dir() -> Option<PathBuf> {
+    let file = appimage_file()?;
+    let dir = file.parent()?.to_path_buf();
+    if dir.as_os_str().is_empty() || is_appimage_payload_path(&dir) {
+        return None;
+    }
+    Some(dir)
+}
+
+/// The `.AppImage` file the user launched, when we can see it.
+pub fn appimage_file() -> Option<PathBuf> {
     if let Some(raw) = std::env::var_os("APPIMAGE") {
         if !raw.is_empty() {
-            if let Some(dir) = parent_if_not_payload(PathBuf::from(raw)) {
-                return Some(dir);
+            if let Some(path) = resolve_appimage_path(PathBuf::from(raw)) {
+                return Some(path);
             }
         }
     }
     if let Some(raw) = std::env::var_os("ARGV0") {
         let path = PathBuf::from(&raw);
         if looks_like_appimage_filename(&path) {
-            if let Some(dir) = parent_if_not_payload(path) {
-                return Some(dir);
+            if let Some(path) = resolve_appimage_path(path) {
+                return Some(path);
             }
         }
     }
     if let Some(raw) = std::env::args_os().next() {
         let path = PathBuf::from(&raw);
         if looks_like_appimage_filename(&path) {
-            if let Some(dir) = parent_if_not_payload(path) {
-                return Some(dir);
+            if let Some(path) = resolve_appimage_path(path) {
+                return Some(path);
             }
         }
     }
     None
+}
+
+/// Binary to spawn after an in-place update. AppImage must relaunch the
+/// `.AppImage` file, not `current_exe()` inside the old squashfs mount.
+pub fn process_launch_path() -> PathBuf {
+    if let Some(path) = appimage_file() {
+        return path;
+    }
+    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("euclide"))
 }
 
 fn looks_like_appimage_filename(path: &Path) -> bool {
@@ -56,7 +75,7 @@ fn looks_like_appimage_filename(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn parent_if_not_payload(mut path: PathBuf) -> Option<PathBuf> {
+fn resolve_appimage_path(mut path: PathBuf) -> Option<PathBuf> {
     if path.as_os_str().is_empty() {
         return None;
     }
@@ -67,11 +86,10 @@ fn parent_if_not_payload(mut path: PathBuf) -> Option<PathBuf> {
             path = cwd.join(path);
         }
     }
-    let dir = path.parent()?.to_path_buf();
-    if dir.as_os_str().is_empty() || is_appimage_payload_path(&dir) {
+    if is_appimage_payload_path(&path) {
         return None;
     }
-    Some(dir)
+    Some(path)
 }
 
 /// True for the squashfs / AppDir payload (never a place to put `Euclide-Data`).
@@ -312,6 +330,7 @@ mod tests {
         let image = tmp.join("Euclide.AppImage");
         std::env::set_var("APPIMAGE", &image);
         assert_eq!(exe_dir(), tmp);
+        assert_eq!(process_launch_path(), image);
         assert_eq!(data_root_config_path(), tmp.join("euclide-data.json"));
         assert!(!is_appimage_payload_path(&tmp.join("Euclide-Data")));
 

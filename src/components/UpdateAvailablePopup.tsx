@@ -105,17 +105,25 @@ export function UpdateAvailablePopup({
           )}
 
           <div className="flex justify-end gap-2 mt-3">
-            <button type="button" onClick={dismiss} disabled={busy} className="new-btn-ghost text-xs py-0.5">
-              {get("updater.popupLater", "Plus tard")}
-            </button>
+            {!busy && (
+              <button
+                type="button"
+                onClick={dismiss}
+                className="new-btn-ghost text-xs py-0.5 whitespace-nowrap shrink-0"
+              >
+                {get("updater.popupLater", "Plus tard")}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void install()}
               disabled={busy}
-              className="new-btn-primary bg-primary text-white text-xs py-0.5"
+              className="new-btn-primary bg-primary text-white text-xs py-0.5 whitespace-nowrap tabular-nums shrink-0"
             >
               {busy
-                ? fmt(get("updater.installing", "Téléchargement… {percent} %"), { percent: percent ?? 0 })
+                ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
+                    percent: percent ?? 0,
+                  })
                 : get("updater.popupInstall", "Installer")}
             </button>
           </div>
