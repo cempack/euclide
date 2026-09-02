@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod keepawake;
 mod paths;
+mod portable_update;
 mod sidecar;
 
 use keepawake::KeepAwake;
@@ -12,8 +13,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             use tauri::Manager;
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
             app.manage(db::Db(std::sync::Mutex::new(db::open())));
             app.manage(KeepAwake::default());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
@@ -143,6 +148,7 @@ pub fn run() {
             commands::set_course_class_progress,
             commands::update_course_class_notes,
             commands::pronote_classes,
+            portable_update::apply_windows_portable_update,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Euclide")

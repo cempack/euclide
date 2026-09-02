@@ -84,7 +84,7 @@ export default function Courses() {
   const [editIconKey, setEditIconKey] = useState("book");
 
   const refresh = () => {
-    api.listCourses().then(setCourses).catch(() => {}).finally(() => setLoading(false));
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {}).finally(() => setLoading(false));
   };
   useEffect(() => {
     refresh();
@@ -92,16 +92,24 @@ export default function Courses() {
 
   const create = async () => {
     if (!name.trim()) return;
-    await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
-    window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    window.dispatchEvent(new CustomEvent("eu:course-changed"));
-    toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
-    setName("");
-    setDesc("");
-    setMatiere("Mathématiques");
-    setIconKey("book");
-    setOpen(false);
-    refresh();
+    try {
+      const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
+      if (!created?.id) {
+        toast(get("messages.genericError", "Erreur"), "error");
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      window.dispatchEvent(new CustomEvent("eu:course-changed"));
+      toast(`${t.common?.newCourse || "Nouveau cours"} : ${name}`, "success");
+      setName("");
+      setDesc("");
+      setMatiere("Mathématiques");
+      setIconKey("book");
+      setOpen(false);
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const openEdit = (c: Course) => {
@@ -118,25 +126,29 @@ export default function Courses() {
     if (!editName.trim() || !editId) return;
     const courseToUpdate = courses.find((c) => c.id === editId);
     if (!courseToUpdate) return;
-    await api.updateCourse({
-      ...courseToUpdate,
-      name: editName.trim(),
-      emoji: editIconKey,
-      color: editColor,
-      description: editDesc.trim(),
-      matiere: editMatiere,
-    });
-    window.dispatchEvent(new CustomEvent("eu:library-changed")); // ensure fresh lists everywhere (triggers cache invalidation + listeners)
-    window.dispatchEvent(new CustomEvent("eu:course-changed"));
-    toast("Cours modifié", "success");
-    setEditOpen(false);
-    // reset edit
-    setEditId(null);
-    setEditName("");
-    setEditDesc("");
-    setEditMatiere("Mathématiques");
-    setEditIconKey("book");
-    refresh();
+    try {
+      await api.updateCourse({
+        ...courseToUpdate,
+        name: editName.trim(),
+        emoji: editIconKey,
+        color: editColor,
+        description: editDesc.trim(),
+        matiere: editMatiere,
+      });
+      window.dispatchEvent(new CustomEvent("eu:library-changed")); // ensure fresh lists everywhere (triggers cache invalidation + listeners)
+      window.dispatchEvent(new CustomEvent("eu:course-changed"));
+      toast("Cours modifié", "success");
+      setEditOpen(false);
+      // reset edit
+      setEditId(null);
+      setEditName("");
+      setEditDesc("");
+      setEditMatiere("Mathématiques");
+      setEditIconKey("book");
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const closeEdit = () => {
@@ -162,7 +174,7 @@ export default function Courses() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="font-display-sm text-display-sm tracking-tight text-primary">{t.nav.courses}</h1>
-          <p className="text-body-mute text-sm mt-1">{get("documents.subtitle", "Documents et notes.")}</p>
+          <p className="text-body-mute text-sm mt-1">{get("courses.subtitle", "Classes, séquences et casiers.")}</p>
         </div>
         <button onClick={() => { setIconKey("book"); setOpen(true); }} className="new-btn-primary">
           <PlusIcon className="w-4 h-4" /> {t.common?.newCourse || "Nouveau cours"}

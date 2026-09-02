@@ -79,7 +79,7 @@ export default function CommandPalette({
   useEffect(() => {
     const h = setTimeout(() => {
       if (query.trim().length < 2) return setResults([]);
-      api.globalSearch(query.trim()).then(setResults).catch(() => {});
+      api.globalSearch(query.trim()).then((r) => setResults(Array.isArray(r) ? r : [])).catch(() => {});
     }, 130);
     return () => clearTimeout(h);
   }, [query]);
@@ -170,7 +170,10 @@ export default function CommandPalette({
     // score + rank base actions + backend results for better precision + typo tolerance
     const scored: { a: Action; s: number }[] = [];
     for (const a of baseActions) {
-      const s = Math.max(scoreMatch(a.label, query), a.hint ? scoreMatch(a.hint, query) : 0);
+      const s = Math.max(
+        scoreMatch(a.label, query),
+        a.hint && norm(a.hint).includes(norm(query)) ? scoreMatch(a.hint, query) : 0
+      );
       if (s > 0) scored.push({ a, s });
     }
     for (const r of resultActions) {

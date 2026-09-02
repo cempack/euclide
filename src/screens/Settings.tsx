@@ -2,12 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import {
   api,
+  isTauri,
   type AppInfo,
   type Course,
   type PronoteStatus,
   type ScheduleEntry,
 } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
+import {
+  checkForAppUpdate,
+  installPendingUpdate,
+  isNoPublishedUpdate,
+  updaterSupported,
+  type AppUpdateInfo,
+} from "../lib/updater";
 import { DAY_LABELS } from "../lib/format";
 
 import { EmptyState, Modal, SectionHeader, useToast, useConfirm } from "../components/ui";
@@ -194,7 +202,11 @@ function PronoteSection() {
     }
   };
 
-  const finishConnect = async (s: PronoteStatus) => {
+  const finishConnect = async (s: PronoteStatus | null) => {
+    if (!s) {
+      toast(t.settings?.toastConnectFailed || "Connexion échouée, vérifiez vos informations", "error");
+      return;
+    }
     setStatus(s);
     if (s.connected) {
       toast(t.settings?.toastConnected || "Connecté à Pronote", "success");
@@ -284,7 +296,7 @@ function PronoteSection() {
               </button>
             </div>
           ) : (
-            <button onClick={() => setOpen(true)} className="new-btn-primary bg-primary text-white bg-primary text-white">
+            <button onClick={() => setOpen(true)} className="new-btn-primary bg-primary text-white">
               {t.common?.connect || "Connecter"}
             </button>
           )}
@@ -434,20 +446,28 @@ function ScheduleSection() {
     room: "",
   });
 
-  const refresh = () => api.listSchedule().then(setEntries).catch(() => {});
+  const refresh = () => api.listSchedule().then((e) => setEntries(Array.isArray(e) ? e : [])).catch(() => {});
   useEffect(() => {
     refresh();
-    api.listCourses().then(setCourses).catch(() => {});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
   }, []);
 
   const save = async () => {
     if (!form.subject?.trim()) return;
-    await api.saveScheduleEntry({ ...form, source: "manual" });
-    toast(t.settings?.toastScheduleAdded || "Cours ajouté à l'emploi du temps", "success");
-    setOpen(false);
-    setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
-    window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-    refresh();
+    try {
+      const saved = await api.saveScheduleEntry({ ...form, source: "manual" });
+      if (!saved?.id) {
+        toast(get("messages.genericError", "Erreur"), "error");
+        return;
+      }
+      toast(t.settings?.toastScheduleAdded || "Cours ajouté à l'emploi du temps", "success");
+      setOpen(false);
+      setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
+      window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+      refresh();
+    } catch {
+      toast(get("messages.genericError", "Erreur"), "error");
+    }
   };
 
   const byDay = (d: number) =>
@@ -674,18 +694,155 @@ function TabsSection() {
 // About
 
 function AboutSection({ info }: { info: AppInfo | null }) {
+  const toast = useToast();
+  const [status, setStatus] = useState<"idle" | "checking" | "upToDate" | "available" | "installing" | "error">(
+    "idle"
+  );
+  const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
+  const [error, setError] = useState("");
+  const [percent, setPercent] = useState<number | null>(null);
+
+  const runCheck = async (quiet: boolean) => {
+    if (!updaterSupported()) return;
+    setStatus("checking");
+    setError("");
+    try {
+      const next = await checkForAppUpdate(!quiet);
+      if (next) {
+        setUpdate(next);
+        setStatus("available");
+        window.dispatchEvent(new CustomEvent("eu:update-available", { detail: next }));
+      } else {
+        setUpdate(null);
+        setStatus("upToDate");
+      }
+    } catch (err) {
+      if (isNoPublishedUpdate(err)) {
+        setUpdate(null);
+        setStatus("upToDate");
+        return;
+      }
+      setStatus("error");
+      setError(err instanceof Error ? err.message : String(err));
+      if (!quiet) toast(get("updater.error", "Impossible de vérifier les mises à jour."), "error");
+    }
+  };
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    void runCheck(true);
+    const onAvailable = (e: Event) => {
+      const detail = (e as CustomEvent<AppUpdateInfo>).detail;
+      if (!detail?.version) return;
+      setUpdate(detail);
+      setStatus("available");
+    };
+    window.addEventListener("eu:update-available", onAvailable);
+    return () => window.removeEventListener("eu:update-available", onAvailable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one quiet check on mount
+  }, []);
+
+  const install = async () => {
+    if (!update) return;
+    const ok = confirm(
+      fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
+        version: update.version,
+      })
+    );
+    if (!ok) return;
+    setStatus("installing");
+    setPercent(0);
+    try {
+      await installPendingUpdate(({ downloaded, contentLength }) => {
+        if (contentLength && contentLength > 0) {
+          setPercent(Math.min(100, Math.round((downloaded / contentLength) * 100)));
+        }
+      });
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : String(err));
+      toast(get("updater.error", "Impossible de vérifier les mises à jour."), "error");
+    }
+  };
+
+  const statusLine =
+    status === "checking"
+      ? get("updater.checking", "Recherche…")
+      : status === "upToDate"
+        ? get("updater.upToDate", "Euclide est à jour.")
+        : status === "available" && update
+          ? fmt(get("updater.available", "Version {version} disponible (actuelle : {current})."), {
+              version: update.version,
+              current: update.currentVersion,
+            })
+          : status === "installing"
+            ? fmt(get("updater.installing", "Téléchargement… {percent} %"), {
+                percent: percent ?? 0,
+              })
+            : status === "error"
+              ? error || get("updater.error", "Impossible de vérifier les mises à jour.")
+              : "";
+
   return (
     <section>
       <SectionHeader title={get("about.title", "À propos")} />
-      <div className="new-card p-6 flex items-center gap-4">
-        <img src="/euclide-logo.png" alt="Euclide" className="w-16 h-16 rounded-2xl object-contain" />
-        <div>
-          <p className="font-semibold text-primary">
-            {t.appName} {info && <span className="text-mute font-normal">v{info.version}</span>}
-          </p>
-          <p className="text-mute text-sm mt-1">{t.madeBy}</p>
-          {info && <p className="text-[11px] text-mute opacity-60 mt-2 selectable">{info.data_dir}</p>}
+      <div className="new-card p-6 flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          <img src="/euclide-logo.png" alt="Euclide" className="w-16 h-16 rounded-2xl object-contain" />
+          <div>
+            <p className="font-semibold text-primary">
+              {t.appName} {info && <span className="text-mute font-normal">v{info.version}</span>}
+            </p>
+            <p className="text-mute text-sm mt-1">{t.madeBy}</p>
+            {info && <p className="text-[11px] text-mute opacity-60 mt-2 selectable">{info.data_dir}</p>}
+          </div>
         </div>
+
+        {isTauri() && (
+          <div className="border-t border-hairline pt-4 flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void runCheck(false)}
+                disabled={status === "checking" || status === "installing"}
+                className="new-btn-ghost"
+              >
+                {get("updater.check", "Vérifier les mises à jour")}
+              </button>
+              {(status === "available" || status === "installing") && (
+                <button
+                  type="button"
+                  onClick={() => void install()}
+                  disabled={status === "installing"}
+                  className="new-btn-primary bg-primary text-white"
+                >
+                  {get("updater.install", "Installer et redémarrer")}
+                </button>
+              )}
+            </div>
+            {statusLine && (
+              <p className={`text-[11px] leading-snug ${status === "error" ? "text-tui-danger" : "text-mute"}`}>
+                {statusLine}
+              </p>
+            )}
+            {status === "available" && update?.body && (
+              <p className="text-[11px] text-mute leading-snug whitespace-pre-wrap">{update.body}</p>
+            )}
+            {status === "installing" && (
+              <div className="h-1 rounded-full bg-hairline overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-[width] duration-150"
+                  style={{ width: `${percent ?? 0}%` }}
+                />
+              </div>
+            )}
+            <p className="text-[11px] text-mute leading-snug">
+              {info?.windows_portable
+                ? get("updater.hintPortable")
+                : get("updater.hint")}
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

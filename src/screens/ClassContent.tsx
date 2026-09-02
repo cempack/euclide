@@ -118,9 +118,6 @@ export default function ClassContent({
       const rt = new Date();
       setLastRefresh(rt);
       contentCache.set(cacheKey, { data: items, ts: rt.getTime() });
-      if (items.length === 0) {
-        // empty state is shown in the page; do not toast success
-      }
     } catch (e: any) {
       setError(e?.message || "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof).");
       if (!hasStale) {
