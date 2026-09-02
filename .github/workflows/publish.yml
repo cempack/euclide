@@ -183,7 +183,37 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build ${{ matrix.args }} --config src-tauri/tauri.usb.conf.json
 
-      # Post-build: USB-friendly extras (zips / renamed AppImage). Updater assets stay as tauri-action uploaded them.
+      - name: Unbundle host Wayland libs from AppImage
+        id: appimage_wayland
+        if: runner.os == 'Linux'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          chmod +x scripts/appimage-unbundle-wayland.sh
+          scripts/appimage-unbundle-wayland.sh \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/appimage" \
+            "src-tauri/target/release/bundle/appimage"
+
+      - name: Replace Linux AppImage on the GitHub release
+        if: runner.os == 'Linux' && steps.rel.outputs.upload == 'true' && steps.appimage_wayland.outputs.repacked == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage*
+            src-tauri/target/release/bundle/appimage/*.AppImage*
+          )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No AppImage artifacts to upload."
+            exit 0
+          fi
+          gh release upload "${{ steps.rel.outputs.tag }}" "${files[@]}" --clobber --repo "${{ github.repository }}"
+        shell: bash
+
+      # Post-build: USB-friendly extras (zips / renamed AppImage). Linux AppImage
+      # has already had bundled libwayland stripped when present.
       - name: Package portable/standard apps
         run: |
           mkdir -p dist-portable
@@ -279,6 +309,7 @@ jobs:
           cd /tmp/euclide-updater
           gh release download "$TAG" --pattern 'Euclide-windows-portable.zip' --repo "$REPO"
           gh release download "$TAG" --pattern 'latest.json' --repo "$REPO"
+          gh release download "$TAG" --pattern '*amd64.AppImage.tar.gz.sig' --repo "$REPO" || true
           test -f Euclide-windows-portable.zip
           test -f latest.json
           npx --yes @tauri-apps/cli@2 signer sign Euclide-windows-portable.zip
@@ -297,6 +328,14 @@ jobs:
               platforms["windows-x86_64-nsis"] = win
           portable_url = f"https://github.com/{repo}/releases/download/{tag}/Euclide-windows-portable.zip"
           platforms["windows-x86_64"] = {"signature": sig, "url": portable_url}
+          linux_sigs = sorted(pathlib.Path(".").glob("*amd64.AppImage.tar.gz.sig"))
+          if linux_sigs:
+              linux_sig = linux_sigs[0].read_text().strip()
+              if linux_sig:
+                  linux = platforms.get("linux-x86_64") or {}
+                  linux["signature"] = linux_sig
+                  platforms["linux-x86_64"] = linux
+                  print("linux-x86_64 signature refreshed from", linux_sigs[0].name)
           pathlib.Path("latest.json").write_text(json.dumps(data, indent=2) + "\n")
           print("windows-x86_64 ->", portable_url)
           print("windows-x86_64-nsis ->", (platforms.get("windows-x86_64-nsis") or {}).get("url"))
