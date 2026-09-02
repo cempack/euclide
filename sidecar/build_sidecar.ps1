@@ -8,10 +8,10 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script = Join-Path $here "..\src-tauri\resources\euclide_sidecar.py"
 $out = Join-Path $here "dist"
 
-python -m pip install --upgrade pip
-python -m pip install -r (Join-Path $here "requirements.txt") pyinstaller
+python -m pip install --disable-pip-version-check --no-input -r (Join-Path $here "requirements.txt") pyinstaller
 
 python -m PyInstaller `
+  --noconfirm `
   --onedir `
   --noconsole `
   --name euclide-sidecar `

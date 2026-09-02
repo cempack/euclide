@@ -6,7 +6,7 @@
 # next to the Tauri executable / inside the app resources at bundle time.
 # --noconsole prevents terminal windows on Windows/mac when spawned from the GUI.
 #
-# Uses a temporary venv to avoid polluting system Python (important on macOS with Homebrew).
+# Reuses the build venv when present so local/CI rebuilds skip venv creation.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,19 +15,21 @@ OUT="$HERE/dist"
 VENV="$HERE/.build-venv"
 BUILD_DIR="$HERE/build"
 
-# Clean previous
-rm -rf "$VENV" "$OUT" "$BUILD_DIR"
+rm -rf "$OUT" "$BUILD_DIR"
 
-echo "Creating build venv..."
-python3 -m venv "$VENV"
+if [ ! -x "$VENV/bin/python" ]; then
+  echo "Creating build venv..."
+  python3 -m venv "$VENV"
+fi
+# shellcheck source=/dev/null
 source "$VENV/bin/activate"
 
 echo "Installing deps in venv..."
-python -m pip install --upgrade pip
-python -m pip install -r "$HERE/requirements.txt" pyinstaller
+python -m pip install --disable-pip-version-check --no-input -r "$HERE/requirements.txt" pyinstaller
 
 echo "Running PyInstaller..."
 python -m PyInstaller \
+  --noconfirm \
   --onedir \
   --noconsole \
   --name euclide-sidecar \
