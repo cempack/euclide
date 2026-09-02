@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTabs } from "../lib/tabs";
-import { api, type Course, type Note } from "../lib/api";
+import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon } from "./icons";
 import { get } from "../lib/i18n";
@@ -42,7 +42,7 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
         setCourses(cs);
 
         if (noteId) {
-          const all = await api.allNotes();
+          const all = (await api.allNotes()) ?? [];
           const found = all.find((n) => n.id === noteId);
           if (found && mounted) {
             setDraft(found);
@@ -68,6 +68,7 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
 
   // Auto save on changes (debounced)
   useEffect(() => {
+    if (!isTauri()) return;
     if (!dirty || !draft.title) return;
     const t = setTimeout(async () => {
       try {
@@ -78,10 +79,14 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
           body: draft.body || "",
           course_id: draft.course_id ?? null,
         });
+        if (!saved?.id) {
+          toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
+          return;
+        }
         setDraft(saved);
         setDirty(false);
         // If this was a fresh "new" tab, migrate it to the stable note:<id> key so lists can target it without dup tabs
-        if (wasNew && saved.id) {
+        if (wasNew) {
           const cur = tabs.activeId;
           if (cur && cur.startsWith("note:new:")) {
             setTimeout(() => {
@@ -248,27 +253,34 @@ export default function NoteEditor({ noteId, isNew, initialCourseId }: NoteEdito
       toast(get("notes.titleRequired", "Le titre est requis"), "error");
       return;
     }
-    const wasNew = draft.id == null;
-    const saved = await api.saveNote({
-      id: draft.id,
-      title: draft.title,
-      body: draft.body || "",
-      course_id: draft.course_id ?? null,
-    });
-    setDraft(saved);
-    setDirty(false);
-    toast(get("notes.saved", "Note enregistrée"), "success");
-    // migrate new tab -> stable id tab (prevents duplicate tabs when later opening from Documents/Course list)
-    if (wasNew && saved.id) {
-      const cur = tabs.activeId;
-      if (cur && cur.startsWith("note:new:")) {
-        setTimeout(() => {
-          tabs.close(cur);
-          tabs.open({ kind: "note", title: saved.title || "Note", params: { noteId: saved.id } });
-        }, 0);
+    try {
+      const wasNew = draft.id == null;
+      const saved = await api.saveNote({
+        id: draft.id,
+        title: draft.title,
+        body: draft.body || "",
+        course_id: draft.course_id ?? null,
+      });
+      if (!saved?.id) {
+        toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
+        return;
       }
+      setDraft(saved);
+      setDirty(false);
+      toast(get("notes.saved", "Note enregistrée"), "success");
+      if (wasNew && saved.id) {
+        const cur = tabs.activeId;
+        if (cur && cur.startsWith("note:new:")) {
+          setTimeout(() => {
+            tabs.close(cur);
+            tabs.open({ kind: "note", title: saved.title || "Note", params: { noteId: saved.id } });
+          }, 0);
+        }
+      }
+      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    } catch {
+      toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
     }
-    window.dispatchEvent(new CustomEvent("eu:library-changed"));
   };
 
   if (loading) {

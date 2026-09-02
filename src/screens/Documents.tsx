@@ -135,9 +135,9 @@ export default function Documents() {
   const [renameValue, setRenameValue] = useState("");
 
   const refresh = () => {
-    api.listFiles(null).then(setDocs).catch(() => {});
-    api.allNotes().then(setNotes).catch(() => {});
-    api.listCourses().then(setCourses).catch(() => {});
+    api.listFiles(null).then((f) => setDocs(Array.isArray(f) ? f : [])).catch(() => {});
+    api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
   };
   useEffect(() => {
     refresh();
@@ -151,7 +151,7 @@ export default function Documents() {
   const courseName = useCallback((id: number | null) => courses.find((c) => c.id === id)?.name, [courses]);
 
   const importDocs = async () => {
-    const added = await api.importFiles(null);
+    const added = (await api.importFiles(null)) ?? [];
     if (added.length) {
       added.forEach((f) => api.logEvent("file_import", f.name, null));
       toast(fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }), "success");

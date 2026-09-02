@@ -46,11 +46,11 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const refresh = () => {
     api.getTodayClasses().then(setClasses).catch(() => {});
     api.listReminders().then(setReminders).catch(() => {});
-    api.allNotes().then(setNotes).catch(() => {});
-    api.listCourses().then(setCourses).catch(() => {});
-    api.listFiles(null).then((f) => setDocCount(f.length)).catch(() => {});
-    api.listLinks().then(setLinks).catch(() => {});
-    api.recentFiles(5).then(setRecentFiles).catch(() => {});
+    api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
+    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
+    api.listFiles(null).then((f) => setDocCount(Array.isArray(f) ? f.length : 0)).catch(() => {});
+    api.listLinks().then((l) => setLinks(Array.isArray(l) ? l : [])).catch(() => {});
+    api.recentFiles(5).then((f) => setRecentFiles(Array.isArray(f) ? f : [])).catch(() => {});
     api.pronoteStatus().then(setPronoteStatus).catch(() => {});
     api.keepAwakeStatus().then((s) => setKeepAwakeOn(!!s)).catch(() => {});
     api.getRecap("today").then(setRecap).catch(() => {});

@@ -53,7 +53,7 @@ export default function Reminders() {
     setLoading(true);
     try {
       const list = await api.listReminders();
-      setReminders(list);
+      setReminders(Array.isArray(list) ? list : []);
     } catch {
       // silent
     }
@@ -71,7 +71,11 @@ export default function Reminders() {
     if (!newTitle.trim()) return;
     try {
       const due = newDue ? new Date(newDue).toISOString() : null;
-      await api.createReminder(newTitle.trim(), due);
+      const created = await api.createReminder(newTitle.trim(), due);
+      if (!created?.id) {
+        toast(t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel", "error");
+        return;
+      }
       toast(t.dashboard?.toastReminderAdded || "Rappel ajouté", "success");
       setNewTitle("");
       setNewDue("");

@@ -88,7 +88,11 @@ function LinksCard() {
   const add = async () => {
     if (!label.trim() || !url.trim()) return;
     const normalized = url.startsWith("http") ? url : `https://${url}`;
-    await api.createLink(label.trim(), normalized, ""); // icon field legacy; UI uses real favicon or default
+    const created = await api.createLink(label.trim(), normalized, "");
+    if (!created?.id) {
+      toast(t.common?.error || "Erreur", "error");
+      return;
+    }
     setLabel("");
     setUrl("");
     setOpen(false);

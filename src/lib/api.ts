@@ -73,14 +73,61 @@ export const isTauri = (): boolean =>
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
     console.warn(`[euclide] invoke("${cmd}") called outside Tauri - returning fallback.`);
-    return fallback<T>(cmd);
+    return fallback<T>(cmd, args);
   }
   return tauriInvoke<T>(cmd, args);
 }
 
-function fallback<T>(cmd: string): T {
-  if (cmd.startsWith("list_") || cmd.endsWith("_search") || cmd === "get_today_classes")
+function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
+  const listCmds = new Set([
+    "all_notes",
+    "recent_files",
+    "get_today_classes",
+    "get_file_versions",
+    "python_complete",
+    "pronote_classes",
+    "pronote_contents",
+    "import_files",
+    "import_paths",
+  ]);
+  if (cmd.startsWith("list_") || cmd.endsWith("_search") || listCmds.has(cmd)) {
     return [] as unknown as T;
+  }
+  if (cmd === "get_app_info") {
+    return {
+      teacher_name: "Monsieur Madrias",
+      author: "Elliot Moreau",
+      version: "0.1.0",
+      data_dir: "(navigateur — hors Tauri)",
+      windows_portable: false,
+    } as unknown as T;
+  }
+  if (cmd === "get_recap") {
+    return {
+      files_opened: 0,
+      notes_written: 0,
+      demos_run: 0,
+      reminders_done: 0,
+      active_minutes: 0,
+      top_courses: [],
+      top_documents: [],
+      top_tools: [],
+      time_by_area: [],
+    } as unknown as T;
+  }
+  if (cmd === "pronote_status") {
+    return { connected: false, account_name: null, last_sync: null } as unknown as T;
+  }
+  if (cmd === "keep_awake_status") return true as unknown as T;
+  if (cmd === "set_keep_awake") return Boolean(args?.on) as unknown as T;
+  if (cmd === "reindex_documents") return 0 as unknown as T;
+  if (cmd === "run_python_code" || cmd === "run_python_demo") {
+    return {
+      ok: false,
+      stdout: "",
+      stderr: "Sidecar Python indisponible hors application.",
+    } as unknown as T;
+  }
   return null as unknown as T;
 }
 
