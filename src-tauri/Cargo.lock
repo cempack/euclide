@@ -1029,6 +1029,7 @@ dependencies = [
  "keepawake",
  "minisign-verify",
  "reqwest",
+ "rfd",
  "rusqlite",
  "serde",
  "serde_json",
