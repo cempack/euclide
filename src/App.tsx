@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
 import { api, type AppInfo, isTauri } from "./lib/api";
-import { get } from "./lib/i18n";
+import { fmt, get } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
+import { checkForAppUpdate } from "./lib/updater";
 
 import { TabsProvider, useTabs, type TabKind } from "./lib/tabs";
 import { ToastProvider, useToast, Loading, COURSE_ICONS } from "./components/ui";
@@ -374,6 +375,33 @@ function Shell() {
  useEffect(() => {
  api.appInfo().then(setInfo).catch(() => {});
  }, []);
+
+ useEffect(() => {
+ if (!isTauri()) return;
+ let cancelled = false;
+ const timer = window.setTimeout(async () => {
+ try {
+ const update = await checkForAppUpdate();
+ if (cancelled || !update) return;
+ const seen = sessionStorage.getItem("euclide.updateNotified");
+ if (seen === update.version) return;
+ sessionStorage.setItem("euclide.updateNotified", update.version);
+ toast(
+ fmt(get("updater.availableToast", "Mise à jour {version} disponible — Réglages › À propos."), {
+ version: update.version,
+ }),
+ "info"
+ );
+ window.dispatchEvent(new CustomEvent("eu:update-available", { detail: update }));
+ } catch {
+ // Draft-only GitHub releases, offline, etc. Stay quiet.
+ }
+ }, 4000);
+ return () => {
+ cancelled = true;
+ window.clearTimeout(timer);
+ };
+ }, [toast]);
 
  // Global drag-and-drop file import into the documents library.
  useEffect(() => {

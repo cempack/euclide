@@ -367,6 +367,21 @@
     "title": "À propos"
   },
 
+  "updater": {
+    "check": "Vérifier les mises à jour",
+    "checking": "Recherche…",
+    "upToDate": "Euclide est à jour.",
+    "available": "Version {version} disponible (actuelle : {current}).",
+    "notes": "Notes",
+    "install": "Installer et redémarrer",
+    "installing": "Téléchargement… {percent} %",
+    "confirmInstall": "Installer la version {version} et redémarrer Euclide ?",
+    "error": "Impossible de vérifier les mises à jour.",
+    "noChannel": "Aucune version publiée pour le moment.",
+    "availableToast": "Mise à jour {version} disponible — Réglages › À propos.",
+    "hint": "Windows : la mise à jour installe le programme officiel (pas l’archive USB). Linux et macOS mettent à jour l’application en place."
+  },
+
   "classContent": {
     "back": "Retour au cours",
     "title": "Contenu du cours — {class}",

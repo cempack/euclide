@@ -12,8 +12,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             use tauri::Manager;
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
             app.manage(db::Db(std::sync::Mutex::new(db::open())));
             app.manage(KeepAwake::default());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
