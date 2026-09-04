@@ -12,6 +12,7 @@ import { t, fmt, get } from "../lib/i18n";
 import {
   checkForAppUpdate,
   dismissAvailableUpdate,
+  installErrorMessage,
   installPendingUpdate,
   isIncompleteUpdateManifest,
   isNoPublishedUpdate,
@@ -1048,8 +1049,9 @@ function AboutSection({ info }: { info: AppInfo | null }) {
       toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
     } catch (err) {
       setStatus("error");
-      setError(err instanceof Error ? err.message : String(err));
-      toast(get("updater.error", "Impossible de vérifier les mises à jour."), "error");
+      const msg = installErrorMessage(err) || get("updater.installFailed", "Impossible d'installer la mise à jour.");
+      setError(msg);
+      toast(msg, "error");
     }
   };
 

@@ -24,7 +24,7 @@ chrono = "0.4"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 keepawake = "0.6"
-tokio = { version = "1", features = ["process", "io-util", "sync"] }
+tokio = { version = "1", features = ["process", "io-util", "sync", "time"] }
 tauri-plugin-process = "2.3.1"
 # deflate-flate2 alone leaves flate2 with no compression backend. On Windows,
 # reqwest also depends on flate2 with default-features = false, so the unified

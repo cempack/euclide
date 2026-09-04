@@ -532,6 +532,7 @@
     "confirmInstall": "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le.",
     "installed": "Mise à jour installée. Fermez Euclide, puis rouvrez-le.",
     "error": "Impossible de vérifier les mises à jour.",
+    "installFailed": "Impossible d'installer la mise à jour.",
     "noChannel": "Aucune version publiée pour le moment.",
     "availableToast": "Mise à jour {version} disponible — Réglages › À propos.",
     "popupTitle": "Mise à jour {version}",
