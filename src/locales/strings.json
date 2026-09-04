@@ -404,7 +404,8 @@
     "importing": "Import…",
     "indexing": "Indexation…",
     "importError": "Import impossible (sélection annulée ?)",
-    "saved": "Enregistré"
+    "saved": "Enregistré",
+    "openUrlError": "Impossible d'ouvrir le lien"
   },
   "recap": {
     "subtitle": "temps passé dans l'application",
