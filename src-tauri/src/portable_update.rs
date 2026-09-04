@@ -9,8 +9,9 @@
 //! 2. Overlays **only** `euclide.exe` / `Euclide.exe`, `euclide-sidecar/**`, and
 //!    a couple of marker/readme files
 //! 3. Never deletes unknown files, `Euclide-Data`, or `euclide-data.json`
-//! 4. Replaces the running exe from a helper after this process exits, in the
-//!    **same folder** (including `E:\` on a stick). Does not start Euclide again.
+//! 4. Puts the new `euclide.exe` in place **before** the app quits (Windows can
+//!    rename a running exe, not overwrite it). Leftover `*.euclide-old` files
+//!    are deleted after this PID exits. Does not start Euclide again.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::Cursor;
@@ -19,49 +20,25 @@ use std::path::{Component, Path, PathBuf};
 use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::AppHandle;
-#[cfg(windows)]
-use tauri::Manager;
 
 const PORTABLE_MARKER: &str = "euclide.portable";
+const OLD_SUFFIX: &str = ".euclide-old";
+const NEW_SUFFIX: &str = ".euclide-new";
 
-/// Replaces the running exe only after this PID is gone. Does **not** start
-/// Euclide again — the user reopens it. Linux CI asserts wait / retry / no
-/// `Start-Process`: a silent copy skip would leave the old binary in place.
-const OVERLAY_HELPER_PS1: &str = r#"param(
+/// After this PID exits, delete renamed leftovers (`*.euclide-old`). The new
+/// exe is already at `$Dest\euclide.exe` — this script must not copy or start.
+const CLEANUP_HELPER_PS1: &str = r#"param(
   [Parameter(Mandatory=$true)][string]$Dest,
-  [Parameter(Mandatory=$true)][string]$Stage,
-  [Parameter(Mandatory=$true)][int]$AppPid,
-  [Parameter(Mandatory=$true)][string]$ExeName
+  [Parameter(Mandatory=$true)][int]$AppPid
 )
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'SilentlyContinue'
 $deadline = (Get-Date).AddSeconds(60)
 while ((Get-Process -Id $AppPid -ErrorAction SilentlyContinue) -and ((Get-Date) -lt $deadline)) {
   Start-Sleep -Milliseconds 250
 }
-Start-Sleep -Milliseconds 400
-
-function Copy-WithRetry([string]$From, [string]$To) {
-  $tries = 0
-  while ($tries -lt 10) {
-    try {
-      Copy-Item -LiteralPath $From -Destination $To -Recurse -Force -ErrorAction Stop
-      return $true
-    } catch {
-      $tries++
-      Start-Sleep -Milliseconds 400
-    }
-  }
-  return $false
-}
-
-# Overlay only: copy/overwrite files from the staging dir. Never Remove-Item on $Dest,
-# never robocopy /MIR. Euclide-Data, euclide-data.json, and any other files stay.
-if (Test-Path -LiteralPath $Stage) {
-  Get-ChildItem -LiteralPath $Stage -Force | ForEach-Object {
-    Copy-WithRetry $_.FullName $Dest | Out-Null
-  }
-}
-Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+Get-ChildItem -LiteralPath $Dest -Recurse -Force -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -like '*.euclide-old' -or $_.Name -like '*.euclide-new' } |
+  Remove-Item -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 "#;
 #[cfg(windows)]
@@ -306,6 +283,95 @@ pub fn extract_allowed_overlay(bytes: &[u8], dest: &Path) -> Result<usize, Strin
     Ok(written)
 }
 
+fn sibling_with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_os_string();
+    name.push(suffix);
+    PathBuf::from(name)
+}
+
+/// Windows can rename a running exe/dll but not overwrite it. Write the new
+/// bytes beside the target, move the live file out of the way, then put the
+/// new file at the original name.
+pub fn replace_locked_file(src: &Path, dest: &Path) -> Result<(), String> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Impossible de créer {}: {e}", parent.display()))?;
+    }
+
+    let incoming = sibling_with_suffix(dest, NEW_SUFFIX);
+    let backup = sibling_with_suffix(dest, OLD_SUFFIX);
+    let _ = std::fs::remove_file(&incoming);
+    std::fs::copy(src, &incoming)
+        .map_err(|e| format!("Impossible de préparer {}: {e}", dest.display()))?;
+
+    if dest.exists() {
+        let _ = std::fs::remove_file(&backup);
+        if let Err(e) = std::fs::rename(dest, &backup) {
+            let _ = std::fs::remove_file(&incoming);
+            return Err(format!(
+                "Impossible de déplacer {} (fichier verrouillé): {e}",
+                dest.display()
+            ));
+        }
+    }
+
+    if let Err(e) = std::fs::rename(&incoming, dest) {
+        if let Err(copy_err) = std::fs::copy(&incoming, dest) {
+            let _ = std::fs::rename(&backup, dest);
+            let _ = std::fs::remove_file(&incoming);
+            return Err(format!(
+                "Impossible d'installer {}: {e} / {copy_err}",
+                dest.display()
+            ));
+        }
+        let _ = std::fs::remove_file(&incoming);
+    }
+    Ok(())
+}
+
+fn collect_files(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    fn rec(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                rec(&path, out);
+            } else {
+                out.push(path);
+            }
+        }
+    }
+    rec(root, &mut out);
+    out
+}
+
+fn dest_has_app_exe(dest: &Path) -> bool {
+    dest.join("euclide.exe").is_file() || dest.join("Euclide.exe").is_file()
+}
+
+/// Copy staged app files onto `dest` now (rename-around locks). `Euclide-Data`
+/// is never touched. Fails if `euclide.exe` does not end up in `dest`.
+pub fn apply_staging_overlay(staging: &Path, dest: &Path) -> Result<usize, String> {
+    let mut written = 0usize;
+    for src in collect_files(staging) {
+        let Ok(rel) = src.strip_prefix(staging) else {
+            continue;
+        };
+        if rel.as_os_str().is_empty() || !is_allowed_overlay_rel(rel) {
+            continue;
+        }
+        replace_locked_file(&src, &dest.join(rel))?;
+        written += 1;
+    }
+    if written == 0 || !dest_has_app_exe(dest) {
+        return Err("La mise à jour n'a pas pu remplacer euclide.exe.".into());
+    }
+    Ok(written)
+}
+
 #[tauri::command]
 pub async fn apply_windows_portable_update(
     app: AppHandle,
@@ -326,7 +392,7 @@ pub async fn apply_windows_portable_update(
 
 #[cfg(windows)]
 async fn apply_windows_portable_update_inner(
-    app: AppHandle,
+    _app: AppHandle,
     url: String,
     signature: String,
     on_event: Channel<PortableDownloadEvent>,
@@ -350,24 +416,18 @@ async fn apply_windows_portable_update_inner(
     std::fs::create_dir_all(&staging)
         .map_err(|e| format!("Dossier temporaire de mise à jour: {e}"))?;
 
-    let written = match extract_allowed_overlay(&bytes, &staging) {
-        Ok(n) => n,
-        Err(e) => {
-            let _ = std::fs::remove_dir_all(&staging);
-            return Err(e);
-        }
-    };
-    let _ = written;
-
-    let exe_name = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.file_name().map(|n| n.to_os_string()))
-        .unwrap_or_else(|| std::ffi::OsString::from("euclide.exe"));
-
-    spawn_overlay_helper(&dest, &staging, &exe_name)?;
-    // Running `euclide.exe` cannot be overwritten. Quit so the helper can overlay.
-    // Do not start the new process — the user opens Euclide again.
-    app.exit(0);
+    if let Err(e) = extract_allowed_overlay(&bytes, &staging) {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err(e);
+    }
+    if let Err(e) = apply_staging_overlay(&staging, &dest) {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err(e);
+    }
+    let _ = std::fs::remove_dir_all(&staging);
+    // New exe is already on disk. Do not exit here — the UI tells the user to
+    // close and reopen. Helper only deletes `*.euclide-old` after this PID dies.
+    let _ = spawn_cleanup_helper(&dest);
     Ok(())
 }
 
@@ -424,11 +484,7 @@ async fn download_update(
 }
 
 #[cfg(windows)]
-fn spawn_overlay_helper(
-    dest: &Path,
-    staging: &Path,
-    exe_name: &std::ffi::OsStr,
-) -> Result<(), String> {
+fn spawn_cleanup_helper(dest: &Path) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -437,7 +493,7 @@ fn spawn_overlay_helper(
 
     let helper =
         std::env::temp_dir().join(format!("euclide-apply-update-{}.ps1", std::process::id()));
-    std::fs::write(&helper, OVERLAY_HELPER_PS1)
+    std::fs::write(&helper, CLEANUP_HELPER_PS1)
         .map_err(|e| format!("Helper de mise à jour: {e}"))?;
 
     let powershell = std::env::var("SystemRoot")
@@ -454,12 +510,8 @@ fn spawn_overlay_helper(
         .arg(&helper)
         .arg("-Dest")
         .arg(dest)
-        .arg("-Stage")
-        .arg(staging)
         .arg("-AppPid")
         .arg(std::process::id().to_string())
-        .arg("-ExeName")
-        .arg(exe_name)
         .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)
         .spawn()
         .map_err(|e| format!("Impossible de lancer le helper de mise à jour: {e}"))?;
@@ -669,27 +721,52 @@ mod tests {
     }
 
     #[test]
-    fn overlay_helper_waits_and_copies_without_starting_the_app() {
-        assert!(OVERLAY_HELPER_PS1.contains("Get-Process -Id $AppPid"));
-        assert!(OVERLAY_HELPER_PS1.contains("AddSeconds(60)"));
-        assert!(OVERLAY_HELPER_PS1.contains("Copy-WithRetry"));
-        assert!(OVERLAY_HELPER_PS1.contains("-ErrorAction Stop"));
+    fn cleanup_helper_only_deletes_renamed_leftovers() {
+        assert!(CLEANUP_HELPER_PS1.contains("Get-Process -Id $AppPid"));
+        assert!(CLEANUP_HELPER_PS1.contains("*.euclide-old"));
         assert!(
-            !OVERLAY_HELPER_PS1
-                .lines()
-                .any(|l| l.contains("Copy-Item") && l.contains("SilentlyContinue")),
-            "locked exe must not be skipped with SilentlyContinue"
-        );
-        assert!(
-            !OVERLAY_HELPER_PS1
+            !CLEANUP_HELPER_PS1
                 .lines()
                 .any(|l| !l.trim().starts_with('#') && l.contains("Start-Process")),
-            "must not auto-start Euclide after overlay"
+            "must not auto-start Euclide"
         );
-        assert!(!OVERLAY_HELPER_PS1.lines().any(|l| {
+        assert!(!CLEANUP_HELPER_PS1.lines().any(|l| {
             let t = l.trim();
-            !t.starts_with('#') && t.to_ascii_lowercase().contains("robocopy")
+            !t.starts_with('#') && t.to_ascii_lowercase().contains("copy-item")
         }));
+    }
+
+    #[test]
+    fn replace_locked_file_moves_old_aside_and_writes_new() {
+        let tmp = std::env::temp_dir().join(format!("euclide-replace-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("Euclide-Data")).unwrap();
+        std::fs::write(tmp.join("Euclide-Data/euclide.db"), b"KEEP-DB").unwrap();
+        std::fs::write(tmp.join("euclide.exe"), b"OLD-EXE").unwrap();
+        std::fs::create_dir_all(tmp.join("euclide-sidecar")).unwrap();
+        std::fs::write(tmp.join("euclide-sidecar/run.exe"), b"OLD-SC").unwrap();
+
+        let stage = tmp.join("stage");
+        std::fs::create_dir_all(stage.join("euclide-sidecar")).unwrap();
+        std::fs::write(stage.join("euclide.exe"), b"NEW-EXE").unwrap();
+        std::fs::write(stage.join("euclide-sidecar/run.exe"), b"NEW-SC").unwrap();
+        std::fs::write(stage.join("euclide.portable"), b"").unwrap();
+
+        apply_staging_overlay(&stage, &tmp).unwrap();
+        assert_eq!(std::fs::read(tmp.join("euclide.exe")).unwrap(), b"NEW-EXE");
+        assert_eq!(
+            std::fs::read(tmp.join("euclide.exe.euclide-old")).unwrap(),
+            b"OLD-EXE"
+        );
+        assert_eq!(
+            std::fs::read(tmp.join("euclide-sidecar/run.exe")).unwrap(),
+            b"NEW-SC"
+        );
+        assert_eq!(
+            std::fs::read(tmp.join("Euclide-Data/euclide.db")).unwrap(),
+            b"KEEP-DB"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
