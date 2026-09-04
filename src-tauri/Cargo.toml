@@ -1,6 +1,6 @@
 [package]
 name = "euclide"
-version = "0.1.0"
+version = "0.1.2"
 description = "Euclide - le bureau d'enseignement pour un professeur de mathématiques et NSI"
 authors = ["Elliot Moreau"]
 edition = "2021"
