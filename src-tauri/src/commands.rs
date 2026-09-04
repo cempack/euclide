@@ -2874,6 +2874,25 @@ pub async fn pronote_qr_login(
     })
 }
 
+/// Reuse a saved Pronote device id only when the same account logs in again.
+/// A leftover id from another URL/user is what produces the AES un-pad error.
+fn reuse_pronote_client_id(
+    stored_url: Option<&str>,
+    stored_user: Option<&str>,
+    url: &str,
+    username: &str,
+    stored_cid: Option<&str>,
+) -> Option<String> {
+    let cid = stored_cid.filter(|s| !s.is_empty())?;
+    let same_url = stored_url.is_some_and(|s| s == url);
+    let same_user = stored_user.is_some_and(|s| s == username);
+    if same_url && same_user {
+        Some(cid.to_string())
+    } else {
+        None
+    }
+}
+
 #[tauri::command]
 pub async fn pronote_password_login(
     app: AppHandle,
@@ -2883,32 +2902,37 @@ pub async fn pronote_password_login(
     password: String,
     pin: Option<String>,
 ) -> R<PronoteStatus> {
-    // Generate or retrieve a stable device name for PIN-based device registration
-    let device_name = {
+    // Device name is only meaningful together with a PIN (new-device
+    // registration). A leftover client_identifier from another account
+    // makes Pronote derive the wrong AES key.
+    let (device_name, client_id) = {
         let conn = state.0.lock().unwrap();
-        match get_setting_raw(&conn, "pronote_device_name") {
+        let device_name = match get_setting_raw(&conn, "pronote_device_name") {
             Some(d) => d,
             None => {
                 let d = format!("Euclide-{}", &uuid::Uuid::new_v4().to_string()[..8]);
                 set_setting_raw(&conn, "pronote_device_name", &d);
                 d
             }
-        }
-    };
-    // Load previously saved client_identifier (skips PIN on repeat logins)
-    let client_id = {
-        let conn = state.0.lock().unwrap();
-        get_setting_raw(&conn, "pronote_client_identifier")
+        };
+        let client_id = reuse_pronote_client_id(
+            get_setting_raw(&conn, "pronote_url").as_deref(),
+            get_setting_raw(&conn, "pronote_username").as_deref(),
+            &url,
+            &username,
+            get_setting_raw(&conn, "pronote_client_identifier").as_deref(),
+        );
+        (device_name, client_id)
     };
 
     let mut payload = json!({
         "url": url,
         "username": username,
         "password": password,
-        "device_name": device_name,
     });
-    if let Some(p) = &pin {
+    if let Some(p) = pin.as_ref().filter(|s| !s.is_empty()) {
         payload["pin"] = serde_json::Value::String(p.clone());
+        payload["device_name"] = serde_json::Value::String(device_name);
     }
     if let Some(cid) = &client_id {
         payload["client_identifier"] = serde_json::Value::String(cid.clone());
@@ -2938,7 +2962,11 @@ pub async fn pronote_password_login(
         set_setting_raw(&conn, "pronote_connected", "1");
         set_setting_raw(&conn, "pronote_mode", "password");
         set_setting_raw(&conn, "pronote_account", &account);
-        set_setting_raw(&conn, "pronote_url", &url);
+        let stored_url = res
+            .get("url")
+            .and_then(|x| x.as_str())
+            .unwrap_or(url.as_str());
+        set_setting_raw(&conn, "pronote_url", stored_url);
         set_setting_raw(&conn, "pronote_username", &username);
         set_setting_raw(&conn, "pronote_password", &password);
         // Persist client_identifier for future logins (skips PIN next time)
@@ -3552,5 +3580,40 @@ mod classroom_flow_tests {
         let density = crate::commands::get_setting_raw(&conn, "density").unwrap();
         assert_eq!(theme, "dark");
         assert_eq!(density, "compact");
+    }
+}
+
+#[cfg(test)]
+mod pronote_login_tests {
+    use super::reuse_pronote_client_id;
+
+    #[test]
+    fn client_id_reused_only_for_same_account() {
+        let cid = Some("ABC123");
+        assert_eq!(
+            reuse_pronote_client_id(
+                Some("https://demo/pronote/professeur.html"),
+                Some("demo"),
+                "https://demo/pronote/professeur.html",
+                "demo",
+                cid,
+            )
+            .as_deref(),
+            Some("ABC123")
+        );
+        assert_eq!(
+            reuse_pronote_client_id(
+                Some("https://old.example/pronote/professeur.html"),
+                Some("demo"),
+                "https://new.example/pronote/professeur.html",
+                "demo",
+                cid,
+            ),
+            None
+        );
+        assert_eq!(
+            reuse_pronote_client_id(None, None, "https://x/pronote/professeur.html", "a", cid),
+            None
+        );
     }
 }

@@ -366,6 +366,15 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
 
 type LoginMethod = "qr" | "direct";
 
+function pronoteErrorMessage(err: unknown): string {
+  let raw = "";
+  if (typeof err === "string") raw = err;
+  else if (err && typeof err === "object" && "message" in err) {
+    raw = String((err as { message: unknown }).message);
+  }
+  return raw.replace(/^"+|"+$/g, "");
+}
+
 function PronoteSection() {
   const toast = useToast();
   const [status, setStatus] = useState<PronoteStatus | null>(null);
@@ -423,8 +432,8 @@ function PronoteSection() {
     try {
       const s = await api.pronoteQrLogin(qrJson.trim(), pin.trim());
       await finishConnect(s);
-    } catch {
-      toast(t.settings?.toastConnectFail || "Connexion Pronote impossible", "error");
+    } catch (err) {
+      toast(pronoteErrorMessage(err) || (t.settings?.toastConnectFail || "Connexion Pronote impossible"), "error");
     } finally {
       setBusy(false);
     }
@@ -440,11 +449,10 @@ function PronoteSection() {
       const s = await api.pronotePasswordLogin(url.trim(), username.trim(), password, pinCode.trim() || undefined);
       await finishConnect(s);
     } catch (err) {
-      const msg = typeof err === "string" ? err : "";
-      // Detect PIN-required error from the backend
+      const msg = pronoteErrorMessage(err);
       if (msg.startsWith("NEEDS_PIN:")) {
         setNeedsPin(true);
-        toast("Code PIN requis pour cet appareil. Saisissez-le ci-dessous.", "error");
+        toast(msg.slice("NEEDS_PIN:".length) || "Code PIN requis pour cet appareil. Saisissez-le ci-dessous.", "error");
       } else {
         toast(msg || (t.settings?.toastConnectFail || "Connexion impossible"), "error");
       }

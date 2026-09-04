@@ -225,12 +225,101 @@ def _clear_cache():
     _cached_password = None
 
 
+def _normalize_pronote_url(url):
+    """Teachers usually paste the establishment root (`…/pronote/`).
+
+    pronotepy needs the account page (`professeur.html` / `eleve.html`).
+    Without it the AES challenge fails with the same 'un pad' error as a
+    bad password. Euclide is a teaching desk, so a bare /pronote root
+    becomes the professeur page. An explicit page is left alone.
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    raw = (url or "").strip()
+    if not raw:
+        return raw
+    if "://" not in raw:
+        raw = "https://" + raw
+    parts = urlsplit(raw)
+    path = parts.path or ""
+    leaf = path.rstrip("/").rsplit("/", 1)[-1] if path else ""
+    if leaf.endswith(".html") or leaf.endswith(".htm"):
+        return urlunsplit((parts.scheme, parts.netloc, path, parts.query, ""))
+    trimmed = path.rstrip("/")
+    if trimmed.endswith("/pronote") or trimmed == "/pronote":
+        path = trimmed + "/professeur.html"
+    elif trimmed == "":
+        path = "/pronote/professeur.html"
+    return urlunsplit((parts.scheme, parts.netloc, path, parts.query, ""))
+
+
+def _password_login_kwargs(pin, device_name, client_id):
+    """PIN registers a device. Sending `device_name` without a PIN (or a
+    leftover `client_identifier` from another account) makes Pronote
+    derive the wrong AES key and fail with the un-pad error.
+    """
+    kwargs = {}
+    if pin:
+        kwargs["account_pin"] = str(pin)
+        if device_name:
+            kwargs["device_name"] = str(device_name)
+    if client_id:
+        kwargs["client_identifier"] = str(client_id)
+    return kwargs
+
+
+def _is_login_crypto_error(exc):
+    text = str(exc).lower()
+    return any(
+        needle in text
+        for needle in ("decrypt", "un pad", "unpad", "bad username", "bad password")
+    )
+
+
+def _login_error_payload(exc, *, offered_pin):
+    if _is_login_crypto_error(exc):
+        if not offered_pin:
+            return {
+                "ok": False,
+                "needs_pin": True,
+                "error": (
+                    "NEEDS_PIN:Identifiants refusés. Vérifiez l'adresse Pronote "
+                    "(page professeur.html), l'identifiant et le mot de passe. "
+                    "Si le compte exige un code PIN, saisissez-le. "
+                    "Les établissements avec ENT se connectent par QR code."
+                ),
+            }
+        return {
+            "ok": False,
+            "error": (
+                "Identifiants refusés. Vérifiez l'adresse Pronote, l'identifiant, "
+                "le mot de passe et le code PIN. Les établissements avec ENT "
+                "se connectent par QR code."
+            ),
+        }
+    err_str = str(exc).lower()
+    if "pin" in err_str or "appareil" in err_str or "device" in err_str:
+        return {"ok": False, "error": f"NEEDS_PIN:Code PIN requis : {exc}", "needs_pin": True}
+    return {"ok": False, "error": f"Connexion refusée : {exc}"}
+
+
+def _open_password_client(pronotepy, url, username, password, pin, device_name, client_id):
+    kwargs = _password_login_kwargs(pin, device_name, client_id)
+    try:
+        return pronotepy.Client(url, username, password, **kwargs)
+    except Exception as exc:  # noqa: BLE001
+        if client_id and _is_login_crypto_error(exc):
+            retry = _password_login_kwargs(pin, device_name, None)
+            return pronotepy.Client(url, username, password, **retry)
+        raise
+
+
 def _get_client(payload):
     global _cached_client, _cached_url, _cached_username, _cached_password
     import pronotepy
 
     mode = payload.get("mode") or "qr"
-    url = payload.get("url")
+    url = _normalize_pronote_url(payload.get("url") or "")
     username = payload.get("username")
     password = payload.get("password")
     uuid = str(payload.get("uuid", ""))
@@ -253,15 +342,9 @@ def _get_client(payload):
 
     client = None
     if mode == "password":
-        # Build kwargs for pronotepy.Client, adding PIN params when provided
-        kwargs = {}
-        if pin:
-            kwargs["account_pin"] = str(pin)
-        if device_name:
-            kwargs["device_name"] = str(device_name)
-        if client_id:
-            kwargs["client_identifier"] = str(client_id)
-        client = pronotepy.Client(url, username, password, **kwargs)
+        client = _open_password_client(
+            pronotepy, url, username, password, pin, device_name, client_id
+        )
     else:
         try:
             login_args = [url, username, password, uuid]
@@ -307,7 +390,7 @@ def pronote_login(payload):
     try:
         client = pronotepy.Client.qrcode_login(qr, pin, uuid)
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"Connexion refusee : {exc}"}
+        return _login_error_payload(exc, offered_pin=bool(pin))
 
     if not getattr(client, "logged_in", False):
         return {"ok": False, "error": "Identifiants invalides."}
@@ -336,7 +419,7 @@ def pronote_password_login(payload):
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
-    url = str(payload.get("url", "")).strip()
+    url = _normalize_pronote_url(str(payload.get("url", "")))
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", ""))
     pin = payload.get("pin") or None
@@ -347,20 +430,11 @@ def pronote_password_login(payload):
         return {"ok": False, "error": "URL, identifiant et mot de passe requis."}
 
     try:
-        kwargs = {}
-        if pin:
-            kwargs["account_pin"] = str(pin)
-        if device_name:
-            kwargs["device_name"] = str(device_name)
-        if client_id:
-            kwargs["client_identifier"] = str(client_id)
-        client = pronotepy.Client(url, username, password, **kwargs)
+        client = _open_password_client(
+            pronotepy, url, username, password, pin, device_name, client_id
+        )
     except Exception as exc:  # noqa: BLE001
-        err_str = str(exc).lower()
-        # Detect PIN-required errors so the UI can prompt the user
-        if "pin" in err_str or "code" in err_str or "appareil" in err_str or "device" in err_str:
-            return {"ok": False, "error": f"Code PIN requis : {exc}", "needs_pin": True}
-        return {"ok": False, "error": f"Connexion refusee : {exc}"}
+        return _login_error_payload(exc, offered_pin=bool(pin))
 
     if not getattr(client, "logged_in", False):
         return {"ok": False, "error": "Identifiants invalides."}
