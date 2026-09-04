@@ -14,7 +14,7 @@ import {
  ProjectorIcon,
  TrashIcon,
 } from "../components/icons";
-import { Favicon } from "../components/Favicon";
+import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 
 export default function Tools() {
  return (
@@ -220,15 +220,28 @@ function LinksSection() {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
-  const [remoteIcons, setRemoteIcons] = useState(false);
+  const [remoteIcons, setRemoteIcons] = useState(true);
 
   const refresh = () => api.listLinks().then(setLinks).catch(() => {});
   useEffect(() => {
     refresh();
-    api
-      .getSetting("remote_favicons")
-      .then((v) => setRemoteIcons(v === "1"))
-      .catch(() => {});
+    const readIcons = () => {
+      api
+        .getSetting("remote_favicons")
+        .then((v) => setRemoteIcons(remoteFaviconsEnabled(v)))
+        .catch(() => {});
+    };
+    readIcons();
+    const onChange = () => {
+      refresh();
+      readIcons();
+    };
+    window.addEventListener("eu:quicklinks-changed", onChange);
+    window.addEventListener("eu:settings-changed", onChange);
+    return () => {
+      window.removeEventListener("eu:quicklinks-changed", onChange);
+      window.removeEventListener("eu:settings-changed", onChange);
+    };
   }, []);
 
   const add = async () => {

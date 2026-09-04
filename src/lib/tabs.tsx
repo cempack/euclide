@@ -66,7 +66,21 @@ const SINGLETONS: TabKind[] = [
   "recap",
 ];
 
-const DEFAULT_MAX_TABS = 10;
+/** How the tab cap is chosen. `auto` follows the strip width; the others are explicit. */
+export type MaxTabsMode = "auto" | "unlimited" | "fixed";
+
+/** Smallest number of tabs we will keep available in auto / fixed modes. */
+export const TAB_FIT_MIN = 3;
+/** Typical painted width of one tab (icon + title + close), used to count how many fit. */
+export const TAB_SLOT_PX = 156;
+/** Used only until the strip has been measured. */
+const TAB_FIT_FALLBACK = 8;
+const MAX_TABS_FIXED_CAP = 30;
+
+export function fitTabCount(availablePx: number): number {
+  if (!Number.isFinite(availablePx) || availablePx <= 0) return TAB_FIT_MIN;
+  return Math.max(TAB_FIT_MIN, Math.floor(availablePx / TAB_SLOT_PX));
+}
 
 const DEFAULT_TITLES: Record<TabKind, string> = {
   dashboard: "Tableau de bord",
@@ -101,6 +115,22 @@ function keyOf(spec: OpenSpec): string {
   return `${spec.kind}:${Math.random().toString(36).slice(2)}`;
 }
 
+function evictToLimit(
+  prev: Tab[],
+  limit: number,
+  activeId: string,
+  dirty: Record<string, boolean>
+): Tab[] {
+  if (limit <= 0 || prev.length <= limit) return prev;
+  const next = [...prev];
+  while (next.length > limit) {
+    const evictIdx = next.findIndex((t) => t.id !== activeId && !t.pinned && !dirty[t.id]);
+    if (evictIdx === -1) break;
+    next.splice(evictIdx, 1);
+  }
+  return next;
+}
+
 function isRestorable(t: { kind: TabKind; params: TabParams }): boolean {
   if (t.kind === "note" && !t.params.noteId) return false;
   if (t.kind === "whiteboard" && !t.params.fileId) return false;
@@ -126,7 +156,15 @@ type TabsCtx = {
   /** Drag-and-drop reordering of the tab strip. */
   move: (fromIndex: number, toIndex: number) => void;
   togglePin: (id: string) => void;
+  /** Effective cap used when opening a tab. `0` means unlimited. */
   maxTabs: number;
+  maxTabsMode: MaxTabsMode;
+  /** Remembered slider value when the mode is not `fixed`. */
+  maxTabsFixed: number;
+  /** How many tabs the strip can paint without scrolling. `0` until measured. */
+  tabFitCapacity: number;
+  setTabFitCapacity: (n: number) => void;
+  setMaxTabsMode: (mode: MaxTabsMode, fixed?: number) => void;
   updateMaxTabs: (n: number) => void;
   isDirty: (id: string) => boolean;
   setTabDirty: (id: string, dirty: boolean) => void;
@@ -153,9 +191,20 @@ const HOME: Tab = {
 export function TabsProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<Tab[]>([HOME]);
   const [activeId, setActiveId] = useState<string>("dashboard");
-  const [maxTabs, setMaxTabs] = useState<number>(DEFAULT_MAX_TABS);
+  const [maxTabsMode, setMaxTabsModeState] = useState<MaxTabsMode>("auto");
+  const [maxTabsFixed, setMaxTabsFixed] = useState<number>(TAB_FIT_FALLBACK);
+  const [tabFitCapacity, setTabFitCapacityState] = useState<number>(0);
   const [dirtyMap, setDirtyMap] = useState<Record<string, boolean>>({});
   const [hydrated, setHydrated] = useState(false);
+
+  const effectiveMaxTabs =
+    maxTabsMode === "unlimited"
+      ? 0
+      : maxTabsMode === "auto"
+        ? tabFitCapacity > 0
+          ? tabFitCapacity
+          : TAB_FIT_FALLBACK
+        : maxTabsFixed;
 
   const activeIdRef = useRef<string>(activeId);
   useEffect(() => {
@@ -173,21 +222,29 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const v = await api.getSetting("max_tabs");
+        const [modeRaw, nRaw] = await Promise.all([
+          api.getSetting("max_tabs_mode"),
+          api.getSetting("max_tabs"),
+        ]);
         if (cancelled) return;
-        if (v != null) {
-          const n = parseInt(v, 10);
-          if (!isNaN(n) && n >= 0) setMaxTabs(n);
-          else {
-            api.setSetting("max_tabs", String(DEFAULT_MAX_TABS)).catch(() => {});
-            setMaxTabs(DEFAULT_MAX_TABS);
-          }
+        const n = nRaw != null ? parseInt(nRaw, 10) : NaN;
+        if (Number.isFinite(n) && n >= 3) {
+          setMaxTabsFixed(Math.min(MAX_TABS_FIXED_CAP, Math.floor(n)));
+        }
+        if (modeRaw === "unlimited") {
+          setMaxTabsModeState("unlimited");
+        } else if (modeRaw === "fixed" && Number.isFinite(n) && n > 0) {
+          setMaxTabsModeState("fixed");
+        } else if (modeRaw === "auto") {
+          setMaxTabsModeState("auto");
+        } else if (nRaw === "0") {
+          setMaxTabsModeState("unlimited");
         } else {
-          api.setSetting("max_tabs", String(DEFAULT_MAX_TABS)).catch(() => {});
-          setMaxTabs(DEFAULT_MAX_TABS);
+          setMaxTabsModeState("auto");
+          api.setSetting("max_tabs_mode", "auto").catch(() => {});
         }
       } catch {
-        if (!cancelled) setMaxTabs(DEFAULT_MAX_TABS);
+        if (!cancelled) setMaxTabsModeState("auto");
       }
 
       try {
@@ -328,14 +385,13 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         }
 
         let nextTabs = prev;
-        if (maxTabs > 0 && prev.length >= maxTabs) {
-          const curActive = activeIdRef.current;
-          const evictIdx = prev.findIndex(
-            (t) => t.id !== curActive && !t.pinned && !dirtyMapRef.current[t.id]
+        if (effectiveMaxTabs > 0 && prev.length >= effectiveMaxTabs) {
+          nextTabs = evictToLimit(
+            prev,
+            effectiveMaxTabs - 1,
+            activeIdRef.current,
+            dirtyMapRef.current
           );
-          if (evictIdx !== -1) {
-            nextTabs = prev.filter((_, i) => i !== evictIdx);
-          }
         }
         return [...nextTabs, { id, kind: spec.kind, title, params: newParams, mountId: newMountId() }];
       });
@@ -345,30 +401,45 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       }
       return id;
     },
-    [maxTabs]
+    [effectiveMaxTabs]
   );
 
-  const updateMaxTabs = useCallback((n: number) => {
-    const val = n <= 0 ? 0 : Math.max(3, Math.min(30, Math.floor(n)));
-    setMaxTabs(val);
-    api.setSetting("max_tabs", String(val)).catch(() => {});
-
-    if (val > 0) {
-      setTabs((prev) => {
-        if (prev.length <= val) return prev;
-        const curActive = activeIdRef.current;
-        let next = [...prev];
-        while (next.length > val) {
-          const evictIdx = next.findIndex(
-            (t) => t.id !== curActive && !t.pinned && !dirtyMapRef.current[t.id]
-          );
-          if (evictIdx !== -1) next.splice(evictIdx, 1);
-          else break;
-        }
-        return next;
-      });
-    }
+  const setTabFitCapacity = useCallback((n: number) => {
+    const count = Math.max(TAB_FIT_MIN, Math.floor(n));
+    setTabFitCapacityState((prev) => (prev === count ? prev : count));
   }, []);
+
+  useEffect(() => {
+    if (maxTabsMode !== "auto" || tabFitCapacity < TAB_FIT_MIN) return;
+    setTabs((prev) => evictToLimit(prev, tabFitCapacity, activeIdRef.current, dirtyMapRef.current));
+  }, [maxTabsMode, tabFitCapacity]);
+
+  const setMaxTabsMode = useCallback((mode: MaxTabsMode, fixed?: number) => {
+    const nextFixed =
+      typeof fixed === "number" && Number.isFinite(fixed)
+        ? Math.max(TAB_FIT_MIN, Math.min(MAX_TABS_FIXED_CAP, Math.floor(fixed)))
+        : null;
+    if (nextFixed != null) {
+      setMaxTabsFixed(nextFixed);
+      api.setSetting("max_tabs", String(nextFixed)).catch(() => {});
+    }
+    setMaxTabsModeState(mode);
+    api.setSetting("max_tabs_mode", mode).catch(() => {});
+    if (mode === "unlimited") {
+      api.setSetting("max_tabs", "0").catch(() => {});
+    } else {
+      const cap = nextFixed ?? maxTabsFixed;
+      api.setSetting("max_tabs", String(cap)).catch(() => {});
+      if (mode === "fixed") {
+        setTabs((prev) => evictToLimit(prev, cap, activeIdRef.current, dirtyMapRef.current));
+      }
+    }
+  }, [maxTabsFixed]);
+
+  const updateMaxTabs = useCallback((n: number) => {
+    if (n <= 0) setMaxTabsMode("unlimited");
+    else setMaxTabsMode("fixed", n);
+  }, [setMaxTabsMode]);
 
   const close = useCallback((id: string) => {
     setDirtyMap((prev) => {
@@ -503,7 +574,12 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       focusIndex,
       move,
       togglePin,
-      maxTabs,
+      maxTabs: effectiveMaxTabs,
+      maxTabsMode,
+      maxTabsFixed,
+      tabFitCapacity,
+      setTabFitCapacity,
+      setMaxTabsMode,
       updateMaxTabs,
       isDirty,
       setTabDirty,
@@ -522,7 +598,12 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       focusIndex,
       move,
       togglePin,
-      maxTabs,
+      effectiveMaxTabs,
+      maxTabsMode,
+      maxTabsFixed,
+      tabFitCapacity,
+      setTabFitCapacity,
+      setMaxTabsMode,
       updateMaxTabs,
       dirtyMap,
       isDirty,
