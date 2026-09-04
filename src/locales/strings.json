@@ -526,10 +526,11 @@
     "upToDate": "Euclide est à jour.",
     "available": "Version {version} disponible (actuelle : {current}).",
     "notes": "Notes",
-    "install": "Installer et redémarrer",
+    "install": "Installer",
     "installing": "Téléchargement… {percent}\u202f%",
     "publishing": "Publication encore en cours pour cette plateforme. Réessayez dans un moment.",
-    "confirmInstall": "Installer la version {version} et redémarrer Euclide ?",
+    "confirmInstall": "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le.",
+    "installed": "Mise à jour installée. Fermez Euclide, puis rouvrez-le.",
     "error": "Impossible de vérifier les mises à jour.",
     "noChannel": "Aucune version publiée pour le moment.",
     "availableToast": "Mise à jour {version} disponible — Réglages › À propos.",
@@ -538,8 +539,8 @@
     "popupDismiss": "Fermer",
     "popupLater": "Plus tard",
     "popupInstall": "Installer",
-    "hint": "Windows installé : mise à jour via l’installateur. Linux et macOS se mettent à jour en place.",
-    "hintPortable": "Windows portable : la mise à jour remplace uniquement le programme dans ce dossier (clé USB comprise). Euclide-Data et vos fichiers restent en place."
+    "hint": "Windows installé : mise à jour via l’installateur. Linux et macOS se mettent à jour en place. Fermez ensuite Euclide, puis rouvrez-le.",
+    "hintPortable": "Windows portable : la mise à jour remplace uniquement le programme dans ce dossier (clé USB comprise). Euclide-Data et vos fichiers restent en place. Fermez ensuite Euclide, puis rouvrez-le."
   },
   "classContent": {
     "back": "Retour au cours",

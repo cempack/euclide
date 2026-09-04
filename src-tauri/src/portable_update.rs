@@ -10,7 +10,7 @@
 //!    a couple of marker/readme files
 //! 3. Never deletes unknown files, `Euclide-Data`, or `euclide-data.json`
 //! 4. Replaces the running exe from a helper after this process exits, in the
-//!    **same folder** (including `E:\` on a stick)
+//!    **same folder** (including `E:\` on a stick). Does not start Euclide again.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::Cursor;
@@ -24,10 +24,9 @@ use tauri::Manager;
 
 const PORTABLE_MARKER: &str = "euclide.portable";
 
-/// Replaces the running exe only after this PID is gone, then starts the new
-/// one from `$Dest` (USB folder). Linux CI asserts the wait / retry / relaunch
-/// contract — Windows file locks on `euclide.exe` and the sidecar linger after
-/// `ExitProcess`, and a silent copy failure would restart the *old* binary.
+/// Replaces the running exe only after this PID is gone. Does **not** start
+/// Euclide again — the user reopens it. Linux CI asserts wait / retry / no
+/// `Start-Process`: a silent copy skip would leave the old binary in place.
 const OVERLAY_HELPER_PS1: &str = r#"param(
   [Parameter(Mandatory=$true)][string]$Dest,
   [Parameter(Mandatory=$true)][string]$Stage,
@@ -39,9 +38,7 @@ $deadline = (Get-Date).AddSeconds(60)
 while ((Get-Process -Id $AppPid -ErrorAction SilentlyContinue) -and ((Get-Date) -lt $deadline)) {
   Start-Sleep -Milliseconds 250
 }
-# Handles on exe / sidecar / SQLite WAL are often still held for a beat.
-Start-Sleep -Milliseconds 700
-Get-Process -Name 'euclide-sidecar' -ErrorAction SilentlyContinue | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 400
 
 function Copy-WithRetry([string]$From, [string]$To) {
   $tries = 0
@@ -63,11 +60,6 @@ if (Test-Path -LiteralPath $Stage) {
   Get-ChildItem -LiteralPath $Stage -Force | ForEach-Object {
     Copy-WithRetry $_.FullName $Dest | Out-Null
   }
-}
-$exe = Join-Path $Dest $ExeName
-if (Test-Path -LiteralPath $exe) {
-  Start-Sleep -Milliseconds 200
-  Start-Process -FilePath $exe -WorkingDirectory $Dest
 }
 Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
@@ -367,17 +359,14 @@ async fn apply_windows_portable_update_inner(
     };
     let _ = written;
 
-    if let Some(sc) = app.try_state::<crate::sidecar::Sidecar>() {
-        sc.stop().await;
-    }
-
     let exe_name = std::env::current_exe()
         .ok()
         .and_then(|p| p.file_name().map(|n| n.to_os_string()))
         .unwrap_or_else(|| std::ffi::OsString::from("euclide.exe"));
 
     spawn_overlay_helper(&dest, &staging, &exe_name)?;
-    // Helper is already watching this PID. Exit now so it can overlay and relaunch.
+    // Running `euclide.exe` cannot be overwritten. Quit so the helper can overlay.
+    // Do not start the new process — the user opens Euclide again.
     app.exit(0);
     Ok(())
 }
@@ -680,11 +669,9 @@ mod tests {
     }
 
     #[test]
-    fn overlay_helper_waits_retries_and_restarts_from_dest() {
+    fn overlay_helper_waits_and_copies_without_starting_the_app() {
         assert!(OVERLAY_HELPER_PS1.contains("Get-Process -Id $AppPid"));
         assert!(OVERLAY_HELPER_PS1.contains("AddSeconds(60)"));
-        assert!(OVERLAY_HELPER_PS1.contains("Start-Sleep -Milliseconds 700"));
-        assert!(OVERLAY_HELPER_PS1.contains("Wait-Process -Timeout 15"));
         assert!(OVERLAY_HELPER_PS1.contains("Copy-WithRetry"));
         assert!(OVERLAY_HELPER_PS1.contains("-ErrorAction Stop"));
         assert!(
@@ -693,7 +680,12 @@ mod tests {
                 .any(|l| l.contains("Copy-Item") && l.contains("SilentlyContinue")),
             "locked exe must not be skipped with SilentlyContinue"
         );
-        assert!(OVERLAY_HELPER_PS1.contains("Start-Process -FilePath $exe -WorkingDirectory $Dest"));
+        assert!(
+            !OVERLAY_HELPER_PS1
+                .lines()
+                .any(|l| !l.trim().starts_with('#') && l.contains("Start-Process")),
+            "must not auto-start Euclide after overlay"
+        );
         assert!(!OVERLAY_HELPER_PS1.lines().any(|l| {
             let t = l.trim();
             !t.starts_with('#') && t.to_ascii_lowercase().contains("robocopy")
