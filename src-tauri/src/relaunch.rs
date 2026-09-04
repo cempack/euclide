@@ -2,6 +2,29 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
 
+/// Wait until this PID is gone, then start the updated exe from its folder.
+/// Same race as Linux: spawning while we still hold `euclide.exe` / SQLite fails
+/// or starts a second instance that dies. Portable Windows must *not* call
+/// `relaunch_after_update` — the overlay helper replaces the exe only after exit.
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+const WINDOWS_RELAUNCH_PS1: &str = r#"
+$ErrorActionPreference = 'SilentlyContinue'
+$appPid = [int]$env:EUCLIDE_RELAUNCH_PID
+$bin = $env:EUCLIDE_RELAUNCH_BIN
+$cwd = $env:EUCLIDE_RELAUNCH_CWD
+if (-not $bin -or -not (Test-Path -LiteralPath $bin)) { exit 1 }
+$deadline = (Get-Date).AddSeconds(45)
+while ((Get-Process -Id $appPid -ErrorAction SilentlyContinue) -and ((Get-Date) -lt $deadline)) {
+  Start-Sleep -Milliseconds 200
+}
+Start-Sleep -Milliseconds 500
+if ($cwd -and (Test-Path -LiteralPath $cwd)) {
+  Start-Process -FilePath $bin -WorkingDirectory $cwd
+} else {
+  Start-Process -FilePath $bin
+}
+"#;
+
 /// Spawn the updated binary and quit this process.
 ///
 /// After an AppImage update the squashfs mount still holds the *old* payload.
@@ -41,7 +64,11 @@ fn spawn_updated_binary() -> bool {
         }
         return spawn_unix_relaunch_helper(&path).is_ok();
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        return spawn_windows_relaunch_helper(&path).is_ok();
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         Command::new(&path)
             .stdin(Stdio::null())
@@ -84,6 +111,42 @@ exec \"$bin\"
     }
     cmd.process_group(0);
     cmd.spawn()
+}
+
+#[cfg(windows)]
+fn spawn_windows_relaunch_helper(path: &Path) -> std::io::Result<std::process::Child> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+
+    let cwd = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let powershell = std::env::var("SystemRoot")
+        .map(|r| format!(r"{r}\System32\WindowsPowerShell\v1.0\powershell.exe"))
+        .unwrap_or_else(|_| "powershell.exe".into());
+
+    Command::new(powershell)
+        .arg("-NoProfile")
+        .arg("-WindowStyle")
+        .arg("Hidden")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-Command")
+        .arg(WINDOWS_RELAUNCH_PS1.trim())
+        .env("EUCLIDE_RELAUNCH_PID", std::process::id().to_string())
+        .env("EUCLIDE_RELAUNCH_BIN", path.as_os_str())
+        .env("EUCLIDE_RELAUNCH_CWD", cwd.as_os_str())
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)
+        .spawn()
 }
 
 #[cfg(test)]
@@ -130,5 +193,21 @@ mod tests {
         let mut child = child.expect("helper should spawn");
         let _ = child.kill();
         let _ = child.wait();
+    }
+
+    #[test]
+    fn windows_relaunch_helper_waits_then_starts_from_exe_dir() {
+        assert!(WINDOWS_RELAUNCH_PS1.contains("Get-Process -Id $appPid"));
+        assert!(WINDOWS_RELAUNCH_PS1.contains("Start-Sleep -Milliseconds 500"));
+        assert!(
+            WINDOWS_RELAUNCH_PS1.contains("Start-Process -FilePath $bin -WorkingDirectory $cwd")
+        );
+        assert!(WINDOWS_RELAUNCH_PS1.contains("EUCLIDE_RELAUNCH_PID"));
+        assert!(WINDOWS_RELAUNCH_PS1.contains("EUCLIDE_RELAUNCH_CWD"));
+        // `$PID` is reserved in PowerShell; a naive `$pid` would be this process, not the app.
+        assert!(
+            !WINDOWS_RELAUNCH_PS1.contains("$PID") && !WINDOWS_RELAUNCH_PS1.contains("$pid"),
+            "must not use PowerShell automatic $PID"
+        );
     }
 }

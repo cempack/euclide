@@ -23,6 +23,55 @@ use tauri::AppHandle;
 use tauri::Manager;
 
 const PORTABLE_MARKER: &str = "euclide.portable";
+
+/// Replaces the running exe only after this PID is gone, then starts the new
+/// one from `$Dest` (USB folder). Linux CI asserts the wait / retry / relaunch
+/// contract — Windows file locks on `euclide.exe` and the sidecar linger after
+/// `ExitProcess`, and a silent copy failure would restart the *old* binary.
+const OVERLAY_HELPER_PS1: &str = r#"param(
+  [Parameter(Mandatory=$true)][string]$Dest,
+  [Parameter(Mandatory=$true)][string]$Stage,
+  [Parameter(Mandatory=$true)][int]$AppPid,
+  [Parameter(Mandatory=$true)][string]$ExeName
+)
+$ErrorActionPreference = 'Continue'
+$deadline = (Get-Date).AddSeconds(60)
+while ((Get-Process -Id $AppPid -ErrorAction SilentlyContinue) -and ((Get-Date) -lt $deadline)) {
+  Start-Sleep -Milliseconds 250
+}
+# Handles on exe / sidecar / SQLite WAL are often still held for a beat.
+Start-Sleep -Milliseconds 700
+Get-Process -Name 'euclide-sidecar' -ErrorAction SilentlyContinue | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
+
+function Copy-WithRetry([string]$From, [string]$To) {
+  $tries = 0
+  while ($tries -lt 10) {
+    try {
+      Copy-Item -LiteralPath $From -Destination $To -Recurse -Force -ErrorAction Stop
+      return $true
+    } catch {
+      $tries++
+      Start-Sleep -Milliseconds 400
+    }
+  }
+  return $false
+}
+
+# Overlay only: copy/overwrite files from the staging dir. Never Remove-Item on $Dest,
+# never robocopy /MIR. Euclide-Data, euclide-data.json, and any other files stay.
+if (Test-Path -LiteralPath $Stage) {
+  Get-ChildItem -LiteralPath $Stage -Force | ForEach-Object {
+    Copy-WithRetry $_.FullName $Dest | Out-Null
+  }
+}
+$exe = Join-Path $Dest $ExeName
+if (Test-Path -LiteralPath $exe) {
+  Start-Sleep -Milliseconds 200
+  Start-Process -FilePath $exe -WorkingDirectory $Dest
+}
+Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+"#;
 #[cfg(windows)]
 const STAGING_PREFIX: &str = "euclide-update-";
 #[cfg(windows)]
@@ -328,12 +377,8 @@ async fn apply_windows_portable_update_inner(
         .unwrap_or_else(|| std::ffi::OsString::from("euclide.exe"));
 
     spawn_overlay_helper(&dest, &staging, &exe_name)?;
-
-    let app2 = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-        app2.exit(0);
-    });
+    // Helper is already watching this PID. Exit now so it can overlay and relaunch.
+    app.exit(0);
     Ok(())
 }
 
@@ -403,31 +448,8 @@ fn spawn_overlay_helper(
 
     let helper =
         std::env::temp_dir().join(format!("euclide-apply-update-{}.ps1", std::process::id()));
-    let script = r#"param(
-  [Parameter(Mandatory=$true)][string]$Dest,
-  [Parameter(Mandatory=$true)][string]$Stage,
-  [Parameter(Mandatory=$true)][int]$AppPid,
-  [Parameter(Mandatory=$true)][string]$ExeName
-)
-$ErrorActionPreference = 'Continue'
-while (Get-Process -Id $AppPid -ErrorAction SilentlyContinue) {
-  Start-Sleep -Milliseconds 400
-}
-# Overlay only: copy/overwrite files from the staging dir. Never Remove-Item on $Dest,
-# never robocopy /MIR. Euclide-Data, euclide-data.json, and any other files stay.
-if (Test-Path -LiteralPath $Stage) {
-  Get-ChildItem -LiteralPath $Stage -Force | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $Dest -Recurse -Force -ErrorAction SilentlyContinue
-  }
-}
-$exe = Join-Path $Dest $ExeName
-if (Test-Path -LiteralPath $exe) {
-  Start-Process -FilePath $exe -WorkingDirectory $Dest
-}
-Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
-"#;
-    std::fs::write(&helper, script).map_err(|e| format!("Helper de mise à jour: {e}"))?;
+    std::fs::write(&helper, OVERLAY_HELPER_PS1)
+        .map_err(|e| format!("Helper de mise à jour: {e}"))?;
 
     let powershell = std::env::var("SystemRoot")
         .map(|r| format!(r"{r}\System32\WindowsPowerShell\v1.0\powershell.exe"))
@@ -655,6 +677,27 @@ mod tests {
         );
         assert_eq!(std::fs::read(tmp.join("keep.bin")).unwrap(), b"KEEP");
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn overlay_helper_waits_retries_and_restarts_from_dest() {
+        assert!(OVERLAY_HELPER_PS1.contains("Get-Process -Id $AppPid"));
+        assert!(OVERLAY_HELPER_PS1.contains("AddSeconds(60)"));
+        assert!(OVERLAY_HELPER_PS1.contains("Start-Sleep -Milliseconds 700"));
+        assert!(OVERLAY_HELPER_PS1.contains("Wait-Process -Timeout 15"));
+        assert!(OVERLAY_HELPER_PS1.contains("Copy-WithRetry"));
+        assert!(OVERLAY_HELPER_PS1.contains("-ErrorAction Stop"));
+        assert!(
+            !OVERLAY_HELPER_PS1
+                .lines()
+                .any(|l| l.contains("Copy-Item") && l.contains("SilentlyContinue")),
+            "locked exe must not be skipped with SilentlyContinue"
+        );
+        assert!(OVERLAY_HELPER_PS1.contains("Start-Process -FilePath $exe -WorkingDirectory $Dest"));
+        assert!(!OVERLAY_HELPER_PS1.lines().any(|l| {
+            let t = l.trim();
+            !t.starts_with('#') && t.to_ascii_lowercase().contains("robocopy")
+        }));
     }
 
     #[test]

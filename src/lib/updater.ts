@@ -180,11 +180,18 @@ export async function installPendingUpdate(
       onEvent,
     });
     pending = null;
+    // Overlay helper waits for this PID, then copies and Start-Process from the USB folder.
+    // Do not call relaunch_after_update: that would start the *old* exe before overlay.
     return;
   }
 
   await pending.downloadAndInstall(report);
   pending = null;
+  // NSIS: the plugin launches the installer with /R then process::exit. If this
+  // line runs on Windows anyway, do not spawn a second instance of the old exe.
+  if (/windows/i.test(navigator.userAgent)) {
+    return;
+  }
   try {
     await invoke("relaunch_after_update");
   } catch {
