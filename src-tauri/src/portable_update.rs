@@ -11,7 +11,8 @@
 //! 3. Never deletes unknown files, `Euclide-Data`, or `euclide-data.json`
 //! 4. Puts the new `euclide.exe` in place **before** the app quits (Windows can
 //!    rename a running exe, not overwrite it). Leftover `*.euclide-old` files
-//!    are deleted after this PID exits. Does not start Euclide again.
+//!    are deleted after this PID exits. Then this window closes; the user
+//!    opens Euclide again. Does not start the new process.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::Cursor;
@@ -20,6 +21,8 @@ use std::path::{Component, Path, PathBuf};
 use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::AppHandle;
+#[cfg(windows)]
+use tauri::Manager;
 
 const PORTABLE_MARKER: &str = "euclide.portable";
 const OLD_SUFFIX: &str = ".euclide-old";
@@ -283,10 +286,27 @@ pub fn extract_allowed_overlay(bytes: &[u8], dest: &Path) -> Result<usize, Strin
     Ok(written)
 }
 
-fn sibling_with_suffix(path: &Path, suffix: &str) -> PathBuf {
+fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_os_string();
     name.push(suffix);
+    name.push(format!(
+        "-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0)
+    ));
     PathBuf::from(name)
+}
+
+fn is_app_exe_rel(rel: &Path) -> bool {
+    rel.components().nth(1).is_none()
+        && rel
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.eq_ignore_ascii_case("euclide.exe"))
+            .unwrap_or(false)
 }
 
 /// Windows can rename a running exe/dll but not overwrite it. Write the new
@@ -298,14 +318,24 @@ pub fn replace_locked_file(src: &Path, dest: &Path) -> Result<(), String> {
             .map_err(|e| format!("Impossible de créer {}: {e}", parent.display()))?;
     }
 
-    let incoming = sibling_with_suffix(dest, NEW_SUFFIX);
-    let backup = sibling_with_suffix(dest, OLD_SUFFIX);
-    let _ = std::fs::remove_file(&incoming);
+    let mut last = String::new();
+    for _ in 0..8 {
+        match replace_locked_file_once(src, dest) {
+            Ok(()) => return Ok(()),
+            Err(e) => last = e,
+        }
+        std::thread::sleep(std::time::Duration::from_millis(80));
+    }
+    Err(last)
+}
+
+fn replace_locked_file_once(src: &Path, dest: &Path) -> Result<(), String> {
+    let incoming = unique_sibling(dest, NEW_SUFFIX);
+    let backup = unique_sibling(dest, OLD_SUFFIX);
     std::fs::copy(src, &incoming)
         .map_err(|e| format!("Impossible de préparer {}: {e}", dest.display()))?;
 
     if dest.exists() {
-        let _ = std::fs::remove_file(&backup);
         if let Err(e) = std::fs::rename(dest, &backup) {
             let _ = std::fs::remove_file(&incoming);
             return Err(format!(
@@ -352,21 +382,41 @@ fn dest_has_app_exe(dest: &Path) -> bool {
     dest.join("euclide.exe").is_file() || dest.join("Euclide.exe").is_file()
 }
 
-/// Copy staged app files onto `dest` now (rename-around locks). `Euclide-Data`
-/// is never touched. Fails if `euclide.exe` does not end up in `dest`.
+/// Copy staged app files onto `dest` now (rename-around locks). `euclide.exe`
+/// is replaced first and must succeed. Sidecar files that are still locked
+/// are skipped so a busy helper never aborts the whole update. `Euclide-Data`
+/// is never touched.
 pub fn apply_staging_overlay(staging: &Path, dest: &Path) -> Result<usize, String> {
+    let mut files = collect_files(staging);
+    files.sort_by_key(|src| {
+        src.strip_prefix(staging)
+            .ok()
+            .map(|rel| if is_app_exe_rel(rel) { 0 } else { 1 })
+            .unwrap_or(2)
+    });
+
     let mut written = 0usize;
-    for src in collect_files(staging) {
+    let mut exe_ok = false;
+    for src in files {
         let Ok(rel) = src.strip_prefix(staging) else {
             continue;
         };
         if rel.as_os_str().is_empty() || !is_allowed_overlay_rel(rel) {
             continue;
         }
-        replace_locked_file(&src, &dest.join(rel))?;
-        written += 1;
+        let is_exe = is_app_exe_rel(rel);
+        match replace_locked_file(&src, &dest.join(rel)) {
+            Ok(()) => {
+                written += 1;
+                if is_exe {
+                    exe_ok = true;
+                }
+            }
+            Err(e) if is_exe => return Err(e),
+            Err(_) => {}
+        }
     }
-    if written == 0 || !dest_has_app_exe(dest) {
+    if !exe_ok || !dest_has_app_exe(dest) {
         return Err("La mise à jour n'a pas pu remplacer euclide.exe.".into());
     }
     Ok(written)
@@ -392,7 +442,7 @@ pub async fn apply_windows_portable_update(
 
 #[cfg(windows)]
 async fn apply_windows_portable_update_inner(
-    _app: AppHandle,
+    app: AppHandle,
     url: String,
     signature: String,
     on_event: Channel<PortableDownloadEvent>,
@@ -416,6 +466,10 @@ async fn apply_windows_portable_update_inner(
     std::fs::create_dir_all(&staging)
         .map_err(|e| format!("Dossier temporaire de mise à jour: {e}"))?;
 
+    if let Some(sc) = app.try_state::<crate::sidecar::Sidecar>() {
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(800), sc.stop()).await;
+    }
+
     if let Err(e) = extract_allowed_overlay(&bytes, &staging) {
         let _ = std::fs::remove_dir_all(&staging);
         return Err(e);
@@ -425,9 +479,14 @@ async fn apply_windows_portable_update_inner(
         return Err(e);
     }
     let _ = std::fs::remove_dir_all(&staging);
-    // New exe is already on disk. Do not exit here — the UI tells the user to
-    // close and reopen. Helper only deletes `*.euclide-old` after this PID dies.
     let _ = spawn_cleanup_helper(&dest);
+    // Return success first so the UI does not treat the dying IPC as a failure.
+    // Then close this window. Do not start the new process.
+    let app2 = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        app2.exit(0);
+    });
     Ok(())
 }
 
@@ -754,10 +813,17 @@ mod tests {
 
         apply_staging_overlay(&stage, &tmp).unwrap();
         assert_eq!(std::fs::read(tmp.join("euclide.exe")).unwrap(), b"NEW-EXE");
-        assert_eq!(
-            std::fs::read(tmp.join("euclide.exe.euclide-old")).unwrap(),
-            b"OLD-EXE"
-        );
+        let backup = std::fs::read_dir(&tmp)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.contains("euclide-old"))
+            })
+            .expect("old exe kept beside the new one");
+        assert_eq!(std::fs::read(backup).unwrap(), b"OLD-EXE");
         assert_eq!(
             std::fs::read(tmp.join("euclide-sidecar/run.exe")).unwrap(),
             b"NEW-SC"

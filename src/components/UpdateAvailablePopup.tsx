@@ -5,6 +5,7 @@ import { useConfirm, useToast } from "./ui";
 import { fmt, get } from "../lib/i18n";
 import {
   dismissAvailableUpdate,
+  installErrorMessage,
   installPendingUpdate,
   type AppUpdateInfo,
 } from "../lib/updater";
@@ -70,7 +71,7 @@ export function UpdateAvailablePopup({
       toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
     } catch (err) {
       setBusy(false);
-      setError(err instanceof Error ? err.message : get("updater.error", "Impossible de vérifier les mises à jour."));
+      setError(installErrorMessage(err) || get("updater.installFailed", "Impossible d'installer la mise à jour."));
     }
   };
 

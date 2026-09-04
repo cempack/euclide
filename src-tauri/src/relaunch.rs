@@ -1,7 +1,7 @@
 use tauri::{AppHandle, Manager};
 
-/// Quit after an in-place update. The new binary is not started from here —
-/// the user closes (or we already exited) and opens Euclide again.
+/// Quit after an in-place update (AppImage / after the new file is on disk).
+/// Does not start the new binary — the user opens Euclide again.
 #[tauri::command]
 pub async fn relaunch_after_update(app: AppHandle) {
     if let Some(sc) = app.try_state::<crate::sidecar::Sidecar>() {

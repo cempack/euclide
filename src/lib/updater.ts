@@ -64,11 +64,32 @@ function metadataOf(update: Update): AppUpdateInfo {
 function errorMessage(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    if (typeof o.message === "string" && o.message.trim()) return o.message;
+  }
   try {
     return JSON.stringify(err);
   } catch {
     return String(err);
   }
+}
+
+export function installErrorMessage(err: unknown): string {
+  const msg = errorMessage(err).trim();
+  return msg || "Impossible d'installer la mise à jour.";
+}
+
+function isClosingAfterInstall(err: unknown): boolean {
+  const msg = errorText(err);
+  return (
+    msg.includes("webview") ||
+    msg.includes("destroyed") ||
+    msg.includes("closed") ||
+    msg.includes("cancelled") ||
+    msg.includes("canceled") ||
+    msg.includes("ipc")
+  );
 }
 
 function errorText(err: unknown): string {
@@ -174,15 +195,26 @@ export async function installPendingUpdate(
     }
     const onEvent = new Channel<DownloadEvent>();
     onEvent.onmessage = report;
-    await invoke("apply_windows_portable_update", {
-      url: asset.url,
-      signature: asset.signature,
-      onEvent,
-    });
+    try {
+      await invoke("apply_windows_portable_update", {
+        url: asset.url,
+        signature: asset.signature,
+        onEvent,
+      });
+    } catch (err) {
+      if (!isClosingAfterInstall(err)) throw err;
+    }
     pending = null;
     return;
   }
 
   await pending.downloadAndInstall(report);
   pending = null;
+  // AppImage (and macOS): the file is already replaced. Close this window;
+  // do not start a second instance. NSIS usually exits on its own.
+  try {
+    await invoke("relaunch_after_update");
+  } catch {
+    /* window is already going away */
+  }
 }
