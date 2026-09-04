@@ -8,6 +8,9 @@ import { Field, MetaDot, PageHeader, Panel } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { DocIcon, NoteIcon, PenIcon, PlusIcon, SearchIcon, FileKindIcon, TrashIcon } from "../components/icons";
+import { useVisibleRefresh } from "../lib/visible-refresh";
+
+const DOCUMENTS_EVENTS = ["eu:library-changed"] as const;
 
 type Filter = { kind: "all" } | { kind: "type"; value: string } | { kind: "class"; courseId: number };
 
@@ -157,7 +160,7 @@ const MemoNoteItem = memo(function MemoNoteItem({
   );
 });
 
-export default function Documents({ filterHint }: { filterHint?: string }) {
+export default function Documents({ filterHint, visible = true }: { filterHint?: string; visible?: boolean }) {
   const toast = useToast();
   const tabs = useTabs();
   const confirm = useConfirm();
@@ -171,19 +174,12 @@ export default function Documents({ filterHint }: { filterHint?: string }) {
   const [renameTarget, setRenameTarget] = useState<null | { kind: "file" | "note"; id: number; current: string }>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     api.listFiles(null).then((f) => setDocs(Array.isArray(f) ? f : [])).catch(() => {});
     api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
     api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
-  };
-  useEffect(() => {
-    refresh();
-    const onChange = () => refresh();
-    window.addEventListener("eu:library-changed", onChange);
-    return () => {
-      window.removeEventListener("eu:library-changed", onChange);
-    };
   }, []);
+  useVisibleRefresh(visible, refresh, DOCUMENTS_EVENTS);
 
   useEffect(() => {
     if (filterHint === "note" || filterHint === "pdf" || filterHint === "image" || filterHint === "board") {

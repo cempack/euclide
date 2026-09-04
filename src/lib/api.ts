@@ -50,8 +50,7 @@ if (typeof window !== "undefined") {
     if (type.includes("demo")) {
       invalidateCache("listDemos");
     }
-    // Fallback: if unknown or "library" broad, full clear for safety on some events
-    if (type.includes("library-changed") || type.includes("full-invalidate")) {
+    if (type.includes("full-invalidate")) {
       invalidateCache();
     }
   };

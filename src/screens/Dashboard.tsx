@@ -53,6 +53,17 @@ import {
   TrashIcon,
 } from "../components/icons";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
+import { useVisibleRefresh } from "../lib/visible-refresh";
+
+const DASHBOARD_EVENTS = [
+  "eu:library-changed",
+  "eu:quicklinks-changed",
+  "eu:schedule-changed",
+  "eu:reminders-changed",
+  "eu:course-changed",
+  "eu:pronote-changed",
+  "eu:settings-changed",
+] as const;
 
 /**
  * Le tableau de bord.
@@ -67,7 +78,7 @@ import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
  * the mini activity recap — now lives in the window status bar and in Outils,
  * so it is reachable from every screen instead of only from this one.
  */
-export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
+export default function Dashboard({ info: _info, visible = true }: { info?: AppInfo | null; visible?: boolean }) {
   const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();
@@ -104,21 +115,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
     api.getSetting("remote_favicons").then((v) => setRemoteIcons(remoteFaviconsEnabled(v))).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const onChange = () => refresh();
-    const events = [
-      "eu:library-changed",
-      "eu:quicklinks-changed",
-      "eu:schedule-changed",
-      "eu:reminders-changed",
-      "eu:course-changed",
-      "eu:pronote-changed",
-      "eu:settings-changed",
-    ];
-    events.forEach((ev) => window.addEventListener(ev, onChange));
-    return () => events.forEach((ev) => window.removeEventListener(ev, onChange));
-  }, [refresh]);
+  useVisibleRefresh(visible, refresh, DASHBOARD_EVENTS);
 
   // ---- reminders -----------------------------------------------------------
 

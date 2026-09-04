@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useTabs } from "../lib/tabs";
 import {
   api,
@@ -64,7 +64,7 @@ function sanitizePronoteClasses(raw: any[]): any[] {
   return out;
 }
 
-export default function CourseDetail({ courseId }: { courseId: number }) {
+export default function CourseDetail({ courseId, visible = true }: { courseId: number; visible?: boolean }) {
   const tabs = useTabs();
   const toast = useToast();
   const confirmDlg = useConfirm();
@@ -83,6 +83,7 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
   const [showAttach, setShowAttach] = useState(false);
   const [attachDocs, setAttachDocs] = useState<FileItem[]>([]);
   const [attachSelected, setAttachSelected] = useState<number[]>([]);
+  const staleLib = useRef(false);
 
   const { resolved } = useAppearance();
 
@@ -159,12 +160,24 @@ export default function CourseDetail({ courseId }: { courseId: number }) {
   // Keep notes (and files) in sync when edited/deleted from the standalone editor or Documents
   useEffect(() => {
     const onLibChange = () => {
+      if (!visible) {
+        staleLib.current = true;
+        return;
+      }
       refreshNotes();
       refreshFiles();
     };
     window.addEventListener("eu:library-changed", onLibChange);
     return () => window.removeEventListener("eu:library-changed", onLibChange);
-  }, [courseId]);
+  }, [visible, refreshNotes, refreshFiles]);
+
+  useEffect(() => {
+    if (visible && staleLib.current) {
+      staleLib.current = false;
+      refreshNotes();
+      refreshFiles();
+    }
+  }, [visible, refreshNotes, refreshFiles]);
 
   // Sanitized + not-yet-attached Pronote classes for the dropdown (prevents weird/non-class entries and dups).
   // We aggressively drop subgroup names containing "." (e.g. 4ITAGR.1, 3ESPGR.2, 5ALLGR.1, 4AP.1)

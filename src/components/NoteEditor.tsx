@@ -34,6 +34,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   });
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [previewBody, setPreviewBody] = useState("");
   const loggedWrite = useRef(false);
 
   const draftRef = useRef(draft);
@@ -65,6 +66,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           const found = all.find((n) => n.id === noteId);
           if (found && mounted) {
             setDraft(found);
+            setPreviewBody(found.body || "");
             setDirty(false);
           }
         } else if (isNew) {
@@ -85,6 +87,14 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     return () => { mounted = false; };
   }, [noteId, isNew, initialCourseId, toast]);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setPreviewBody(draft.body || ""), 180);
+    return () => window.clearTimeout(t);
+  }, [draft.body]);
+
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
   const persist = useCallback(async () => {
     const d = draftRef.current;
     if (!d.title) return d;
@@ -100,24 +110,25 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     }
     setDraft(saved);
     setDirty(false);
+    const t = tabsRef.current;
     if (wasNew && saved.id) {
       api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
       loggedWrite.current = true;
       const nextId = `note:${saved.id}`;
       if (tabId !== nextId) {
-        tabs.retarget(tabId, nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
+        t.retarget(tabId, nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
       }
-      tabs.rename(nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
+      t.rename(nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
     } else if (!loggedWrite.current) {
       api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
       loggedWrite.current = true;
-      tabs.rename(tabId, saved.title || "Note");
+      t.rename(tabId, saved.title || "Note");
     } else {
-      tabs.rename(tabId, saved.title || "Note");
+      t.rename(tabId, saved.title || "Note");
     }
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
     return saved;
-  }, [tabId, tabs]);
+  }, [tabId]);
 
   useEffect(() => {
     tabs.setTabDirty(tabId, dirty);
@@ -492,7 +503,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             {get("notes.preview", "Aperçu")}
           </p>
           <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
-            {draft.body ? (
+            {previewBody ? (
               <div className="eu-prose max-w-[68ch]">
                 <ReactMarkdown
                   remarkPlugins={[remarkMath]}
@@ -503,7 +514,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
                     ),
                   }}
                 >
-                  {draft.body}
+                  {previewBody}
                 </ReactMarkdown>
               </div>
             ) : (
