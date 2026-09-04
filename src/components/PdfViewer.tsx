@@ -124,6 +124,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   // PDF.js viewer (for PDFs)
   const [viewerReady, setViewerReady] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
+  const pdfLoadedRef = useRef(false);
+  pdfLoadedRef.current = pdfLoaded;
   const [currentEditorMode, setCurrentEditorMode] = useState<number>(0); // 0=select (NONE), 15=Ink (Stylo)
   const [versions, setVersions] = useState<any[]>([]);
   const [currentColor, setCurrentColor] = useState("#000000");
@@ -157,7 +159,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       loadPdfIntoViewer();
 
       const timeout = setTimeout(() => {
-        if (!pdfLoaded) {
+        if (!pdfLoadedRef.current) {
           console.warn('[PdfViewer] pdf-loaded message not received in time, forcing loaded state');
           setPdfLoaded(true);
           setCurrentEditorMode(0);
@@ -165,7 +167,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       }, 5000);
       return () => clearTimeout(timeout);
     }
-  }, [viewerReady, pdfSrc, legacyMode, pdfLoaded]);
+  }, [viewerReady, pdfSrc, legacyMode]);
 
   // Image annotator fallback (canvas overlay for images)
   const drawLegacy = () => {

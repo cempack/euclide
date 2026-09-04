@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, type QuickLink, type SearchResult } from "../lib/api";
 import { useTabs } from "../lib/tabs";
@@ -66,7 +66,7 @@ function cmdAliases(key: string): string[] {
   return aliasesOf(get(`palette.aliases.${key}`, ""));
 }
 
-export default function CommandPalette({
+function CommandPalette({
   open,
   onClose,
   onHelp,
@@ -522,3 +522,5 @@ export default function CommandPalette({
     </AnimatePresence>
   );
 }
+
+export default memo(CommandPalette);

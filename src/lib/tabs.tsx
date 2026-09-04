@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { api } from "./api";
@@ -180,6 +181,61 @@ export const useTabs = () => {
   return c;
 };
 
+type DirtyMap = Record<string, boolean>;
+
+function createDirtyStore() {
+  let map: DirtyMap = {};
+  const listeners = new Set<() => void>();
+  const emit = () => {
+    for (const listener of listeners) listener();
+  };
+  return {
+    getSnapshot: () => map,
+    subscribe: (fn: () => void) => {
+      listeners.add(fn);
+      return () => {
+        listeners.delete(fn);
+      };
+    },
+    set: (id: string, dirty: boolean) => {
+      if (!!map[id] === dirty) return;
+      const next = { ...map };
+      if (dirty) next[id] = true;
+      else delete next[id];
+      map = next;
+      emit();
+    },
+    clear: (id: string) => {
+      if (!(id in map)) return;
+      const next = { ...map };
+      delete next[id];
+      map = next;
+      emit();
+    },
+    retarget: (oldId: string, newId: string) => {
+      if (!(oldId in map) && !(newId in map)) return;
+      const next = { ...map };
+      if (oldId in next) {
+        next[newId] = next[oldId];
+        delete next[oldId];
+      }
+      map = next;
+      emit();
+    },
+  };
+}
+
+type DirtyStore = ReturnType<typeof createDirtyStore>;
+
+const DirtyCtx = createContext<DirtyStore | null>(null);
+
+/** Subscribe to unsaved-tab dots without re-rendering every `useTabs` consumer. */
+export function useDirtyMap(): DirtyMap {
+  const store = useContext(DirtyCtx);
+  if (!store) throw new Error("useDirtyMap: no provider");
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
+
 const HOME: Tab = {
   id: "dashboard",
   kind: "dashboard",
@@ -194,8 +250,8 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   const [maxTabsMode, setMaxTabsModeState] = useState<MaxTabsMode>("auto");
   const [maxTabsFixed, setMaxTabsFixed] = useState<number>(TAB_FIT_FALLBACK);
   const [tabFitCapacity, setTabFitCapacityState] = useState<number>(0);
-  const [dirtyMap, setDirtyMap] = useState<Record<string, boolean>>({});
   const [hydrated, setHydrated] = useState(false);
+  const dirtyStore = useMemo(() => createDirtyStore(), []);
 
   const effectiveMaxTabs =
     maxTabsMode === "unlimited"
@@ -210,11 +266,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
-
-  const dirtyMapRef = useRef(dirtyMap);
-  useEffect(() => {
-    dirtyMapRef.current = dirtyMap;
-  }, [dirtyMap]);
 
   const flushFns = useRef(new Map<string, () => Promise<void>>());
 
@@ -310,16 +361,10 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   }, [hydrated, tabs, activeId]);
 
   const setTabDirty = useCallback((id: string, dirty: boolean) => {
-    setDirtyMap((prev) => {
-      if (!!prev[id] === dirty) return prev;
-      const next = { ...prev };
-      if (dirty) next[id] = true;
-      else delete next[id];
-      return next;
-    });
-  }, []);
+    dirtyStore.set(id, dirty);
+  }, [dirtyStore]);
 
-  const isDirty = useCallback((id: string) => !!dirtyMap[id], [dirtyMap]);
+  const isDirty = useCallback((id: string) => !!dirtyStore.getSnapshot()[id], [dirtyStore]);
 
   const registerFlush = useCallback((id: string, fn: () => Promise<void>) => {
     flushFns.current.set(id, fn);
@@ -390,7 +435,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
             prev,
             effectiveMaxTabs - 1,
             activeIdRef.current,
-            dirtyMapRef.current
+            dirtyStore.getSnapshot()
           );
         }
         return [...nextTabs, { id, kind: spec.kind, title, params: newParams, mountId: newMountId() }];
@@ -401,7 +446,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       }
       return id;
     },
-    [effectiveMaxTabs]
+    [effectiveMaxTabs, dirtyStore]
   );
 
   const setTabFitCapacity = useCallback((n: number) => {
@@ -411,8 +456,8 @@ export function TabsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (maxTabsMode !== "auto" || tabFitCapacity < TAB_FIT_MIN) return;
-    setTabs((prev) => evictToLimit(prev, tabFitCapacity, activeIdRef.current, dirtyMapRef.current));
-  }, [maxTabsMode, tabFitCapacity]);
+    setTabs((prev) => evictToLimit(prev, tabFitCapacity, activeIdRef.current, dirtyStore.getSnapshot()));
+  }, [maxTabsMode, tabFitCapacity, dirtyStore]);
 
   const setMaxTabsMode = useCallback((mode: MaxTabsMode, fixed?: number) => {
     const nextFixed =
@@ -431,10 +476,10 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       const cap = nextFixed ?? maxTabsFixed;
       api.setSetting("max_tabs", String(cap)).catch(() => {});
       if (mode === "fixed") {
-        setTabs((prev) => evictToLimit(prev, cap, activeIdRef.current, dirtyMapRef.current));
+        setTabs((prev) => evictToLimit(prev, cap, activeIdRef.current, dirtyStore.getSnapshot()));
       }
     }
-  }, [maxTabsFixed]);
+  }, [maxTabsFixed, dirtyStore]);
 
   const updateMaxTabs = useCallback((n: number) => {
     if (n <= 0) setMaxTabsMode("unlimited");
@@ -442,12 +487,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   }, [setMaxTabsMode]);
 
   const close = useCallback((id: string) => {
-    setDirtyMap((prev) => {
-      if (!(id in prev)) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+    dirtyStore.clear(id);
     flushFns.current.delete(id);
     setTabs((prev) => {
       const idx = prev.findIndex((t) => t.id === id);
@@ -464,7 +504,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       });
       return next;
     });
-  }, []);
+  }, [dirtyStore]);
 
   const rename = useCallback((id: string, title: string, paramsPatch?: Partial<TabParams>) => {
     setTabs((prev) =>
@@ -500,22 +540,14 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         });
       });
       setActiveId((cur) => (cur === oldId ? newId : cur));
-      setDirtyMap((prev) => {
-        if (!(oldId in prev) && !(newId in prev)) return prev;
-        const next = { ...prev };
-        if (oldId in next) {
-          next[newId] = next[oldId];
-          delete next[oldId];
-        }
-        return next;
-      });
+      dirtyStore.retarget(oldId, newId);
       const fn = flushFns.current.get(oldId);
       if (fn) {
         flushFns.current.delete(oldId);
         flushFns.current.set(newId, fn);
       }
     },
-    [rename]
+    [rename, dirtyStore]
   );
 
   const focusIndex = useCallback((i: number) => {
@@ -605,7 +637,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       setTabFitCapacity,
       setMaxTabsMode,
       updateMaxTabs,
-      dirtyMap,
       isDirty,
       setTabDirty,
       registerFlush,
@@ -614,5 +645,9 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <DirtyCtx.Provider value={dirtyStore}>
+      <Ctx.Provider value={value}>{children}</Ctx.Provider>
+    </DirtyCtx.Provider>
+  );
 }

@@ -14,8 +14,9 @@ import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "./lib/
 import { courseVisual } from "./lib/color";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
+import { TimerProvider, useTimerControls, useTimerSec, formatTimer, chime } from "./lib/timer";
 
-import { TabsProvider, useTabs, fitTabCount, type Tab, type TabKind } from "./lib/tabs";
+import { TabsProvider, useTabs, useDirtyMap, fitTabCount, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
 import { Segmented } from "./components/layout";
 import CommandPalette from "./components/CommandPalette";
@@ -273,48 +274,6 @@ const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
  );
 });
 
-function formatTimer(sec: number) {
- const m = Math.floor(Math.max(0, sec) / 60);
- const s = Math.max(0, sec) % 60;
- return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-/**
- * Two-note chime with a soft attack and release.
- * The previous version was a bare 880 Hz square burst — startling in a quiet
- * classroom. This is deliberately gentle: a fifth, fading out.
- */
-function chime(volume = 0.07) {
- try {
- const Ctx =
- window.AudioContext ||
- (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
- const ctx = new Ctx();
- const now = ctx.currentTime;
- const notes: Array<[number, number]> = [
- [660, 0],
- [990, 0.16],
- ];
- for (const [freq, delay] of notes) {
- const osc = ctx.createOscillator();
- const gain = ctx.createGain();
- osc.type = "sine";
- osc.frequency.value = freq;
- osc.connect(gain);
- gain.connect(ctx.destination);
- const t = now + delay;
- gain.gain.setValueAtTime(0, t);
- gain.gain.linearRampToValueAtTime(volume, t + 0.03);
- gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
- osc.start(t);
- osc.stop(t + 0.8);
- }
- window.setTimeout(() => ctx.close().catch(() => {}), 1400);
- } catch {
- // no audio device / autoplay blocked: silence is an acceptable outcome
- }
-}
-
 /** Icon shown on a tab, including the course colour when we know it. */
 function TabIcon({
  tab,
@@ -354,14 +313,13 @@ const TopBar = memo(function TopBar({
  onHelp,
  onSearch,
  onCloseTab,
- timer,
 }: {
  onHelp: () => void;
  onSearch: () => void;
  onCloseTab: (id: string) => void;
- timer: TimerApi;
 }) {
  const tabs = useTabs();
+ const dirtyMap = useDirtyMap();
  const barRef = useRef<HTMLDivElement>(null);
  const extrasRef = useRef<HTMLDivElement>(null);
  const [courseIconMap, setCourseIconMap] = useState<Record<number, { key: string; color: string }>>({});
@@ -382,7 +340,7 @@ const TopBar = memo(function TopBar({
  if (extrasRef.current) ro.observe(extrasRef.current);
  measure();
  return () => ro.disconnect();
- }, [tabs.setTabFitCapacity, timer.sec]);
+ }, [tabs.setTabFitCapacity]);
 
  useEffect(() => {
  const courseTabs = tabs.tabs.filter(
@@ -415,7 +373,7 @@ const TopBar = memo(function TopBar({
  >
  {tabs.tabs.map((tab, index) => {
  const active = tab.id === tabs.activeId;
- const dirty = tabs.isDirty(tab.id);
+ const dirty = !!dirtyMap[tab.id];
  const dropTarget = overIndex === index && dragIndex !== null && dragIndex !== index;
  return (
  <div
@@ -516,7 +474,7 @@ const TopBar = memo(function TopBar({
  <div className="flex-1 min-w-2" />
 
  <div ref={extrasRef} className="flex items-center gap-1 shrink-0 pl-2 pr-2">
- {timer.sec != null && <TimerControl timer={timer} />}
+ <TimerSlot />
 
  <button
  type="button"
@@ -545,19 +503,19 @@ const TopBar = memo(function TopBar({
 
 // ---------------------------------------------------------------------------
 // Class timer — free duration, +1 min, reset, gentle chime, projection view.
+// Seconds live in TimerProvider so a tick does not re-render the rest of the app.
 // ---------------------------------------------------------------------------
 
-type TimerApi = {
- sec: number | null;
- running: boolean;
- start: (minutes: number) => void;
- toggle: () => void;
- add: (minutes: number) => void;
- stop: () => void;
-};
+function TimerSlot() {
+ const sec = useTimerSec();
+ if (sec == null) return null;
+ return <TimerControl />;
+}
 
-function TimerControl({ timer }: { timer: TimerApi }) {
- const done = (timer.sec ?? 0) <= 0;
+function TimerControl() {
+ const timer = useTimerControls();
+ const sec = useTimerSec() ?? 0;
+ const done = sec <= 0;
  return (
  <div
  className={`flex items-center rounded border overflow-hidden ${
@@ -574,7 +532,7 @@ function TimerControl({ timer }: { timer: TimerApi }) {
  }`}
  >
  {timer.running ? <PauseIcon className="w-3.5 h-3.5" /> : <PlayIcon className="w-3.5 h-3.5" />}
- {formatTimer(timer.sec ?? 0)}
+ {formatTimer(sec)}
  </button>
  <button
  type="button"
@@ -598,10 +556,23 @@ function TimerControl({ timer }: { timer: TimerApi }) {
  );
 }
 
+function StatusTimerChip() {
+ const sec = useTimerSec();
+ if (sec == null) return null;
+ return (
+ <span className="flex items-center gap-1.5 px-2.5 border-r border-line text-ink-muted tabular-nums">
+ <ClockIcon className="w-3 h-3" />
+ {formatTimer(sec)}
+ </span>
+ );
+}
+
 /** Big countdown for the classroom, shown while projection mode is on. */
-function TimerStage({ timer }: { timer: TimerApi }) {
- if (timer.sec == null) return null;
- const done = timer.sec <= 0;
+function TimerStage() {
+ const timer = useTimerControls();
+ const sec = useTimerSec();
+ if (sec == null) return null;
+ const done = sec <= 0;
  return (
  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-overlay">
  <div
@@ -614,7 +585,7 @@ function TimerStage({ timer }: { timer: TimerApi }) {
  done ? "text-danger" : "text-ink"
  }`}
  >
- {formatTimer(timer.sec)}
+ {formatTimer(sec)}
  </span>
  <div className="flex flex-col gap-1.5">
  <button type="button" onClick={timer.toggle} className="eu-btn-ghost eu-btn-sm">
@@ -665,16 +636,16 @@ const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }
  );
 });
 
-function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
+const TabPane = memo(function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
  switch (tab.kind) {
  case "dashboard":
- return <Dashboard info={info} />;
+ return <Dashboard info={info} visible={visible} />;
  case "courses":
  return <Courses />;
  case "course":
  return (
  <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
- <CourseDetail courseId={tab.params.courseId!} />
+ <CourseDetail courseId={tab.params.courseId!} visible={visible} />
  </Suspense>
  );
  case "class-content":
@@ -688,7 +659,7 @@ function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visib
  </Suspense>
  );
  case "documents":
- return <Documents filterHint={tab.params.filter} />;
+ return <Documents filterHint={tab.params.filter} visible={visible} />;
  case "tools":
  return <Tools />;
  case "python":
@@ -728,7 +699,7 @@ function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visib
  default:
  return null;
  }
-}
+});
 
 /**
  * The reading column for content screens: one place that owns the max width,
@@ -749,7 +720,7 @@ function Scroll({ children }: { children: React.ReactNode }) {
 // widgets, available from every screen instead of only from the home page.
 // ---------------------------------------------------------------------------
 
-const StatusBar = memo(function StatusBar({ info, timer }: { info: AppInfo | null; timer: TimerApi }) {
+const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | null }) {
  const tabs = useTabs();
  const { resolved, pref } = useAppearance();
  const [classes, setClasses] = useState<ScheduleEntry[]>([]);
@@ -821,12 +792,7 @@ const StatusBar = memo(function StatusBar({ info, timer }: { info: AppInfo | nul
  </span>
  )}
 
- {timer.sec != null && (
- <span className="flex items-center gap-1.5 px-2.5 border-r border-line text-ink-muted tabular-nums">
- <ClockIcon className="w-3 h-3" />
- {formatTimer(timer.sec)}
- </span>
- )}
+ <StatusTimerChip />
 
  <button
  type="button"
@@ -879,6 +845,8 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
  const [text, setText] = useState("");
  const [mode, setMode] = useState<"reminder" | "note">("reminder");
  const inputRef = useRef<HTMLInputElement>(null);
+ const onCloseRef = useRef(onClose);
+ onCloseRef.current = onClose;
 
  useEffect(() => {
  if (!open) return;
@@ -886,14 +854,14 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
  setMode("reminder");
  const t = window.setTimeout(() => inputRef.current?.focus(), 30);
  const onKey = (e: KeyboardEvent) => {
- if (e.key === "Escape") onClose();
+ if (e.key === "Escape") onCloseRef.current();
  };
  window.addEventListener("keydown", onKey);
  return () => {
  window.clearTimeout(t);
  window.removeEventListener("keydown", onKey);
  };
- }, [open, onClose]);
+ }, [open]);
 
  // Prefix shortcuts: `!` forces a reminder, `#` forces a note.
  const effectiveMode = text.startsWith("!") ? "reminder" : text.startsWith("#") ? "note" : mode;
@@ -1009,42 +977,6 @@ function Shell() {
  const [captureOpen, setCaptureOpen] = useState(false);
  const { projection, toggleProjection } = useAppearance();
 
- const [timerSec, setTimerSec] = useState<number | null>(null);
- const [timerRunning, setTimerRunning] = useState(false);
- const timerRunningRef = useRef(false);
- useEffect(() => { timerRunningRef.current = timerRunning; }, [timerRunning]);
-
- const timer = useMemo<TimerApi>(
- () => ({
- sec: timerSec,
- running: timerRunning,
- start: (minutes: number) => {
- setTimerSec(Math.max(1, Math.round(minutes * 60)));
- setTimerRunning(true);
- },
- toggle: () => {
- setTimerSec((s) => {
- if (s == null) return s;
- if (s <= 0) {
- setTimerRunning(false);
- return null;
- }
- setTimerRunning((r) => !r);
- return s;
- });
- },
- add: (minutes: number) => {
- setTimerSec((s) => (s == null ? s : Math.max(0, s) + minutes * 60));
- setTimerRunning(true);
- },
- stop: () => {
- setTimerSec(null);
- setTimerRunning(false);
- },
- }),
- [timerSec, timerRunning]
- );
-
  const activityContextRef = useRef<{ area: string; courseId: number | null }>({ area: "dashboard", courseId: null });
  const [appFocused, setAppFocused] = useState(true);
  const appFocusedRef = useRef(appFocused);
@@ -1062,6 +994,10 @@ function Shell() {
 
  const handleHelp = useCallback(() => setHelp(true), []);
  const handleSearch = useCallback(() => setPalette(true), []);
+ const closePalette = useCallback(() => setPalette(false), []);
+ const closeCapture = useCallback(() => setCaptureOpen(false), []);
+ const closeHelp = useCallback(() => setHelp(false), []);
+ const dismissUpdate = useCallback(() => setAvailableUpdate(null), []);
 
  const requestClose = useCallback(async (id: string) => {
  if (tabs.isDirty(id)) {
@@ -1084,16 +1020,6 @@ function Shell() {
 
  useEffect(() => {
  api.appInfo().then(setInfo).catch(() => {});
- }, []);
-
- useEffect(() => {
- const onStart = (e: Event) => {
- const minutes = Number((e as CustomEvent).detail?.minutes) || 5;
- setTimerSec(Math.max(1, Math.round(minutes * 60)));
- setTimerRunning(true);
- };
- window.addEventListener("eu:timer-start", onStart as EventListener);
- return () => window.removeEventListener("eu:timer-start", onStart as EventListener);
  }, []);
 
  useEffect(() => {
@@ -1158,21 +1084,6 @@ function Shell() {
  window.clearTimeout(seed);
  };
  }, [toast]);
-
- useEffect(() => {
- if (!timerRunning) return;
- const id = window.setInterval(() => {
- setTimerSec((s) => (s == null || s <= 0 ? s : s - 1));
- }, 1000);
- return () => clearInterval(id);
- }, [timerRunning]);
-
- useEffect(() => {
- if (timerSec !== 0 || !timerRunning) return;
- setTimerRunning(false);
- chime();
- toast(get("timer.done", "Minuteur terminé"), "success");
- }, [timerSec, timerRunning, toast]);
 
  useEffect(() => {
  const onAvailable = (e: Event) => {
@@ -1365,22 +1276,19 @@ function Shell() {
  <TopBar
  onHelp={handleHelp}
  onSearch={handleSearch}
- onCloseTab={(id) => {
- void requestClose(id);
- }}
- timer={timer}
+ onCloseTab={requestClose}
  />
  )}
  <MainContent info={info} />
- {!projection && <StatusBar info={info} timer={timer} />}
+ {!projection && <StatusBar info={info} />}
  </main>
 
- {projection && <TimerStage timer={timer} />}
+ {projection && <TimerStage />}
 
- <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
- <QuickCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
- <ShortcutsHelp open={help} onClose={() => setHelp(false)} />
- <UpdateAvailablePopup update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} />
+ <CommandPalette open={palette} onClose={closePalette} onHelp={handleHelp} />
+ <QuickCapture open={captureOpen} onClose={closeCapture} />
+ <ShortcutsHelp open={help} onClose={closeHelp} />
+ <UpdateAvailablePopup update={availableUpdate} onDismiss={dismissUpdate} />
  {dragging && (
  <div className="fixed inset-0 z-[80] grid place-items-center bg-accent/10 pointer-events-none">
  <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
@@ -1403,7 +1311,9 @@ export default function App() {
  <ToastProvider>
  <ConfirmProvider>
  <TabsProvider>
+ <TimerProvider>
  <Shell />
+ </TimerProvider>
  </TabsProvider>
  </ConfirmProvider>
  </ToastProvider>
