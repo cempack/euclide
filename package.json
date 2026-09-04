@@ -1,7 +1,7 @@
 {
   "name": "euclide",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "Euclide - un bureau d'enseignement local et portable pour un professeur de mathématiques et NSI.",
   "author": "Elliot Moreau",
