@@ -59,8 +59,9 @@ pub fn appimage_file() -> Option<PathBuf> {
     None
 }
 
-/// Binary to spawn after an in-place update. AppImage must relaunch the
-/// `.AppImage` file, not `current_exe()` inside the old squashfs mount.
+/// The `.AppImage` file (or the real exe). Used after an in-place update so
+/// the next launch is not `current_exe()` inside an old squashfs mount.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn process_launch_path() -> PathBuf {
     if let Some(path) = appimage_file() {
         return path;

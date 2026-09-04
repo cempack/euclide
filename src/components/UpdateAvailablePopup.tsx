@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { XIcon } from "./icons";
-import { useConfirm } from "./ui";
+import { useConfirm, useToast } from "./ui";
 import { fmt, get } from "../lib/i18n";
 import {
   dismissAvailableUpdate,
@@ -17,7 +17,9 @@ export function UpdateAvailablePopup({
   onDismiss: () => void;
 }) {
   const confirmDlg = useConfirm();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
   const [percent, setPercent] = useState<number | null>(null);
   const [error, setError] = useState("");
 
@@ -45,11 +47,12 @@ export function UpdateAvailablePopup({
     // In-app dialog rather than the native window.confirm(), which looked
     // foreign inside the Tauri window.
     const ok = await confirmDlg.ask({
-      title: get("updater.install", "Installer et redémarrer"),
-      message: fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
-        version: update.version,
-      }),
-      confirmLabel: get("updater.install", "Installer et redémarrer"),
+      title: get("updater.install", "Installer"),
+      message: fmt(
+        get("updater.confirmInstall", "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le."),
+        { version: update.version }
+      ),
+      confirmLabel: get("updater.install", "Installer"),
     });
     if (!ok) return;
     setBusy(true);
@@ -61,6 +64,10 @@ export function UpdateAvailablePopup({
           setPercent(Math.min(100, Math.round((downloaded / contentLength) * 100)));
         }
       });
+      dismissAvailableUpdate(update.version);
+      setBusy(false);
+      setDone(true);
+      toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
     } catch (err) {
       setBusy(false);
       setError(err instanceof Error ? err.message : get("updater.error", "Impossible de vérifier les mises à jour."));
@@ -85,7 +92,9 @@ export function UpdateAvailablePopup({
                 {fmt(get("updater.popupTitle", "Mise à jour {version}"), { version: update.version })}
               </p>
               <p className="eu-t-meta mt-1">
-                {get("updater.popupBody", "Une nouvelle version est disponible.")}
+                {done
+                  ? get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le.")
+                  : get("updater.popupBody", "Une nouvelle version est disponible.")}
               </p>
             </div>
             <button
@@ -110,21 +119,25 @@ export function UpdateAvailablePopup({
           <div className="flex justify-end gap-2 mt-3 flex-wrap">
             {!busy && (
               <button type="button" onClick={dismiss} className="eu-btn-quiet eu-btn-sm shrink-0">
-                {get("updater.popupLater", "Plus tard")}
+                {done
+                  ? get("updater.popupDismiss", "Fermer")
+                  : get("updater.popupLater", "Plus tard")}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => void install()}
-              disabled={busy}
-              className="eu-btn-primary eu-btn-sm whitespace-nowrap tabular-nums shrink-0"
-            >
-              {busy
-                ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
-                    percent: percent ?? 0,
-                  })
-                : get("updater.popupInstall", "Installer")}
-            </button>
+            {!done && (
+              <button
+                type="button"
+                onClick={() => void install()}
+                disabled={busy}
+                className="eu-btn-primary eu-btn-sm whitespace-nowrap tabular-nums shrink-0"
+              >
+                {busy
+                  ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
+                      percent: percent ?? 0,
+                    })
+                  : get("updater.popupInstall", "Installer")}
+              </button>
+            )}
           </div>
         </motion.div>
       )}

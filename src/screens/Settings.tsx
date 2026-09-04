@@ -11,6 +11,7 @@ import {
 import { t, fmt, get } from "../lib/i18n";
 import {
   checkForAppUpdate,
+  dismissAvailableUpdate,
   installPendingUpdate,
   isIncompleteUpdateManifest,
   isNoPublishedUpdate,
@@ -964,7 +965,14 @@ function AboutSection({ info }: { info: AppInfo | null }) {
   const toast = useToast();
   const confirmDlg = useConfirm();
   const [status, setStatus] = useState<
-    "idle" | "checking" | "upToDate" | "publishing" | "available" | "installing" | "error"
+    | "idle"
+    | "checking"
+    | "upToDate"
+    | "publishing"
+    | "available"
+    | "installing"
+    | "installed"
+    | "error"
   >("idle");
   const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
   const [error, setError] = useState("");
@@ -1020,11 +1028,11 @@ function AboutSection({ info }: { info: AppInfo | null }) {
     // The app has its own confirmation dialog; the native window.confirm()
     // that used to be here looked foreign inside the Tauri window.
     const ok = await confirmDlg.ask({
-      title: get("updater.install", "Installer et redémarrer"),
-      message: fmt(get("updater.confirmInstall", "Installer la version {version} et redémarrer Euclide ?"), {
+      title: get("updater.install", "Installer"),
+      message: fmt(get("updater.confirmInstall", "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le."), {
         version: update.version,
       }),
-      confirmLabel: get("updater.install", "Installer et redémarrer"),
+      confirmLabel: get("updater.install", "Installer"),
     });
     if (!ok) return;
     setStatus("installing");
@@ -1035,6 +1043,9 @@ function AboutSection({ info }: { info: AppInfo | null }) {
           setPercent(Math.min(100, Math.round((downloaded / contentLength) * 100)));
         }
       });
+      dismissAvailableUpdate(update.version);
+      setStatus("installed");
+      toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : String(err));
@@ -1061,6 +1072,8 @@ function AboutSection({ info }: { info: AppInfo | null }) {
               ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
                   percent: percent ?? 0,
                 })
+              : status === "installed"
+                ? get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le.")
               : status === "error"
                 ? error || get("updater.error", "Impossible de vérifier les mises à jour.")
                 : "";
@@ -1096,7 +1109,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                   disabled={status === "installing"}
                   className="eu-btn-primary eu-btn-sm"
                 >
-                  {get("updater.install", "Installer et redémarrer")}
+                  {get("updater.install", "Installer")}
                 </button>
               )}
             </div>
