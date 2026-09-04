@@ -188,7 +188,11 @@ export default function Recap() {
           <StatStrip>
             <StatTile
               icon={<ClockIcon className="w-4 h-4" />}
-              value={totalMin >= 60 ? `${hours} h ${String(mins).padStart(2, "0")}` : `${mins} min`}
+              value={
+                totalMin >= 60
+                  ? `${hours}\u00a0h\u00a0${String(mins).padStart(2, "0")}`
+                  : `${mins}\u00a0min`
+              }
               label={t.recap?.activityTime || "Temps actif"}
               hint={PERIOD_LABELS[period]}
             />

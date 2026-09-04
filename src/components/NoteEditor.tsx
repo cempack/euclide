@@ -407,8 +407,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
       {/* Markdown toolbar */}
       <div className="relative shrink-0">
-        <Toolbar className="h-8 py-0">
-          <ToolGroup label={get("notes.format", "Mise en forme")}>
+        <Toolbar className="h-8 py-0 gap-0.5">
+          <ToolGroup className="gap-0" label={get("notes.format", "Mise en forme")}>
             <button onClick={insertBold} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.bold", "Gras")} aria-label={get("notes.bold", "Gras")}>
               <span className="font-bold text-[13px]">B</span>
             </button>

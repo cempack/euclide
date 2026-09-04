@@ -35,7 +35,7 @@ type ThemeCtx = {
   setPref: (p: ThemePref) => void;
   density: Density;
   setDensity: (d: Density) => void;
-  /** Classroom beamer mode: larger type, no sidebar, no tab strip. */
+  /** Classroom beamer mode: larger type, slim rail instead of the full sidebar. */
   projection: boolean;
   setProjection: (on: boolean) => void;
   toggleProjection: () => void;

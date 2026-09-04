@@ -26,14 +26,12 @@ import {
   CheckIcon,
   MoonIcon,
   PlusIcon,
-  ProjectorIcon,
   QrIcon,
   SunIcon,
   TrashIcon,
 } from "../components/icons";
 import { useTabs } from "../lib/tabs";
 import { useAppearance } from "../lib/theme";
-import { MOD } from "../lib/shortcuts";
 
 export default function Settings({ info }: { info: AppInfo | null }) {
   return (
@@ -63,19 +61,27 @@ export default function Settings({ info }: { info: AppInfo | null }) {
   );
 }
 
-// Appearance: theme, density, projection, site icons and the end-of-class notice.
-// These are the settings that used to have no home at all.
+// Appearance: theme, density, site icons and the end-of-class notice.
+// Projection lives on the sidebar (next to Réglages), not here.
 
 function AppearanceSection() {
-  const { pref, setPref, density, setDensity, projection, toggleProjection } = useAppearance();
-  const [remoteIcons, setRemoteIcons] = useState(false);
+  const { pref, setPref, density, setDensity } = useAppearance();
+  const [remoteIcons, setRemoteIcons] = useState(true);
   const [endNotice, setEndNotice] = useState<"off" | "toast" | "sound">("toast");
   const [endLead, setEndLead] = useState(5);
 
   useEffect(() => {
     api
       .getSetting("remote_favicons")
-      .then((v) => setRemoteIcons(v === "1"))
+      .then((v) => {
+        if (v == null) {
+          api.setSetting("remote_favicons", "1").catch(() => {});
+          window.dispatchEvent(new CustomEvent("eu:settings-changed"));
+          setRemoteIcons(true);
+        } else {
+          setRemoteIcons(v !== "0");
+        }
+      })
       .catch(() => {});
     api
       .getSetting("class_end_notice")
@@ -140,7 +146,10 @@ function AppearanceSection() {
             <div className="min-w-0">
               <p className="eu-t-body font-medium text-ink">{get("appearance.density", "Densité")}</p>
               <p className="eu-t-meta">
-                {get("appearance.densityHint", "« Compact » resserre les listes sur un petit écran.")}
+                {get(
+                  "appearance.densityHint",
+                  "« Compact » resserre pages, boutons et listes. « Confortable » les aère."
+                )}
               </p>
             </div>
             <Segmented
@@ -152,30 +161,6 @@ function AppearanceSection() {
                 { value: "compact", label: get("appearance.compact", "Compact") },
               ]}
             />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
-            <div className="min-w-0">
-              <p className="eu-t-body font-medium text-ink">
-                {get("appearance.projection", "Mode projection")}
-              </p>
-              <p className="eu-t-meta">
-                {get(
-                  "appearance.projectionHint",
-                  "Typographie agrandie et barres masquées, pour le vidéoprojecteur."
-                )}{" "}
-                <span className="eu-kbd">{MOD}⇧P</span>
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={toggleProjection}
-              aria-pressed={projection}
-              className={projection ? "eu-btn-primary eu-btn-sm" : "eu-btn-ghost eu-btn-sm"}
-            >
-              <ProjectorIcon className="w-3.5 h-3.5" />
-              {projection ? get("common.active", "Activé") : get("common.enable", "Activer")}
-            </button>
           </div>
 
           <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
@@ -567,24 +552,16 @@ function PronoteSection() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={get("settings.pronoteTitle", "Pronote")} width="max-w-xl">
         <div className="flex flex-col gap-4">
-          <div className="eu-segment w-full">
-            <button
-              onClick={() => setMethod("qr")}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                method === "qr" ? "active bg-ink text-panel" : ""
-              }`}
-            >
-              QR code (ENT)
-            </button>
-            <button
-              onClick={() => setMethod("direct")}
-              className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                method === "direct" ? "active bg-ink text-panel" : ""
-              }`}
-            >
-              Identifiants
-            </button>
-          </div>
+          <Segmented
+            grow
+            value={method}
+            onChange={setMethod}
+            label={get("settings.pronoteTitle", "Pronote")}
+            options={[
+              { value: "qr", label: get("settings.qrMethod", "QR code (ENT)") },
+              { value: "direct", label: get("settings.idMethod", "Identifiants") },
+            ]}
+          />
 
           {method === "qr" ? (
             <>
@@ -896,86 +873,80 @@ function ScheduleSection() {
 
 function TabsSection() {
   const tabsCtx = useTabs();
-
-  const [unlimited, setUnlimited] = useState(tabsCtx.maxTabs === 0);
-  const [sliderVal, setSliderVal] = useState(tabsCtx.maxTabs > 0 ? tabsCtx.maxTabs : 10);
-
-  // keep local state in sync if maxTabs changes from elsewhere (rare)
-  useEffect(() => {
-    setUnlimited(tabsCtx.maxTabs === 0);
-    if (tabsCtx.maxTabs > 0) setSliderVal(tabsCtx.maxTabs);
-  }, [tabsCtx.maxTabs]);
-
   const MIN = 3;
   const MAX = 25;
-
-  const apply = (nextUnlimited: boolean, nextSlider: number) => {
-    const effective = nextUnlimited ? 0 : Math.max(MIN, Math.min(MAX, Math.floor(nextSlider)));
-    setUnlimited(nextUnlimited);
-    if (!nextUnlimited) setSliderVal(effective);
-    tabsCtx.updateMaxTabs(effective);
-    // subtle feedback (no spam on every slider tick)
-    // toast is optional; we keep it quiet for live slider
-  };
+  const mode = tabsCtx.maxTabsMode;
+  const sliderVal = Math.max(MIN, Math.min(MAX, tabsCtx.maxTabsFixed));
+  const chip =
+    mode === "unlimited"
+      ? get("settings.maxTabsUnlimited", "Illimité").toUpperCase()
+      : mode === "auto"
+        ? `${get("settings.maxTabsAutoChip", "AUTO")} · ${tabsCtx.tabFitCapacity || "…"}`
+        : `${tabsCtx.maxTabs} MAX`;
 
   return (
-    <Section
-      title={t.settings?.tabsTitle || "Onglets"}
-      action={<span className="eu-chip">{tabsCtx.maxTabs === 0 ? "ILLIMITÉ" : `${tabsCtx.maxTabs} MAX`}</span>}
-    >
+    <Section title={t.settings?.tabsTitle || "Onglets"} action={<span className="eu-chip">{chip}</span>}>
       <Panel pad>
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            id="tabs-unlimited"
-            type="checkbox"
-            className="accent-accent"
-            checked={unlimited}
-            onChange={(e) => apply(e.target.checked, sliderVal)}
+        <div className="flex flex-col gap-3">
+          <Segmented
+            grow
+            value={mode}
+            onChange={(next) => tabsCtx.setMaxTabsMode(next, sliderVal)}
+            label={get("settings.tabsTitle", "Onglets")}
+            options={[
+              { value: "auto", label: get("settings.maxTabsAuto", "Automatique") },
+              { value: "fixed", label: get("settings.maxTabsFixed", "Nombre fixe") },
+              { value: "unlimited", label: get("settings.maxTabsUnlimited", "Illimité") },
+            ]}
           />
-          <label htmlFor="tabs-unlimited" className="text-sm cursor-pointer select-none">
-            {t.settings?.maxTabsUnlimited || "Aucune limite (illimité)"}
-          </label>
-        </div>
 
-        {!unlimited && (
-          <div className="pl-1">
-            <div className="flex items-baseline justify-between text-sm mb-1.5">
-              <div>
-                <span className="font-medium text-ink">{t.settings?.maxTabsLabel || "Nombre maximum d'onglets"}</span>
-              </div>
-              <div className="font-mono tabular-nums text-ink text-lg leading-none">{sliderVal}</div>
-            </div>
-
-            <input
-              type="range"
-              min={MIN}
-              max={MAX}
-              step={1}
-              value={sliderVal}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                setSliderVal(v);
-                apply(false, v);
-              }}
-              className="w-full accent-accent cursor-pointer"
-            />
-            <div className="flex justify-between text-[10px] text-ink-muted mt-0.5 font-mono tabular-nums">
-              <span>{MIN}</span>
-              <span>{MAX}</span>
-            </div>
-
-            <p className="text-[11px] text-ink-muted mt-2 leading-snug">
-              {t.settings?.maxTabsHint ||
-                "Lorsque la limite est atteinte, l’onglet le plus ancien (non actif) est automatiquement fermé à l’ouverture d’un nouveau. La limite s’applique aux nouveaux onglets seulement."}
+          {mode === "auto" && (
+            <p className="eu-t-meta leading-snug">
+              {fmt(
+                get(
+                  "settings.maxTabsAutoHint",
+                  "Autant d'onglets que la barre peut afficher sans défiler. Actuellement : {count}."
+                ),
+                { count: tabsCtx.tabFitCapacity || "…" }
+              )}
             </p>
-          </div>
-        )}
+          )}
 
-        {unlimited && (
-          <p className="eu-t-meta pl-1">
-            {t.settings?.maxTabsDisabledHint || "Vous pouvez ouvrir autant d’onglets que vous voulez (le + dans la barre d’onglets reste toujours actif)."}
-          </p>
-        )}
+          {mode === "fixed" && (
+            <div>
+              <div className="flex items-baseline justify-between text-sm mb-1.5">
+                <span className="font-medium text-ink">
+                  {t.settings?.maxTabsLabel || "Nombre maximum d'onglets"}
+                </span>
+                <span className="font-mono tabular-nums text-ink text-lg leading-none">{sliderVal}</span>
+              </div>
+              <input
+                type="range"
+                min={MIN}
+                max={MAX}
+                step={1}
+                value={sliderVal}
+                onChange={(e) => tabsCtx.setMaxTabsMode("fixed", parseInt(e.target.value, 10))}
+                className="w-full accent-accent cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-ink-muted mt-0.5 font-mono tabular-nums">
+                <span>{MIN}</span>
+                <span>{MAX}</span>
+              </div>
+              <p className="eu-t-meta mt-2 leading-snug">
+                {t.settings?.maxTabsHint ||
+                  "Lorsque la limite est atteinte, l’onglet le plus ancien (non actif) est automatiquement fermé à l’ouverture d’un nouveau."}
+              </p>
+            </div>
+          )}
+
+          {mode === "unlimited" && (
+            <p className="eu-t-meta leading-snug">
+              {t.settings?.maxTabsDisabledHint ||
+                "Vous pouvez ouvrir autant d’onglets que vous voulez (le + dans la barre d’onglets reste toujours actif)."}
+            </p>
+          )}
+        </div>
         <p className="eu-t-meta mt-3 pt-3 border-t border-line leading-snug">
           {get(
             "settings.pinHint",

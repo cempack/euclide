@@ -170,16 +170,19 @@ export function Segmented<T extends string | number>({
   onChange,
   options,
   label,
+  grow = false,
   className = "",
 }: {
   value: T;
   onChange: (v: T) => void;
   options: Array<{ value: T; label: ReactNode; title?: string }>;
   label?: string;
+  /** Stretch options across the full track (login method, filters). */
+  grow?: boolean;
   className?: string;
 }) {
   return (
-    <div className={`eu-segment ${className}`} role="tablist" aria-label={label}>
+    <div className={`eu-segment ${grow ? "eu-segment-fill" : ""} ${className}`} role="tablist" aria-label={label}>
       {options.map((o) => (
         <button
           key={String(o.value)}
@@ -226,7 +229,7 @@ export function StatTile({
           {icon}
         </span>
       )}
-      <span className="min-w-0">
+      <span>
         <span className="eu-t-metric text-ink block">{value}</span>
         <span className="eu-t-label block mt-1.5">{label}</span>
         {hint && <span className="eu-t-meta block mt-1 normal-case tracking-normal">{hint}</span>}
@@ -234,7 +237,7 @@ export function StatTile({
     </>
   );
   const base =
-    "flex-1 min-w-[150px] flex items-center gap-3 px-4 py-3.5 border-r border-line last:border-r-0 text-left";
+    "eu-stat-tile flex-1 flex items-center gap-3 px-4 border-r border-line last:border-r-0 text-left";
   return onClick ? (
     <button type="button" onClick={onClick} title={title} className={`${base} hover:bg-panel-alt transition-colors duration-fast`}>
       {inner}

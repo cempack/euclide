@@ -80,24 +80,51 @@
 }
 
 /* Density: « confortable » (bureau) vs « compact » (petit portable).
-   Multiplies the vertical rhythm of rows, panels and toolbars. */
-:root {
+   These tokens are consumed by page chrome, buttons, panels and rows — not
+   only `.eu-row`, which is why switching used to look like a no-op. */
+:root,
+[data-density="comfortable"] {
   --eu-density: 1;
-  --eu-row-y: calc(8px * var(--eu-density));
-  --eu-pad: calc(14px * var(--eu-density));
+  --eu-type-scale: 1;
+  --eu-row-y: 10px;
+  --eu-pad: 24px;
+  --eu-page-gap: 24px;
+  --eu-page-x: 28px;
+  --eu-btn-h: 32px;
+  --eu-btn-h-sm: 28px;
+  --eu-icon: 32px;
+  --eu-icon-sm: 28px;
+  --eu-nav-h: 32px;
+  --eu-topbar-h: 40px;
+  --eu-sidebar-p: 12px;
+  --eu-panel-pad: 14px;
+  --eu-panel-head-y: 10px;
+  --eu-stat-y: 14px;
+  --eu-stat-min: 11.5rem;
 }
 [data-density="compact"] {
-  --eu-density: 0.72;
+  --eu-density: 0.78;
+  --eu-row-y: 5px;
+  --eu-pad: 14px;
+  --eu-page-gap: 14px;
+  --eu-page-x: 18px;
+  --eu-btn-h: 26px;
+  --eu-btn-h-sm: 22px;
+  --eu-icon: 26px;
+  --eu-icon-sm: 22px;
+  --eu-nav-h: 26px;
+  --eu-topbar-h: 32px;
+  --eu-sidebar-p: 8px;
+  --eu-panel-pad: 10px;
+  --eu-panel-head-y: 6px;
+  --eu-stat-y: 8px;
+  --eu-stat-min: 9.5rem;
 }
 
-/* Projection mode: bigger type and thicker strokes for the classroom beamer.
-   Set on <html> by the projection toggle; scales the whole UI typographically. */
+/* Projection mode: bigger type for the classroom beamer. Density stays
+   whatever the teacher chose — compact on a small laptop still compact. */
 [data-projection="on"] {
   --eu-type-scale: 1.15;
-  --eu-density: 1.15;
-}
-:root {
-  --eu-type-scale: 1;
 }
 
 * {
@@ -127,12 +154,32 @@ body {
 }
 
 /* Hide scrollbar on the tab strip for a clean tab bar (still fully scrollable). */
+.eu-topbar {
+  height: var(--eu-topbar-h);
+}
 .eu-topbar .overflow-x-auto::-webkit-scrollbar {
   display: none;
 }
 .eu-topbar .overflow-x-auto {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.eu-sidebar {
+  padding: var(--eu-sidebar-p);
+}
+.eu-sidebar-rail {
+  width: 3rem;
+  padding: var(--eu-sidebar-p) 0;
+}
+.eu-nav-item {
+  height: var(--eu-nav-h);
+}
+.eu-page {
+  display: flex;
+  flex-direction: column;
+  padding: var(--eu-pad) var(--eu-page-x) 4rem;
+  gap: var(--eu-page-gap);
 }
 
 /* Regions the window must not treat as a drag handle (canvas, editors, lists).
@@ -163,6 +210,14 @@ select,
   outline: 2px solid rgb(var(--eu-accent));
   outline-offset: 2px;
   border-radius: 3px;
+}
+
+/* The command palette input is the whole header — a ring on the field
+   sits flush against the modal edge and the COMMANDES divider. */
+.eu-cmdk-input:focus,
+.eu-cmdk-input:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 ::selection {
@@ -196,7 +251,7 @@ select,
     @apply text-[26px] leading-[1.18] font-semibold tracking-[-0.02em];
   }
   .eu-t-metric {
-    @apply font-mono text-[32px] leading-none font-semibold tracking-[-0.02em] tabular-nums;
+    @apply font-mono text-[32px] leading-none font-semibold tracking-[-0.02em] tabular-nums whitespace-nowrap;
   }
   .eu-t-section {
     @apply text-[15px] leading-[1.4] font-semibold tracking-[-0.01em];
@@ -221,10 +276,11 @@ select,
     @apply rounded-md bg-panel border border-line;
   }
   .eu-panel-head {
-    @apply flex items-center justify-between gap-3 px-[14px] py-2.5 border-b border-line bg-panel-alt;
+    @apply flex items-center justify-between gap-3 border-b border-line bg-panel-alt;
+    padding: var(--eu-panel-head-y) var(--eu-panel-pad);
   }
   .eu-panel-pad {
-    @apply p-[14px];
+    padding: var(--eu-panel-pad);
   }
   .eu-panel-alt {
     @apply rounded-md bg-panel-alt border border-line;
@@ -235,9 +291,10 @@ select,
      toolbars align without per-site tweaking.
      ------------------------------------------------------------------------- */
   .eu-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded h-8 px-3 text-[12.5px] font-medium
+    @apply inline-flex items-center justify-center gap-2 rounded px-3 text-[12.5px] font-medium
       whitespace-nowrap border border-transparent transition-colors duration-fast
       disabled:opacity-45 disabled:pointer-events-none;
+    height: var(--eu-btn-h);
   }
   .eu-btn-primary {
     @apply eu-btn bg-ink text-panel border-ink hover:bg-ink/90 active:bg-ink;
@@ -252,29 +309,36 @@ select,
     @apply eu-btn bg-danger text-white border-danger hover:bg-danger/90;
   }
   .eu-btn-sm {
-    @apply h-7 px-2.5 text-[11.5px] gap-1.5;
+    @apply px-2.5 text-[11.5px] gap-1.5;
+    height: var(--eu-btn-h-sm);
   }
   .eu-btn-icon {
-    @apply w-8 h-8 p-0 shrink-0;
+    @apply p-0 shrink-0;
+    width: var(--eu-icon);
+    height: var(--eu-icon);
   }
   .eu-btn-icon.eu-btn-sm {
-    @apply w-7 h-7;
+    width: var(--eu-icon-sm);
+    height: var(--eu-icon-sm);
   }
 
   /* -------------------------------------------------------------------------
      Form controls.
      ------------------------------------------------------------------------- */
   .eu-input {
-    @apply w-full rounded h-8 bg-panel border border-line px-2.5 text-[13px] text-ink
+    @apply w-full rounded bg-panel border border-line px-2.5 text-[13px] text-ink
       placeholder:text-ink-faint transition-colors duration-fast
       focus:border-accent focus:outline-none focus-visible:outline-none
       disabled:opacity-50;
+    height: var(--eu-btn-h);
   }
   .eu-textarea {
-    @apply eu-input h-auto py-2 leading-[1.55] resize-y;
+    @apply eu-input py-2 leading-[1.55] resize-y;
+    height: auto;
   }
   .eu-select {
     @apply eu-input pr-7 appearance-none bg-no-repeat cursor-pointer;
+    height: var(--eu-btn-h);
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7276' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 8px center;
   }
@@ -309,18 +373,30 @@ select,
     @apply inline-flex items-center gap-0.5 rounded border border-line bg-panel-alt p-0.5;
   }
   .eu-segment > button {
-    @apply rounded-sm px-2.5 h-6 text-[12px] font-medium text-ink-muted transition-colors duration-fast
+    @apply rounded-sm px-2.5 text-[12px] font-medium text-ink-muted transition-colors duration-fast
       hover:text-ink;
+    height: var(--eu-btn-h-sm);
   }
   .eu-segment > button[aria-selected="true"],
   .eu-segment > button.active {
     @apply bg-ink text-panel hover:text-panel;
+  }
+  .eu-segment-fill {
+    @apply w-full;
+  }
+  .eu-segment-fill > button {
+    @apply flex-1;
   }
 
   /* -------------------------------------------------------------------------
      Rows: the list primitive used by schedule, reminders, documents, files.
      Row actions stay reachable: they fade in on hover *and* on focus-within.
      ------------------------------------------------------------------------- */
+  .eu-stat-tile {
+    min-width: var(--eu-stat-min);
+    padding-top: var(--eu-stat-y);
+    padding-bottom: var(--eu-stat-y);
+  }
   .eu-row {
     @apply flex items-center gap-2.5 px-[14px] transition-colors duration-fast;
     padding-top: var(--eu-row-y);

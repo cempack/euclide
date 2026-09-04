@@ -52,7 +52,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from "../components/icons";
-import { Favicon } from "../components/Favicon";
+import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 
 /**
  * Le tableau de bord.
@@ -82,7 +82,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
   const [recentFiles, setRecentFiles] = useState<FileItem[]>([]);
   const [pronoteStatus, setPronoteStatus] = useState<PronoteStatus | null>(null);
   const [recap, setRecap] = useState<RecapData | null>(null);
-  const [remoteIcons, setRemoteIcons] = useState(false);
+  const [remoteIcons, setRemoteIcons] = useState(true);
 
   // Live tick so "in progress", countdowns and the gauge move without a refetch.
   const [nowTick, setNowTick] = useState(() => new Date());
@@ -101,7 +101,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
     api.recentFiles(6).then((f) => setRecentFiles(Array.isArray(f) ? f : [])).catch(() => {});
     api.pronoteStatus().then(setPronoteStatus).catch(() => {});
     api.getRecap("today").then(setRecap).catch(() => {});
-    api.getSetting("remote_favicons").then((v) => setRemoteIcons(v === "1")).catch(() => {});
+    api.getSetting("remote_favicons").then((v) => setRemoteIcons(remoteFaviconsEnabled(v))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -114,6 +114,7 @@ export default function Dashboard({ info: _info }: { info?: AppInfo | null }) {
       "eu:reminders-changed",
       "eu:course-changed",
       "eu:pronote-changed",
+      "eu:settings-changed",
     ];
     events.forEach((ev) => window.addEventListener(ev, onChange));
     return () => events.forEach((ev) => window.removeEventListener(ev, onChange));

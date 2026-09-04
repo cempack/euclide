@@ -284,7 +284,7 @@ export default function CommandPalette({
             exit={{ opacity: 0, scale: 0.985 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
           >
-            <div className="flex items-center gap-2.5 px-3.5 border-b border-line">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line">
               {scope === "all" ? (
                 <SearchIcon className="w-4 h-4 text-ink-faint shrink-0" />
               ) : (
@@ -298,7 +298,7 @@ export default function CommandPalette({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKey}
                 placeholder={get("palette.placeholder", "Rechercher un cours, un document, une note…")}
-                className="flex-1 bg-transparent py-3 text-[14px] text-ink outline-none placeholder:text-ink-faint"
+                className="eu-cmdk-input flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-faint"
               />
             </div>
             <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">

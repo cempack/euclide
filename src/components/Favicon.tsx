@@ -4,19 +4,21 @@ import { getFaviconUrl } from "../lib/format";
 import { domainBadge } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 
+/** Missing or any value other than `"0"` means remote favicons are on. */
+export function remoteFaviconsEnabled(raw: string | null | undefined): boolean {
+  return raw !== "0";
+}
+
 /**
  * Site mark for a quick link.
  *
- * Local by default: a deterministic badge derived from the domain, so the
- * library looks the same on a classroom machine with no network as it does
- * online — and Euclide stops calling Google's favicon service on every render.
- * Remote favicons remain available behind the « Icônes de sites distantes »
- * setting (Réglages → Apparence).
+ * Remote favicons are on by default (« Icônes de sites distantes »). Opting
+ * out draws a local domain badge and never hits the network.
  */
 export function Favicon({
   url,
   className = "w-5 h-5",
-  remote = false,
+  remote = true,
 }: {
   url: string;
   className?: string;

@@ -15,7 +15,7 @@ import { courseVisual } from "./lib/color";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 
-import { TabsProvider, useTabs, type Tab, type TabKind } from "./lib/tabs";
+import { TabsProvider, useTabs, fitTabCount, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
 import { Segmented } from "./components/layout";
 import CommandPalette from "./components/CommandPalette";
@@ -28,7 +28,6 @@ import {
  GearIcon,
  HelpIcon,
  HomeIcon,
- MoonIcon,
  PauseIcon,
  PenIcon,
  PinIcon,
@@ -36,7 +35,6 @@ import {
  PlusIcon,
  ProjectorIcon,
  SearchIcon,
- SunIcon,
  ToolIcon,
  XIcon,
  BellIcon,
@@ -127,7 +125,7 @@ const NavButton = memo(function NavButton({
  type="button"
  onClick={() => onOpen(item)}
  aria-current={active ? "page" : undefined}
- className={`group flex items-center gap-2.5 h-8 px-2.5 rounded text-left transition-colors duration-fast ${
+ className={`eu-nav-item group flex items-center gap-2.5 px-2.5 rounded text-left transition-colors duration-fast ${
  active
  ? "bg-ink text-panel font-medium"
  : "text-ink-muted hover:text-ink hover:bg-panel-alt"
@@ -148,9 +146,27 @@ const NavButton = memo(function NavButton({
  );
 });
 
+const ProjectionRail = memo(function ProjectionRail() {
+ const { toggleProjection } = useAppearance();
+ return (
+ <aside className="eu-sidebar eu-sidebar-rail shrink-0 h-full flex flex-col items-center bg-canvas border-r border-line">
+ <button
+ type="button"
+ onClick={toggleProjection}
+ aria-pressed
+ title={`${get("appearance.leaveProjection", "Quitter la projection")} (Échap)`}
+ aria-label={get("appearance.leaveProjection", "Quitter la projection")}
+ className="eu-btn-ghost eu-btn-icon"
+ >
+ <ProjectorIcon className="w-4 h-4" />
+ </button>
+ </aside>
+ );
+});
+
 const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
  const tabs = useTabs();
- const { pref, resolved, setPref } = useAppearance();
+ const { projection, toggleProjection } = useAppearance();
  const [pronote, setPronote] = useState<PronoteStatus | null>(null);
  const isActive = (kind: TabKind) => navKindActive(kind, tabs.active?.kind);
 
@@ -179,18 +195,8 @@ const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
  [tabs]
  );
 
- const cycleTheme = () => {
- setPref(pref === "auto" ? "light" : pref === "light" ? "dark" : "auto");
- };
- const themeLabel =
- pref === "auto"
- ? get("appearance.auto", "Auto")
- : pref === "light"
- ? get("appearance.light", "Clair")
- : get("appearance.dark", "Sombre");
-
  return (
- <aside className="eu-sidebar w-[232px] shrink-0 h-full flex flex-col gap-1 px-3 py-3 bg-canvas border-r border-line">
+ <aside className="eu-sidebar w-[232px] shrink-0 h-full flex flex-col gap-1 bg-canvas border-r border-line">
  <div className="flex items-center gap-2.5 px-1.5 pb-1">
  <img src="/euclide-logo.png" alt="" className="w-7 h-7 rounded object-contain" />
  <div className="min-w-0 leading-tight">
@@ -240,12 +246,15 @@ const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
  )}
  <button
  type="button"
- onClick={cycleTheme}
- title={`${get("appearance.theme", "Apparence")} : ${themeLabel}`}
- aria-label={`${get("appearance.theme", "Apparence")} : ${themeLabel}`}
- className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+ onClick={toggleProjection}
+ aria-pressed={projection}
+ title={`${get("appearance.projection", "Mode projection")} (${MOD}⇧P)`}
+ aria-label={get("appearance.projection", "Mode projection")}
+ className={`eu-btn-icon eu-btn-sm ${
+ projection ? "eu-btn-ghost" : "eu-btn-quiet"
+ }`}
  >
- {resolved === "dark" ? <MoonIcon className="w-4 h-4" /> : <SunIcon className="w-4 h-4" />}
+ <ProjectorIcon className="w-4 h-4" />
  </button>
  <button
  type="button"
@@ -353,9 +362,27 @@ const TopBar = memo(function TopBar({
  timer: TimerApi;
 }) {
  const tabs = useTabs();
+ const barRef = useRef<HTMLDivElement>(null);
+ const extrasRef = useRef<HTMLDivElement>(null);
  const [courseIconMap, setCourseIconMap] = useState<Record<number, { key: string; color: string }>>({});
  const [dragIndex, setDragIndex] = useState<number | null>(null);
  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+ useEffect(() => {
+ const bar = barRef.current;
+ if (!bar) return;
+ const measure = () => {
+ const extras = extrasRef.current?.offsetWidth ?? 0;
+ const plus = 36;
+ const available = bar.clientWidth - extras - plus - 12;
+ tabs.setTabFitCapacity(fitTabCount(available));
+ };
+ const ro = new ResizeObserver(measure);
+ ro.observe(bar);
+ if (extrasRef.current) ro.observe(extrasRef.current);
+ measure();
+ return () => ro.disconnect();
+ }, [tabs.setTabFitCapacity, timer.sec]);
 
  useEffect(() => {
  const courseTabs = tabs.tabs.filter(
@@ -380,7 +407,7 @@ const TopBar = memo(function TopBar({
  const atLimit = tabs.maxTabs > 0 && tabs.tabs.length >= tabs.maxTabs;
 
  return (
- <div className="eu-topbar h-10 shrink-0 flex items-stretch bg-canvas border-b border-line">
+ <div ref={barRef} className="eu-topbar shrink-0 flex items-stretch bg-canvas border-b border-line">
  <div
  role="tablist"
  aria-label={get("app.openTabs", "Onglets ouverts")}
@@ -488,7 +515,7 @@ const TopBar = memo(function TopBar({
 
  <div className="flex-1 min-w-2" />
 
- <div className="flex items-center gap-1 shrink-0 pl-2 pr-2">
+ <div ref={extrasRef} className="flex items-center gap-1 shrink-0 pl-2 pr-2">
  {timer.sec != null && <TimerControl timer={timer} />}
 
  <button
@@ -712,7 +739,7 @@ function TabPane({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visib
 function Scroll({ children }: { children: React.ReactNode }) {
  return (
  <div className="h-full overflow-y-auto">
- <div className="mx-auto max-w-col px-7 lg:px-9 py-6 pb-16 flex flex-col gap-6">{children}</div>
+ <div className="mx-auto max-w-col eu-page">{children}</div>
  </div>
  );
 }
@@ -1325,8 +1352,8 @@ function Shell() {
 
  return (
  <div className="flex h-full w-full overflow-hidden bg-canvas eu-root">
- {/* Projection mode hides the chrome so the content fills the beamer. */}
- {!projection && <Sidebar info={info} />}
+ {/* Projection keeps a slim quit rail; the tab strip and status bar hide. */}
+ {projection ? <ProjectionRail /> : <Sidebar info={info} />}
  <main className="flex-1 h-full flex flex-col min-w-0 bg-canvas eu-main">
  {!projection && (
  <TopBar
@@ -1342,20 +1369,7 @@ function Shell() {
  {!projection && <StatusBar info={info} timer={timer} />}
  </main>
 
- {projection && (
- <>
- <button
- type="button"
- onClick={toggleProjection}
- className="fixed top-3 right-3 z-overlay eu-btn-ghost eu-btn-sm shadow-pop"
- title={`${get("appearance.leaveProjection", "Quitter le mode projection")} (Échap)`}
- >
- <ProjectorIcon className="w-4 h-4" />
- {get("appearance.leaveProjection", "Quitter la projection")}
- </button>
- <TimerStage timer={timer} />
- </>
- )}
+ {projection && <TimerStage timer={timer} />}
 
  <CommandPalette open={palette} onClose={() => setPalette(false)} onHelp={handleHelp} />
  <QuickCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
