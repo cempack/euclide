@@ -1,29 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { api, type SearchResult } from "../lib/api";
+import { api, type QuickLink, type SearchResult } from "../lib/api";
 import { useTabs } from "../lib/tabs";
-import { get } from "../lib/i18n";
+import { get, fmt, t } from "../lib/i18n";
+import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
+import { useAppearance } from "../lib/theme";
+import { useToast } from "./ui";
 
 import {
   BellIcon,
   BookIcon,
+  ClockIcon,
+  CoffeeIcon,
+  CodeIcon,
   DocIcon,
   GearIcon,
+  HelpIcon,
   HomeIcon,
-
+  LinkIcon,
   NoteIcon,
   PenIcon,
+  PlusIcon,
+  ProjectorIcon,
   SearchIcon,
-  ToolIcon,
-  CodeIcon,
-  HelpIcon,
   SparkleIcon,
+  ToolIcon,
 } from "./icons";
 
 interface Action {
   id: string;
   label: string;
   hint?: string;
+  aliases?: string[];
   /** Search-result excerpt (PDF content matches). */
   snippet?: string;
   group: string;
@@ -54,28 +62,8 @@ function scopeOf(query: string): { scope: Scope; term: string } {
   return { scope: "all", term: query };
 }
 
-const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-function scoreMatch(text: string, q: string): number {
-  const t = norm(text);
-  const qq = norm(q);
-  if (!qq) return 0;
-  if (t === qq) return 100;
-  if (t.startsWith(qq)) return 90;
-  if (t.includes(qq)) return 75;
-  // subsequence match (handles partial typing + some typos/gaps)
-  let ti = 0;
-  let qi = 0;
-  while (ti < t.length && qi < qq.length) {
-    if (t[ti] === qq[qi]) {
-      qi++;
-    }
-    ti++;
-  }
-  if (qi === qq.length) return 65;
-  // very loose partial
-  if (qi >= Math.max(2, Math.floor(qq.length * 0.6))) return 40;
-  return 0;
+function cmdAliases(key: string): string[] {
+  return aliasesOf(get(`palette.aliases.${key}`, ""));
 }
 
 export default function CommandPalette({
@@ -88,9 +76,13 @@ export default function CommandPalette({
   onHelp: () => void;
 }) {
   const tabs = useTabs();
+  const toast = useToast();
+  const { projection, toggleProjection } = useAppearance();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [links, setLinks] = useState<QuickLink[]>([]);
+  const [keepAwake, setKeepAwake] = useState<boolean | null>(null);
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -100,6 +92,14 @@ export default function CommandPalette({
     setResults([]);
     setSel(0);
     setTimeout(() => inputRef.current?.focus(), 30);
+    api
+      .listLinks()
+      .then((l) => setLinks(Array.isArray(l) ? l : []))
+      .catch(() => setLinks([]));
+    api
+      .keepAwakeStatus()
+      .then((s) => setKeepAwake(!!s))
+      .catch(() => {});
   }, [open]);
 
   // global search across courses, files (name + content) and notes
@@ -127,18 +127,67 @@ export default function CommandPalette({
       onClose();
     };
     const G = get("palette.groupCommands", "Commandes");
-    return [
-      { id: "dash", group: G, label: get("nav.dashboard", "Tableau de bord"), icon: <HomeIcon className="w-4 h-4" />, run: go("dashboard") },
-      { id: "courses", group: G, label: get("nav.courses", "Cours"), icon: <BookIcon className="w-4 h-4" />, run: go("courses") },
-      { id: "docs", group: G, label: get("nav.documents", "Documents"), icon: <DocIcon className="w-4 h-4" />, run: go("documents") },
-      { id: "tools", group: G, label: get("nav.tools", "Outils"), icon: <ToolIcon className="w-4 h-4" />, run: go("tools") },
-      { id: "python", group: G, label: get("nav.python", "Python"), icon: <CodeIcon className="w-4 h-4" />, run: go("python") },
-      { id: "reminders", group: G, label: get("nav.reminders", "Rappels"), icon: <BellIcon className="w-4 h-4" />, run: go("reminders") },
+    const timerTitle = get("tools.timerTitle", "Minuteur de classe");
+    const startTimer = (minutes: number) => () => {
+      window.dispatchEvent(new CustomEvent("eu:timer-start", { detail: { minutes } }));
+      onClose();
+    };
+
+    const actions: Action[] = [
+      {
+        id: "dash",
+        group: G,
+        label: get("nav.dashboard", "Tableau de bord"),
+        aliases: cmdAliases("dashboard"),
+        icon: <HomeIcon className="w-4 h-4" />,
+        run: go("dashboard"),
+      },
+      {
+        id: "courses",
+        group: G,
+        label: get("nav.courses", "Cours"),
+        aliases: cmdAliases("courses"),
+        icon: <BookIcon className="w-4 h-4" />,
+        run: go("courses"),
+      },
+      {
+        id: "docs",
+        group: G,
+        label: get("nav.documents", "Documents"),
+        aliases: cmdAliases("documents"),
+        icon: <DocIcon className="w-4 h-4" />,
+        run: go("documents"),
+      },
+      {
+        id: "tools",
+        group: G,
+        label: get("nav.tools", "Outils"),
+        aliases: cmdAliases("tools"),
+        icon: <ToolIcon className="w-4 h-4" />,
+        run: go("tools"),
+      },
+      {
+        id: "python",
+        group: G,
+        label: get("nav.python", "Python"),
+        aliases: cmdAliases("python"),
+        icon: <CodeIcon className="w-4 h-4" />,
+        run: go("python"),
+      },
+      {
+        id: "reminders",
+        group: G,
+        label: get("nav.reminders", "Rappels"),
+        aliases: cmdAliases("reminders"),
+        icon: <BellIcon className="w-4 h-4" />,
+        run: go("reminders"),
+      },
       {
         id: "board",
         group: G,
         label: get("nav.whiteboard", "Tableau blanc"),
         hint: get("palette.new", "nouveau"),
+        aliases: cmdAliases("whiteboard"),
         icon: <PenIcon className="w-4 h-4" />,
         run: go("whiteboard", get("app.tabWhiteboard", "Tableau"), { isNew: true }),
       },
@@ -147,24 +196,131 @@ export default function CommandPalette({
         group: G,
         label: get("common.newNote", "Nouvelle note"),
         hint: get("palette.new", "nouveau"),
+        aliases: cmdAliases("note"),
         icon: <NoteIcon className="w-4 h-4" />,
         run: go("note", get("common.newNote", "Nouvelle note"), { isNew: true }),
       },
-      { id: "recap", group: G, label: get("nav.recap", "Bilan"), icon: <SparkleIcon className="w-4 h-4" />, run: go("recap", get("nav.recap", "Bilan")) },
-      { id: "settings", group: G, label: get("nav.settings", "Réglages"), icon: <GearIcon className="w-4 h-4" />, run: go("settings") },
+      {
+        id: "recap",
+        group: G,
+        label: get("nav.recap", "Bilan"),
+        aliases: cmdAliases("recap"),
+        icon: <SparkleIcon className="w-4 h-4" />,
+        run: go("recap", get("nav.recap", "Bilan")),
+      },
+      {
+        id: "settings",
+        group: G,
+        label: get("nav.settings", "Réglages"),
+        aliases: cmdAliases("settings"),
+        icon: <GearIcon className="w-4 h-4" />,
+        run: go("settings"),
+      },
       {
         id: "help",
         group: G,
         label: get("app.shortcutsTitle", "Raccourcis"),
+        aliases: cmdAliases("help"),
         icon: <HelpIcon className="w-4 h-4" />,
         run: () => {
           onHelp();
           onClose();
         },
       },
-
+      {
+        id: "keepawake",
+        group: G,
+        label: get("tools.keepAwake", "Ne pas verrouiller l'écran"),
+        hint:
+          keepAwake == null
+            ? undefined
+            : keepAwake
+              ? t.tools?.keepAwakeOn || "L'écran reste allumé"
+              : t.tools?.keepAwakeOff || "Verrouillage écran normal",
+        aliases: cmdAliases("keepAwake"),
+        icon: <CoffeeIcon className="w-4 h-4" />,
+        run: () => {
+          void (async () => {
+            try {
+              const current = keepAwake ?? (await api.keepAwakeStatus());
+              const next = await api.setKeepAwake(!current);
+              setKeepAwake(next);
+              window.dispatchEvent(new CustomEvent("eu:keepawake-changed"));
+              toast(
+                next
+                  ? t.tools?.keepAwakeOn || "L'écran reste allumé"
+                  : t.tools?.keepAwakeOff || "Verrouillage écran normal",
+                next ? "success" : "info"
+              );
+            } catch {
+              toast(get("messages.genericError", "Erreur"), "error");
+            }
+            onClose();
+          })();
+        },
+      },
+      {
+        id: "projection",
+        group: G,
+        label: get("appearance.projection", "Mode projection"),
+        hint: projection ? get("common.active", "Activé") : get("common.enable", "Activer"),
+        aliases: cmdAliases("projection"),
+        icon: <ProjectorIcon className="w-4 h-4" />,
+        run: () => {
+          toggleProjection();
+          onClose();
+        },
+      },
+      {
+        id: "capture",
+        group: G,
+        label: get("capture.title", "Capture rapide"),
+        aliases: cmdAliases("capture"),
+        icon: <PlusIcon className="w-4 h-4" />,
+        run: () => {
+          onClose();
+          window.dispatchEvent(new CustomEvent("eu:capture-open"));
+        },
+      },
     ];
-  }, [tabs, onClose, onHelp]);
+
+    for (const minutes of [5, 10, 15, 30]) {
+      actions.push({
+        id: `timer-${minutes}`,
+        group: G,
+        label: `${timerTitle} · ${fmt(get("tools.timerMinutes", "{count} min"), { count: minutes })}`,
+        aliases: [...cmdAliases("timer"), String(minutes), `${minutes}min`],
+        icon: <ClockIcon className="w-4 h-4" />,
+        run: startTimer(minutes),
+      });
+    }
+
+    const linkGroup = get("palette.groupLinks", "Liens rapides");
+    actions.push({
+      id: "links-manage",
+      group: linkGroup,
+      label: get("palette.manageLinks", "Gérer les liens"),
+      aliases: cmdAliases("links"),
+      icon: <LinkIcon className="w-4 h-4" />,
+      run: go("tools"),
+    });
+    for (const link of links) {
+      actions.push({
+        id: `link-${link.id}`,
+        group: linkGroup,
+        label: link.label,
+        hint: link.url,
+        aliases: [...cmdAliases("links"), link.url],
+        icon: <LinkIcon className="w-4 h-4" />,
+        run: () => {
+          api.openUrl(link.url).catch(() => toast(get("messages.genericError", "Erreur"), "error"));
+          onClose();
+        },
+      });
+    }
+
+    return actions;
+  }, [tabs, onClose, onHelp, toast, projection, toggleProjection, keepAwake, links]);
 
   const resultActions = useMemo<Action[]>(() => {
     return results.map((r) => {
@@ -215,30 +371,27 @@ export default function CommandPalette({
     const wantResults = scope !== "commands";
 
     if (!term.trim()) {
-      return wantCommands ? baseActions.slice(0, 9) : [];
+      return wantCommands ? baseActions.filter((a) => a.group === get("palette.groupCommands", "Commandes")).slice(0, 9) : [];
     }
 
-    const scored: { a: Action; s: number }[] = [];
-    if (wantCommands) {
-      for (const a of baseActions) {
-        const s = Math.max(
-          scoreMatch(a.label, term),
-          a.hint && norm(a.hint).includes(norm(term)) ? scoreMatch(a.hint, term) : 0
-        );
-        if (s > 0) scored.push({ a, s });
-      }
+    const commands = wantCommands ? rankPaletteItems(baseActions, term) : [];
+    const scopedResults = wantResults
+      ? resultActions.filter((r) => {
+          if (scope === "courses") return r.group === get("palette.groupCourses", "Cours");
+          if (scope === "documents") return r.group === get("palette.groupDocs", "Documents et notes");
+          if (scope === "reminders") return false;
+          return true;
+        })
+      : [];
+
+    const seen = new Set<string>();
+    const out: Action[] = [];
+    for (const a of [...commands, ...scopedResults]) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      out.push(a);
     }
-    if (wantResults) {
-      for (const r of resultActions) {
-        if (scope === "courses" && r.group !== get("palette.groupCourses", "Cours")) continue;
-        if (scope === "documents" && r.group !== get("palette.groupDocs", "Documents et notes")) continue;
-        if (scope === "reminders") continue; // reminders are not in the backend index yet
-        const s = Math.max(scoreMatch(r.label, term), r.hint ? scoreMatch(r.hint, term) : 0) || 55;
-        scored.push({ a: r, s });
-      }
-    }
-    scored.sort((x, y) => y.s - x.s);
-    return scored.slice(0, 18).map((x) => x.a);
+    return out.slice(0, 18);
   }, [baseActions, resultActions, term, scope]);
 
   const listRef = useRef<HTMLDivElement>(null);

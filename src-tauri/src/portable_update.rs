@@ -10,9 +10,11 @@
 //!    a couple of marker/readme files
 //! 3. Never deletes unknown files, `Euclide-Data`, or `euclide-data.json`
 //! 4. Puts the new `euclide.exe` in place **before** the app quits (Windows can
-//!    rename a running exe, not overwrite it). Leftover `*.euclide-old` files
-//!    are deleted after this PID exits. Then this window closes; the user
-//!    opens Euclide again. Does not start the new process.
+//!    rename a running exe, not overwrite it). The displaced file is deleted
+//!    immediately when unlocked, otherwise right after this PID exits (helper)
+//!    and again on the next launch. No `*.euclide-old*` leftovers are kept.
+//!    Then this window closes; the user opens Euclide again. Does not start
+//!    the new process.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::Cursor;
@@ -28,20 +30,43 @@ const PORTABLE_MARKER: &str = "euclide.portable";
 const OLD_SUFFIX: &str = ".euclide-old";
 const NEW_SUFFIX: &str = ".euclide-new";
 
-/// After this PID exits, delete renamed leftovers (`*.euclide-old`). The new
+/// After this PID exits, delete renamed leftovers (`*.euclide-old*`). The new
 /// exe is already at `$Dest\euclide.exe` — this script must not copy or start.
+/// Names are `euclide.exe.euclide-old-<pid>-<nanos>`, so the glob must be
+/// `*.euclide-old*` (not `*.euclide-old`, which never matched).
 const CLEANUP_HELPER_PS1: &str = r#"param(
   [Parameter(Mandatory=$true)][string]$Dest,
   [Parameter(Mandatory=$true)][int]$AppPid
 )
 $ErrorActionPreference = 'SilentlyContinue'
+function Clear-EuclideLeftovers {
+  param([string]$Root, [switch]$Recurse)
+  if (-not (Test-Path -LiteralPath $Root)) { return }
+  $items = if ($Recurse) {
+    Get-ChildItem -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue
+  } else {
+    Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue
+  }
+  $items |
+    Where-Object { -not $_.PSIsContainer -and ($_.Name -like '*.euclide-old*' -or $_.Name -like '*.euclide-new*') } |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+}
 $deadline = (Get-Date).AddSeconds(60)
 while ((Get-Process -Id $AppPid -ErrorAction SilentlyContinue) -and ((Get-Date) -lt $deadline)) {
   Start-Sleep -Milliseconds 250
 }
-Get-ChildItem -LiteralPath $Dest -Recurse -Force -ErrorAction SilentlyContinue |
-  Where-Object { $_.Name -like '*.euclide-old' -or $_.Name -like '*.euclide-new' } |
-  Remove-Item -Force -ErrorAction SilentlyContinue
+$until = (Get-Date).AddSeconds(15)
+do {
+  Clear-EuclideLeftovers -Root $Dest
+  $sc = Join-Path $Dest 'euclide-sidecar'
+  Clear-EuclideLeftovers -Root $sc -Recurse
+  $left = @(
+    Get-ChildItem -LiteralPath $Dest -Force -ErrorAction SilentlyContinue |
+      Where-Object { -not $_.PSIsContainer -and ($_.Name -like '*.euclide-old*' -or $_.Name -like '*.euclide-new*') }
+  )
+  if ($left.Count -eq 0) { break }
+  Start-Sleep -Milliseconds 400
+} while ((Get-Date) -lt $until)
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 "#;
 #[cfg(windows)]
@@ -286,6 +311,59 @@ pub fn extract_allowed_overlay(bytes: &[u8], dest: &Path) -> Result<usize, Strin
     Ok(written)
 }
 
+pub fn is_update_leftover_name(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    n.contains(".euclide-old") || n.contains(".euclide-new")
+}
+
+fn purge_leftover_files_in(dir: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut removed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !is_update_leftover_name(name) {
+            continue;
+        }
+        if std::fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
+}
+
+fn purge_leftover_files_under(dir: &Path) -> usize {
+    let mut removed = purge_leftover_files_in(dir);
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return removed;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            removed += purge_leftover_files_under(&path);
+        }
+    }
+    removed
+}
+
+/// Delete displaced update files (`*.euclide-old*`, `*.euclide-new*`) next to
+/// the exe and under `euclide-sidecar`. Never walks `Euclide-Data`.
+pub fn purge_update_leftovers(dir: &Path) -> usize {
+    let mut removed = purge_leftover_files_in(dir);
+    let sidecar = dir.join("euclide-sidecar");
+    if sidecar.is_dir() {
+        removed += purge_leftover_files_under(&sidecar);
+    }
+    removed
+}
+
 fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_os_string();
     name.push(suffix);
@@ -356,6 +434,10 @@ fn replace_locked_file_once(src: &Path, dest: &Path) -> Result<(), String> {
         }
         let _ = std::fs::remove_file(&incoming);
     }
+    // Do not keep the displaced file. A running Windows exe may still lock
+    // `backup` until this PID exits — the cleanup helper / next launch
+    // removes it then.
+    let _ = std::fs::remove_file(&backup);
     Ok(())
 }
 
@@ -479,6 +561,7 @@ async fn apply_windows_portable_update_inner(
         return Err(e);
     }
     let _ = std::fs::remove_dir_all(&staging);
+    let _ = purge_update_leftovers(&dest);
     let _ = spawn_cleanup_helper(&dest);
     // Return success first so the UI does not treat the dying IPC as a failure.
     // Then close this window. Do not start the new process.
@@ -780,9 +863,17 @@ mod tests {
     }
 
     #[test]
+    fn leftover_name_matches_unique_sibling() {
+        assert!(is_update_leftover_name("euclide.exe.euclide-old-12-99"));
+        assert!(is_update_leftover_name("euclide.exe.euclide-new-12-99"));
+        assert!(!is_update_leftover_name("euclide.exe"));
+        assert!(!is_update_leftover_name("euclide.db"));
+    }
+
+    #[test]
     fn cleanup_helper_only_deletes_renamed_leftovers() {
         assert!(CLEANUP_HELPER_PS1.contains("Get-Process -Id $AppPid"));
-        assert!(CLEANUP_HELPER_PS1.contains("*.euclide-old"));
+        assert!(CLEANUP_HELPER_PS1.contains("*.euclide-old*"));
         assert!(
             !CLEANUP_HELPER_PS1
                 .lines()
@@ -813,17 +904,16 @@ mod tests {
 
         apply_staging_overlay(&stage, &tmp).unwrap();
         assert_eq!(std::fs::read(tmp.join("euclide.exe")).unwrap(), b"NEW-EXE");
-        let backup = std::fs::read_dir(&tmp)
+        let leftovers: Vec<_> = std::fs::read_dir(&tmp)
             .unwrap()
             .flatten()
-            .map(|e| e.path())
-            .find(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.contains("euclide-old"))
-            })
-            .expect("old exe kept beside the new one");
-        assert_eq!(std::fs::read(backup).unwrap(), b"OLD-EXE");
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| is_update_leftover_name(n))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "old exe must be deleted, leftover={leftovers:?}"
+        );
         assert_eq!(
             std::fs::read(tmp.join("euclide-sidecar/run.exe")).unwrap(),
             b"NEW-SC"
@@ -831,6 +921,27 @@ mod tests {
         assert_eq!(
             std::fs::read(tmp.join("Euclide-Data/euclide.db")).unwrap(),
             b"KEEP-DB"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn purge_removes_leftovers_and_skips_data_dir() {
+        let tmp = std::env::temp_dir().join(format!("euclide-purge-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("Euclide-Data")).unwrap();
+        std::fs::create_dir_all(tmp.join("euclide-sidecar/internal")).unwrap();
+        std::fs::write(tmp.join("euclide.exe"), b"LIVE").unwrap();
+        std::fs::write(tmp.join("euclide.exe.euclide-old-1-2"), b"OLD").unwrap();
+        std::fs::write(tmp.join("euclide-sidecar/run.exe.euclide-new-3-4"), b"TMP").unwrap();
+        std::fs::write(tmp.join("Euclide-Data/keep.euclide-old-x"), b"KEEP").unwrap();
+        assert_eq!(purge_update_leftovers(&tmp), 2);
+        assert!(tmp.join("euclide.exe").is_file());
+        assert!(!tmp.join("euclide.exe.euclide-old-1-2").exists());
+        assert!(!tmp.join("euclide-sidecar/run.exe.euclide-new-3-4").exists());
+        assert_eq!(
+            std::fs::read(tmp.join("Euclide-Data/keep.euclide-old-x")).unwrap(),
+            b"KEEP"
         );
         let _ = std::fs::remove_dir_all(&tmp);
     }

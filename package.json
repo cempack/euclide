@@ -23,6 +23,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.11.0",
     "framer-motion": "^11.15.0",
+    "fuse.js": "^7.5.0",
     "jspdf": "^2.5.2",
     "jsqr": "^1.4.0",
     "katex": "^0.18.5",

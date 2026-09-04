@@ -1096,6 +1096,12 @@ function Shell() {
  return () => window.removeEventListener("eu:timer-start", onStart as EventListener);
  }, []);
 
+ useEffect(() => {
+ const onCapture = () => setCaptureOpen(true);
+ window.addEventListener("eu:capture-open", onCapture);
+ return () => window.removeEventListener("eu:capture-open", onCapture);
+ }, []);
+
  // « Fin de cours annoncée »: one discreet notice a few minutes before the bell,
  // driven by the schedule. Off / silent / with a chime, from Réglages.
  useEffect(() => {
