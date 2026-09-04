@@ -664,7 +664,27 @@
     "groupCourses": "Cours",
     "groupDocs": "Documents et notes",
     "placeholder": "Rechercher un cours, un document, une note…",
-    "open": "ouvrir"
+    "open": "ouvrir",
+    "groupLinks": "Liens rapides",
+    "manageLinks": "Gérer les liens",
+    "aliases": {
+      "dashboard": "accueil home dashboard bureau start",
+      "courses": "matiere matières classes lessons subjects cours",
+      "documents": "fichiers files pdf bibliotheque bibliothèque library docs",
+      "tools": "classroom classe utilities outils",
+      "python": "script nsi code ide",
+      "reminders": "todos taches tâches tasks agenda",
+      "whiteboard": "board tableau craie dessin ardoise",
+      "note": "notes memo mémo",
+      "recap": "stats statistiques recapitulatif récapitulatif summary bilan",
+      "settings": "settings parametres paramètres config configuration preferences préférences prefs options reglages réglages",
+      "help": "shortcuts raccourcis clavier keymap help aide",
+      "timer": "timer chrono countdown minuteur minute horloge classe",
+      "keepAwake": "veille awake lock sleep ecran écran verrouiller sleep prevent",
+      "projection": "projection beamer projecteur video vidéo videoprojecteur vidéoprojecteur presenter présentateur",
+      "capture": "capture inbox note rapide quick",
+      "links": "liens links favoris bookmarks url"
+    }
   },
   "sequences": {
     "title": "Progression",
