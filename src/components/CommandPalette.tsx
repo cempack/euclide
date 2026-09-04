@@ -313,7 +313,9 @@ function CommandPalette({
         aliases: [...cmdAliases("links"), link.url],
         icon: <LinkIcon className="w-4 h-4" />,
         run: () => {
-          api.openUrl(link.url).catch(() => toast(get("messages.genericError", "Erreur"), "error"));
+          api.openUrl(link.url).catch(() =>
+            toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error")
+          );
           onClose();
         },
       });

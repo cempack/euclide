@@ -289,7 +289,12 @@ function LinksSection() {
             {links.map((l) => (
               <div key={l.id} className="eu-row-hover group">
                 <button
-                  onClick={() => api.openUrl(l.url)}
+                  type="button"
+                  onClick={() => {
+                    void api.openUrl(l.url).catch(() =>
+                      toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error")
+                    );
+                  }}
                   className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                   title={l.url}
                 >

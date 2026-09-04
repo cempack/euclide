@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTabs } from "../lib/tabs";
-import { api, isTauri } from "../lib/api";
+import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel } from "../components/layout";
 import { get, fmt } from "../lib/i18n";
@@ -307,10 +307,6 @@ export default function ClassContent({
                                 onClick={() => {
                                   if (!d.url) return;
                                   api.openUrl(d.url).catch(() => {});
-                                  if (!isTauri()) {
-                                    // fallback to open in browser when running in plain Vite dev (no Tauri)
-                                    window.open(d.url, '_blank');
-                                  }
                                 }}
                                 className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-ink focus:outline-none"
                                 title="Ouvrir dans le navigateur"

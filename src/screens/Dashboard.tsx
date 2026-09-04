@@ -438,7 +438,12 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                 {links.slice(0, 8).map((l) => (
                   <button
                     key={l.id}
-                    onClick={() => api.openUrl(l.url)}
+                    type="button"
+                    onClick={() => {
+                      void api.openUrl(l.url).catch(() =>
+                        toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error")
+                      );
+                    }}
                     className="eu-btn-ghost eu-btn-sm"
                     title={l.url}
                   >

@@ -64,6 +64,34 @@ if (typeof window !== "undefined") {
 export const isTauri = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/** Prefix https:// when the teacher typed a bare host (google.com). */
+export function normalizeExternalUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return "";
+  const lower = u.toLowerCase();
+  if (
+    lower.startsWith("https://") ||
+    lower.startsWith("http://") ||
+    lower.startsWith("mailto:") ||
+    lower.startsWith("tel:")
+  ) {
+    return u;
+  }
+  return `https://${u}`;
+}
+
+/** Open a quick link in the system browser. Throws if nothing could launch. */
+export async function openExternalUrl(url: string): Promise<void> {
+  const href = normalizeExternalUrl(url);
+  if (!href) throw new Error("empty url");
+  if (!isTauri()) {
+    const opened = window.open(href, "_blank", "noopener,noreferrer");
+    if (!opened) throw new Error("popup blocked");
+    return;
+  }
+  await invoke<void>("open_url", { url: href });
+}
+
 /**
  * Thin wrapper around Tauri's invoke. When running in a plain browser (e.g.
  * `vite` without the Tauri shell) it resolves to a sensible empty value so the
@@ -537,7 +565,7 @@ export const api = {
   createLink: (label: string, url: string, icon: string) =>
     invoke<QuickLink>("create_link", { label, url, icon }),
   deleteLink: (id: number) => invoke<void>("delete_link", { id }),
-  openUrl: (url: string) => invoke<void>("open_url", { url }),
+  openUrl: (url: string) => openExternalUrl(url),
 
   // Schedule
   listSchedule: () => {
