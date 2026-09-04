@@ -150,8 +150,8 @@ impl Sidecar {
             };
 
             if let Some(false) = val.get("ok").and_then(|b| b.as_bool()) {
-                if let Some(err) = val.get("error") {
-                    return Err(err.to_string());
+                if let Some(err) = error_from_sidecar(&val) {
+                    return Err(err);
                 }
             }
             return Ok(val);
@@ -293,4 +293,31 @@ fn sidecar_script(app: &AppHandle) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Sidecar `{ok:false, error}` payloads are JSON strings. `Value::to_string()`
+/// would wrap them in extra quotes and that quoted dump was what the toast showed.
+pub(crate) fn error_from_sidecar(val: &Value) -> Option<String> {
+    val.get("error").map(|err| {
+        err.as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| err.to_string())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::error_from_sidecar;
+    use serde_json::json;
+
+    #[test]
+    fn error_from_sidecar_does_not_quote_strings() {
+        let v = json!({
+            "ok": false,
+            "error": "Connexion refusee : ('Decryption failed while trying to un pad.', 'probably bad username/password')"
+        });
+        let msg = error_from_sidecar(&v).unwrap();
+        assert!(!msg.starts_with('"'), "got {msg:?}");
+        assert!(msg.starts_with("Connexion refusee"));
+    }
 }
