@@ -31,7 +31,10 @@ pub fn run() {
             if !crate::paths::ensure_writable_data_dir() {
                 std::process::exit(0);
             }
-            crate::portable_update::purge_update_leftovers(&crate::paths::exe_dir());
+            let exe_dir = crate::paths::exe_dir();
+            crate::portable_update::purge_update_leftovers(&exe_dir);
+            #[cfg(windows)]
+            crate::portable_update::schedule_leftover_cleanup(&exe_dir);
             app.manage(db::Db(std::sync::Mutex::new(db::open())));
             app.manage(KeepAwake::default());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));

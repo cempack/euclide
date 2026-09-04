@@ -49,13 +49,16 @@ function Clear-EuclideLeftovers {
   }
   $items |
     Where-Object { -not $_.PSIsContainer -and ($_.Name -like '*.euclide-old*' -or $_.Name -like '*.euclide-new*') } |
-    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+    ForEach-Object {
+      $_.IsReadOnly = $false
+      Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
+    }
 }
-$deadline = (Get-Date).AddSeconds(60)
+$deadline = (Get-Date).AddSeconds(90)
 while ((Get-Process -Id $AppPid -ErrorAction SilentlyContinue) -and ((Get-Date) -lt $deadline)) {
   Start-Sleep -Milliseconds 250
 }
-$until = (Get-Date).AddSeconds(15)
+$until = (Get-Date).AddSeconds(90)
 do {
   Clear-EuclideLeftovers -Root $Dest
   $sc = Join-Path $Dest 'euclide-sidecar'
@@ -316,6 +319,51 @@ pub fn is_update_leftover_name(name: &str) -> bool {
     n.contains(".euclide-old") || n.contains(".euclide-new")
 }
 
+fn clear_readonly(path: &Path) {
+    if let Ok(meta) = std::fs::metadata(path) {
+        let mut perms = meta.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = std::fs::set_permissions(path, perms);
+        }
+    }
+}
+
+/// Windows `remove_file` fails on read-only leftovers (zip/USB) and on a
+/// sharing violation while the old exe is still mapped. Clear the bit and retry.
+fn delete_leftover_file(path: &Path) -> bool {
+    if !path.exists() {
+        return true;
+    }
+    clear_readonly(path);
+    for i in 0..16 {
+        if std::fs::remove_file(path).is_ok() {
+            return true;
+        }
+        clear_readonly(path);
+        std::thread::sleep(std::time::Duration::from_millis(40 + i * 20));
+    }
+    !path.exists()
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn leftover_file_names_in(dir: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        entry
+            .file_name()
+            .to_str()
+            .is_some_and(is_update_leftover_name)
+    })
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn leftovers_present(dir: &Path) -> bool {
+    leftover_file_names_in(dir) || leftover_file_names_in(&dir.join("euclide-sidecar"))
+}
+
 fn purge_leftover_files_in(dir: &Path) -> usize {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return 0;
@@ -323,16 +371,14 @@ fn purge_leftover_files_in(dir: &Path) -> usize {
     let mut removed = 0usize;
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
             continue;
         };
         if !is_update_leftover_name(name) {
             continue;
         }
-        if std::fs::remove_file(&path).is_ok() {
+        if delete_leftover_file(&path) {
             removed += 1;
         }
     }
@@ -362,6 +408,15 @@ pub fn purge_update_leftovers(dir: &Path) -> usize {
         removed += purge_leftover_files_under(&sidecar);
     }
     removed
+}
+
+/// After the in-process delete, a detached helper waits for this PID to exit
+/// and retries — the running `euclide.exe` leftover can stay locked until then.
+#[cfg(windows)]
+pub fn schedule_leftover_cleanup(dir: &Path) {
+    if leftovers_present(dir) {
+        let _ = spawn_cleanup_helper(dir);
+    }
 }
 
 fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
@@ -408,6 +463,12 @@ pub fn replace_locked_file(src: &Path, dest: &Path) -> Result<(), String> {
 }
 
 fn replace_locked_file_once(src: &Path, dest: &Path) -> Result<(), String> {
+    // Unlocked files (readme, portable marker) overwrite in place — no sibling.
+    clear_readonly(dest);
+    if std::fs::copy(src, dest).is_ok() {
+        return Ok(());
+    }
+
     let incoming = unique_sibling(dest, NEW_SUFFIX);
     let backup = unique_sibling(dest, OLD_SUFFIX);
     std::fs::copy(src, &incoming)
@@ -415,7 +476,7 @@ fn replace_locked_file_once(src: &Path, dest: &Path) -> Result<(), String> {
 
     if dest.exists() {
         if let Err(e) = std::fs::rename(dest, &backup) {
-            let _ = std::fs::remove_file(&incoming);
+            let _ = delete_leftover_file(&incoming);
             return Err(format!(
                 "Impossible de déplacer {} (fichier verrouillé): {e}",
                 dest.display()
@@ -426,18 +487,18 @@ fn replace_locked_file_once(src: &Path, dest: &Path) -> Result<(), String> {
     if let Err(e) = std::fs::rename(&incoming, dest) {
         if let Err(copy_err) = std::fs::copy(&incoming, dest) {
             let _ = std::fs::rename(&backup, dest);
-            let _ = std::fs::remove_file(&incoming);
+            let _ = delete_leftover_file(&incoming);
             return Err(format!(
                 "Impossible d'installer {}: {e} / {copy_err}",
                 dest.display()
             ));
         }
-        let _ = std::fs::remove_file(&incoming);
+        let _ = delete_leftover_file(&incoming);
     }
     // Do not keep the displaced file. A running Windows exe may still lock
     // `backup` until this PID exits — the cleanup helper / next launch
     // removes it then.
-    let _ = std::fs::remove_file(&backup);
+    let _ = delete_leftover_file(&backup);
     Ok(())
 }
 
@@ -866,6 +927,12 @@ mod tests {
     fn leftover_name_matches_unique_sibling() {
         assert!(is_update_leftover_name("euclide.exe.euclide-old-12-99"));
         assert!(is_update_leftover_name("euclide.exe.euclide-new-12-99"));
+        assert!(is_update_leftover_name(
+            "README.txt.euclide-old-7964-506436300"
+        ));
+        assert!(is_update_leftover_name(
+            "euclide.portable.euclide-old-7964-503352900"
+        ));
         assert!(!is_update_leftover_name("euclide.exe"));
         assert!(!is_update_leftover_name("euclide.db"));
     }
@@ -874,6 +941,10 @@ mod tests {
     fn cleanup_helper_only_deletes_renamed_leftovers() {
         assert!(CLEANUP_HELPER_PS1.contains("Get-Process -Id $AppPid"));
         assert!(CLEANUP_HELPER_PS1.contains("*.euclide-old*"));
+        assert!(
+            CLEANUP_HELPER_PS1.contains("IsReadOnly"),
+            "Windows leftovers from a zip are often read-only; -Force alone is not enough"
+        );
         assert!(
             !CLEANUP_HELPER_PS1
                 .lines()
@@ -884,6 +955,24 @@ mod tests {
             let t = l.trim();
             !t.starts_with('#') && t.to_ascii_lowercase().contains("copy-item")
         }));
+    }
+
+    #[test]
+    fn purge_removes_readonly_leftovers() {
+        let tmp = std::env::temp_dir().join(format!("euclide-purge-ro-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let leftover = tmp.join("README.txt.euclide-old-7964-506436300");
+        std::fs::write(&leftover, b"OLD").unwrap();
+        let mut perms = std::fs::metadata(&leftover).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&leftover, perms).unwrap();
+        assert_eq!(purge_update_leftovers(&tmp), 1);
+        assert!(
+            !leftover.exists(),
+            "read-only leftover must be deleted on the next launch"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
