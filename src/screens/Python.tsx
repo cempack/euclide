@@ -179,7 +179,8 @@ export default function Python() {
     }
   };
 
-  const save = async () => {
+  /** Saves the open script; `quiet` when Ctrl+S or quitting asks (they say so themselves). */
+  const save = async (quiet = false) => {
     if (!openScript) return;
 
     try {
@@ -210,7 +211,7 @@ export default function Python() {
         // Still refresh in background to fully reconcile list + ensure selection (in case of races or external changes).
         refresh(created.path).catch(logged("python.refresh"));
 
-        toast(tr("tools.toastScriptSaved"), "success");
+        if (!quiet) toast(tr("tools.toastScriptSaved"), "success");
         return; // we already promoted the openScript + list; don't fall through to the old common set
       } else {
         const pathToUse = openScript.path!;
@@ -226,7 +227,7 @@ export default function Python() {
           path: pathToUse,
           isDirty: false,
         });
-        toast(tr("tools.toastScriptSaved"), "success");
+        if (!quiet) toast(tr("tools.toastScriptSaved"), "success");
       }
     } catch (err) {
       reportError("python.save", err);
@@ -235,7 +236,7 @@ export default function Python() {
   };
 
   useEffect(() => {
-    return editors.registerFlush("python", save);
+    return editors.registerFlush("python", () => save(true));
   }, [openScript]);
 
   const run = async (withChecks: boolean) => {
@@ -474,7 +475,7 @@ export default function Python() {
             <ToolSep />
             <ToolGroup>
               <button
-                onClick={save}
+                onClick={() => void save()}
                 disabled={!openScript.isDirty}
                 className="eu-btn-ghost eu-btn-sm"
                 {...tip(tr("tools.saveBtn"), keysOf("save"))}

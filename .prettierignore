@@ -1,6 +1,5 @@
 node_modules/
 dist/
-public/pdfjs/
 src-tauri/
 sidecar/
 .delta/

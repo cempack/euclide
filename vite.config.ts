@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
+import { pdfjsAssets } from "./scripts/vite-pdfjs-assets";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -10,7 +11,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   // React Compiler: components and hooks memoized at build time, so a state
   // change re-renders only what reads it.
-  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss(), pdfjsAssets()],
 
   test: {
     environment: "happy-dom",
@@ -21,9 +22,9 @@ export default defineConfig(async () => ({
   clearScreen: false,
 
   build: {
-    // Silence the "large chunk" warning for now; main bundle includes heavy deps like PDF.js, editors, etc.
-    // For production, consider code-splitting with manualChunks or dynamic imports for NoteEditor etc.
-    chunkSizeWarningLimit: 600,
+    // Every screen is its own chunk; the largest, the document viewer (PDF.js
+    // with its polyfills), loads only when a document is opened.
+    chunkSizeWarningLimit: 800,
   },
   server: {
     port: 1420,

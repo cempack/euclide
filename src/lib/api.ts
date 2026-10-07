@@ -64,7 +64,7 @@ async function invokeBytes<T>(
   bytes: ArrayBuffer | Uint8Array,
   headers: Record<string, string>,
 ): Promise<T> {
-  if (!isTauri()) return invoke<T>(cmd, { headers, size: bytes.byteLength });
+  if (!isTauri()) return invoke<T>(cmd, { headers, size: bytes.byteLength, bytes });
   const t0 = performance.now();
   try {
     return await tauriInvoke<T>(cmd, bytes, { headers });
@@ -73,10 +73,17 @@ async function invokeBytes<T>(
   }
 }
 
+/** Browser mode (development): the mock backend says where a file's bytes are. */
+let devFiles: ((kind: "file" | "version", id: number) => string) | null = null;
+export function serveDevFiles(resolve: (kind: "file" | "version", id: number) => string) {
+  devFiles = resolve;
+}
+
 /** URL of a library document for the webview (`<img>`, `fetch`, PDF.js). */
-export const fileUrl = (id: number) => convertFileSrc(`file/${id}`, "eufile");
+export const fileUrl = (id: number) => devFiles?.("file", id) ?? convertFileSrc(`file/${id}`, "eufile");
 /** URL of a saved version of a document. */
-export const versionUrl = (versionId: number) => convertFileSrc(`version/${versionId}`, "eufile");
+export const versionUrl = (versionId: number) =>
+  devFiles?.("version", versionId) ?? convertFileSrc(`version/${versionId}`, "eufile");
 
 function asList<T>(data: unknown): T[] {
   return Array.isArray(data) ? (data as T[]).filter((x) => x != null) : [];

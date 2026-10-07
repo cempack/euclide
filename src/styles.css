@@ -834,6 +834,36 @@
   .eu-tab[data-pinned] {
     @apply min-w-0 basis-auto shrink-0 grow-0;
   }
+  /* Documents: PDF.js pages on the stage, as sheets of paper. */
+  .eu-pdf {
+    background: var(--color-stage);
+    --page-margin: 1rem auto;
+    --page-border: none;
+  }
+  /* Focus lands on the document when it is clicked: no ring around the whole stage. */
+  .eu-pdf:focus-visible {
+    outline: none;
+  }
+  .eu-pdf .pdfViewer .page {
+    border: none;
+    margin: 1rem auto;
+    box-shadow: var(--shadow-pop);
+  }
+  .eu-pdf-thumb {
+    @apply block w-full rounded-sm border-2 border-transparent overflow-hidden transition-colors duration-fast
+      hover:border-stage-line;
+  }
+  .eu-pdf-thumb-current {
+    @apply border-stage-accent hover:border-stage-accent;
+  }
+  /* A colour to pick: the chosen one is ringed. */
+  .eu-swatch {
+    @apply w-5 h-5 shrink-0 rounded-full border border-line transition-transform duration-fast hover:scale-110;
+  }
+  .eu-swatch[aria-checked="true"] {
+    @apply ring-2 ring-accent ring-offset-2 ring-offset-panel;
+  }
+
   /* Where a dragged tab will land: a bar between two tabs. */
   .eu-tab[data-drop-before]::before,
   .eu-tab[data-drop-after]::before {

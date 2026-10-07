@@ -22,7 +22,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
 
 /** Files that are on their way out (replaced in a later milestone). */
-const EXEMPT = new Set(["src/components/CodeEditor.tsx"]);
+const EXEMPT = new Set([]);
 
 const PALETTE =
   "white|black|gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
