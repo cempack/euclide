@@ -73,6 +73,11 @@ export const q = {
       queryKey: ["schedule", "today", new Date().toDateString()],
       queryFn: fresh("getTodayClasses", () => api.getTodayClasses().then(list)),
     }),
+  schedule: () =>
+    queryOptions({
+      queryKey: ["schedule", "all"],
+      queryFn: fresh("listSchedule", () => api.listSchedule().then(list)),
+    }),
   links: () =>
     queryOptions({ queryKey: ["links"], queryFn: fresh("listLinks", () => api.listLinks().then(list)) }),
   pronoteStatus: () =>

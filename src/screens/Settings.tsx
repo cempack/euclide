@@ -19,6 +19,13 @@ import { Field, MetaDot, PageHeader, Panel, Section, Segmented } from "../compon
 import { ArchiveIcon, CheckIcon, MoonIcon, PlusIcon, QrIcon, SunIcon, TrashIcon } from "../components/icons";
 import { useTabs } from "../lib/tabs";
 import { useAppearance } from "../lib/theme";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
+import { useSetting } from "../api/hooks";
+import { remoteFaviconsEnabled } from "../components/Favicon";
+
+const NO_ENTRIES: ScheduleEntry[] = [];
+const NO_COURSES: Course[] = [];
 
 export default function Settings({ info }: { info: AppInfo | null }) {
   return (
@@ -53,42 +60,14 @@ export default function Settings({ info }: { info: AppInfo | null }) {
 
 function AppearanceSection() {
   const { pref, setPref, density, setDensity } = useAppearance();
-  const [remoteIcons, setRemoteIcons] = useState(true);
-  const [endNotice, setEndNotice] = useState<"off" | "toast" | "sound">("toast");
-  const [endLead, setEndLead] = useState(5);
-
-  useEffect(() => {
-    api
-      .getSetting("remote_favicons")
-      .then((v) => {
-        if (v == null) {
-          api.setSetting("remote_favicons", "1").catch(() => {});
-          window.dispatchEvent(new CustomEvent("eu:settings-changed"));
-          setRemoteIcons(true);
-        } else {
-          setRemoteIcons(v !== "0");
-        }
-      })
-      .catch(() => {});
-    api
-      .getSetting("class_end_notice")
-      .then((v) => {
-        if (v === "off" || v === "toast" || v === "sound") setEndNotice(v);
-      })
-      .catch(() => {});
-    api
-      .getSetting("class_end_lead")
-      .then((v) => {
-        const n = v ? parseInt(v, 10) : NaN;
-        if (!Number.isNaN(n) && n >= 1 && n <= 15) setEndLead(n);
-      })
-      .catch(() => {});
-  }, []);
-
-  const persist = (key: string, value: string) => {
-    api.setSetting(key, value).catch(() => {});
-    window.dispatchEvent(new CustomEvent("eu:settings-changed"));
-  };
+  const [favicons, setFavicons] = useSetting("remote_favicons");
+  const [noticeRaw, setNotice] = useSetting("class_end_notice");
+  const [leadRaw, setLead] = useSetting("class_end_lead");
+  const remoteIcons = remoteFaviconsEnabled(favicons);
+  const endNotice: "off" | "toast" | "sound" =
+    noticeRaw === "off" || noticeRaw === "toast" || noticeRaw === "sound" ? noticeRaw : "toast";
+  const leadN = leadRaw ? parseInt(leadRaw, 10) : NaN;
+  const endLead = leadN >= 1 && leadN <= 15 ? leadN : 5;
 
   return (
     <Section title={get("settings.metaAppearance", "Apparence")}>
@@ -172,8 +151,7 @@ function AppearanceSection() {
                     value={endLead}
                     onChange={(e) => {
                       const n = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 1));
-                      setEndLead(n);
-                      persist("class_end_lead", String(n));
+                      setLead(String(n));
                     }}
                     aria-label={get("classEnd.lead", "Minutes avant la fin")}
                     className="eu-input w-16 text-center tabular-nums"
@@ -184,8 +162,7 @@ function AppearanceSection() {
               <Segmented
                 value={endNotice}
                 onChange={(v) => {
-                  setEndNotice(v);
-                  persist("class_end_notice", v);
+                  setNotice(v);
                 }}
                 label={get("classEnd.title", "Fin de cours annoncée")}
                 options={[
@@ -203,8 +180,7 @@ function AppearanceSection() {
               className="accent-accent mt-0.5"
               checked={remoteIcons}
               onChange={(e) => {
-                setRemoteIcons(e.target.checked);
-                persist("remote_favicons", e.target.checked ? "1" : "0");
+                setFavicons(e.target.checked ? "1" : "0");
                 window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
               }}
             />
@@ -339,7 +315,9 @@ type LoginMethod = "qr" | "direct";
 
 function PronoteSection() {
   const toast = useToast();
-  const [status, setStatus] = useState<PronoteStatus | null>(null);
+  const queryClient = useQueryClient();
+  const status = useQuery(q.pronoteStatus()).data ?? null;
+  const setStatus = (s: PronoteStatus) => queryClient.setQueryData(q.pronoteStatus().queryKey, s);
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<LoginMethod>("qr");
   const [busy, setBusy] = useState(false);
@@ -356,14 +334,7 @@ function PronoteSection() {
   const [pinCode, setPinCode] = useState("");
   const [needsPin, setNeedsPin] = useState(false);
 
-  const refresh = () =>
-    api
-      .pronoteStatus()
-      .then(setStatus)
-      .catch(() => {});
-  useEffect(() => {
-    refresh();
-  }, []);
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["pronote"] });
 
   const decodeImage = (file: File) => {
     const reader = new FileReader();
@@ -670,8 +641,9 @@ function PronoteSection() {
 
 function ScheduleSection() {
   const toast = useToast();
-  const [entries, setEntries] = useState<ScheduleEntry[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const queryClient = useQueryClient();
+  const entries = useQuery(q.schedule()).data ?? NO_ENTRIES;
+  const courses = useQuery(q.courses()).data ?? NO_COURSES;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Partial<ScheduleEntry>>({
     day_of_week: 1,
@@ -681,18 +653,7 @@ function ScheduleSection() {
     room: "",
   });
 
-  const refresh = () =>
-    api
-      .listSchedule()
-      .then((e) => setEntries(Array.isArray(e) ? e : []))
-      .catch(() => {});
-  useEffect(() => {
-    refresh();
-    api
-      .listCourses()
-      .then((c) => setCourses(Array.isArray(c) ? c : []))
-      .catch(() => {});
-  }, []);
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["schedule"] });
 
   const save = async () => {
     if (!form.subject?.trim()) return;
