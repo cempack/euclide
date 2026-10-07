@@ -88,10 +88,17 @@ async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "s
 const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }) {
   const tabs = useTabs();
   useLayoutEffect(tabSwitchEnd, [tabs.activeId]);
+  // A pane mounts the first time its tab is shown, then stays mounted.
+  // Restoring a session used to start every screen at launch (and a PDF.js
+  // per PDF tab) before the teacher had looked at any of them.
+  const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set());
+  const activeMount = tabs.active?.mountId;
+  if (activeMount && !shown.has(activeMount)) setShown(new Set(shown).add(activeMount));
   return (
     <div className="flex-1 min-h-0 relative bg-canvas">
       {tabs.tabs.map((tab) => {
         const visible = tab.id === tabs.activeId;
+        if (!visible && !shown.has(tab.mountId)) return null;
         return (
           <div
             key={tab.mountId}
