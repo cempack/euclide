@@ -1,6 +1,6 @@
 import { Clock, Pause, Play, X } from "lucide-react";
 import { get } from "../lib/i18n";
-import { formatTimer, useTimerControls, useTimerSec } from "../lib/timer";
+import { formatTimer, timer, useTimerRunning, useTimerSec } from "../stores/timer";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
 
@@ -12,15 +12,15 @@ export function TimerSlot() {
 }
 
 function TimerControl({ sec }: { sec: number }) {
-  const timer = useTimerControls();
+  const running = useTimerRunning();
   const done = sec <= 0;
-  const toggleLabel = timer.running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre");
+  const toggleLabel = running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre");
   const addLabel = get("timer.addMinute", "+1 minute");
   const stopLabel = get("timer.stop", "Arrêter le minuteur");
   return (
     <div className={`eu-timer ${done ? "eu-timer-done" : ""}`}>
       <button type="button" onClick={timer.toggle} aria-label={toggleLabel} {...tip(toggleLabel)}>
-        <Icon icon={timer.running ? Pause : Play} size={14} />
+        <Icon icon={running ? Pause : Play} size={14} />
         <span className="eu-t-num">{formatTimer(sec)}</span>
       </button>
       <button type="button" onClick={() => timer.add(1)} aria-label={addLabel} {...tip(addLabel)}>
@@ -47,7 +47,7 @@ export function StatusTimerChip() {
 
 /** Big countdown for the classroom, shown while projection mode is on. */
 export function TimerStage() {
-  const timer = useTimerControls();
+  const running = useTimerRunning();
   const sec = useTimerSec();
   if (sec == null) return null;
   const done = sec <= 0;
@@ -63,8 +63,8 @@ export function TimerStage() {
         </span>
         <div className="flex flex-col gap-1.5">
           <button type="button" onClick={timer.toggle} className="eu-btn-ghost eu-btn-sm">
-            <Icon icon={timer.running ? Pause : Play} size={14} />
-            {timer.running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre")}
+            <Icon icon={running ? Pause : Play} size={14} />
+            {running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre")}
           </button>
           <button type="button" onClick={() => timer.add(1)} className="eu-btn-ghost eu-btn-sm">
             +1 min
