@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { useTabs } from "../lib/tabs";
 import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
@@ -21,9 +22,7 @@ interface ContentItem {
   documents?: Array<{ name: string; id?: string; type?: number; url?: string; estUnLienInterne?: boolean }>;
 }
 
-// TTL cache for Pronote lesson contents (per course/class/matiere) to avoid repeated sidecar fetches.
-const contentCache = new Map<string, { data: ContentItem[]; ts: number }>();
-const CONTENT_CACHE_TTL = 10 * 60 * 1000;
+const NO_CONTENTS: ContentItem[] = [];
 
 export default function ClassContent({
   courseId,
@@ -36,13 +35,6 @@ export default function ClassContent({
 }) {
   const tabs = useTabs();
   const toast = useToast();
-  const [course, setCourse] = useState<any>(null);
-  const [contents, setContents] = useState<ContentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
   const subjectForPronote = (m: string) => {
     const lower = (m || "").toLowerCase();
     if (lower.includes("experte")) return "MATHÉMATIQUES EXPERTES";
@@ -52,92 +44,25 @@ export default function ClassContent({
     return m || ""; // fallback, partial match will try
   };
 
-  const load = async (forceFresh = false) => {
-    setError(null);
-
-    // Always fetch course meta (cheap local DB) so back-link title and matiere are fresh.
-    let c: any = null;
-    try {
-      const cs = await api.listCourses();
-      c = cs.find((x: any) => x.id === courseId);
-      setCourse(c || null);
-    } catch {
-      // keep previous course if any
-    }
-
-    const cacheKey = `${courseId}:${className}:${matiere || ""}`;
-    const cached = contentCache.get(cacheKey);
-    const now = Date.now();
-
-    const noMatiere = !c?.matiere && !matiere;
-    if (noMatiere) {
-      setError(
-        "Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes.",
-      );
-      setContents([]);
-      setLoading(false);
-      setIsRefreshing(false);
-      return;
-    }
-
-    if (!forceFresh && cached && now - cached.ts < CONTENT_CACHE_TTL) {
-      // Fresh cache hit: instant open, no network.
-      setContents(cached.data);
-      setLastRefresh(new Date(cached.ts));
-      setLoading(false);
-      setIsRefreshing(false);
-      return;
-    }
-
-    const hasStale = !forceFresh && !!cached;
-    if (hasStale) {
-      // Show previous data immediately, refresh in background (stale-while-revalidate).
-      setContents(cached!.data);
-      setLastRefresh(new Date(cached!.ts));
-      setLoading(false);
-      setIsRefreshing(true);
-    } else {
-      setLoading(true);
-      setIsRefreshing(false);
-    }
-
-    try {
-      const effectiveMatiere = matiere || c?.matiere || "";
-      const subject = subjectForPronote(effectiveMatiere);
-
-      // Do not pass fromDate here: let the sidecar use its default (120 days back relative to the
-      // Pronote "today"/calendar). Ensures recent data for real + demo instances.
-      // in 2025-2026 periods relative to the demo's "now"). The returned list is already newest-first.
-      const res = await api.pronoteContents(subject, className);
-      if (!res?.ok) {
-        throw new Error(res?.error || "Erreur Pronote");
-      }
-      let items: ContentItem[] = res.contents || [];
-      // Ensure sorted newest first (already done in sidecar but defensive)
-      items = [...items].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-      // Cap to recent entries.
-      items = items.slice(0, 30);
-      setContents(items);
-      const rt = new Date();
-      setLastRefresh(rt);
-      contentCache.set(cacheKey, { data: items, ts: rt.getTime() });
-    } catch (e: any) {
-      setError(
-        e?.message || "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof).",
-      );
-      if (!hasStale) {
-        setContents([]);
-      }
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId, className, matiere]);
+  const coursesQ = useQuery(q.courses());
+  const course = coursesQ.data?.find((x) => x.id === courseId) ?? null;
+  const matiereKnown = matiere || course?.matiere || "";
+  const contentsQ = useQuery({
+    ...q.pronoteContents(subjectForPronote(matiereKnown), className),
+    enabled: !!matiereKnown,
+  });
+  const contents = (contentsQ.data ?? NO_CONTENTS) as ContentItem[];
+  const noMatiere = !coursesQ.isPending && !matiereKnown;
+  const loading = coursesQ.isPending || (!!matiereKnown && contentsQ.isPending);
+  // A refetch with data on screen: keep it, show the refresh.
+  const isRefreshing = contentsQ.isFetching && !contentsQ.isPending;
+  const lastRefresh = contentsQ.dataUpdatedAt ? new Date(contentsQ.dataUpdatedAt) : null;
+  const error = noMatiere
+    ? "Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes."
+    : contentsQ.error
+      ? contentsQ.error.message ||
+        "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof)."
+      : null;
 
   const copyUrl = (url?: string) => {
     if (!url) return;
@@ -153,13 +78,8 @@ export default function ClassContent({
 
   const effectiveMatiere = matiere || course?.matiere || "—";
 
-  const refreshContents = () => {
-    void load(true);
-  };
-
-  const retryLoad = () => {
-    void load(true);
-  };
+  const refreshContents = () => void contentsQ.refetch();
+  const retryLoad = refreshContents;
 
   return (
     <>
