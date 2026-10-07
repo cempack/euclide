@@ -1377,6 +1377,10 @@ input[type="radio"] {
 .eu-prose ol {
   list-style: decimal;
 }
+/* Room for « 10. » and up. */
+.eu-prose ol:has(> li:nth-child(10)) {
+  padding-left: 1.9em;
+}
 .eu-prose li + li {
   margin-top: 0.2em;
 }
