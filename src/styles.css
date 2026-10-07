@@ -6,6 +6,8 @@
 /* Tailwind reads colours from the --eu-* tokens below (RGB triples, so the
    same token feeds rgb(var(--eu-x) / alpha) in plain CSS). */
 @theme {
+  /* Only Euclide's tokens: Tailwind's default palette must not leak in. */
+  --color-*: initial;
   --color-canvas: rgb(var(--eu-canvas));
   --color-panel: rgb(var(--eu-panel));
   --color-panel-alt: rgb(var(--eu-panel-alt));
@@ -14,6 +16,8 @@
   --color-ink-faint: rgb(var(--eu-ink-faint));
   --color-line: rgb(var(--eu-line) / var(--eu-line-a));
   --color-line-strong: rgb(var(--eu-line) / var(--eu-line-a-strong));
+  --color-hover: rgb(var(--eu-ink) / var(--eu-hover-a));
+  --color-pressed: rgb(var(--eu-ink) / var(--eu-pressed-a));
   --color-accent: rgb(var(--eu-accent));
   --color-accent-soft: rgb(var(--eu-accent-soft));
   --color-ok: rgb(var(--eu-ok));
@@ -25,12 +29,50 @@
   --color-ok-solid: rgb(var(--eu-ok-solid));
   --color-warn-solid: rgb(var(--eu-warn-solid));
   --color-danger-solid: rgb(var(--eu-danger-solid));
+  --color-danger-fill: rgb(var(--eu-danger-fill));
+  --color-on-fill: rgb(var(--eu-on-fill));
+  --color-scrim: rgb(var(--eu-scrim) / var(--eu-scrim-a));
   --color-stage: rgb(var(--eu-stage));
   --color-stage-alt: rgb(var(--eu-stage-alt));
   --color-stage-ink: rgb(var(--eu-stage-ink));
+  --color-stage-muted: rgb(var(--eu-stage-muted));
+  --color-stage-line: rgb(var(--eu-stage-ink) / 0.14);
+  --color-stage-hover: rgb(var(--eu-stage-ink) / 0.08);
+  --color-stage-pressed: rgb(var(--eu-stage-ink) / 0.14);
+  --color-stage-accent: rgb(var(--eu-stage-accent));
+  --color-stage-danger: rgb(var(--eu-stage-danger));
+  /* Paper stays paper: the whiteboard and printed previews in both themes. */
+  --color-paper: rgb(255 255 255);
+  --color-paper-ink: rgb(17 18 19);
+  --color-transparent: transparent;
+  --color-current: currentcolor;
 
   --font-sans: IBM Plex Sans, system-ui, -apple-system, Segoe UI, sans-serif;
   --font-mono: IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Type roles, in rem so projection mode scales them all (see .eu-t-*). */
+  --text-page: 1.625rem;
+  --text-page--line-height: 1.18;
+  --text-page--letter-spacing: -0.02em;
+  --text-page--font-weight: 600;
+  --text-title: 0.9375rem;
+  --text-title--line-height: 1.4;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 600;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.55;
+  --text-small: 0.78125rem;
+  --text-small--line-height: 1.45;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.45;
+  --text-label: 0.65625rem;
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.12em;
+  --text-label--font-weight: 600;
+  --text-metric: 2rem;
+  --text-metric--line-height: 1;
+  --text-metric--letter-spacing: -0.02em;
+  --text-metric--font-weight: 600;
 
   --radius-none: 0px;
   --radius-sm: 3px;
@@ -39,38 +81,45 @@
   --radius-lg: 8px;
   --radius-full: 9999px;
 
+  /* Motion: things arrive in 180 ms and leave in 120 ms; no springs. */
   --transition-duration-fast: 120ms;
   --default-transition-duration: 180ms;
   --transition-duration-base: 180ms;
   --transition-duration-slow: 260ms;
-
   --default-transition-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
-  --ease-out: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   --shadow-none: none;
-  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 24px -12px rgb(0 0 0 / 0.22);
+  --shadow-raised: var(--eu-shadow-raised);
+  --shadow-pop: var(--eu-shadow-pop);
 
   --container-col: 1080px;
 
+  /* One stacking order for the whole app. */
+  --z-index-sticky: 10;
+  --z-index-dropdown: 40;
   --z-index-overlay: 60;
   --z-index-palette: 70;
+  --z-index-toast: 80;
   --z-index-confirm: 90;
+  --z-index-tooltip: 100;
 }
 
-/* Tailwind 3 defaults this UI was drawn with; Tailwind 4 changed them. */
+/* Defaults this UI was drawn with: a bare `border` is a hairline. */
 @layer base {
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: rgb(var(--eu-line) / var(--eu-line-a));
   }
   input::placeholder,
   textarea::placeholder {
     opacity: 1;
-    color: var(--color-gray-400);
+    color: rgb(var(--eu-ink-faint));
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -93,9 +142,9 @@
   --eu-canvas: 250 249 248; /* application background            */
   --eu-panel: 255 255 255; /* cards, panels, popovers          */
   --eu-panel-alt: 247 246 245; /* panel headers, zebra, wells      */
-  --eu-ink: 17 18 19; /* primary text            17.8:1   */
-  --eu-ink-muted: 92 95 99; /* secondary text           6.1:1   */
-  --eu-ink-faint: 110 114 118; /* metadata                 4.6:1   */
+  --eu-ink: 17 18 19; /* primary text            17.4:1   */
+  --eu-ink-muted: 78 82 87; /* secondary text           7.3:1   */
+  --eu-ink-faint: 106 110 114; /* metadata                 4.8:1   */
   --eu-line: 16 12 8; /* hairlines, used with an alpha    */
   --eu-accent: 15 79 168; /* selection / state text   7.4:1   */
   --eu-accent-soft: 234 240 251;
@@ -108,13 +157,30 @@
 
   /* Vivid variants: fills, dots, gauges, cursors — never small text. */
   --eu-ok-solid: 47 158 68;
-  --eu-warn-solid: 217 139 11;
+  --eu-warn-solid: 196 120 0;
   --eu-danger-solid: 217 59 52;
+  /* A filled danger button and the text on it (7.3:1). */
+  --eu-danger-fill: 164 38 44;
+  --eu-on-fill: 255 255 255;
 
   /* Chrome that stays dark in both themes (PDF stage, Python terminal). */
   --eu-stage: 24 24 24;
   --eu-stage-alt: 16 16 16;
   --eu-stage-ink: 236 234 230;
+  --eu-stage-muted: 160 157 151; /*                    6.6:1   */
+  --eu-stage-accent: 138 180 248;
+  --eu-stage-danger: 245 138 150;
+
+  /* States: an ink overlay, so they work on any surface. */
+  --eu-hover-a: 0.04;
+  --eu-pressed-a: 0.07;
+
+  --eu-scrim: 10 8 6;
+  --eu-scrim-a: 0.34;
+
+  /* Raised paper: the selected item, a card lifted off the page. */
+  --eu-shadow-raised: 0 1px 0 rgb(16 12 8 / 0.03), 0 1px 3px rgb(16 12 8 / 0.09);
+  --eu-shadow-pop: 0 1px 2px rgb(16 12 8 / 0.05), 0 8px 24px -12px rgb(16 12 8 / 0.24);
 }
 
 [data-theme="dark"] {
@@ -124,8 +190,8 @@
   --eu-panel: 25 25 25;
   --eu-panel-alt: 32 32 32;
   --eu-ink: 236 234 230;
-  --eu-ink-muted: 168 164 158;
-  --eu-ink-faint: 148 144 137;
+  --eu-ink-muted: 182 178 171; /*                     7.7:1   */
+  --eu-ink-faint: 142 138 132; /*                     4.8:1   */
   --eu-line: 255 250 240;
   --eu-accent: 138 180 248;
   --eu-accent-soft: 30 41 59;
@@ -136,13 +202,28 @@
   --eu-danger: 245 138 150;
   --eu-danger-soft: 43 24 26;
 
-  --eu-ok-solid: 143 206 120;
-  --eu-warn-solid: 224 175 104;
-  --eu-danger-solid: 245 138 150;
+  --eu-ok-solid: 76 186 98;
+  --eu-warn-solid: 240 165 45;
+  --eu-danger-solid: 240 88 88;
+  --eu-danger-fill: 190 52 60;
+  --eu-on-fill: 255 255 255;
 
   --eu-stage: 16 16 16;
   --eu-stage-alt: 10 10 10;
   --eu-stage-ink: 236 234 230;
+  --eu-stage-muted: 160 157 151;
+  --eu-stage-accent: 138 180 248;
+  --eu-stage-danger: 245 138 150;
+
+  --eu-hover-a: 0.06;
+  --eu-pressed-a: 0.1;
+
+  --eu-scrim: 0 0 0;
+  --eu-scrim-a: 0.6;
+
+  /* On a dark page, light comes from above: a highlight on the top edge. */
+  --eu-shadow-raised: inset 0 1px 0 rgb(255 250 240 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+  --eu-shadow-pop: inset 0 1px 0 rgb(255 250 240 / 0.07), 0 12px 32px -8px rgb(0 0 0 / 0.7);
 }
 
 /* Hairline opacity differs per theme: 12 % of near-black reads like 16 % of
@@ -157,50 +238,53 @@
   --eu-line-a-strong: 0.3;
 }
 
-/* Density: « confortable » (bureau) vs « compact » (petit portable).
-   These tokens are consumed by page chrome, buttons, panels and rows — not
-   only `.eu-row`, which is why switching used to look like a no-op. */
+/* Density: « confortable » (bureau) vs « compact » (petit portable). Metrics
+   are in rem, so projection mode scales controls along with the text.
+   Controls come in three heights (28, 32 and 40 px at 100 %) and every
+   control on a row shares one, so toolbars line up. */
 :root,
 [data-density="comfortable"] {
   --eu-type-scale: 1;
-  --eu-row-y: 10px;
-  --eu-pad: 24px;
-  --eu-page-gap: 24px;
-  --eu-page-x: 28px;
-  --eu-btn-h: 32px;
-  --eu-btn-h-sm: 28px;
-  --eu-icon: 32px;
-  --eu-icon-sm: 28px;
-  --eu-nav-h: 32px;
-  --eu-topbar-h: 40px;
-  --eu-sidebar-p: 12px;
-  --eu-panel-pad: 14px;
-  --eu-panel-head-y: 10px;
-  --eu-stat-y: 14px;
+  --eu-control: 2rem;
+  --eu-control-sm: 1.75rem;
+  --eu-control-lg: 2.5rem;
+  --eu-row-y: 0.625rem;
+  --eu-pad: 1.5rem;
+  --eu-page-gap: 1.5rem;
+  --eu-page-x: 2rem;
+  --eu-panel-pad: 1rem;
+  --eu-panel-head-y: 0.625rem;
+  --eu-topbar-h: 2.5rem;
+  --eu-sidebar-p: 0.75rem;
+  --eu-stat-y: 0.875rem;
   --eu-stat-min: 11.5rem;
+  /* Older names, kept while screens move to the ones above. */
+  --eu-btn-h: var(--eu-control);
+  --eu-btn-h-sm: var(--eu-control-sm);
+  --eu-icon: var(--eu-control);
+  --eu-icon-sm: var(--eu-control-sm);
+  --eu-nav-h: var(--eu-control);
 }
 [data-density="compact"] {
-  --eu-row-y: 5px;
-  --eu-pad: 14px;
-  --eu-page-gap: 14px;
-  --eu-page-x: 18px;
-  --eu-btn-h: 26px;
-  --eu-btn-h-sm: 22px;
-  --eu-icon: 26px;
-  --eu-icon-sm: 22px;
-  --eu-nav-h: 26px;
-  --eu-topbar-h: 32px;
-  --eu-sidebar-p: 8px;
-  --eu-panel-pad: 10px;
-  --eu-panel-head-y: 6px;
-  --eu-stat-y: 8px;
+  --eu-control: 1.75rem;
+  --eu-control-sm: 1.5rem;
+  --eu-control-lg: 2.25rem;
+  --eu-row-y: 0.3125rem;
+  --eu-pad: 0.875rem;
+  --eu-page-gap: 0.875rem;
+  --eu-page-x: 1.25rem;
+  --eu-panel-pad: 0.75rem;
+  --eu-panel-head-y: 0.375rem;
+  --eu-topbar-h: 2rem;
+  --eu-sidebar-p: 0.5rem;
+  --eu-stat-y: 0.5rem;
   --eu-stat-min: 9.5rem;
 }
 
-/* Projection mode: bigger type for the classroom beamer. Density stays
-   whatever the teacher chose — compact on a small laptop still compact. */
+/* Projection mode: everything a quarter bigger for the classroom beamer.
+   Density stays whatever the teacher chose. */
 [data-projection="on"] {
-  --eu-type-scale: 1.15;
+  --eu-type-scale: 1.25;
 }
 
 /* Element defaults live in the base layer so components and utilities
@@ -226,7 +310,10 @@
     background-color: rgb(var(--eu-canvas));
     color: rgb(var(--eu-ink));
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    /* Times, counts and sizes line up in every list. */
+    font-variant-numeric: tabular-nums;
     overflow: hidden;
     user-select: none;
     cursor: default;
@@ -243,11 +330,15 @@
     app-region: no-drag;
   }
 
-  /* One focus ring for the whole application. Visible on keyboard only. */
+  /* One focus ring for the whole application, keyboard only. It follows the
+     element's own corners; .eu-focus-inset draws it inside, for rows in a
+     list that clips its overflow. */
   :focus-visible {
     outline: 2px solid rgb(var(--eu-accent));
     outline-offset: 2px;
-    border-radius: 3px;
+  }
+  .eu-focus-inset:focus-visible {
+    outline-offset: -2px;
   }
 }
 
@@ -324,33 +415,42 @@
 
 @layer components {
   /* -------------------------------------------------------------------------
-     Typographic roles. Seven of them, and not one more: every size in the UI
-     must map to one of these, which is what keeps screens consistent.
+     Type roles. Every size in the UI maps to one of these, which is what
+     keeps screens consistent: page, title, body, small, caption (mono, normal
+     case), label (mono capitals: group and column headers only), metric.
      ------------------------------------------------------------------------- */
   .eu-t-page {
-    @apply text-[26px] leading-[1.18] font-semibold tracking-[-0.02em];
+    @apply text-page;
   }
   .eu-t-metric {
-    @apply font-mono text-[32px] leading-none font-semibold tracking-[-0.02em] tabular-nums whitespace-nowrap;
+    @apply font-mono text-metric tabular-nums whitespace-nowrap;
   }
+  .eu-t-title,
   .eu-t-section {
-    @apply text-[15px] leading-[1.4] font-semibold tracking-[-0.01em];
+    @apply text-title;
   }
   .eu-t-body {
-    @apply text-[14px] leading-[1.55];
+    @apply text-body;
+  }
+  .eu-t-small {
+    @apply text-small;
   }
   .eu-t-meta {
-    @apply text-[12.5px] leading-[1.45] text-ink-muted;
+    @apply text-small text-ink-muted;
+  }
+  .eu-t-caption {
+    @apply font-mono text-caption text-ink-faint;
   }
   .eu-t-label {
-    @apply font-mono text-[10.5px] leading-none font-semibold uppercase tracking-[0.12em] text-ink-faint;
+    @apply font-mono text-label uppercase text-ink-faint;
   }
   .eu-t-num {
     @apply font-mono tabular-nums;
   }
 
   /* -------------------------------------------------------------------------
-     Panels. One container primitive with an optional header / alt surface.
+     Surfaces. A panel is a sheet of paper on the canvas; « raised paper » is
+     the one selected item: a sheet lifted off its surroundings.
      ------------------------------------------------------------------------- */
   .eu-panel {
     @apply rounded-md bg-panel border border-line;
@@ -365,83 +465,99 @@
   .eu-panel-alt {
     @apply rounded-md bg-panel-alt border border-line;
   }
+  .eu-raised {
+    @apply bg-panel border-line text-ink shadow-raised;
+  }
 
   /* -------------------------------------------------------------------------
-     Buttons. `eu-btn` is the base; add one variant. Height is uniform so
-     toolbars align without per-site tweaking.
+     Buttons. `eu-btn` is the base; add one variant. Hover and press are ink
+     overlays painted over whatever the surface is.
      ------------------------------------------------------------------------- */
   .eu-btn,
   .eu-btn-primary,
   .eu-btn-ghost,
   .eu-btn-quiet,
   .eu-btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded px-3 text-[12.5px] font-medium
+    @apply inline-flex items-center justify-center gap-2 rounded px-3 text-small font-medium
       whitespace-nowrap border border-transparent transition-colors duration-fast
       disabled:opacity-45 disabled:pointer-events-none;
-    height: var(--eu-btn-h);
+    height: var(--eu-control);
   }
   .eu-btn-primary {
-    @apply bg-ink text-panel border-ink hover:bg-ink/90 active:bg-ink;
+    @apply bg-ink text-panel border-ink hover:bg-ink/88 active:bg-ink/80;
   }
   .eu-btn-ghost {
-    @apply bg-panel text-ink border-line hover:bg-panel-alt active:bg-ink/10;
+    @apply bg-panel text-ink border-line;
   }
   .eu-btn-quiet {
-    @apply text-ink-muted hover:text-ink hover:bg-panel-alt active:bg-ink/10;
+    @apply text-ink-muted hover:text-ink hover:bg-hover active:bg-pressed;
   }
   .eu-btn-danger {
-    @apply bg-danger text-white border-danger hover:bg-danger/90;
+    @apply bg-danger-fill text-on-fill border-danger-fill;
+  }
+  .eu-btn-ghost:hover,
+  .eu-btn-danger:hover {
+    background-image: linear-gradient(var(--color-hover), var(--color-hover));
+  }
+  .eu-btn-ghost:active,
+  .eu-btn-danger:active {
+    background-image: linear-gradient(var(--color-pressed), var(--color-pressed));
   }
   .eu-btn-sm {
-    @apply px-2.5 text-[11.5px] gap-1.5;
-    height: var(--eu-btn-h-sm);
+    @apply px-2.5 gap-1.5;
+    height: var(--eu-control-sm);
   }
   .eu-btn-icon {
     @apply p-0 shrink-0;
-    width: var(--eu-icon);
-    height: var(--eu-icon);
+    width: var(--eu-control);
+    height: var(--eu-control);
   }
   .eu-btn-icon.eu-btn-sm {
-    width: var(--eu-icon-sm);
-    height: var(--eu-icon-sm);
+    width: var(--eu-control-sm);
+    height: var(--eu-control-sm);
   }
 
   /* -------------------------------------------------------------------------
-     Form controls.
+     Form controls. Focus: an accent border and a soft ring around the field.
      ------------------------------------------------------------------------- */
   .eu-input,
   .eu-textarea,
   .eu-select {
-    @apply w-full rounded bg-panel border border-line px-2.5 text-[13px] text-ink
-      placeholder:text-ink-faint transition-colors duration-fast
-      focus:border-accent focus:outline-none focus-visible:outline-none
+    @apply w-full rounded bg-panel border border-line px-2.5 text-body text-ink
+      placeholder:text-ink-faint transition-[border-color,box-shadow] duration-fast
       disabled:opacity-50;
-    height: var(--eu-btn-h);
+    height: var(--eu-control);
+  }
+  .eu-input:focus,
+  .eu-textarea:focus,
+  .eu-select:focus {
+    @apply border-accent outline-none;
+    box-shadow: 0 0 0 3px rgb(var(--eu-accent) / 0.16);
   }
   .eu-textarea {
-    @apply py-2 leading-[1.55] resize-y;
+    @apply py-2 resize-y;
     height: auto;
   }
   .eu-select {
     @apply pr-7 appearance-none bg-no-repeat cursor-pointer;
-    height: var(--eu-btn-h);
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7276' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    height: var(--eu-control);
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236a6e72' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 8px center;
   }
   [data-theme="dark"] .eu-select {
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23949089' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8a84' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
 
   /* -------------------------------------------------------------------------
-     Chips, badges, keys, segmented control.
+     Chips, keys, segmented control. The chosen segment is raised paper.
      ------------------------------------------------------------------------- */
   .eu-chip,
   .eu-chip-ok,
   .eu-chip-warn,
   .eu-chip-danger,
   .eu-chip-accent {
-    @apply inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[10.5px]
-      leading-[1.5] border border-line bg-panel-alt text-ink-muted whitespace-nowrap;
+    @apply inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-caption
+      border border-line bg-panel-alt text-ink-muted whitespace-nowrap;
   }
   .eu-chip-ok {
     @apply bg-ok-soft border-ok/25 text-ok;
@@ -456,20 +572,21 @@
     @apply bg-accent-soft border-accent/25 text-accent;
   }
   .eu-kbd {
-    @apply inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-sm border border-line
-      bg-panel-alt font-mono text-[9.5px] font-medium text-ink-faint tabular-nums;
+    @apply inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-sm border border-line
+      bg-panel-alt font-mono text-[0.625rem] font-medium text-ink-faint tabular-nums;
   }
   .eu-segment {
     @apply inline-flex items-center gap-0.5 rounded border border-line bg-panel-alt p-0.5;
+    height: var(--eu-control);
   }
   .eu-segment > button {
-    @apply rounded-sm px-2.5 text-[12px] font-medium text-ink-muted transition-colors duration-fast
-      hover:text-ink;
-    height: var(--eu-btn-h-sm);
+    @apply h-full rounded-sm border border-transparent px-2.5 text-small font-medium text-ink-muted
+      transition-colors duration-fast hover:text-ink;
   }
   .eu-segment > button[aria-selected="true"],
+  .eu-segment > button[aria-pressed="true"],
   .eu-segment > button.active {
-    @apply bg-ink text-panel hover:text-panel;
+    @apply bg-panel border-line text-ink shadow-raised;
   }
   .eu-segment-fill {
     @apply w-full;
@@ -481,6 +598,7 @@
   /* -------------------------------------------------------------------------
      Rows: the list primitive used by schedule, reminders, documents, files.
      Row actions stay reachable: they fade in on hover *and* on focus-within.
+     The keyboard cursor in a list is an ink tint.
      ------------------------------------------------------------------------- */
   .eu-stat-tile {
     min-width: var(--eu-stat-min);
@@ -489,12 +607,17 @@
   }
   .eu-row,
   .eu-row-hover {
-    @apply flex items-center gap-2.5 px-[14px] transition-colors duration-fast;
+    @apply flex items-center gap-2.5 px-3.5 transition-colors duration-fast;
     padding-top: var(--eu-row-y);
     padding-bottom: var(--eu-row-y);
   }
   .eu-row-hover {
-    @apply hover:bg-panel-alt;
+    @apply hover:bg-hover;
+  }
+  .eu-row-cursor,
+  .eu-row[aria-selected="true"],
+  .eu-row-hover[aria-selected="true"] {
+    @apply bg-pressed;
   }
   .eu-row-actions {
     @apply opacity-0 transition-opacity duration-fast;
@@ -521,13 +644,8 @@
      repaint on the low-end laptops Euclide runs on, and older WebKitGTK
      composites it incorrectly. A plain scrim reads better in both themes. */
   .eu-scrim {
-    @apply absolute inset-0;
-    background: rgb(10 8 6 / 0.34);
+    @apply absolute inset-0 bg-scrim;
   }
-}
-
-[data-theme="dark"] .eu-scrim {
-  background: rgb(0 0 0 / 0.6);
 }
 
 /* Native controls (range, checkbox, radio) follow the accent token. */
