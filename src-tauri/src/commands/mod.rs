@@ -4,12 +4,15 @@
 //!
 //! `legacy` still holds the commands that have not been converted yet.
 
+pub mod app;
 pub mod courses;
 pub mod legacy;
 pub mod links;
 pub mod notes;
+pub mod recap;
 pub mod reminders;
 pub mod schedule;
 pub mod sequences;
+pub mod settings;
 
-pub(crate) use legacy::{get_setting_raw, set_setting_raw};
+pub(crate) use settings::{get_setting_raw, set_setting_raw};

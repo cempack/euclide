@@ -55,6 +55,7 @@ pub fn run() {
                 }
             };
             db::seed_python_demos();
+            let _ = commands::recap::prune(&db.lock());
             app.manage(db);
             app.manage(KeepAwake::default());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
@@ -116,7 +117,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::legacy::get_app_info,
+            commands::app::get_app_info,
             commands::courses::list_courses,
             commands::courses::create_course,
             commands::courses::update_course,
@@ -186,12 +187,12 @@ pub fn run() {
             commands::legacy::choose_data_dir,
             commands::legacy::reset_data_dir,
             commands::legacy::backup_data_dir,
-            commands::legacy::set_keep_awake,
-            commands::legacy::keep_awake_status,
-            commands::legacy::get_setting,
-            commands::legacy::set_setting,
-            commands::legacy::log_event,
-            commands::legacy::get_recap,
+            commands::settings::set_keep_awake,
+            commands::settings::keep_awake_status,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::recap::log_event,
+            commands::recap::get_recap,
             commands::legacy::pronote_status,
             commands::legacy::pronote_qr_login,
             commands::legacy::pronote_password_login,
