@@ -7,7 +7,7 @@ import { Panel } from "../../components/layout";
 import { ChevronDownIcon, LayersIcon, PlusIcon, TrashIcon } from "../../components/icons";
 import { api, type CourseClass, type Sequence, type SequenceItem, type StepResource } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
-import { tr } from "../../lib/i18n";
+import { tr, trn } from "../../lib/i18n";
 import { reportError } from "../../lib/report";
 import { Icon } from "../../ui/Icon";
 import { tip } from "../../ui/Tooltip";
@@ -201,9 +201,7 @@ export function Progression({
                     />
                   </button>
                   <span className="eu-t-body font-medium text-ink truncate flex-1">{seq.title}</span>
-                  <span className="eu-chip shrink-0">
-                    {tr("sequences.stepCount", { count: seqItems.length })}
-                  </span>
+                  <span className="eu-chip shrink-0">{trn("sequences.stepCount", seqItems.length)}</span>
                   <div className="eu-row-actions eu-row-tools flex items-center gap-0.5 shrink-0">
                     <button
                       onClick={() =>

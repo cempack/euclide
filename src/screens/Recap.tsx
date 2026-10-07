@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import type { RecapData } from "../lib/api";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import {
   BookIcon,
   ClockIcon,
@@ -141,14 +141,10 @@ export default function Recap() {
   const highlights: string[] = [];
   if (data) {
     if (data.files_opened > 0) {
-      highlights.push(tr("recap.highlightFiles", { count: data.files_opened }));
+      highlights.push(trn("recap.highlightFiles", data.files_opened));
     }
     if (data.notes_written > 0) {
-      highlights.push(
-        tr("recap.highlightNotes", {
-          count: data.notes_written,
-        }),
-      );
+      highlights.push(trn("recap.highlightNotes", data.notes_written));
     }
     if (data.top_courses?.length > 0) {
       const top = data.top_courses[0];
@@ -163,11 +159,7 @@ export default function Recap() {
       highlights.push(tr("recap.highlightTopTool", { name: top.name }));
     }
     if (data.reminders_done > 0) {
-      highlights.push(
-        tr("recap.highlightReminders", {
-          count: data.reminders_done,
-        }),
-      );
+      highlights.push(trn("recap.highlightReminders", data.reminders_done));
     }
     if (highlights.length === 0) {
       highlights.push(tr("recap.highlightEmpty"));
@@ -253,7 +245,7 @@ export default function Recap() {
               label: d.name,
               icon: <DocIcon className="w-4 h-4" />,
               value: d.count,
-              text: tr("recap.opens", { count: d.count }),
+              text: trn("recap.opens", d.count),
             }))}
           />
 
@@ -265,7 +257,7 @@ export default function Recap() {
               label: tool.name,
               icon: <ToolIcon className="w-4 h-4" />,
               value: tool.count,
-              text: tr("recap.uses", { count: tool.count }),
+              text: trn("recap.uses", tool.count),
             }))}
           />
 

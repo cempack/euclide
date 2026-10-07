@@ -4,7 +4,7 @@ import { openFile } from "../lib/files";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type CourseClass, type FileItem, type Note } from "../lib/api";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
@@ -186,7 +186,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       const added = await api.attachFilesToCourse(courseId, attachSelected);
       if (added.length) {
         added.forEach((f) => api.logEvent("file_import", f.name, courseId));
-        toast(tr("courseDetail.importedFilesToast", { count: added.length }), "success");
+        toast(trn("courseDetail.importedFilesToast", added.length), "success");
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       }
       setShowAttach(false);
@@ -234,11 +234,11 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
         title={course.name}
         meta={
           <>
-            <span>{tr("courseDetail.metaClasses", { count: courseClasses.length })}</span>
+            <span>{trn("courseDetail.metaClasses", courseClasses.length)}</span>
             <MetaDot />
-            <span>{tr("courseDetail.metaFiles", { count: files.length })}</span>
+            <span>{trn("courseDetail.metaFiles", files.length)}</span>
             <MetaDot />
-            <span>{tr("courseDetail.metaNotes", { count: notes.length })}</span>
+            <span>{trn("courseDetail.metaNotes", notes.length)}</span>
             {course.description && (
               <>
                 <MetaDot />
@@ -470,7 +470,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
         <div className="space-y-3">
           <p className="eu-t-body text-ink-muted">{tr("courseDetail.attachDocsHint")}</p>
           {attachDocs.length === 0 ? (
-            <p className="eu-t-body text-ink-muted">Aucun document dans la bibliothèque globale.</p>
+            <p className="eu-t-body text-ink-muted">{tr("courseDetail.libraryEmpty")}</p>
           ) : (
             <div className="max-h-72 overflow-auto border border-line rounded divide-y divide-line/60">
               {attachDocs.map((d) => {
@@ -505,12 +505,12 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
           )}
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setShowAttach(false)} className="eu-btn-ghost">
-              Annuler
+              {tr("common.cancel")}
             </button>
             <button onClick={doAttachDocs} disabled={attachSelected.length === 0} className="eu-btn-primary">
               {attachSelected.length > 0
-                ? `Attacher ${attachSelected.length} document(s)`
-                : "Attacher des documents"}
+                ? trn("courseDetail.attachDocsCount", attachSelected.length)
+                : tr("courseDetail.attachDocsNone")}
             </button>
           </div>
         </div>

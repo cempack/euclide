@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useToast } from "../components/ui";
 import { api, type FileItem } from "../lib/api";
 import { errorMessage } from "../lib/errors";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { logged, reportError } from "../lib/report";
 
 /**
@@ -19,7 +19,7 @@ export function useImportFiles() {
         if (!added.length) return;
         for (const f of added) api.logEvent("file_import", f.name, f.course_id).catch(logged("import.log"));
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
-        toast(tr("documents.toastImported", { count: added.length }), "success");
+        toast(trn("documents.toastImported", added.length), "success");
       } catch (err) {
         reportError(where, err);
         toast(errorMessage(err, tr("messages.importError")), "error");
