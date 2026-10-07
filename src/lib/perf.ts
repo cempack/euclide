@@ -57,11 +57,14 @@ function send(lines: string[]) {
   });
 }
 
-/** The dashboard has its first data: the app is usable. Logged once. */
-export function appReady() {
+/**
+ * The first screen is usable, logged once: the dashboard once its data is in,
+ * any other screen restored at launch once it has rendered.
+ */
+export function appReady(firstScreen = "dashboard") {
   if (readyLogged) return;
   readyLogged = true;
-  const lines = [`app.ready_ms=${round(performance.now())}`];
+  const lines = [`app.ready_ms=${round(performance.now())}`, `app.ready_screen=${firstScreen}`];
   const fcp = performance.getEntriesByName("first-contentful-paint")[0];
   if (fcp) lines.push(`app.first_paint_ms=${round(fcp.startTime)}`);
   const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
