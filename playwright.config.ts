@@ -18,7 +18,12 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   expect: {
-    toHaveScreenshot: { maxDiffPixelRatio: 0.002, animations: "disabled", caret: "hide" },
+    // SHOTS_STRICT=1 reports every changed pixel, for reviewing a deliberate change.
+    toHaveScreenshot: {
+      maxDiffPixelRatio: process.env.SHOTS_STRICT ? 0 : 0.002,
+      animations: "disabled",
+      caret: "hide",
+    },
   },
   use: {
     baseURL: "http://localhost:1420",
