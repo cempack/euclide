@@ -11,7 +11,6 @@ Run:
   sidecar/.venv/bin/python sidecar/test_3d_contents.py
 """
 
-import json
 import sys
 from pathlib import Path
 

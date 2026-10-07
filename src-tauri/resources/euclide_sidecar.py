@@ -396,7 +396,7 @@ def _get_client(payload):
 
 def pronote_login(payload):
     try:
-        import pronotepy
+        import pronotepy  # noqa: F401 - availability check
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
@@ -438,7 +438,7 @@ def pronote_password_login(payload):
     for accounts that have PIN authentication enabled.
     """
     try:
-        import pronotepy
+        import pronotepy  # noqa: F401 - availability check
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
@@ -481,14 +481,14 @@ def pronote_password_login(payload):
 
 def pronote_sync(payload):
     try:
-        import pronotepy
+        import pronotepy  # noqa: F401 - availability check
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
     try:
         client = _get_client(payload)
         lessons = _lessons_for_week(client)
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         # Retry once after clearing cache (in case session expired)
         _clear_cache()
         try:
@@ -721,7 +721,6 @@ def _contents_via_lessons(client, days_back: int = 365, class_name: str | None =
     If class_name is given, we fetch raw EDT to only consider lessons for that class (G=1 in ListeContenus).
     """
     import datetime as dt
-    import json as json_mod
 
     today = dt.date.today()
     from_d = today - dt.timedelta(days=days_back)
@@ -892,7 +891,7 @@ def pronote_contents(payload):
     class when published/available in your Pronote instance.
     """
     try:
-        import pronotepy
+        import pronotepy  # noqa: F401 - availability check
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 
@@ -1006,7 +1005,7 @@ def pronote_classes(payload):
     Used to populate dropdowns instead of free-text class names.
     """
     try:
-        import pronotepy
+        import pronotepy  # noqa: F401 - availability check
     except ImportError:
         return {"ok": False, "error": "pronotepy n'est pas installe dans le sidecar."}
 

@@ -6,7 +6,6 @@ Run: python3 sidecar/test_pronote_login.py
 from __future__ import annotations
 
 import importlib.util
-import sys
 import unittest
 from pathlib import Path
 
