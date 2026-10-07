@@ -17,7 +17,7 @@ import { DAY_LABELS, isoDayOfWeek } from "../lib/format";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Section, Segmented } from "../components/layout";
 import { ArchiveIcon, CheckIcon, MoonIcon, PlusIcon, QrIcon, SunIcon, TrashIcon } from "../components/icons";
-import { useTabs } from "../lib/tabs";
+import { tabs, useTabLimit } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
@@ -848,17 +848,17 @@ function ScheduleSection() {
 // Tabs (max tabs limit)
 
 function TabsSection() {
-  const tabsCtx = useTabs();
+  const limit = useTabLimit();
   const MIN = 3;
   const MAX = 25;
-  const mode = tabsCtx.maxTabsMode;
-  const sliderVal = Math.max(MIN, Math.min(MAX, tabsCtx.maxTabsFixed));
+  const mode = limit.mode;
+  const sliderVal = Math.max(MIN, Math.min(MAX, limit.fixed));
   const chip =
     mode === "unlimited"
       ? get("settings.maxTabsUnlimited", "Illimité").toUpperCase()
       : mode === "auto"
-        ? `${get("settings.maxTabsAutoChip", "AUTO")} · ${tabsCtx.tabFitCapacity || "…"}`
-        : `${tabsCtx.maxTabs} MAX`;
+        ? `${get("settings.maxTabsAutoChip", "AUTO")} · ${limit.fit || "…"}`
+        : `${limit.max} MAX`;
 
   return (
     <Section title={t.settings?.tabsTitle || "Onglets"} action={<span className="eu-chip">{chip}</span>}>
@@ -867,7 +867,7 @@ function TabsSection() {
           <Segmented
             grow
             value={mode}
-            onChange={(next) => tabsCtx.setMaxTabsMode(next, sliderVal)}
+            onChange={(next) => tabs.setMaxTabsMode(next, sliderVal)}
             label={get("settings.tabsTitle", "Onglets")}
             options={[
               { value: "auto", label: get("settings.maxTabsAuto", "Automatique") },
@@ -883,7 +883,7 @@ function TabsSection() {
                   "settings.maxTabsAutoHint",
                   "Autant d'onglets que la barre peut afficher sans défiler. Actuellement : {count}.",
                 ),
-                { count: tabsCtx.tabFitCapacity || "…" },
+                { count: limit.fit || "…" },
               )}
             </p>
           )}
@@ -902,7 +902,7 @@ function TabsSection() {
                 max={MAX}
                 step={1}
                 value={sliderVal}
-                onChange={(e) => tabsCtx.setMaxTabsMode("fixed", parseInt(e.target.value, 10))}
+                onChange={(e) => tabs.setMaxTabsMode("fixed", parseInt(e.target.value, 10))}
                 className="w-full accent-accent cursor-pointer"
               />
               <div className="flex justify-between eu-t-caption text-ink-muted mt-0.5">

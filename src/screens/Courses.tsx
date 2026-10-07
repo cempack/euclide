@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, memo } from "react";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course } from "../lib/api";
@@ -200,7 +200,6 @@ function CourseForm({
 }
 
 export default function Courses() {
-  const tabs = useTabs();
   const toast = useToast();
   const { resolved } = useAppearance();
   const queryClient = useQueryClient();
@@ -272,12 +271,9 @@ export default function Courses() {
     }
   };
 
-  const handleOpenCourse = useCallback(
-    (c: Course) => {
-      tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } });
-    },
-    [tabs],
-  );
+  const handleOpenCourse = useCallback((c: Course) => {
+    tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } });
+  }, []);
 
   return (
     <>

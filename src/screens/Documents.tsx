@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import { api, type Course, type FileItem, type Note } from "../lib/api";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import { t, fmt, get } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
@@ -185,7 +185,6 @@ export default function Documents({
   visible?: boolean;
 }) {
   const toast = useToast();
-  const tabs = useTabs();
   const confirm = useConfirm();
   const live = { subscribed: visible };
   const docs = useQuery({ ...q.files(null), ...live }).data ?? NO_FILES;
@@ -270,14 +269,17 @@ export default function Documents({
       if (!ok) return;
       try {
         await api.deleteFile(f.id);
-        tabs.tabs.filter((t) => t.params.fileId === f.id).forEach((t) => tabs.close(t.id));
+        tabs
+          .list()
+          .filter((t) => t.params.fileId === f.id)
+          .forEach((t) => tabs.close(t.id));
         toast(get("documents.toastDeleted", "Supprimé"), "success");
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       } catch (err: any) {
         toast(err?.message || get("messages.genericError", "Erreur"), "error");
       }
     },
-    [confirm, tabs, toast],
+    [confirm, toast],
   );
 
   const deleteNoteItem = useCallback(
@@ -291,7 +293,8 @@ export default function Documents({
       if (!ok) return;
       try {
         await api.deleteNote(n.id);
-        tabs.tabs
+        tabs
+          .list()
           .filter((t) => t.kind === "note" && t.params.noteId === n.id)
           .forEach((t) => tabs.close(t.id, { discard: true }));
         toast(get("notes.deleted", "Note supprimée"), "success");
@@ -300,7 +303,7 @@ export default function Documents({
         toast(err?.message || get("messages.genericError", "Erreur"), "error");
       }
     },
-    [confirm, tabs, toast],
+    [confirm, toast],
   );
 
   const closeRename = useCallback(() => {
@@ -323,7 +326,7 @@ export default function Documents({
           return;
         }
         const tid = `note:${renameTarget.id}`;
-        if (tabs.tabs.some((t) => t.id === tid)) {
+        if (tabs.list().some((t) => t.id === tid)) {
           tabs.rename(tid, newName);
         }
         api.logEvent("note_rename", newName, null);
@@ -339,7 +342,7 @@ export default function Documents({
             : updated.kind === "pdf" || updated.kind === "image"
               ? `pdf:${updated.id}`
               : null;
-        if (tid && tabs.tabs.some((t) => t.id === tid)) {
+        if (tid && tabs.list().some((t) => t.id === tid)) {
           const patch =
             updated.kind === "pdf" || updated.kind === "image" ? { fileName: newName } : undefined;
           tabs.rename(tid, newName, patch);
@@ -353,7 +356,7 @@ export default function Documents({
     } finally {
       closeRename();
     }
-  }, [renameTarget, renameValue, tabs, toast, closeRename]);
+  }, [renameTarget, renameValue, toast, closeRename]);
 
   // Unified + sorted + filtered view (fixes previous note-first concat + enables search + groups)
   const filteredItems = useMemo((): DocItem[] => {

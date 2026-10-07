@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api, invalidateCache, type PythonDemo, type PythonResult } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import { useToast, useConfirm } from "../components/ui";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
+import { editors } from "../stores/editors";
 import CodeEditor from "../components/CodeEditor";
 import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { MOD, isMac } from "../lib/shortcuts";
@@ -15,7 +16,6 @@ const STARTER_CODE =
 export default function Python() {
   const toast = useToast();
   const confirm = useConfirm();
-  const tabs = useTabs();
   const [demos, setDemos] = useState<PythonDemo[]>([]);
   const [openScript, setOpenScript] = useState<{
     name: string;
@@ -36,9 +36,9 @@ export default function Python() {
   }, [openScript?.path, openScript?.name]);
 
   useEffect(() => {
-    tabs.setTabDirty("python", !!openScript?.isDirty);
-    return () => tabs.setTabDirty("python", false);
-  }, [openScript?.isDirty, tabs]);
+    editors.setDirty("python", !!openScript?.isDirty);
+    return () => editors.setDirty("python", false);
+  }, [openScript?.isDirty]);
 
   // ⌘↵ / Ctrl+↵ runs the open script. Only while the Python tab is the active
   // one, so it never fires from another pane (all panes stay mounted).
@@ -46,7 +46,7 @@ export default function Python() {
     const onKey = (e: KeyboardEvent) => {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (!mod || e.key !== "Enter") return;
-      if (tabs.active?.kind !== "python") return;
+      if (tabs.active()?.kind !== "python") return;
       e.preventDefault();
       void run();
     };
@@ -228,8 +228,8 @@ export default function Python() {
   };
 
   useEffect(() => {
-    return tabs.registerFlush("python", save);
-  }, [tabs, openScript]);
+    return editors.registerFlush("python", save);
+  }, [openScript]);
 
   const run = async () => {
     if (!openScript) return;

@@ -6,7 +6,7 @@ import { t, get, fmt } from "../lib/i18n";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, Panel, Section, PageHeader, MetaDot } from "../components/layout";
 import { useAppearance } from "../lib/theme";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import {
   CoffeeIcon,
   CodeIcon,
@@ -43,7 +43,6 @@ export default function Tools() {
 /** Screen lock, projection and the shortcuts that used to sit on the dashboard. */
 function ClassroomSection() {
   const toast = useToast();
-  const tabs = useTabs();
   const { projection, toggleProjection } = useAppearance();
   const [on, setOn] = useState(true); // default on (matches backend startup default)
 

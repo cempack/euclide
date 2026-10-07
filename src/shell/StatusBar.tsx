@@ -5,7 +5,7 @@ import { Coffee } from "lucide-react";
 import type { AppInfo, ScheduleEntry } from "../lib/api";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../lib/format";
 import { fmt, get } from "../lib/i18n";
-import { useTabs } from "../lib/tabs";
+import { tabs, useMaxTabs, useTabsStore } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
@@ -19,7 +19,8 @@ import { StatusTimerChip } from "./Timer";
 const NONE: ScheduleEntry[] = [];
 
 export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | null }) {
-  const tabs = useTabs();
+  const tabCount = useTabsStore((s) => s.tabs.length);
+  const maxTabs = useMaxTabs();
   const { resolved, pref } = useAppearance();
   const classes = useQuery(q.todayClasses()).data ?? NONE;
   const pronote = useQuery(q.pronoteStatus()).data ?? null;
@@ -92,8 +93,8 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
       <span className="flex-1" />
 
       <span className="eu-status-item eu-status-end hidden lg:flex">
-        {tabs.tabs.length}
-        {tabs.maxTabs > 0 ? ` / ${tabs.maxTabs}` : ""} {get("status.tabs", "onglets")}
+        {tabCount}
+        {maxTabs > 0 ? ` / ${maxTabs}` : ""} {get("status.tabs", "onglets")}
       </span>
       <span
         className="eu-status-item eu-status-end hidden xl:flex max-w-[19rem] selectable"

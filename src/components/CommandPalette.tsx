@@ -3,7 +3,7 @@ import { Dialog } from "../ui/Dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type QuickLink, type SearchResult } from "../lib/api";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import { get, fmt, t } from "../lib/i18n";
 import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
 import { useAppearance } from "../lib/theme";
@@ -79,7 +79,6 @@ function CommandPalette({
   onClose: () => void;
   onHelp: () => void;
 }) {
-  const tabs = useTabs();
   const toast = useToast();
   const { projection, toggleProjection } = useAppearance();
 
@@ -320,7 +319,7 @@ function CommandPalette({
     }
 
     return actions;
-  }, [tabs, onClose, onHelp, toast, projection, toggleProjection, keepAwake, links]);
+  }, [onClose, onHelp, toast, projection, toggleProjection, keepAwake, links]);
 
   const resultActions = useMemo<Action[]>(() => {
     return results.map((r) => {
@@ -369,7 +368,7 @@ function CommandPalette({
         },
       };
     });
-  }, [results, tabs, onClose]);
+  }, [results, onClose]);
 
   const filtered = useMemo(() => {
     const wantCommands = scope === "all" || scope === "commands";

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, versionUrl, type Course, type FileVersion } from "../lib/api";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
+import { editors } from "../stores/editors";
 import { useToast, useConfirm } from "./ui";
 import {
   DownloadIcon,
@@ -87,7 +88,6 @@ export default function Whiteboard({
   visible?: boolean;
 }) {
   const toast = useToast();
-  const tabs = useTabs();
   const confirm = useConfirm();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -243,9 +243,9 @@ export default function Whiteboard({
   }, [visible]);
 
   useEffect(() => {
-    tabs.setTabDirty(tabId, dirty);
-    return () => tabs.setTabDirty(tabId, false);
-  }, [tabId, dirty, tabs]);
+    editors.setDirty(tabId, dirty);
+    return () => editors.setDirty(tabId, false);
+  }, [tabId, dirty]);
 
   useEffect(() => {
     api
@@ -579,7 +579,7 @@ export default function Whiteboard({
       oc.drawImage(c, 0, 0);
       const blob = await new Promise<Blob | null>((resolve) => o.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("png");
-      const title = tabs.tabs.find((t) => t.id === tabId)?.title ?? "Tableau";
+      const title = tabs.list().find((t) => t.id === tabId)?.title ?? "Tableau";
       const exported = await api.createFileBytes(
         `${title.replace(/\.euboard$/i, "")}.png`,
         await blob.arrayBuffer(),
@@ -598,8 +598,8 @@ export default function Whiteboard({
   };
 
   useEffect(() => {
-    return tabs.registerFlush(tabId, save);
-  }, [tabId, tabs, currentFileId, courseId, dirty]);
+    return editors.registerFlush(tabId, save);
+  }, [tabId, currentFileId, courseId, dirty]);
   const zoomIn = () => setZoom((z) => Math.min(4, z * 1.25));
   const zoomOut = () => setZoom((z) => Math.max(0.25, z / 1.25));
   const resetZoom = () => setZoom(1);

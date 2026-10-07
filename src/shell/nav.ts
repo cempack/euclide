@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { get } from "../lib/i18n";
-import type { TabKind } from "../lib/tabs";
+import type { TabKind } from "../stores/tabs";
 
 /**
  * One glyph per kind of screen, everywhere it appears (sidebar, tabs, palette,

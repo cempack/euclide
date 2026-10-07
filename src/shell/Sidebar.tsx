@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { PanelLeftClose, PanelLeftOpen, Projector, Settings } from "lucide-react";
@@ -7,7 +7,7 @@ import type { AppInfo } from "../lib/api";
 import { get } from "../lib/i18n";
 import { NARROW_WINDOW, useMediaQuery } from "../lib/media";
 import { shortcutText } from "../lib/shortcuts";
-import { useTabs, type TabKind } from "../lib/tabs";
+import { tabs, useActiveKind, type TabKind } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
@@ -63,35 +63,28 @@ export const ProjectionRail = memo(function ProjectionRail() {
   );
 });
 
+function openNav(item: NavItem) {
+  if (item.kind === "whiteboard") {
+    tabs.open({ kind: "whiteboard", title: get("app.tabWhiteboard", "Tableau"), params: { isNew: true } });
+  } else if (item.kind === "note") {
+    tabs.open({ kind: "note", title: get("common.newNote", "Nouvelle note"), params: { isNew: true } });
+  } else {
+    tabs.open({ kind: item.kind });
+  }
+}
+
 export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
-  const tabs = useTabs();
+  const activeKind = useActiveKind();
   const { projection, toggleProjection } = useAppearance();
   const pronote = useQuery(q.pronoteStatus()).data ?? null;
   const displayName = (useQuery(q.setting("teacher_display_name")).data ?? "").trim();
-  const isActive = (kind: TabKind) => navKindActive(kind, tabs.active?.kind);
+  const isActive = (kind: TabKind) => navKindActive(kind, activeKind ?? undefined);
   // A narrow window always gets the rail; a wide one, when the teacher folds it.
   const narrow = useMediaQuery(NARROW_WINDOW);
   const [saved, setSaved] = useSetting("sidebar");
   const rail = narrow || saved === "rail";
 
   const name = displayName || (pronote?.connected ? (pronote.account_name ?? "").trim() : "");
-
-  const onOpen = useCallback(
-    (item: NavItem) => {
-      if (item.kind === "whiteboard") {
-        tabs.open({
-          kind: "whiteboard",
-          title: get("app.tabWhiteboard", "Tableau"),
-          params: { isNew: true },
-        });
-      } else if (item.kind === "note") {
-        tabs.open({ kind: "note", title: get("common.newNote", "Nouvelle note"), params: { isNew: true } });
-      } else {
-        tabs.open({ kind: item.kind });
-      }
-    },
-    [tabs],
-  );
 
   const projectionLabel = get("appearance.projection", "Mode projection");
   const settingsLabel = get("nav.settings", "Réglages");
@@ -148,7 +141,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
                   item={item}
                   active={isActive(item.kind)}
                   rail={rail}
-                  onOpen={onOpen}
+                  onOpen={openNav}
                 />
               ))}
             </nav>

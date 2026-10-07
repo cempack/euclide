@@ -4,7 +4,8 @@ import { q } from "../api/queries";
 import { CircleHelp, Pin, Plus, Search, X } from "lucide-react";
 import { courseVisual } from "../lib/color";
 import { get } from "../lib/i18n";
-import { fitTabCount, useDirtyMap, useTabs, type Tab } from "../lib/tabs";
+import { fitTabCount, tabs, useActiveId, useMaxTabs, useTabList, type Tab } from "../stores/tabs";
+import { useDirtyMap } from "../stores/editors";
 import { useAppearance } from "../lib/theme";
 import { COURSE_ICONS } from "../components/ui";
 import { Icon } from "../ui/Icon";
@@ -45,7 +46,9 @@ export const TopBar = memo(function TopBar({
   onSearch: () => void;
   onCloseTab: (id: string) => void;
 }) {
-  const tabs = useTabs();
+  const list = useTabList();
+  const activeId = useActiveId();
+  const maxTabs = useMaxTabs();
   const dirtyMap = useDirtyMap();
   const barRef = useRef<HTMLDivElement>(null);
   const extrasRef = useRef<HTMLDivElement>(null);
@@ -65,9 +68,9 @@ export const TopBar = memo(function TopBar({
     if (extrasRef.current) ro.observe(extrasRef.current);
     measure();
     return () => ro.disconnect();
-  }, [tabs.setTabFitCapacity]);
+  }, []);
 
-  const hasCourseTab = tabs.tabs.some((t) => t.kind === "course" && typeof t.params?.courseId === "number");
+  const hasCourseTab = list.some((t) => t.kind === "course" && typeof t.params?.courseId === "number");
   const courses = useQuery({ ...q.courses(), enabled: hasCourseTab }).data;
   const courseIcons = useMemo(() => {
     const map: CourseIcons = {};
@@ -75,7 +78,7 @@ export const TopBar = memo(function TopBar({
     return map;
   }, [courses]);
 
-  const atLimit = tabs.maxTabs > 0 && tabs.tabs.length >= tabs.maxTabs;
+  const atLimit = maxTabs > 0 && list.length >= maxTabs;
   const closeLabel = get("common.close", "Fermer");
   const newTabLabel = get("app.newTab", "Nouvel onglet");
   const helpLabel = get("app.shortcutsTitle", "Raccourcis");
@@ -83,8 +86,8 @@ export const TopBar = memo(function TopBar({
   return (
     <div ref={barRef} className="eu-tabstrip">
       <div role="tablist" aria-label={get("app.openTabs", "Onglets ouverts")} className="eu-tabs">
-        {tabs.tabs.map((tab, index) => {
-          const active = tab.id === tabs.activeId;
+        {list.map((tab, index) => {
+          const active = tab.id === activeId;
           const dirty = !!dirtyMap[tab.id];
           const pinned = !!tab.pinned;
           return (
@@ -126,7 +129,7 @@ export const TopBar = memo(function TopBar({
                 onClick={() => tabs.setActive(tab.id)}
                 onAuxClick={(e) => {
                   // Middle click closes, as in a browser.
-                  if (e.button === 1 && tabs.tabs.length > 1) {
+                  if (e.button === 1 && list.length > 1) {
                     e.preventDefault();
                     onCloseTab(tab.id);
                   }
@@ -140,7 +143,7 @@ export const TopBar = memo(function TopBar({
                 {pinned && !dirty && <Icon icon={Pin} size={14} className="eu-tab-pin" />}
                 {dirty && <span className="eu-tab-dirty" aria-label={get("app.unsaved", "Non enregistré")} />}
               </button>
-              {!pinned && tabs.tabs.length > 1 && (
+              {!pinned && list.length > 1 && (
                 <button
                   type="button"
                   onClick={() => onCloseTab(tab.id)}
@@ -157,7 +160,7 @@ export const TopBar = memo(function TopBar({
         <button
           type="button"
           onClick={() => {
-            if (tabs.active?.kind !== "dashboard") tabs.open({ kind: "dashboard" });
+            if (tabs.active()?.kind !== "dashboard") tabs.open({ kind: "dashboard" });
           }}
           aria-label={newTabLabel}
           {...(atLimit
