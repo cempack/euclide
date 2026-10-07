@@ -243,8 +243,25 @@ const HOME: Tab = {
 };
 
 export function TabsProvider({ children }: { children: ReactNode }) {
-  const [tabs, setTabs] = useState<Tab[]>([HOME]);
-  const [activeId, setActiveId] = useState<string>("dashboard");
+  const [tabs, setTabsState] = useState<Tab[]>([HOME]);
+  const [activeId, setActiveIdState] = useState<string>("dashboard");
+
+  // The refs are the source of truth and change synchronously, so several
+  // actions in one event (open a tab then focus it, close then reopen…) each
+  // see the previous one. State updaters must stay free of side effects:
+  // React 19 runs them later, and twice in development.
+  const tabsRef = useRef<Tab[]>(tabs);
+  const activeIdRef = useRef<string>(activeId);
+  const commitTabs = useCallback((next: Tab[]) => {
+    if (next === tabsRef.current) return;
+    tabsRef.current = next;
+    setTabsState(next);
+  }, []);
+  const setActiveId = useCallback((id: string) => {
+    if (id === activeIdRef.current) return;
+    activeIdRef.current = id;
+    setActiveIdState(id);
+  }, []);
   const [maxTabsMode, setMaxTabsModeState] = useState<MaxTabsMode>("auto");
   const [maxTabsFixed, setMaxTabsFixed] = useState<number>(TAB_FIT_FALLBACK);
   const [tabFitCapacity, setTabFitCapacityState] = useState<number>(0);
@@ -259,11 +276,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           ? tabFitCapacity
           : TAB_FIT_FALLBACK
         : maxTabsFixed;
-
-  const activeIdRef = useRef<string>(activeId);
-  useEffect(() => {
-    activeIdRef.current = activeId;
-  }, [activeId]);
 
   const flushFns = useRef(new Map<string, () => Promise<void>>());
   const discarded = useRef(new Set<string>());
@@ -324,7 +336,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         if (!restored.some((t) => t.kind === "dashboard")) {
           restored.unshift({ ...HOME, mountId: newMountId() });
         }
-        setTabs(restored);
+        commitTabs(restored);
         const nextActive =
           parsed.activeId && restored.some((t) => t.id === parsed.activeId)
             ? parsed.activeId
@@ -339,7 +351,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [commitTabs, setActiveId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -382,68 +394,49 @@ export function TabsProvider({ children }: { children: ReactNode }) {
 
   const open = useCallback(
     (spec: OpenSpec): string => {
-      let id = "";
       const title = spec.title ?? DEFAULT_TITLES[spec.kind];
       const newParams = spec.params ?? {};
+      const prev = tabsRef.current;
 
-      setTabs((prev) => {
-        if (spec.kind === "note" && newParams.noteId) {
-          const byNote = prev.find((t) => t.kind === "note" && t.params.noteId === newParams.noteId);
-          if (byNote) {
-            id = byNote.id;
-            return prev;
-          }
-        }
-        if (spec.kind === "pdf" && newParams.fileId) {
-          const byFile = prev.find((t) => t.kind === "pdf" && t.params.fileId === newParams.fileId);
-          if (byFile) {
-            id = byFile.id;
-            return prev;
-          }
-        }
-        if (spec.kind === "whiteboard" && newParams.fileId) {
-          const byFile = prev.find((t) => t.kind === "whiteboard" && t.params.fileId === newParams.fileId);
-          if (byFile) {
-            id = byFile.id;
-            return prev;
-          }
-        }
-        if (spec.kind === "note" && newParams.isNew && !newParams.noteId) {
-          const blank = prev.find((t) => t.kind === "note" && !t.params.noteId);
-          if (blank) {
-            id = blank.id;
-            return prev;
-          }
-        }
-        if (spec.kind === "whiteboard" && newParams.isNew && !newParams.fileId) {
-          const blank = prev.find((t) => t.kind === "whiteboard" && !t.params.fileId);
-          if (blank) {
-            id = blank.id;
-            return prev;
-          }
-        }
+      const find = (): Tab | undefined => {
+        if (spec.kind === "note" && newParams.noteId)
+          return prev.find((t) => t.kind === "note" && t.params.noteId === newParams.noteId);
+        if (spec.kind === "pdf" && newParams.fileId)
+          return prev.find((t) => t.kind === "pdf" && t.params.fileId === newParams.fileId);
+        if (spec.kind === "whiteboard" && newParams.fileId)
+          return prev.find((t) => t.kind === "whiteboard" && t.params.fileId === newParams.fileId);
+        if (spec.kind === "note" && newParams.isNew && !newParams.noteId)
+          return prev.find((t) => t.kind === "note" && !t.params.noteId);
+        if (spec.kind === "whiteboard" && newParams.isNew && !newParams.fileId)
+          return prev.find((t) => t.kind === "whiteboard" && !t.params.fileId);
+        return undefined;
+      };
 
+      let id: string;
+      const reused = find();
+      if (reused) {
+        id = reused.id;
+      } else {
         id = keyOf(spec);
         const existing = prev.find((t) => t.id === id);
         if (existing) {
           const paramsSame = JSON.stringify(existing.params) === JSON.stringify(newParams);
-          if (existing.title === title && paramsSame) return prev;
-          return prev.map((t) => (t.id === id ? { ...t, title, params: newParams } : t));
+          if (existing.title !== title || !paramsSame) {
+            commitTabs(prev.map((t) => (t.id === id ? { ...t, title, params: newParams } : t)));
+          }
+        } else {
+          let nextTabs = prev;
+          if (effectiveMaxTabs > 0 && prev.length >= effectiveMaxTabs) {
+            nextTabs = evictToLimit(prev, effectiveMaxTabs - 1, activeIdRef.current, dirtyStore.getSnapshot());
+          }
+          commitTabs([...nextTabs, { id, kind: spec.kind, title, params: newParams, mountId: newMountId() }]);
         }
-
-        let nextTabs = prev;
-        if (effectiveMaxTabs > 0 && prev.length >= effectiveMaxTabs) {
-          nextTabs = evictToLimit(prev, effectiveMaxTabs - 1, activeIdRef.current, dirtyStore.getSnapshot());
-        }
-        return [...nextTabs, { id, kind: spec.kind, title, params: newParams, mountId: newMountId() }];
-      });
-
-      if (!spec.background) {
-        setActiveId((cur) => (cur === id ? cur : id));
       }
+
+      if (!spec.background) setActiveId(id);
       return id;
     },
-    [effectiveMaxTabs, dirtyStore],
+    [effectiveMaxTabs, dirtyStore, commitTabs, setActiveId],
   );
 
   const setTabFitCapacity = useCallback((n: number) => {
@@ -469,11 +462,11 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         const cap = nextFixed ?? maxTabsFixed;
         api.setSetting("max_tabs", String(cap)).catch(() => {});
         if (mode === "fixed") {
-          setTabs((prev) => evictToLimit(prev, cap, activeIdRef.current, dirtyStore.getSnapshot()));
+          commitTabs(evictToLimit(tabsRef.current, cap, activeIdRef.current, dirtyStore.getSnapshot()));
         }
       }
     },
-    [maxTabsFixed, dirtyStore],
+    [maxTabsFixed, dirtyStore, commitTabs],
   );
 
   const updateMaxTabs = useCallback(
@@ -489,39 +482,36 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       if (opts?.discard) discarded.current.add(id);
       dirtyStore.clear(id);
       flushFns.current.delete(id);
-      setTabs((prev) => {
-        const idx = prev.findIndex((t) => t.id === id);
-        if (idx === -1) return prev;
-        const next = prev.filter((t) => t.id !== id);
-        if (next.length === 0) {
-          setActiveId("dashboard");
-          return [{ ...HOME, mountId: newMountId() }];
-        }
-        setActiveId((cur) => {
-          if (cur !== id) return cur;
-          const fallback = next[Math.max(0, idx - 1)];
-          return fallback.id;
-        });
-        return next;
-      });
+      const prev = tabsRef.current;
+      const idx = prev.findIndex((t) => t.id === id);
+      if (idx === -1) return;
+      const next = prev.filter((t) => t.id !== id);
+      if (next.length === 0) {
+        commitTabs([{ ...HOME, mountId: newMountId() }]);
+        setActiveId("dashboard");
+        return;
+      }
+      commitTabs(next);
+      if (activeIdRef.current === id) setActiveId(next[Math.max(0, idx - 1)].id);
     },
-    [dirtyStore],
+    [dirtyStore, commitTabs, setActiveId],
   );
 
   const takeDiscarded = useCallback((id: string) => discarded.current.delete(id), []);
 
-  const rename = useCallback((id: string, title: string, paramsPatch?: Partial<TabParams>) => {
-    setTabs((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        return {
-          ...t,
-          title,
-          params: paramsPatch ? { ...t.params, ...paramsPatch } : t.params,
-        };
-      }),
-    );
-  }, []);
+  /** No-op when nothing changes: notes rename their tab on every keystroke. */
+  const rename = useCallback(
+    (id: string, title: string, paramsPatch?: Partial<TabParams>) => {
+      const prev = tabsRef.current;
+      const tab = prev.find((t) => t.id === id);
+      if (!tab) return;
+      const params = paramsPatch ? { ...tab.params, ...paramsPatch } : tab.params;
+      const sameParams = !paramsPatch || JSON.stringify(params) === JSON.stringify(tab.params);
+      if (tab.title === title && sameParams) return;
+      commitTabs(prev.map((t) => (t.id === id ? { ...t, title, params } : t)));
+    },
+    [commitTabs],
+  );
 
   const retarget = useCallback(
     (oldId: string, newId: string, title?: string, paramsPatch?: Partial<TabParams>) => {
@@ -529,21 +519,24 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         if (title || paramsPatch) rename(oldId, title || "", paramsPatch);
         return;
       }
-      setTabs((prev) => {
-        if (prev.some((t) => t.id === newId)) {
-          return prev.filter((t) => t.id !== oldId);
-        }
-        return prev.map((t) => {
-          if (t.id !== oldId) return t;
-          return {
-            ...t,
-            id: newId,
-            title: title ?? t.title,
-            params: paramsPatch ? { ...t.params, ...paramsPatch } : t.params,
-          };
-        });
-      });
-      setActiveId((cur) => (cur === oldId ? newId : cur));
+      const prev = tabsRef.current;
+      if (prev.some((t) => t.id === newId)) {
+        commitTabs(prev.filter((t) => t.id !== oldId));
+      } else {
+        commitTabs(
+          prev.map((t) =>
+            t.id !== oldId
+              ? t
+              : {
+                  ...t,
+                  id: newId,
+                  title: title ?? t.title,
+                  params: paramsPatch ? { ...t.params, ...paramsPatch } : t.params,
+                },
+          ),
+        );
+      }
+      if (activeIdRef.current === oldId) setActiveId(newId);
       dirtyStore.retarget(oldId, newId);
       const fn = flushFns.current.get(oldId);
       if (fn) {
@@ -551,18 +544,20 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         flushFns.current.set(newId, fn);
       }
     },
-    [rename, dirtyStore],
+    [rename, dirtyStore, commitTabs, setActiveId],
   );
 
-  const focusIndex = useCallback((i: number) => {
-    setTabs((prev) => {
-      if (prev[i]) setActiveId(prev[i].id);
-      return prev;
-    });
-  }, []);
+  const focusIndex = useCallback(
+    (i: number) => {
+      const tab = tabsRef.current[i];
+      if (tab) setActiveId(tab.id);
+    },
+    [setActiveId],
+  );
 
-  const move = useCallback((fromIndex: number, toIndex: number) => {
-    setTabs((prev) => {
+  const move = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const prev = tabsRef.current;
       if (
         fromIndex === toIndex ||
         fromIndex < 0 ||
@@ -570,30 +565,32 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         fromIndex >= prev.length ||
         toIndex >= prev.length
       ) {
-        return prev;
+        return;
       }
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
-      return next;
-    });
-  }, []);
+      commitTabs(next);
+    },
+    [commitTabs],
+  );
 
-  const togglePin = useCallback((id: string) => {
-    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
-  }, []);
+  const togglePin = useCallback(
+    (id: string) => {
+      commitTabs(tabsRef.current.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
+    },
+    [commitTabs],
+  );
 
-  const step = useCallback((dir: 1 | -1) => {
-    setTabs((prev) => {
-      setActiveId((cur) => {
-        const idx = prev.findIndex((t) => t.id === cur);
-        if (idx === -1) return cur;
-        const ni = (idx + dir + prev.length) % prev.length;
-        return prev[ni].id;
-      });
-      return prev;
-    });
-  }, []);
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      const prev = tabsRef.current;
+      const idx = prev.findIndex((t) => t.id === activeIdRef.current);
+      if (idx === -1) return;
+      setActiveId(prev[(idx + dir + prev.length) % prev.length].id);
+    },
+    [setActiveId],
+  );
 
   const value = useMemo<TabsCtx>(
     () => ({
@@ -630,6 +627,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       open,
       close,
       takeDiscarded,
+      setActiveId,
       rename,
       retarget,
       step,
