@@ -1,4 +1,5 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { recordIpc } from "./perf";
 
 // Simple in-memory cache for snappy UX (avoids repeated SQLite roundtrips on re-renders / tab switches).
 // TTL short because data can change via side effects; events invalidate.
@@ -107,7 +108,12 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
     console.warn(`[euclide] invoke("${cmd}") called outside Tauri - returning fallback.`);
     return fallback<T>(cmd, args);
   }
-  return tauriInvoke<T>(cmd, args);
+  const t0 = performance.now();
+  try {
+    return await tauriInvoke<T>(cmd, args);
+  } finally {
+    if (cmd !== "log_perf") recordIpc(cmd, performance.now() - t0);
+  }
 }
 
 function asList<T>(data: unknown): T[] {
@@ -685,6 +691,7 @@ export const api = {
   getRecap: (period: string = "today") => invoke<RecapData>("get_recap", { period }),
 
   // Settings
+  logPerf: (lines: string[]) => invoke<void>("log_perf", { lines }),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
   setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
 };

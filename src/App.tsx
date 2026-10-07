@@ -1,4 +1,14 @@
-import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense, memo } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  lazy,
+  Suspense,
+  memo,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, type AppInfo, type FileItem, type PronoteStatus, type ScheduleEntry, isTauri } from "./lib/api";
 import { get, fmt } from "./lib/i18n";
@@ -8,6 +18,7 @@ import { courseVisual } from "./lib/color";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 import { TimerProvider, useTimerControls, useTimerSec, formatTimer, chime } from "./lib/timer";
+import { tabSwitchEnd } from "./lib/perf";
 
 import { TabsProvider, useTabs, useDirtyMap, fitTabCount, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
@@ -651,6 +662,7 @@ function TimerStage() {
 
 const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }) {
   const tabs = useTabs();
+  useLayoutEffect(tabSwitchEnd, [tabs.activeId]);
   return (
     <div className="flex-1 min-h-0 relative bg-canvas">
       {tabs.tabs.map((tab) => {
