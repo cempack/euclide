@@ -36,9 +36,9 @@ function contrast(a: [number, number, number], b: [number, number, number]): num
 }
 
 const TEXT: Array<[string, string[]]> = [
-  ["ink", ["canvas", "panel", "panel-alt"]],
-  ["ink-muted", ["canvas", "panel", "panel-alt"]],
-  ["ink-faint", ["canvas", "panel", "panel-alt"]],
+  ["ink", ["chrome", "canvas", "panel", "panel-alt"]],
+  ["ink-muted", ["chrome", "canvas", "panel", "panel-alt"]],
+  ["ink-faint", ["chrome", "canvas", "panel", "panel-alt"]],
   ["accent", ["panel", "accent-soft"]],
   ["ok", ["panel", "ok-soft"]],
   ["warn", ["panel", "warn-soft"]],
