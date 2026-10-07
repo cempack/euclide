@@ -3,6 +3,8 @@ import { tabs } from "../stores/tabs";
 import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
 import { t, get, fmt } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { reportError } from "../lib/report";
 import {
   classProgress,
   focusClass,
@@ -117,9 +119,10 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
       }
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-    } catch {
+    } catch (err) {
+      reportError("dashboard.toggleReminder", err);
       setDone(!markingDone);
-      toast(get("messages.genericError", "Erreur"), "error");
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -135,8 +138,9 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
     try {
       await api.deleteReminder(id);
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-    } catch {
-      toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
+    } catch (err) {
+      reportError("dashboard.deleteReminder", err);
+      toast(errorMessage(err, t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression"), "error");
     }
   };
 
@@ -182,8 +186,9 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           });
           return;
         }
-      } catch {
+      } catch (err) {
         // fall through to the course page
+        reportError("dashboard.courseClasses", err);
       }
       tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } });
     },
@@ -212,8 +217,12 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       }
       toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    } catch {
-      toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
+    } catch (err) {
+      reportError("dashboard.import", err);
+      toast(
+        errorMessage(err, get("messages.importError", "Import impossible (sélection annulée ?)")),
+        "error",
+      );
     }
   };
 
@@ -392,11 +401,13 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     key={l.id}
                     type="button"
                     onClick={() => {
-                      void api
-                        .openUrl(l.url)
-                        .catch(() =>
-                          toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error"),
+                      void api.openUrl(l.url).catch((err) => {
+                        reportError("dashboard.openUrl", err);
+                        toast(
+                          errorMessage(err, get("messages.openUrlError", "Impossible d'ouvrir le lien")),
+                          "error",
                         );
+                      });
                     }}
                     className="eu-btn-ghost eu-btn-sm"
                     data-tip={l.url}

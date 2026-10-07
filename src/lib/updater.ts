@@ -2,6 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import { api, isTauri } from "./api";
 import { errorMessage } from "./errors";
+import { reportError } from "./report";
 
 export type AppUpdateInfo = {
   version: string;
@@ -26,6 +27,7 @@ export function wasUpdateDismissed(version: string): boolean {
   try {
     return sessionStorage.getItem(DISMISS_KEY) === version;
   } catch {
+    // Storage blocked: offer the update again.
     return false;
   }
 }
@@ -47,7 +49,9 @@ async function isPortableWindowsUpdate(): Promise<boolean> {
   try {
     const info = await api.appInfo();
     portableWindows = Boolean(info?.windows_portable);
-  } catch {
+  } catch (err) {
+    // The portable USB build would then be offered the installer.
+    reportError("updater.appInfo", err);
     portableWindows = false;
   }
   return portableWindows;
@@ -137,6 +141,7 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateInfo | 
   inflight = (async () => {
     const { check } = await import("@tauri-apps/plugin-updater");
     if (pending) {
+      // The previous check's handle is dropped either way.
       await pending.close().catch(() => {});
       pending = null;
     }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { describeError } from "./report";
 
 describe("describeError", () => {
@@ -19,5 +19,41 @@ describe("describeError", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     expect(describeError(cyclic)).toBe("[object Object]");
+  });
+});
+
+describe("reportError and logged", () => {
+  const logErrors = vi.fn((_lines: string[]) => Promise.resolve());
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    logErrors.mockClear();
+    vi.doMock("./api", () => ({ api: { logErrors }, isTauri: () => true }));
+  });
+
+  afterEach(() => {
+    vi.doUnmock("./api");
+    vi.useRealTimers();
+  });
+
+  it("logs a caught error with where it was caught", async () => {
+    const { reportError } = await import("./report");
+    reportError("settings.theme", { code: "io", message: "Disque plein" });
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.waitFor(() => expect(logErrors).toHaveBeenCalledOnce());
+    expect(logErrors.mock.calls[0][0]).toEqual([
+      'caught settings.theme: {"code":"io","message":"Disque plein"}',
+    ]);
+  });
+
+  it("gives a rejection handler that logs", async () => {
+    const { logged } = await import("./report");
+    const err = new Error("introuvable");
+    err.stack = "Error: introuvable";
+    await Promise.reject(err).catch(logged("pdf.versions"));
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.waitFor(() => expect(logErrors).toHaveBeenCalledOnce());
+    expect(logErrors.mock.calls[0][0]).toEqual(["caught pdf.versions: Error: introuvable"]);
   });
 });

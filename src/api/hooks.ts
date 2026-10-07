@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { q } from "./queries";
+import { reportError } from "../lib/report";
 
 /**
  * A saved UI setting: its value (null when never saved, undefined while it
@@ -18,7 +19,10 @@ export function useSetting(key: string): [string | null | undefined, (value: str
       api
         .setSetting(key, value)
         .then(() => window.dispatchEvent(new CustomEvent("eu:settings-changed")))
-        .catch(() => void queryClient.invalidateQueries({ queryKey: q.setting(key).queryKey }));
+        .catch((err) => {
+          reportError(`settings.${key}`, err);
+          void queryClient.invalidateQueries({ queryKey: q.setting(key).queryKey });
+        });
     },
     [queryClient, key],
   );

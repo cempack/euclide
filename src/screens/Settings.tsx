@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
+import { reportError } from "../lib/report";
 import {
   checkForAppUpdate,
   dismissAvailableUpdate,
@@ -223,8 +224,12 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
           "success",
         );
       }
-    } catch {
-      toast(get("settings.pickFolderError", "Impossible de sélectionner le dossier"), "error");
+    } catch (err) {
+      reportError("settings.pickFolder", err);
+      toast(
+        errorMessage(err, get("settings.pickFolderError", "Impossible de sélectionner le dossier")),
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -245,8 +250,9 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
         get("settings.resetSuccess", "Configuration réinitialisée. Redémarrez Euclide pour appliquer."),
         "success",
       );
-    } catch {
-      toast(get("settings.resetError", "Erreur lors de la réinitialisation"), "error");
+    } catch (err) {
+      reportError("settings.resetDataDir", err);
+      toast(errorMessage(err, get("settings.resetError", "Erreur lors de la réinitialisation")), "error");
     } finally {
       setBusy(false);
     }
@@ -432,9 +438,16 @@ function PronoteSection() {
           const n2 = await api.pronoteSync();
           window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
           toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n2 }), "success");
-        } catch {
+        } catch (err) {
           // Sync failed but login itself worked — user can manually sync later
-          toast(t.settings?.toastSyncFail || "Synchronisation impossible (réessayez manuellement)", "error");
+          reportError("settings.pronoteFirstSync", err);
+          toast(
+            errorMessage(
+              err,
+              t.settings?.toastSyncFail || "Synchronisation impossible (réessayez manuellement)",
+            ),
+            "error",
+          );
         }
       }
       refresh();
@@ -668,8 +681,9 @@ function ScheduleSection() {
       setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
       window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
       refresh();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("settings.addSchedule", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 

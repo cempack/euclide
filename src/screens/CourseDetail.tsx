@@ -11,6 +11,8 @@ import {
   type SequenceItem,
 } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { reportError } from "../lib/report";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { COURSE_ICONS, EmptyState, Loading, Modal, useToast, useConfirm } from "../components/ui";
 import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
@@ -142,8 +144,9 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       setNewClassName("");
       setSelectedPronoteClass("");
       refreshClasses();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("course.attachClass", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -175,8 +178,9 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       setAttachDocs(available);
       setAttachSelected([]);
       setShowAttach(true);
-    } catch {
-      toast("Impossible de lister les documents", "error");
+    } catch (err) {
+      reportError("course.listDocs", err);
+      toast(errorMessage(err, "Impossible de lister les documents"), "error");
     }
   };
 
@@ -650,7 +654,8 @@ function SequencePane({
       const [s, i] = await Promise.all([api.listSequences(courseId), api.listSequenceItems(courseId)]);
       setSequences(Array.isArray(s) ? s : []);
       setItems(Array.isArray(i) ? i : []);
-    } catch {
+    } catch (err) {
+      reportError("course.sequences", err);
       setSequences([]);
       setItems([]);
     } finally {
@@ -674,8 +679,9 @@ function SequencePane({
       await api.createSequence(courseId, title);
       setNewSequence("");
       await reload();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("course.addSequence", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -687,8 +693,9 @@ function SequencePane({
       setNewItem("");
       setNewItemFile("");
       await reload();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("course.addItem", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -699,8 +706,9 @@ function SequencePane({
     try {
       await api.setCourseClassItem(courseId, className, itemId);
       await reload();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("course.markClass", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 

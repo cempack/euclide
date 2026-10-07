@@ -19,6 +19,7 @@ function flush() {
   pending = [];
   // Imported lazily: lib/api is a large module and this one loads first.
   void import("./api").then(({ api, isTauri }) => {
+    // Never report a failure to report: it would loop.
     if (isTauri()) api.logErrors(lines).catch(() => {});
     else if (import.meta.env.DEV) console.debug("[report]", lines.join("\n"));
   });
@@ -30,6 +31,16 @@ export function reportLine(line: string) {
   seen.add(line);
   pending.push(line);
   if (!flushTimer) flushTimer = window.setTimeout(flush, 2000);
+}
+
+/** Log an error the app caught and handled, with where it was caught. */
+export function reportError(where: string, err: unknown) {
+  reportLine(`caught ${where}: ${describeError(err)}`);
+}
+
+/** A rejection handler that logs: `promise.catch(logged("settings.theme"))`. */
+export function logged(where: string): (err: unknown) => void {
+  return (err) => reportError(where, err);
 }
 
 /** One line for any thrown value: name, message and the first stack frame. */
@@ -45,6 +56,7 @@ export function describeError(err: unknown): string {
   try {
     return JSON.stringify(err) ?? String(err);
   } catch {
+    // Cyclic or BigInt values.
     return String(err);
   }
 }

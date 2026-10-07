@@ -52,6 +52,7 @@ function send(lines: string[]) {
   if (!lines.length) return;
   // Imported lazily: lib/api imports this module for `recordIpc`.
   void import("./api").then(({ api, isTauri }) => {
+    // Timings are best effort: a lost batch is not worth reporting.
     if (isTauri()) api.logPerf(lines).catch(() => {});
     else if (import.meta.env.DEV) console.debug("[perf]", lines.join("\n"));
   });

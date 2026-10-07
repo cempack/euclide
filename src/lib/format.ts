@@ -217,6 +217,7 @@ export function getFaviconUrl(url: string): string | null {
     // Google's public favicon service (works for most domains, cached, no CORS issues for <img>)
     return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=64`;
   } catch {
+    // Not a URL: no favicon.
     return null;
   }
 }

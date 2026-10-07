@@ -15,6 +15,8 @@ import {
   TextIcon,
 } from "./icons";
 import { get } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { logged, reportError } from "../lib/report";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { keysOf } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
@@ -252,7 +254,7 @@ export default function Whiteboard({
     api
       .listCourses()
       .then((c) => setCourses(Array.isArray(c) ? c : []))
-      .catch(() => {});
+      .catch(logged("board.courses"));
     if (fileId)
       api
         .readBoard(fileId)
@@ -274,9 +276,11 @@ export default function Whiteboard({
             const rr = wrapRef.current?.getBoundingClientRect();
             if (rr && rr.width > 0) updateCanvasSize(rr.width, rr.height, zoomRef.current);
             redraw();
-          } catch {}
+          } catch (err) {
+            reportError("board.parse", err);
+          }
         })
-        .catch(() => {});
+        .catch(logged("board.read"));
   }, [fileId]);
 
   // Version history. The first save keeps the original, so nothing is copied on open.
@@ -287,7 +291,8 @@ export default function Whiteboard({
         try {
           const v = await api.getFileVersions(fid);
           setVersions(v);
-        } catch {
+        } catch (err) {
+          reportError("board.versions", err);
           setVersions([]);
         }
       })();
@@ -377,7 +382,9 @@ export default function Whiteboard({
       drawing.current = false;
       try {
         (e.target as Element).releasePointerCapture(e.pointerId);
-      } catch {}
+      } catch {
+        // Already released.
+      }
     }
   };
   const move = (e: React.PointerEvent) => {
@@ -456,7 +463,9 @@ export default function Whiteboard({
       if (e)
         try {
           (e.target as Element)?.releasePointerCapture(e.pointerId);
-        } catch {}
+        } catch {
+          // Already released.
+        }
       return;
     }
     if (!drawing.current) return;
@@ -558,12 +567,10 @@ export default function Whiteboard({
       setDirty(false);
       toast(get("whiteboard.saved", "Enregistré"), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
-      api
-        .getFileVersions(f.id)
-        .then(setVersions)
-        .catch(() => {});
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+      api.getFileVersions(f.id).then(setVersions).catch(logged("board.versions"));
+    } catch (err) {
+      reportError("board.save", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
   const exportPng = async () => {
@@ -593,8 +600,9 @@ export default function Whiteboard({
         return;
       }
       toast(get("whiteboard.exported", "Exporté"), "success");
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("board.exportPng", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -901,8 +909,12 @@ export default function Whiteboard({
                   get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"),
                   "success",
                 );
-              } catch {
-                toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
+              } catch (err) {
+                reportError("board.loadVersion", err);
+                toast(
+                  errorMessage(err, get("pdf.versionLoadError", "Erreur chargement de la version")),
+                  "error",
+                );
               }
             }}
           >

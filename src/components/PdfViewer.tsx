@@ -4,6 +4,8 @@ import { useToast } from "./ui";
 import { DownloadIcon, PenIcon, TrashIcon, GridIcon } from "./icons";
 import { OpenWithButton } from "./OpenWithButton";
 import { get } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { logged, reportError } from "../lib/report";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { MOD } from "../lib/shortcuts";
 
@@ -50,7 +52,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             // pdfLoaded will be set true by the 'euclide-pdf-loaded' postMessage from the iframe after successful open
           }
         }
-      } catch {
+      } catch (err) {
+        reportError("pdf.open", err);
         if (!cancelled) {
           setError("Impossible d'ouvrir ce document.");
         }
@@ -104,17 +107,15 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           // Save back into the same document; the previous content becomes a version.
           await api.writeFileBytes(fileId, d.buffer as ArrayBuffer);
           // refresh versions list
-          api
-            .getFileVersions(fileId)
-            .then(setVersions)
-            .catch(() => {});
+          api.getFileVersions(fileId).then(setVersions).catch(logged("pdf.versions"));
           window.dispatchEvent(new CustomEvent("eu:library-changed"));
           toast(
             get("pdf.annotationsSaved", "Annotations enregistrées dans {name}").replace("{name}", fileName),
             "success",
           );
-        } catch {
-          toast("Erreur lors de l'enregistrement des annotations", "error");
+        } catch (err) {
+          reportError("pdf.saveAnnotations", err);
+          toast(errorMessage(err, "Erreur lors de l'enregistrement des annotations"), "error");
         }
       }
     };
@@ -150,6 +151,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       ifr.contentWindow.postMessage({ type: "euclide-open", buffer }, "*", [buffer]);
     } catch (e) {
       console.error(e);
+      reportError("pdf.load", e);
       setError("Impossible de charger le PDF dans le visualiseur.");
     }
   };
@@ -213,11 +215,13 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           if (saved) {
             try {
               legacyAnnots.current = JSON.parse(saved);
-            } catch {}
+            } catch {
+              // Corrupt annotations: show the image without them.
+            }
           }
           drawLegacy();
         })
-        .catch(() => {});
+        .catch(logged("pdf.readAnnotations"));
     };
     img.src = pdfSrc;
   };
@@ -234,7 +238,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         try {
           const v = await api.getFileVersions(fileId);
           setVersions(v);
-        } catch {
+        } catch (err) {
+          reportError("pdf.versions", err);
           setVersions([]);
         }
       })();
@@ -286,8 +291,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     try {
       await api.saveAnnotations(fileId, JSON.stringify(legacyAnnots.current));
       toast(get("pdf.imageAnnotationsSaved", "Annotations image enregistrées"), "success");
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("pdf.saveImageAnnotations", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -313,8 +319,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         return;
       }
       toast(get("pdf.exported", "Exporté : {name}").replace("{name}", f.name), "success");
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("pdf.exportImage", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -602,8 +609,12 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                       "success",
                     );
                   }
-                } catch {
-                  toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
+                } catch (err) {
+                  reportError("pdf.loadVersion", err);
+                  toast(
+                    errorMessage(err, get("pdf.versionLoadError", "Erreur chargement de la version")),
+                    "error",
+                  );
                 }
               }}
               value=""

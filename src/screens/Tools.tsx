@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type QuickLink } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { logged, reportError } from "../lib/report";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, Panel, Section, PageHeader, MetaDot } from "../components/layout";
 import { useAppearance } from "../lib/theme";
@@ -48,10 +50,7 @@ function ClassroomSection() {
   const [on, setOn] = useState(true); // default on (matches backend startup default)
 
   useEffect(() => {
-    api
-      .keepAwakeStatus()
-      .then(setOn)
-      .catch(() => {});
+    api.keepAwakeStatus().then(setOn).catch(logged("tools.keepAwakeStatus"));
   }, []);
 
   const toggle = async () => {
@@ -65,8 +64,9 @@ function ClassroomSection() {
           : t.tools?.keepAwakeOff || "Verrouillage écran normal",
         next ? "success" : "info",
       );
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("tools.keepAwake", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -275,11 +275,13 @@ function LinksSection() {
                 <button
                   type="button"
                   onClick={() => {
-                    void api
-                      .openUrl(l.url)
-                      .catch(() =>
-                        toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error"),
+                    void api.openUrl(l.url).catch((err) => {
+                      reportError("tools.openUrl", err);
+                      toast(
+                        errorMessage(err, get("messages.openUrlError", "Impossible d'ouvrir le lien")),
+                        "error",
                       );
+                    });
                   }}
                   className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                   data-tip={l.url}

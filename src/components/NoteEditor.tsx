@@ -11,6 +11,8 @@ import { isMac } from "../lib/shortcuts";
 import { keysOf } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { relativeTime } from "../lib/format";
+import { errorMessage } from "../lib/errors";
+import { logged, reportError } from "../lib/report";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -125,8 +127,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           });
           commitDirty(false);
         }
-      } catch {
-        toast(get("notes.loadError", "Erreur de chargement des notes/cours"), "error");
+      } catch (err) {
+        reportError("note.load", err);
+        toast(errorMessage(err, get("notes.loadError", "Erreur de chargement des notes/cours")), "error");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -206,8 +209,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     if (!isTauri()) return;
     if (!dirty || !draft.title) return;
     const t = setTimeout(() => {
-      persist().catch(() => {
-        toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
+      persist().catch((err) => {
+        reportError("note.autosave", err);
+        toast(errorMessage(err, get("notes.saveError", "Erreur lors de l'enregistrement")), "error");
       });
     }, 800);
     return () => clearTimeout(t);
@@ -219,7 +223,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       // write the abandoned draft back.
       if (editors.takeDiscarded(tabId)) return;
       if (dirtyRef.current && draftRef.current.title) {
-        persist().catch(() => {});
+        persist().catch(logged("note.saveOnClose"));
       }
     };
   }, [persist, tabId]);
@@ -381,8 +385,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     try {
       await persist();
       toast(get("notes.saved", "Note enregistrée"), "success");
-    } catch {
-      toast(get("notes.saveError", "Erreur lors de l'enregistrement"), "error");
+    } catch (err) {
+      reportError("note.save", err);
+      toast(errorMessage(err, get("notes.saveError", "Erreur lors de l'enregistrement")), "error");
     }
   };
 
@@ -411,7 +416,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       }
       toast(get("notes.exported", "Exporté : {name}").replace("{name}", f.name), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    } catch {
+    } catch (err) {
+      reportError("note.exportPdf", err);
       doc.save(`${title}.pdf`);
       toast(get("notes.exported", "Exporté : {name}").replace("{name}", `${title}.pdf`), "success");
     }

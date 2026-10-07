@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel } from "../components/layout";
 import { get, fmt } from "../lib/i18n";
+import { logged } from "../lib/report";
 import { BookIcon, DocIcon, RefreshIcon } from "../components/icons";
 
 interface ContentItem {
@@ -71,6 +72,7 @@ export default function ClassContent({
         toast(get("classContent.linkCopied", "Lien copié dans le presse-papiers"), "success");
       })
       .catch(() => {
+        // No clipboard access: show the link instead.
         toast(get("classContent.linkFallback", "Lien : {url}").replace("{url}", url), "success");
       });
   };
@@ -216,7 +218,7 @@ export default function ClassContent({
                               <button
                                 onClick={() => {
                                   if (!d.url) return;
-                                  api.openUrl(d.url).catch(() => {});
+                                  api.openUrl(d.url).catch(logged("classContent.openUrl"));
                                 }}
                                 className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-ink focus:outline-hidden"
                                 data-tip="Ouvrir dans le navigateur"

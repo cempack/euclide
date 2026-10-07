@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { reportError } from "../lib/report";
 import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
@@ -153,8 +155,12 @@ export default function Reminders() {
       setNewRepeat("none");
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
       refresh({ silent: true });
-    } catch {
-      toast(t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel", "error");
+    } catch (err) {
+      reportError("reminders.add", err);
+      toast(
+        errorMessage(err, t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel"),
+        "error",
+      );
     }
   };
 
@@ -182,11 +188,12 @@ export default function Reminders() {
         }
         window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
         if (!optimistic) refresh({ silent: true });
-      } catch {
+      } catch (err) {
+        reportError("reminders.toggle", err);
         if (optimistic) {
           setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: !markingDone } : x)));
         }
-        toast(get("messages.genericError", "Erreur"), "error");
+        toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
       }
     },
     [toast, refresh],
@@ -205,8 +212,12 @@ export default function Reminders() {
         await api.deleteReminder(id);
         window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
         refresh({ silent: true });
-      } catch {
-        toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
+      } catch (err) {
+        reportError("reminders.delete", err);
+        toast(
+          errorMessage(err, t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression"),
+          "error",
+        );
       }
     },
     [toast, confirm, refresh],
@@ -227,8 +238,9 @@ export default function Reminders() {
     for (const r of done) {
       try {
         await api.deleteReminder(r.id);
-      } catch {
+      } catch (err) {
         // keep going: one failure should not abort the sweep
+        reportError("reminders.clearDone", err);
       }
     }
     window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
