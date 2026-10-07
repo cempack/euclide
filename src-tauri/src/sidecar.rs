@@ -185,9 +185,12 @@ pub async fn call(app: &AppHandle, command: &str, payload: &Value) -> Result<Val
 /// Returns (program, leading_args) used to *spawn the base process* (no command/payload args anymore).
 /// The persistent sidecar uses a JSON-line protocol over stdin/stdout instead.
 fn resolve(app: &AppHandle) -> Result<(String, Vec<String>), String> {
-    // 1. Bundled PyInstaller binary (flat or onedir/) next to the exe or in the resource dir.
-    if let Some(bin) = frozen_binary(app) {
-        return Ok((bin.to_string_lossy().to_string(), vec![]));
+    // 1. Bundled PyInstaller binary (flat or onedir/) next to the exe or in the
+    //    resource dir. Debug builds run the script instead, so edits to it apply.
+    if !cfg!(debug_assertions) {
+        if let Some(bin) = frozen_binary(app) {
+            return Ok((bin.to_string_lossy().to_string(), vec![]));
+        }
     }
 
     // 2. Dev fallback: a Python interpreter + the sidecar script.
@@ -256,7 +259,9 @@ fn frozen_binary(app: &AppHandle) -> Option<PathBuf> {
         candidates.push(res.join(name));
         candidates.push(res.join("resources").join(name));
     }
-    candidates.into_iter().find(|p| p.exists())
+    // is_file: the onedir folder itself (or the empty placeholder in a source
+    // checkout) has the same name as the binary.
+    candidates.into_iter().find(|p| p.is_file())
 }
 
 fn sidecar_script(app: &AppHandle) -> Option<PathBuf> {

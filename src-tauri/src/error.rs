@@ -15,6 +15,9 @@ pub enum AppError {
     /// The item asked for no longer exists.
     #[error("{0}")]
     NotFound(String),
+    /// A situation the UI reacts to specifically (e.g. « pronote_needs_pin »).
+    #[error("{message}")]
+    Coded { code: &'static str, message: String },
     #[error(transparent)]
     Db(#[from] rusqlite::Error),
     #[error(transparent)]
@@ -35,9 +38,17 @@ impl AppError {
         Self::NotFound(msg.into())
     }
 
+    pub fn coded(code: &'static str, message: impl Into<String>) -> Self {
+        Self::Coded {
+            code,
+            message: message.into(),
+        }
+    }
+
     pub fn code(&self) -> &'static str {
         match self {
             Self::User(_) => "user",
+            Self::Coded { code, .. } => code,
             Self::NotFound(_) => "not_found",
             Self::Db(rusqlite::Error::QueryReturnedNoRows) => "not_found",
             Self::Db(_) => "db",
@@ -54,6 +65,7 @@ impl AppError {
     pub fn message(&self) -> String {
         match self {
             Self::User(m) | Self::NotFound(m) | Self::Internal(m) => m.clone(),
+            Self::Coded { message, .. } => message.clone(),
             Self::Db(rusqlite::Error::QueryReturnedNoRows) => "Élément introuvable.".into(),
             Self::Db(e) => format!("Erreur de la base de données : {e}"),
             Self::Io(e) => match e.kind() {

@@ -11,6 +11,7 @@ mod perf;
 mod portable_update;
 mod protocol;
 mod relaunch;
+mod secrets;
 mod sidecar;
 
 use keepawake::KeepAwake;
@@ -71,9 +72,11 @@ pub fn run() {
             };
             db::seed_python_demos();
             let _ = commands::recap::prune(&db.lock());
+            commands::pronote::protect_stored_password(&db.lock());
             app.manage(db);
             app.manage(KeepAwake::default());
             app.manage(jobs::indexer::Indexer::default());
+            app.manage(commands::pronote::PronoteLane::default());
             app.manage(jobs::backup::Health::default());
             jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());
@@ -224,19 +227,19 @@ pub fn run() {
             commands::settings::set_setting,
             commands::recap::log_event,
             commands::recap::get_recap,
-            commands::legacy::pronote_status,
-            commands::legacy::pronote_qr_login,
-            commands::legacy::pronote_password_login,
-            commands::legacy::pronote_sync,
-            commands::legacy::pronote_logout,
-            commands::legacy::pronote_contents,
+            commands::pronote::pronote_status,
+            commands::pronote::pronote_qr_login,
+            commands::pronote::pronote_password_login,
+            commands::pronote::pronote_sync,
+            commands::pronote::pronote_logout,
+            commands::pronote::pronote_contents,
             commands::courses::list_course_classes,
             commands::courses::attach_class_to_course,
             commands::courses::detach_course_class,
             commands::courses::set_course_class_progress,
             commands::courses::set_course_class_item,
             commands::courses::update_course_class_notes,
-            commands::legacy::pronote_classes,
+            commands::pronote::pronote_classes,
             perf::log_perf,
             portable_update::apply_windows_portable_update,
             relaunch::relaunch_after_update,

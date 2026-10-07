@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
-import { errorMessage } from "../lib/errors";
+import { errorCode, errorMessage } from "../lib/errors";
 import {
   checkForAppUpdate,
   dismissAvailableUpdate,
@@ -422,12 +422,9 @@ function PronoteSection() {
       await finishConnect(s);
     } catch (err) {
       const msg = errorMessage(err, "");
-      if (msg.startsWith("NEEDS_PIN:")) {
+      if (errorCode(err) === "pronote_needs_pin") {
         setNeedsPin(true);
-        toast(
-          msg.slice("NEEDS_PIN:".length) || "Code PIN requis pour cet appareil. Saisissez-le ci-dessous.",
-          "error",
-        );
+        toast(msg || "Code PIN requis pour cet appareil. Saisissez-le ci-dessous.", "error");
       } else {
         toast(msg || t.settings?.toastConnectFail || "Connexion impossible", "error");
       }
