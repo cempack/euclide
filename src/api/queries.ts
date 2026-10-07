@@ -1,6 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api, invalidateCache } from "../lib/api";
 
+/** One lesson's contents as the Pronote sidecar returns them. */
+export type PronoteContent = {
+  date?: string;
+  [field: string]: unknown;
+};
+
 /**
  * Every query the screens use: one key factory, one place that says what
  * each key fetches. Keys start with their scope ("library", "courses"…), the
@@ -52,6 +58,20 @@ export const q = {
       queryFn: async () => {
         const r = (await api.pronoteClasses()) as { ok?: boolean; classes?: { name: string }[] } | null;
         return r?.ok && Array.isArray(r.classes) ? r.classes : [];
+      },
+      staleTime: 10 * 60_000,
+      retry: 1,
+    }),
+  /** A class's lesson contents from Pronote (sidecar): kept 10 minutes, one retry. */
+  pronoteContents: (subject: string, className: string) =>
+    queryOptions({
+      queryKey: ["pronote", "contents", subject, className],
+      queryFn: async () => {
+        const res = await api.pronoteContents(subject, className);
+        if (!res?.ok) throw new Error(res?.error || "Erreur Pronote");
+        const items: PronoteContent[] = Array.isArray(res.contents) ? res.contents : [];
+        // Newest first (the sidecar already sorts; cheap to be sure), the 30 most recent.
+        return [...items].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 30);
       },
       staleTime: 10 * 60_000,
       retry: 1,
