@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { api, invalidateCache } from "../lib/api";
+import { api } from "../lib/api";
 import { bootSetting } from "../lib/boot";
 
 /** One lesson's contents as the Pronote sidecar returns them. */
@@ -12,45 +12,33 @@ export type PronoteContent = {
  * Every query the screens use: one key factory, one place that says what
  * each key fetches. Keys start with their scope ("library", "courses"…), the
  * unit that mutations and backend events invalidate.
- *
- * lib/api.ts still caches some calls for the screens not moved here yet; a
- * query drops that copy first, so it never refetches stale data.
  */
-function fresh<T>(legacyKey: string, load: () => Promise<T>): () => Promise<T> {
-  return () => {
-    invalidateCache(legacyKey);
-    return load();
-  };
-}
-
-const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
-
 export const q = {
   courses: () =>
     queryOptions({
       queryKey: ["courses"],
-      queryFn: fresh("listCourses", () => api.listCourses().then(list)),
+      queryFn: () => api.listCourses(),
     }),
   courseClasses: (courseId: number) =>
     queryOptions({
       queryKey: ["courses", courseId, "classes"],
-      queryFn: fresh(`listCourseClasses:${courseId}`, () => api.listCourseClasses(courseId).then(list)),
+      queryFn: () => api.listCourseClasses(courseId),
     }),
   /** A course's files, or with null the library (the files of no course). */
   files: (courseId: number | null) =>
     queryOptions({
       queryKey: ["library", "files", courseId],
-      queryFn: fresh(`listFiles:${courseId ?? "all"}`, () => api.listFiles(courseId).then(list)),
+      queryFn: () => api.listFiles(courseId),
     }),
   notes: () =>
     queryOptions({
       queryKey: ["library", "notes"],
-      queryFn: fresh("allNotes", () => api.allNotes().then(list)),
+      queryFn: () => api.allNotes(),
     }),
   courseNotes: (courseId: number) =>
     queryOptions({
       queryKey: ["library", "notes", "course", courseId],
-      queryFn: fresh(`listNotes:${courseId}`, () => api.listNotes(courseId).then(list)),
+      queryFn: () => api.listNotes(courseId),
     }),
   /** Pronote's class list goes through the Python sidecar: kept 10 minutes, one retry. */
   pronoteClasses: () =>
@@ -81,30 +69,29 @@ export const q = {
   recentFiles: (limit: number) =>
     queryOptions({
       queryKey: ["library", "recent", limit],
-      queryFn: fresh(`recentFiles:${limit}`, () => api.recentFiles(limit).then(list)),
+      queryFn: () => api.recentFiles(limit),
     }),
   reminders: () =>
     queryOptions({
       queryKey: ["reminders"],
-      queryFn: fresh("listReminders", () => api.listReminders().then(list)),
+      queryFn: () => api.listReminders(),
     }),
   todayClasses: () =>
     queryOptions({
       // The day is part of the key: a session left open overnight shows the new day.
       queryKey: ["schedule", "today", new Date().toDateString()],
-      queryFn: fresh("getTodayClasses", () => api.getTodayClasses().then(list)),
+      queryFn: () => api.getTodayClasses(),
     }),
   schedule: () =>
     queryOptions({
       queryKey: ["schedule", "all"],
-      queryFn: fresh("listSchedule", () => api.listSchedule().then(list)),
+      queryFn: () => api.listSchedule(),
     }),
-  links: () =>
-    queryOptions({ queryKey: ["links"], queryFn: fresh("listLinks", () => api.listLinks().then(list)) }),
+  links: () => queryOptions({ queryKey: ["links"], queryFn: () => api.listLinks() }),
   pronoteStatus: () =>
     queryOptions({
       queryKey: ["pronote", "status"],
-      queryFn: fresh("pronoteStatus", () => api.pronoteStatus()),
+      queryFn: () => api.pronoteStatus(),
     }),
   recap: (period: "today" | "week" | "month") =>
     queryOptions({ queryKey: ["recap", period], queryFn: () => api.getRecap(period), staleTime: 60_000 }),

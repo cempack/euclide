@@ -2,67 +2,6 @@ import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { recordIpc } from "./perf";
 import { bootSetting, forgetBootSetting, takeBootPronote } from "./boot";
 
-// Simple in-memory cache for snappy UX (avoids repeated SQLite roundtrips on re-renders / tab switches).
-// TTL short because data can change via side effects; events invalidate.
-const apiCache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL_MS = 30_000; // 30s is plenty for local DB + feels instant
-
-function getCached<T>(key: string): T | null {
-  const hit = apiCache.get(key);
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.data as T;
-  return null;
-}
-function setCached(key: string, data: any) {
-  apiCache.set(key, { data, ts: Date.now() });
-}
-export function invalidateCache(keyPrefix?: string) {
-  if (!keyPrefix) {
-    apiCache.clear();
-    return;
-  }
-  for (const k of apiCache.keys()) {
-    if (k.startsWith(keyPrefix)) apiCache.delete(k);
-  }
-}
-
-// Listen once for global invalidations (dispatched by screens on mutations)
-if (typeof window !== "undefined") {
-  const onChange = (e: Event) => {
-    const type = (e as CustomEvent).type;
-    if (type.includes("course")) {
-      invalidateCache("listCourses");
-      invalidateCache("listCourseClasses");
-    }
-    if (type.includes("library") || type.includes("file") || type.includes("note")) {
-      invalidateCache("listFiles");
-      invalidateCache("recentFiles");
-      invalidateCache("allNotes");
-      invalidateCache("listNotes");
-    }
-    if (type.includes("reminder")) {
-      invalidateCache("listReminders");
-    }
-    if (type.includes("schedule")) {
-      invalidateCache("listSchedule");
-      invalidateCache("getTodayClasses");
-    }
-    if (type.includes("link")) {
-      invalidateCache("listLinks");
-    }
-    if (type.includes("demo")) {
-      invalidateCache("listDemos");
-    }
-    if (type.includes("full-invalidate")) {
-      invalidateCache();
-    }
-  };
-  window.addEventListener("eu:library-changed", onChange);
-  window.addEventListener("eu:course-changed", onChange);
-  window.addEventListener("eu:reminders-changed", onChange);
-  window.addEventListener("eu:schedule-changed", onChange);
-  window.addEventListener("eu:quicklinks-changed", onChange);
-}
-
 export const isTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Prefix https:// when the teacher typed a bare host (google.com). */
@@ -141,14 +80,6 @@ export const versionUrl = (versionId: number) => convertFileSrc(`version/${versi
 
 function asList<T>(data: unknown): T[] {
   return Array.isArray(data) ? (data as T[]).filter((x) => x != null) : [];
-}
-
-/** Sequence mutations all invalidate the same two caches. */
-function afterSequenceChange<T>(data: T): T {
-  invalidateCache("listSequences");
-  invalidateCache("listSequenceItems");
-  invalidateCache("listCourseClasses");
-  return data;
 }
 
 function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
@@ -393,164 +324,57 @@ export const api = {
   restoreSnapshot: (name: string) => invoke<void>("restore_snapshot", { name }),
 
   // Courses
-  listCourses: () => {
-    const key = "listCourses";
-    const cached = getCached<Course[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<Course[]>("list_courses").then((data) => {
-      const list = asList<Course>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listCourses: () => invoke<Course[]>("list_courses").then(asList<Course>),
   createCourse: (name: string, emoji: string, color: string, description: string, matiere: string) =>
-    invoke<Course>("create_course", { name, emoji, color, description, matiere }).then((c) => {
-      if (c && typeof c.id === "number") {
-        const key = "listCourses";
-        const cached = getCached<Course[]>(key);
-        if (cached) setCached(key, [...cached, c]);
-      }
-      return c;
-    }),
-  updateCourse: (course: Course) =>
-    invoke<void>("update_course", { course }).then(() => {
-      // optimistic patch
-      const key = "listCourses";
-      const cached = getCached<Course[]>(key);
-      if (cached) {
-        setCached(
-          key,
-          cached.map((c) => (c.id === course.id ? { ...c, ...course } : c)),
-        );
-      }
-      return;
-    }),
-  deleteCourse: (id: number) =>
-    invoke<void>("delete_course", { id }).then(() => {
-      invalidateCache("listCourses");
-      invalidateCache("listCourseClasses");
-    }),
+    invoke<Course>("create_course", { name, emoji, color, description, matiere }),
+  updateCourse: (course: Course) => invoke<void>("update_course", { course }),
+  deleteCourse: (id: number) => invoke<void>("delete_course", { id }),
 
   // Course classes: casier is the course's files; per attached class (exact Pronote name) we track progress + prof notes
-  listCourseClasses: (courseId: number) => {
-    const key = `listCourseClasses:${courseId}`;
-    const cached = getCached<CourseClass[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<CourseClass[]>("list_course_classes", { courseId }).then((data) => {
-      const list = asList<CourseClass>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listCourseClasses: (courseId: number) =>
+    invoke<CourseClass[]>("list_course_classes", { courseId }).then(asList<CourseClass>),
   attachClassToCourse: (courseId: number, className: string) =>
-    invoke<CourseClass>("attach_class_to_course", { courseId, className }).then((data) => {
-      invalidateCache("listCourseClasses");
-      return data;
-    }),
-  detachCourseClass: (id: number) =>
-    invoke<void>("detach_course_class", { id }).then((data) => {
-      invalidateCache("listCourseClasses");
-      return data;
-    }),
+    invoke<CourseClass>("attach_class_to_course", { courseId, className }),
+  detachCourseClass: (id: number) => invoke<void>("detach_course_class", { id }),
   setCourseClassProgress: (courseId: number, className: string, fileId: number | null) =>
-    invoke<void>("set_course_class_progress", { courseId, className, fileId }).then((data) => {
-      invalidateCache("listCourseClasses");
-      return data;
-    }),
+    invoke<void>("set_course_class_progress", { courseId, className, fileId }),
   setCourseClassItem: (courseId: number, className: string, itemId: number | null) =>
-    invoke<void>("set_course_class_item", { courseId, className, itemId }).then((data) => {
-      invalidateCache("listCourseClasses");
-      return data;
-    }),
+    invoke<void>("set_course_class_item", { courseId, className, itemId }),
 
   // Sequences: the course progression (chapters -> steps -> documents)
-  listSequences: (courseId: number) => {
-    const key = `listSequences:${courseId}`;
-    const cached = getCached<Sequence[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<Sequence[]>("list_sequences", { courseId }).then((data) => {
-      const list = asList<Sequence>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
-  listSequenceItems: (courseId: number) => {
-    const key = `listSequenceItems:${courseId}`;
-    const cached = getCached<SequenceItem[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<SequenceItem[]>("list_sequence_items", { courseId }).then((data) => {
-      const list = asList<SequenceItem>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listSequences: (courseId: number) =>
+    invoke<Sequence[]>("list_sequences", { courseId }).then(asList<Sequence>),
+  listSequenceItems: (courseId: number) =>
+    invoke<SequenceItem[]>("list_sequence_items", { courseId }).then(asList<SequenceItem>),
   createSequence: (courseId: number, title: string) =>
-    invoke<Sequence>("create_sequence", { courseId, title }).then(afterSequenceChange),
-  renameSequence: (id: number, title: string) =>
-    invoke<void>("rename_sequence", { id, title }).then(afterSequenceChange),
-  deleteSequence: (id: number) => invoke<void>("delete_sequence", { id }).then(afterSequenceChange),
+    invoke<Sequence>("create_sequence", { courseId, title }),
+  renameSequence: (id: number, title: string) => invoke<void>("rename_sequence", { id, title }),
+  deleteSequence: (id: number) => invoke<void>("delete_sequence", { id }),
   moveSequence: (courseId: number, id: number, delta: number) =>
-    invoke<void>("move_sequence", { courseId, id, delta }).then(afterSequenceChange),
+    invoke<void>("move_sequence", { courseId, id, delta }),
   createSequenceItem: (sequenceId: number, title: string, fileId: number | null) =>
-    invoke<SequenceItem>("create_sequence_item", { sequenceId, title, fileId }).then(afterSequenceChange),
+    invoke<SequenceItem>("create_sequence_item", { sequenceId, title, fileId }),
   updateSequenceItem: (id: number, title: string, fileId: number | null) =>
-    invoke<void>("update_sequence_item", { id, title, fileId }).then(afterSequenceChange),
-  deleteSequenceItem: (id: number) => invoke<void>("delete_sequence_item", { id }).then(afterSequenceChange),
+    invoke<void>("update_sequence_item", { id, title, fileId }),
+  deleteSequenceItem: (id: number) => invoke<void>("delete_sequence_item", { id }),
   moveSequenceItem: (sequenceId: number, id: number, delta: number) =>
-    invoke<void>("move_sequence_item", { sequenceId, id, delta }).then(afterSequenceChange),
+    invoke<void>("move_sequence_item", { sequenceId, id, delta }),
   updateCourseClassNotes: (courseId: number, className: string, notes: string) =>
-    invoke<void>("update_course_class_notes", { courseId, className, notes }).then((data) => {
-      invalidateCache("listCourseClasses");
-      return data;
-    }),
+    invoke<void>("update_course_class_notes", { courseId, className, notes }),
 
   // Notes
-  listNotes: (courseId: number | null) => {
-    const key = `listNotes:${courseId ?? "all"}`;
-    const cached = getCached<Note[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<Note[]>("list_notes", { courseId }).then((data) => {
-      const list = asList<Note>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
-  allNotes: () => {
-    const key = "allNotes";
-    const cached = getCached<Note[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<Note[]>("all_notes").then((data) => {
-      const list = asList<Note>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listNotes: (courseId: number | null) => invoke<Note[]>("list_notes", { courseId }).then(asList<Note>),
+  allNotes: () => invoke<Note[]>("all_notes").then(asList<Note>),
+  getNote: (id: number) => invoke<Note>("get_note", { id }),
   saveNote: (note: Partial<Note>) => invoke<Note>("save_note", { note }),
   deleteNote: (id: number) => invoke<void>("delete_note", { id }),
   renameNote: (id: number, title: string) => invoke<Note>("rename_note", { id, newTitle: title }),
 
   // Files & documents
-  listFiles: (courseId: number | null) => {
-    const key = `listFiles:${courseId ?? "all"}`;
-    const cached = getCached<FileItem[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<FileItem[]>("list_files", { courseId }).then((data) => {
-      const list = asList<FileItem>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listFiles: (courseId: number | null) =>
+    invoke<FileItem[]>("list_files", { courseId }).then(asList<FileItem>),
   libraryStats: () => invoke<LibraryStats>("library_stats"),
-  recentFiles: (limit: number) => {
-    const key = `recentFiles:${limit}`;
-    const cached = getCached<FileItem[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<FileItem[]>("recent_files", { limit }).then((data) => {
-      const list = asList<FileItem>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  recentFiles: (limit: number) => invoke<FileItem[]>("recent_files", { limit }).then(asList<FileItem>),
   importFiles: (courseId: number | null) => invoke<FileItem[]>("import_files", { courseId }),
   importPaths: (paths: string[], courseId: number | null) =>
     invoke<FileItem[]>("import_paths", { paths, courseId }),
@@ -567,16 +391,7 @@ export const api = {
   reindexDocuments: () => invoke<number>("reindex_documents"),
 
   // Reminders
-  listReminders: () => {
-    const key = "listReminders";
-    const cached = getCached<Reminder[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<Reminder[]>("list_reminders").then((data) => {
-      const list = asList<Reminder>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listReminders: () => invoke<Reminder[]>("list_reminders").then(asList<Reminder>),
   createReminder: (
     title: string,
     dueAt: string | null,
@@ -594,42 +409,15 @@ export const api = {
   deleteReminder: (id: number) => invoke<void>("delete_reminder", { id }),
 
   // Quick links
-  listLinks: () => {
-    const key = "listLinks";
-    const cached = getCached<QuickLink[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<QuickLink[]>("list_links").then((data) => {
-      const list = asList<QuickLink>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listLinks: () => invoke<QuickLink[]>("list_links").then(asList<QuickLink>),
   createLink: (label: string, url: string, icon: string) =>
     invoke<QuickLink>("create_link", { label, url, icon }),
   deleteLink: (id: number) => invoke<void>("delete_link", { id }),
   openUrl: (url: string) => openExternalUrl(url),
 
   // Schedule
-  listSchedule: () => {
-    const key = "listSchedule";
-    const cached = getCached<ScheduleEntry[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<ScheduleEntry[]>("list_schedule").then((data) => {
-      const list = asList<ScheduleEntry>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
-  getTodayClasses: () => {
-    const key = "getTodayClasses";
-    const cached = getCached<ScheduleEntry[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<ScheduleEntry[]>("get_today_classes").then((data) => {
-      const list = asList<ScheduleEntry>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listSchedule: () => invoke<ScheduleEntry[]>("list_schedule").then(asList<ScheduleEntry>),
+  getTodayClasses: () => invoke<ScheduleEntry[]>("get_today_classes").then(asList<ScheduleEntry>),
   saveScheduleEntry: (entry: Partial<ScheduleEntry>) =>
     invoke<ScheduleEntry>("save_schedule_entry", { entry }),
   deleteScheduleEntry: (id: number) => invoke<void>("delete_schedule_entry", { id }),
@@ -659,16 +447,7 @@ export const api = {
   readAnnotations: (fileId: number) => invoke<string | null>("read_annotations", { fileId }),
 
   // Python scripts
-  listDemos: () => {
-    const key = "listDemos";
-    const cached = getCached<PythonDemo[]>(key);
-    if (cached) return Promise.resolve(cached);
-    return invoke<PythonDemo[]>("list_python_demos").then((data) => {
-      const list = asList<PythonDemo>(data);
-      setCached(key, list);
-      return list;
-    });
-  },
+  listDemos: () => invoke<PythonDemo[]>("list_python_demos").then(asList<PythonDemo>),
   runDemo: (path: string) => invoke<PythonResult>("run_python_demo", { path }),
   runCode: (code: string) => invoke<PythonResult>("run_python_code", { code }),
   pythonComplete: (code: string, line: number, column: number, filename?: string) =>
@@ -686,39 +465,15 @@ export const api = {
 
   // Pronote
   pronoteStatus: () => {
-    const key = "pronoteStatus";
+    // The status at launch came with the page (lib/boot.ts): the first read costs no round trip.
     const atLaunch = takeBootPronote();
-    if (atLaunch) setCached(key, atLaunch);
-    const cached = getCached<PronoteStatus>(key);
-    if (cached) return Promise.resolve(cached);
-    // 30s TTL is fine; status changes only on login/logout/sync
-    return invoke<PronoteStatus>("pronote_status").then((data) => {
-      setCached(key, data);
-      return data;
-    });
+    return atLaunch ? Promise.resolve(atLaunch) : invoke<PronoteStatus>("pronote_status");
   },
-  pronoteQrLogin: (qrJson: string, pin: string) =>
-    invoke<PronoteStatus>("pronote_qr_login", { qrJson, pin }).then((data) => {
-      setCached("pronoteStatus", data);
-      return data;
-    }),
+  pronoteQrLogin: (qrJson: string, pin: string) => invoke<PronoteStatus>("pronote_qr_login", { qrJson, pin }),
   pronotePasswordLogin: (url: string, username: string, password: string, pin?: string) =>
-    invoke<PronoteStatus>("pronote_password_login", { url, username, password, pin: pin || null }).then(
-      (data) => {
-        setCached("pronoteStatus", data);
-        return data;
-      },
-    ),
-  pronoteSync: () =>
-    invoke<number>("pronote_sync").then((data) => {
-      invalidateCache("pronoteStatus");
-      return data;
-    }),
-  pronoteLogout: () =>
-    invoke<void>("pronote_logout").then((data) => {
-      invalidateCache("pronoteStatus");
-      return data;
-    }),
+    invoke<PronoteStatus>("pronote_password_login", { url, username, password, pin: pin || null }),
+  pronoteSync: () => invoke<number>("pronote_sync"),
+  pronoteLogout: () => invoke<void>("pronote_logout"),
   // pronote_contents: returns sidecar response {ok, contents: [...], matieres: [...], ...}
   // Matches the "Contenu de mes cours" / "Vision élève" style data (chronological lesson contents).
   // All filters optional. className supports class names like "3A". fromDate supports "YYYY-MM-DD" or "DD/MM/YYYY".
