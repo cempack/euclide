@@ -419,7 +419,30 @@
     "select": "Sélection",
     "penTitle": "Stylo : dessin à main levée",
     "pagesTitle": "Vignettes des pages",
-    "deleteAnnotationTitle": "Supprimer l'annotation sélectionnée (Suppr)"
+    "deleteAnnotationTitle": "Supprimer l'annotation sélectionnée (Suppr)",
+    "highlight": "Surligneur",
+    "highlightTitle": "Surligneur : glisser sur le texte",
+    "text": "Texte",
+    "textTitle": "Note : cliquer sur la page pour écrire",
+    "pageN": "Page {n}",
+    "pageOf": "sur {count}",
+    "pageInput": "Aller à la page",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "zoomFit": "Ajuster à la largeur",
+    "viewingVersion": "Version du {date} : lecture seule.",
+    "restore": "Restaurer cette version",
+    "backToCurrent": "Revenir à l'actuelle",
+    "restored": "Version restaurée : la version précédente reste dans l'historique.",
+    "openFailed": "Euclide n'a pas pu afficher ce document.",
+    "openFailedHint": "Il est peut-être protégé ou endommagé. Vous pouvez l'ouvrir avec une autre application.",
+    "eraser": "Gomme",
+    "undo": "Annuler le dernier trait",
+    "clearAll": "Tout effacer",
+    "exportPng": "Exporter une copie annotée (PNG)",
+    "saved": "Enregistré",
+    "colorsFor": "Couleurs",
+    "viewingOriginal": "Version d'origine : lecture seule."
   },
   "openWith": {
     "label": "Ouvrir dehors",
@@ -674,5 +697,15 @@
     "clear": "Effacer",
     "resize": "Redimensionner la console",
     "editorLabel": "Code Python : {name}"
+  },
+  "colors": {
+    "black": "Noir",
+    "blue": "Bleu",
+    "red": "Rouge",
+    "green": "Vert",
+    "orange": "Orange",
+    "purple": "Violet",
+    "yellow": "Jaune",
+    "pink": "Rose"
   }
 }

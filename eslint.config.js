@@ -8,7 +8,6 @@ export default tseslint.config(
   {
     ignores: [
       "dist",
-      "public/pdfjs",
       "src-tauri",
       "sidecar",
       ".delta",
@@ -40,9 +39,8 @@ export default tseslint.config(
     },
   },
   {
-    // Rewritten in later milestones (PDF viewer M6, whiteboard M7): warnings
-    // until then.
-    files: ["src/components/PdfViewer.tsx", "src/components/Whiteboard.tsx"],
+    // Rewritten in M7 (the whiteboard): warnings until then.
+    files: ["src/components/Whiteboard.tsx"],
     rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/immutability": "warn",

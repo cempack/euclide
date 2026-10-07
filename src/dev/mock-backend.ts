@@ -9,6 +9,8 @@
  *
  * Production builds never include this file (see `invoke` in lib/api.ts).
  */
+import samplePdf from "./fixtures/cours.pdf?url";
+import { serveDevFiles } from "../lib/api";
 import type {
   AppInfo,
   Course,
@@ -848,8 +850,27 @@ function handle(cmd: string, args: Args): unknown {
     case "write_file_bytes": {
       const headers = (args?.headers ?? {}) as Record<string, string>;
       const f = files.find((x) => x.id === Number(headers["x-eu-file-id"]));
-      if (f) Object.assign(f, { size: Number(args?.size ?? f.size), added_at: sqlUtc(new Date()) });
-      return f ?? null;
+      if (!f) return null;
+      // As the backend does: what the file was becomes a version.
+      const list = fileVersions.get(f.id) ?? [];
+      const id = newId();
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}00`;
+      list.push({
+        id,
+        version: list.length + 1,
+        timestamp: list.length ? stamp : "original",
+        label: "",
+        created_at: sqlUtc(now),
+        size: f.size,
+      });
+      fileVersions.set(f.id, list);
+      versionUrls.set(id, devFileUrl("file", f.id));
+      const data = args?.bytes as Uint8Array | ArrayBuffer | undefined;
+      if (data)
+        fileUrls.set(f.id, URL.createObjectURL(new Blob([data as BlobPart], { type: "application/pdf" })));
+      Object.assign(f, { size: Number(args?.size ?? f.size), added_at: sqlUtc(now) });
+      return f;
     }
     case "attach_files_to_course": {
       const course = num(args, "courseId");
@@ -960,7 +981,7 @@ function handle(cmd: string, args: Args): unknown {
     case "read_board":
       return "{}";
     case "get_file_versions":
-      return [];
+      return (fileVersions.get(num(args, "fileId") ?? 0) ?? []).slice();
     case "read_annotations":
       return null;
 
@@ -1029,3 +1050,29 @@ function mockSquare() {
   });
   return ops;
 }
+
+/*
+ * Files in browser mode: PDFs show a sample course (fixtures/cours.pdf),
+ * images a drawn picture; a saved file keeps its new bytes in memory and
+ * its old ones as a version.
+ */
+const fileUrls = new Map<number, string>();
+const versionUrls = new Map<number, string>();
+const fileVersions = new Map<number, import("../lib/api").FileVersion[]>();
+
+function devFileUrl(kind: "file" | "version", id: number): string {
+  if (kind === "version") return versionUrls.get(id) ?? samplePdf;
+  const saved = fileUrls.get(id);
+  if (saved) return saved;
+  const f = files.find((x) => x.id === id);
+  if (f && /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name)) return sampleImage;
+  return samplePdf;
+}
+
+const sampleImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#2f4f3f"/>' +
+    '<text x="60" y="120" font-family="serif" font-size="48" fill="#f2f0e6">f(x) = x²</text>' +
+    '<path d="M60 420 Q 400 -120 740 420" stroke="#f2f0e6" stroke-width="4" fill="none"/></svg>',
+)}`;
+
+serveDevFiles(devFileUrl);
