@@ -166,10 +166,15 @@ export async function installPendingUpdate(
 
   let downloaded = 0;
   let contentLength: number | null = null;
+  let lastReport = 0;
   const report = (event: DownloadEvent) => {
     const next = progressFromEvent(event, downloaded, contentLength);
     downloaded = next.downloaded;
     contentLength = next.contentLength;
+    // The plugin reports every chunk: re-render ten times a second at most.
+    const now = performance.now();
+    if (event.event === "Progress" && now - lastReport < 100) return;
+    lastReport = now;
     onProgress?.(next);
   };
 
@@ -185,6 +190,7 @@ export async function installPendingUpdate(
       await invoke("apply_windows_portable_update", {
         url: asset.url,
         signature: asset.signature,
+        version: pending.version,
         onEvent,
       });
     } catch (err) {

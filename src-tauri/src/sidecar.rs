@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
@@ -7,18 +8,21 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command as TokioCommand};
 use tokio::sync::Mutex;
 
-/// Persistent "warm" sidecar manager.
-/// The Python process is started once (at app launch) and kept alive.
-/// Commands are sent over stdin/stdout as JSON lines for very low latency
-/// (no process spawn, no PyInstaller extraction, Python + imports stay hot in RAM).
-/// This makes Pronote, Python scripts, Jedi autocomplete etc. snappy even on low-end hardware.
+/// The Python sidecar: one process, started on first use and kept warm.
+/// Commands go over stdin/stdout as JSON lines, so Pronote, scripts and Jedi
+/// pay the Python startup (PyInstaller unpacking, imports) only once.
 pub struct Sidecar {
-    inner: Arc<Mutex<Option<InnerSidecar>>>,
+    /// The pipes, held for a whole request/response exchange.
+    pipes: Mutex<Option<Pipes>>,
+    /// The process, behind a lock no request ever holds: quitting or
+    /// updating can kill it even while a call waits on a stuck script.
+    process: std::sync::Mutex<Option<Child>>,
+    /// Set when Euclide quits or updates: no restart after that.
+    closed: AtomicBool,
     handle: AppHandle,
 }
 
-struct InnerSidecar {
-    child: Child,
+struct Pipes {
     stdin: tokio::process::ChildStdin,
     stdout: BufReader<tokio::process::ChildStdout>,
 }
@@ -26,17 +30,21 @@ struct InnerSidecar {
 impl Sidecar {
     pub fn new(handle: AppHandle) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(None)),
+            pipes: Mutex::new(None),
+            process: std::sync::Mutex::new(None),
+            closed: AtomicBool::new(false),
             handle,
         }
     }
 
-    /// Start (or ensure started) the persistent sidecar process.
-    /// Called eagerly from setup so it's warm before first user action.
+    /// Start the process unless it is running.
     pub async fn start(&self) -> Result<(), String> {
-        let mut guard = self.inner.lock().await;
+        let mut guard = self.pipes.lock().await;
         if guard.is_some() {
             return Ok(());
+        }
+        if self.closed.load(Ordering::SeqCst) {
+            return Err("Euclide se ferme : Python n'est plus disponible.".into());
         }
 
         let (program, leading_args) = resolve(&self.handle)?;
@@ -46,6 +54,8 @@ impl Sidecar {
         tcmd.stdin(std::process::Stdio::piped());
         tcmd.stdout(std::process::Stdio::piped());
         tcmd.stderr(std::process::Stdio::piped());
+        // A replaced or dropped handle takes its process with it.
+        tcmd.kill_on_drop(true);
 
         // Still apply no-window on Windows (defense in depth, works for both frozen and dev python).
         #[cfg(windows)]
@@ -80,12 +90,10 @@ impl Sidecar {
 
         let stdin = child.stdin.take().ok_or("sidecar stdin introuvable")?;
         let stdout = child.stdout.take().ok_or("sidecar stdout introuvable")?;
-        let reader = BufReader::new(stdout);
-
-        *guard = Some(InnerSidecar {
-            child,
+        *lock_process(&self.process) = Some(child);
+        *guard = Some(Pipes {
             stdin,
-            stdout: reader,
+            stdout: BufReader::new(stdout),
         });
 
         Ok(())
@@ -97,14 +105,14 @@ impl Sidecar {
         for attempt in 0..2u32 {
             // Ensure we have a live process
             {
-                let g = self.inner.lock().await;
+                let g = self.pipes.lock().await;
                 if g.is_none() {
                     drop(g);
                     self.start().await?;
                 }
             }
 
-            let mut guard = self.inner.lock().await;
+            let mut guard = self.pipes.lock().await;
             let inner = match guard.as_mut() {
                 Some(i) => i,
                 None => continue,
@@ -157,22 +165,28 @@ impl Sidecar {
         Err("sidecar indisponible après plusieurs tentatives".into())
     }
 
-    /// Stop the sidecar (called on shutdown if desired).
-    pub async fn stop(&self) {
-        let mut guard = self.inner.lock().await;
-        if let Some(mut inner) = guard.take() {
-            let _ = inner.child.kill().await;
+    /// Kill the process for good (Euclide quits or updates) and wait up to
+    /// `wait` for it to exit, so its files are released. Synchronous: it
+    /// never waits on a running call. A call in flight fails, and no later
+    /// call restarts Python.
+    pub fn shutdown(&self, wait: Duration) {
+        self.closed.store(true, Ordering::SeqCst);
+        let Some(mut child) = lock_process(&self.process).take() else {
+            return;
+        };
+        let _ = child.start_kill();
+        let deadline = Instant::now() + wait;
+        while Instant::now() < deadline {
+            if !matches!(child.try_wait(), Ok(None)) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
         }
     }
 }
 
-impl Drop for InnerSidecar {
-    fn drop(&mut self) {
-        // Ensure the Python sidecar process is killed when InnerSidecar is dropped
-        // (e.g. on explicit stop, on restart in call() when we do *guard = None, or app exit).
-        // start_kill is synchronous and best-effort.
-        let _ = self.child.start_kill();
-    }
+fn lock_process(m: &std::sync::Mutex<Option<Child>>) -> std::sync::MutexGuard<'_, Option<Child>> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// Public helper so call sites stay almost identical:

@@ -13,6 +13,8 @@ type BootState = {
   nonce: string;
   settings: Record<string, string | null>;
   pronote?: PronoteStatus;
+  /** Set on the first launch after an update. */
+  updated?: { from: string; to: string } | null;
 };
 
 declare global {
@@ -56,4 +58,11 @@ export function takeBootPronote(): PronoteStatus | undefined {
   const status = boot?.pronote;
   if (boot) delete boot.pronote;
   return status;
+}
+
+/** The update this launch follows, if any: told once. */
+export function takeBootUpdate(): { from: string; to: string } | null {
+  const updated = boot?.updated ?? null;
+  if (boot) boot.updated = null;
+  return updated;
 }

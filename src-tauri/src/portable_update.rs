@@ -15,6 +15,10 @@
 //!    and again on the next launch. No `*.euclide-old*` leftovers are kept.
 //!    Then this window closes; the user opens Euclide again. Does not start
 //!    the new process.
+//! 5. Stages the new sidecar as `euclide-sidecar.next/` beside the current one
+//!    (the archive is unpacked on the key itself, so this is a rename). The
+//!    next launch of the new version swaps the folders before Python starts:
+//!    the sidecar is replaced whole or not at all, never file by file.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::Cursor;
@@ -29,6 +33,13 @@ use tauri::Manager;
 const PORTABLE_MARKER: &str = "euclide.portable";
 const OLD_SUFFIX: &str = ".euclide-old";
 const NEW_SUFFIX: &str = ".euclide-new";
+const SIDECAR_DIR: &str = "euclide-sidecar";
+const SIDECAR_NEXT: &str = "euclide-sidecar.next";
+const SIDECAR_OLD_PREFIX: &str = "euclide-sidecar.old-";
+/// Written last inside `euclide-sidecar.next/`: the version it belongs to.
+const STAGED_MARKER: &str = ".euclide-staged";
+/// Where an update is unpacked, on the same volume as the app.
+const STAGING_DIR: &str = ".euclide-update";
 
 /// After this PID exits, delete renamed leftovers (`*.euclide-old*`). The new
 /// exe is already at `$Dest\euclide.exe` — this script must not copy or start.
@@ -72,8 +83,6 @@ do {
 } while ((Get-Date) -lt $until)
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 "#;
-#[cfg(windows)]
-const STAGING_PREFIX: &str = "euclide-update-";
 #[cfg(windows)]
 const MAX_UPDATE_BYTES: u64 = 400 * 1024 * 1024;
 
@@ -368,8 +377,8 @@ fn leftover_file_names_in(dir: &Path) -> bool {
     })
 }
 
-#[cfg_attr(not(windows), allow(dead_code))]
-fn leftovers_present(dir: &Path) -> bool {
+/// Cheap: only the two folders where an update renames files.
+pub fn leftovers_present(dir: &Path) -> bool {
     leftover_file_names_in(dir) || leftover_file_names_in(&dir.join("euclide-sidecar"))
 }
 
@@ -428,17 +437,21 @@ pub fn schedule_leftover_cleanup(dir: &Path) {
     }
 }
 
-fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
-    let mut name = path.as_os_str().to_os_string();
-    name.push(suffix);
-    name.push(format!(
-        "-{}-{}",
+fn unique_stamp() -> String {
+    format!(
+        "{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.subsec_nanos())
             .unwrap_or(0)
-    ));
+    )
+}
+
+fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_os_string();
+    name.push(suffix);
+    name.push(format!("-{}", unique_stamp()));
     PathBuf::from(name)
 }
 
@@ -574,13 +587,100 @@ pub fn apply_staging_overlay(staging: &Path, dest: &Path) -> Result<usize, Strin
     Ok(written)
 }
 
+/// Move the unpacked sidecar beside the running one, as a whole: the next
+/// launch of `version` swaps it in (see [`apply_staged_sidecar`]).
+fn stage_sidecar(staging: &Path, dest: &Path, version: &str) -> Result<bool, String> {
+    let src = staging.join(SIDECAR_DIR);
+    if !src.is_dir() {
+        return Ok(false);
+    }
+    let next = dest.join(SIDECAR_NEXT);
+    if next.exists() {
+        std::fs::remove_dir_all(&next)
+            .map_err(|e| format!("Impossible de remplacer {}: {e}", next.display()))?;
+    }
+    std::fs::rename(&src, &next)
+        .map_err(|e| format!("Impossible de préparer le nouveau module Python: {e}"))?;
+    std::fs::write(next.join(STAGED_MARKER), version)
+        .map_err(|e| format!("Impossible de préparer le nouveau module Python: {e}"))?;
+    Ok(true)
+}
+
+/// At launch, before Python can start: swap in the sidecar staged by the
+/// update to `version`. A staged folder for another version (its exe never
+/// made it) or without its marker (copy interrupted) is dropped. Returns the
+/// replaced folder, to delete off the startup path.
+pub fn apply_staged_sidecar(dir: &Path, version: &str) -> Option<PathBuf> {
+    let next = dir.join(SIDECAR_NEXT);
+    if !next.is_dir() {
+        return None;
+    }
+    let staged = std::fs::read_to_string(next.join(STAGED_MARKER)).ok();
+    if staged.as_deref().map(str::trim) != Some(version) {
+        let _ = std::fs::remove_dir_all(&next);
+        return None;
+    }
+    let current = dir.join(SIDECAR_DIR);
+    let old = dir.join(format!("{SIDECAR_OLD_PREFIX}{}", unique_stamp()));
+    if current.exists() {
+        if let Err(e) = std::fs::rename(&current, &old) {
+            // Still in use (an antivirus scan, a stray process): next launch.
+            crate::applog::warn(format!("[update] sidecar swap postponed: {e}"));
+            return None;
+        }
+    }
+    if let Err(e) = std::fs::rename(&next, &current) {
+        let _ = std::fs::rename(&old, &current);
+        crate::applog::warn(format!("[update] sidecar swap failed: {e}"));
+        return None;
+    }
+    let _ = std::fs::remove_file(current.join(STAGED_MARKER));
+    Some(old)
+}
+
+/// What an interrupted update left: its unpacked archive.
+pub fn remove_stale_staging(dir: &Path) {
+    let staging = dir.join(STAGING_DIR);
+    if staging.exists() {
+        let _ = std::fs::remove_dir_all(staging);
+    }
+}
+
+/// Sidecar folders replaced by earlier swaps and not deleted yet.
+pub fn old_sidecar_dirs(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .is_some_and(|n| n.starts_with(SIDECAR_OLD_PREFIX))
+                && e.path().is_dir()
+        })
+        .map(|e| e.path())
+        .collect()
+}
+
+fn valid_version(v: &str) -> bool {
+    !v.is_empty()
+        && v.len() <= 32
+        && v.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+}
+
 #[tauri::command]
 pub async fn apply_windows_portable_update(
     app: AppHandle,
     url: String,
     signature: String,
+    version: String,
     on_event: Channel<PortableDownloadEvent>,
 ) -> Result<(), String> {
+    if !valid_version(&version) {
+        return Err("Version de mise à jour invalide.".into());
+    }
     #[cfg(not(windows))]
     {
         let _ = (app, url, signature, on_event);
@@ -588,7 +688,7 @@ pub async fn apply_windows_portable_update(
     }
     #[cfg(windows)]
     {
-        apply_windows_portable_update_inner(app, url, signature, on_event).await
+        apply_windows_portable_update_inner(app, url, signature, version, on_event).await
     }
 }
 
@@ -597,6 +697,7 @@ async fn apply_windows_portable_update_inner(
     app: AppHandle,
     url: String,
     signature: String,
+    version: String,
     on_event: Channel<PortableDownloadEvent>,
 ) -> Result<(), String> {
     if !is_windows_portable() {
@@ -607,32 +708,14 @@ async fn apply_windows_portable_update_inner(
     }
 
     let bytes = download_update(&url, &on_event).await?;
-    let pubkey = updater_pubkey()?;
-    verify_update_signature(&bytes, &signature, &pubkey)?;
+    // Hashing and unpacking ~100 MB: off the async runtime.
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        install_portable(&handle, &bytes, &signature, &version)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
 
-    let dest = crate::paths::exe_dir();
-    let staging = std::env::temp_dir().join(format!("{STAGING_PREFIX}{}", std::process::id()));
-    if staging.exists() {
-        let _ = std::fs::remove_dir_all(&staging);
-    }
-    std::fs::create_dir_all(&staging)
-        .map_err(|e| format!("Dossier temporaire de mise à jour: {e}"))?;
-
-    if let Some(sc) = app.try_state::<crate::sidecar::Sidecar>() {
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(800), sc.stop()).await;
-    }
-
-    if let Err(e) = extract_allowed_overlay(&bytes, &staging) {
-        let _ = std::fs::remove_dir_all(&staging);
-        return Err(e);
-    }
-    if let Err(e) = apply_staging_overlay(&staging, &dest) {
-        let _ = std::fs::remove_dir_all(&staging);
-        return Err(e);
-    }
-    let _ = std::fs::remove_dir_all(&staging);
-    let _ = purge_update_leftovers(&dest);
-    let _ = spawn_cleanup_helper(&dest);
     // Return success first so the UI does not treat the dying IPC as a failure.
     // Then close this window. Do not start the new process.
     let app2 = app.clone();
@@ -640,6 +723,42 @@ async fn apply_windows_portable_update_inner(
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         app2.exit(0);
     });
+    Ok(())
+}
+
+#[cfg(windows)]
+fn install_portable(
+    app: &AppHandle,
+    bytes: &[u8],
+    signature: &str,
+    version: &str,
+) -> Result<(), String> {
+    let pubkey = updater_pubkey()?;
+    verify_update_signature(bytes, signature, &pubkey)?;
+
+    let dest = crate::paths::exe_dir();
+    let staging = dest.join(STAGING_DIR);
+    let _ = std::fs::remove_dir_all(&staging);
+    std::fs::create_dir_all(&staging)
+        .map_err(|e| format!("Dossier temporaire de mise à jour: {e}"))?;
+
+    let result = (|| {
+        extract_allowed_overlay(bytes, &staging)?;
+        stage_sidecar(&staging, &dest, version)?;
+        // Python must not hold files of the current sidecar: the next launch
+        // renames that folder.
+        if let Some(sc) = app.try_state::<crate::sidecar::Sidecar>() {
+            sc.shutdown(std::time::Duration::from_secs(2));
+        }
+        apply_staging_overlay(&staging, &dest)
+    })();
+    let _ = std::fs::remove_dir_all(&staging);
+    if let Err(e) = result {
+        let _ = std::fs::remove_dir_all(dest.join(SIDECAR_NEXT));
+        return Err(e);
+    }
+    let _ = purge_update_leftovers(&dest);
+    let _ = spawn_cleanup_helper(&dest);
     Ok(())
 }
 
@@ -679,6 +798,9 @@ async fn download_update(
     }
     let _ = on_event.send(PortableDownloadEvent::Started { content_length });
 
+    // Thousands of chunks: report at most ten times a second.
+    let mut unreported = 0usize;
+    let mut last_report = std::time::Instant::now();
     let mut buffer = Vec::new();
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
@@ -686,10 +808,20 @@ async fn download_update(
         if buffer.len() as u64 + chunk.len() as u64 > MAX_UPDATE_BYTES {
             return Err("Archive de mise à jour trop volumineuse.".into());
         }
-        let _ = on_event.send(PortableDownloadEvent::Progress {
-            chunk_length: chunk.len(),
-        });
+        unreported += chunk.len();
+        if last_report.elapsed() >= std::time::Duration::from_millis(100) {
+            let _ = on_event.send(PortableDownloadEvent::Progress {
+                chunk_length: unreported,
+            });
+            unreported = 0;
+            last_report = std::time::Instant::now();
+        }
         buffer.extend_from_slice(&chunk);
+    }
+    if unreported > 0 {
+        let _ = on_event.send(PortableDownloadEvent::Progress {
+            chunk_length: unreported,
+        });
     }
     let _ = on_event.send(PortableDownloadEvent::Finished);
     Ok(buffer)
@@ -1042,6 +1174,59 @@ mod tests {
             b"KEEP"
         );
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn staged_sidecar_is_swapped_whole_by_the_matching_version() {
+        let root = std::env::temp_dir().join(format!("euclide-swap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (staging, dest) = (root.join("staging"), root.join("app"));
+        std::fs::create_dir_all(staging.join("euclide-sidecar/_internal")).unwrap();
+        std::fs::write(staging.join("euclide-sidecar/_internal/new.pyd"), b"new").unwrap();
+        std::fs::create_dir_all(dest.join("euclide-sidecar")).unwrap();
+        std::fs::write(dest.join("euclide-sidecar/old.pyd"), b"old").unwrap();
+
+        assert!(stage_sidecar(&staging, &dest, "0.4.0").unwrap());
+        assert!(!staging.join("euclide-sidecar").exists());
+        // The running version is untouched until the new one starts.
+        assert_eq!(apply_staged_sidecar(&dest, "0.3.0"), None);
+        assert!(dest.join("euclide-sidecar/old.pyd").is_file());
+        assert!(
+            !dest.join(SIDECAR_NEXT).exists(),
+            "a stale stage is dropped"
+        );
+
+        std::fs::create_dir_all(staging.join("euclide-sidecar/_internal")).unwrap();
+        std::fs::write(staging.join("euclide-sidecar/_internal/new.pyd"), b"new").unwrap();
+        stage_sidecar(&staging, &dest, "0.4.0").unwrap();
+        let old = apply_staged_sidecar(&dest, "0.4.0").expect("swapped");
+        assert!(dest.join("euclide-sidecar/_internal/new.pyd").is_file());
+        assert!(!dest.join("euclide-sidecar/old.pyd").exists());
+        assert!(!dest.join("euclide-sidecar").join(STAGED_MARKER).exists());
+        assert!(old.join("old.pyd").is_file());
+        assert_eq!(old_sidecar_dirs(&dest), vec![old]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn interrupted_stage_is_never_swapped_in() {
+        let dest = std::env::temp_dir().join(format!("euclide-swap-cut-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        std::fs::create_dir_all(dest.join(SIDECAR_NEXT)).unwrap();
+        std::fs::create_dir_all(dest.join("euclide-sidecar")).unwrap();
+        assert_eq!(apply_staged_sidecar(&dest, "0.4.0"), None);
+        assert!(dest.join("euclide-sidecar").is_dir());
+        assert!(!dest.join(SIDECAR_NEXT).exists());
+        let _ = std::fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn update_versions_are_plain() {
+        assert!(valid_version("0.4.0"));
+        assert!(valid_version("1.0.0-rc1"));
+        assert!(!valid_version(""));
+        assert!(!valid_version("../0.4.0"));
+        assert!(!valid_version("0.4.0\nx"));
     }
 
     #[test]
