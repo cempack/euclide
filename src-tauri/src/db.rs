@@ -1,27 +1,93 @@
-use rusqlite::Connection;
-use std::sync::Mutex;
+use crate::error::AppResult;
+use rusqlite::{Connection, OpenFlags};
+use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
-pub struct Db(pub Mutex<Connection>);
+/// The database. One writer connection plus two read-only ones: in WAL mode
+/// reads never wait behind a write. Async access (`read` / `write`) runs on
+/// the blocking thread pool, never on the UI thread.
+#[derive(Clone)]
+pub struct Db(Arc<Pool>);
 
-pub fn open() -> Connection {
-    let path = crate::paths::db_path();
-    let conn = Connection::open(&path)
-        .unwrap_or_else(|e| panic!("impossible d'ouvrir la base {} : {e}", path.display()));
-    conn.execute_batch(SCHEMA).expect("init schema");
-    run_migrations(&conn);
+struct Pool {
+    writer: Mutex<Connection>,
+    readers: Vec<Mutex<Connection>>,
+    next: AtomicUsize,
+}
 
-    // Performance PRAGMAs (WAL already in SCHEMA; these are safe to re-apply).
-    // synchronous=NORMAL is good balance with WAL; busy_timeout helps under contention; temp_store in mem.
-    let _ = conn.execute_batch(
-        r#"
-PRAGMA synchronous = NORMAL;
-PRAGMA busy_timeout = 5000;
-PRAGMA temp_store = MEMORY;
-"#,
-    );
+/// A panic while a connection was locked must not break every later command.
+fn lock(conn: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
+    conn.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
-    seed_python_demos();
-    conn
+impl Db {
+    pub fn open(path: &Path) -> AppResult<Db> {
+        let writer = Connection::open(path)?;
+        writer.execute_batch(SCHEMA)?;
+        run_migrations(&writer);
+        // FULL: the data lives on a USB key that can be pulled out at any time.
+        writer.execute_batch(
+            "PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000; PRAGMA temp_store = MEMORY;",
+        )?;
+        writer.set_prepared_statement_cache_capacity(64);
+        // Readers are an optimisation: if they cannot be opened, the writer serves reads.
+        let readers = (0..2)
+            .map_while(|_| open_reader(path).ok())
+            .map(Mutex::new)
+            .collect();
+        Ok(Db(Arc::new(Pool {
+            writer: Mutex::new(writer),
+            readers,
+            next: AtomicUsize::new(0),
+        })))
+    }
+
+    /// The writer, for setup code and commands not yet converted to `read`/`write`.
+    pub fn lock(&self) -> MutexGuard<'_, Connection> {
+        lock(&self.0.writer)
+    }
+
+    /// Run `f` on a read-only connection, off the UI thread.
+    pub async fn read<T, F>(&self, f: F) -> AppResult<T>
+    where
+        F: FnOnce(&Connection) -> AppResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.0.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if pool.readers.is_empty() {
+                return f(&lock(&pool.writer));
+            }
+            let i = pool.next.fetch_add(1, Ordering::Relaxed) % pool.readers.len();
+            f(&lock(&pool.readers[i]))
+        })
+        .await?
+    }
+
+    /// Run `f` on the writer connection, off the UI thread.
+    pub async fn write<T, F>(&self, f: F) -> AppResult<T>
+    where
+        F: FnOnce(&mut Connection) -> AppResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.0.clone();
+        tauri::async_runtime::spawn_blocking(move || f(&mut lock(&pool.writer))).await?
+    }
+}
+
+fn open_reader(path: &Path) -> rusqlite::Result<Connection> {
+    let conn = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_URI,
+    )?;
+    conn.busy_timeout(Duration::from_secs(5))?;
+    conn.execute_batch("PRAGMA temp_store = MEMORY;")?;
+    conn.set_prepared_statement_cache_capacity(64);
+    Ok(conn)
 }
 
 pub(crate) const SCHEMA: &str = r#"
@@ -188,7 +254,7 @@ fn run_migrations(conn: &Connection) {
 }
 
 /// Drop a couple of friendly starter demos so the Tools screen isn't empty.
-fn seed_python_demos() {
+pub fn seed_python_demos() {
     let dir = crate::paths::python_dir();
     let hello = dir.join("bonjour.py");
     if !hello.exists() {
