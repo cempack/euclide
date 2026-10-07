@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { bootSetting, forgetBootSetting } from "../lib/boot";
 import { tabSwitchBegin } from "../lib/perf";
 import { editors } from "./editors";
+import { logged, reportError } from "../lib/report";
 
 export type TabKind =
   | "dashboard"
@@ -267,16 +268,16 @@ function setMaxTabsMode(mode: MaxTabsMode, fixed?: number) {
       : null;
   if (nextFixed != null) {
     setState({ maxTabsFixed: nextFixed });
-    api.setSetting("max_tabs", String(nextFixed)).catch(() => {});
+    api.setSetting("max_tabs", String(nextFixed)).catch(logged("tabs.limit"));
   }
   setState({ maxTabsMode: mode });
-  api.setSetting("max_tabs_mode", mode).catch(() => {});
+  api.setSetting("max_tabs_mode", mode).catch(logged("tabs.limit"));
   if (mode === "unlimited") {
-    api.setSetting("max_tabs", "0").catch(() => {});
+    api.setSetting("max_tabs", "0").catch(logged("tabs.limit"));
     return;
   }
   const cap = nextFixed ?? state().maxTabsFixed;
-  api.setSetting("max_tabs", String(cap)).catch(() => {});
+  api.setSetting("max_tabs", String(cap)).catch(logged("tabs.limit"));
   if (mode === "fixed") commitTabs(evictToLimit(state().tabs, cap, state().activeId, editors.dirtyMap()));
 }
 
@@ -451,7 +452,7 @@ export function startTabSession(): () => void {
   let saved = atLaunch?.raw ?? null;
   let cancelled = false;
   if (atLaunch) {
-    if (atLaunch.limit.migrate) api.setSetting("max_tabs_mode", "auto").catch(() => {});
+    if (atLaunch.limit.migrate) api.setSetting("max_tabs_mode", "auto").catch(logged("tabs.limit"));
   } else {
     void (async () => {
       try {
@@ -466,9 +467,9 @@ export function startTabSession(): () => void {
             ? { maxTabsMode: limit.mode, maxTabsFixed: limit.fixed }
             : { maxTabsMode: limit.mode },
         );
-        if (limit.migrate) api.setSetting("max_tabs_mode", "auto").catch(() => {});
-      } catch {
-        // keep « auto »
+        if (limit.migrate) api.setSetting("max_tabs_mode", "auto").catch(logged("tabs.limit"));
+      } catch (err) {
+        reportError("tabs.readLimit", err); // keep « auto »
       }
       try {
         const raw = await api.getSetting("open_tabs");
@@ -476,8 +477,8 @@ export function startTabSession(): () => void {
         saved = raw;
         const session = parseSession(raw);
         if (session) setState({ tabs: session.tabs, activeId: session.activeId });
-      } catch {
-        // keep the dashboard
+      } catch (err) {
+        reportError("tabs.readSession", err); // keep the dashboard
       } finally {
         if (!cancelled) setState({ hydrated: true });
       }
@@ -492,7 +493,7 @@ export function startTabSession(): () => void {
     const payload = sessionPayload(list, activeId);
     if (payload === saved) return;
     saved = payload;
-    await api.setSetting("open_tabs", payload).catch(() => {});
+    await api.setSetting("open_tabs", payload).catch(logged("tabs.session"));
   };
   saveSessionNow = save;
   const unsubscribe = useTabsStore.subscribe((s, prev) => {
