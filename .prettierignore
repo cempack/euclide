@@ -4,6 +4,7 @@ public/pdfjs/
 src-tauri/
 sidecar/
 .delta/
+.claude/
 .shots/
 test-results/
 playwright-report/

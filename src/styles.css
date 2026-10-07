@@ -807,6 +807,8 @@
   .eu-tabs {
     @apply flex flex-1 items-stretch min-w-0 overflow-x-auto;
     scrollbar-width: none;
+    /* The new-tab button sticks over the end: scroll the active tab clear of it. */
+    scroll-padding-inline-end: 2.75rem;
   }
   .eu-tabs::-webkit-scrollbar {
     display: none;
@@ -832,8 +834,17 @@
   .eu-tab[data-pinned] {
     @apply min-w-0 basis-auto shrink-0 grow-0;
   }
-  .eu-tab[data-drop] {
-    @apply bg-accent-soft;
+  /* Where a dragged tab will land: a bar between two tabs. */
+  .eu-tab[data-drop-before]::before,
+  .eu-tab[data-drop-after]::before {
+    content: "";
+    @apply absolute top-2 bottom-2 w-0.5 rounded-full bg-accent z-2;
+  }
+  .eu-tab[data-drop-before]::before {
+    @apply -left-px;
+  }
+  .eu-tab[data-drop-after]::before {
+    @apply -right-px;
   }
   .eu-tab[data-dragging] {
     @apply opacity-45;
@@ -866,8 +877,9 @@
   .eu-tab[data-active] .eu-tab-close {
     @apply opacity-100;
   }
-  .eu-tab-new {
-    @apply self-center ml-1.5;
+  .eu-tab-new-slot {
+    @apply sticky right-0 z-2 flex items-center shrink-0 pl-1.5 pr-1 bg-chrome;
+    box-shadow: inset 0 -1px 0 var(--color-line);
   }
   .eu-tabstrip-extras {
     @apply flex items-center gap-1.5 shrink-0 pl-2 pr-2.5;

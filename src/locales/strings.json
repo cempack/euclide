@@ -379,7 +379,12 @@
     "openTabs": "Onglets ouverts",
     "pinned": "Épinglé",
     "unsaved": "Non enregistré",
-    "tabLimitHint": "la limite est atteinte : le plus ancien sera fermé"
+    "tabLimitHint": "la limite est atteinte : le plus ancien sera fermé",
+    "pinTab": "Épingler l'onglet",
+    "unpinTab": "Détacher l'onglet",
+    "closeOthers": "Fermer les autres onglets",
+    "closeRight": "Fermer les onglets à droite",
+    "allTabs": "Tous les onglets"
   },
   "messages": {
     "genericError": "Erreur",
