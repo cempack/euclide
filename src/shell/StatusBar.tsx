@@ -1,6 +1,8 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { Coffee } from "lucide-react";
-import { api, type AppInfo, type PronoteStatus, type ScheduleEntry } from "../lib/api";
+import type { AppInfo, ScheduleEntry } from "../lib/api";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../lib/format";
 import { fmt, get } from "../lib/i18n";
 import { useTabs } from "../lib/tabs";
@@ -14,42 +16,19 @@ import { StatusTimerChip } from "./Timer";
  * the timer, Pronote, keep-awake, and where the data lives. Visible from
  * every screen instead of only from the dashboard.
  */
+const NONE: ScheduleEntry[] = [];
+
 export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | null }) {
   const tabs = useTabs();
   const { resolved, pref } = useAppearance();
-  const [classes, setClasses] = useState<ScheduleEntry[]>([]);
-  const [pronote, setPronote] = useState<PronoteStatus | null>(null);
-  const [keepAwake, setKeepAwake] = useState<boolean | null>(null);
+  const classes = useQuery(q.todayClasses()).data ?? NONE;
+  const pronote = useQuery(q.pronoteStatus()).data ?? null;
+  const keepAwake = useQuery(q.keepAwake()).data ?? false;
   const [now, setNow] = useState(() => new Date());
-
-  const refresh = useCallback(() => {
-    api
-      .getTodayClasses()
-      .then(setClasses)
-      .catch(() => {});
-    api
-      .pronoteStatus()
-      .then(setPronote)
-      .catch(() => {});
-    api
-      .keepAwakeStatus()
-      .then((s) => setKeepAwake(!!s))
-      .catch(() => {});
-  }, []);
-
   useEffect(() => {
-    refresh();
-    window.addEventListener("eu:schedule-changed", refresh);
-    window.addEventListener("eu:pronote-changed", refresh);
-    window.addEventListener("eu:keepawake-changed", refresh);
     const id = window.setInterval(() => setNow(new Date()), 20_000);
-    return () => {
-      window.removeEventListener("eu:schedule-changed", refresh);
-      window.removeEventListener("eu:pronote-changed", refresh);
-      window.removeEventListener("eu:keepawake-changed", refresh);
-      window.clearInterval(id);
-    };
-  }, [refresh]);
+    return () => window.clearInterval(id);
+  }, []);
 
   const focus = useMemo(() => focusClass(classes, now), [classes, now]);
   const remaining = focus?.state === "current" ? minutesRemaining(focus.entry, now) : null;
