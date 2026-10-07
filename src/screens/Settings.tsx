@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
 import {
   checkForAppUpdate,
   dismissAvailableUpdate,
@@ -282,10 +283,7 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
       const path = await api.backupDataDir();
       toast(fmt(get("settings.backupDone", "Sauvegarde créée : {path}"), { path }), "success");
     } catch (err) {
-      toast(
-        typeof err === "string" && err ? err : get("settings.backupError", "Sauvegarde impossible"),
-        "error",
-      );
+      toast(errorMessage(err, get("settings.backupError", "Sauvegarde impossible")), "error");
     } finally {
       setBusy(false);
     }
@@ -338,15 +336,6 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
 // Pronote
 
 type LoginMethod = "qr" | "direct";
-
-function pronoteErrorMessage(err: unknown): string {
-  let raw = "";
-  if (typeof err === "string") raw = err;
-  else if (err && typeof err === "object" && "message" in err) {
-    raw = String((err as { message: unknown }).message);
-  }
-  return raw.replace(/^"+|"+$/g, "");
-}
 
 function PronoteSection() {
   const toast = useToast();
@@ -411,10 +400,7 @@ function PronoteSection() {
       const s = await api.pronoteQrLogin(qrJson.trim(), pin.trim());
       await finishConnect(s);
     } catch (err) {
-      toast(
-        pronoteErrorMessage(err) || t.settings?.toastConnectFail || "Connexion Pronote impossible",
-        "error",
-      );
+      toast(errorMessage(err, "") || t.settings?.toastConnectFail || "Connexion Pronote impossible", "error");
     } finally {
       setBusy(false);
     }
@@ -435,7 +421,7 @@ function PronoteSection() {
       );
       await finishConnect(s);
     } catch (err) {
-      const msg = pronoteErrorMessage(err);
+      const msg = errorMessage(err, "");
       if (msg.startsWith("NEEDS_PIN:")) {
         setNeedsPin(true);
         toast(
@@ -497,10 +483,7 @@ function PronoteSection() {
       window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
       toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");
     } catch (err) {
-      toast(
-        typeof err === "string" ? err : t.settings?.toastSyncFail || "Synchronisation impossible",
-        "error",
-      );
+      toast(errorMessage(err, t.settings?.toastSyncFail || "Synchronisation impossible"), "error");
     } finally {
       setBusy(false);
       refresh();

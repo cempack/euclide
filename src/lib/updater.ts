@@ -1,6 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import { api, isTauri } from "./api";
+import { errorMessage } from "./errors";
 
 export type AppUpdateInfo = {
   version: string;
@@ -61,23 +62,8 @@ function metadataOf(update: Update): AppUpdateInfo {
   };
 }
 
-function errorMessage(err: unknown): string {
-  if (err instanceof Error && err.message) return err.message;
-  if (typeof err === "string") return err;
-  if (err && typeof err === "object") {
-    const o = err as Record<string, unknown>;
-    if (typeof o.message === "string" && o.message.trim()) return o.message;
-  }
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
-  }
-}
-
 export function installErrorMessage(err: unknown): string {
-  const msg = errorMessage(err).trim();
-  return msg || "Impossible d'installer la mise à jour.";
+  return errorMessage(err, "Impossible d'installer la mise à jour.");
 }
 
 function isClosingAfterInstall(err: unknown): boolean {
