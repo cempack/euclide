@@ -294,6 +294,16 @@ fn dialog_ok(res: rfd::MessageDialogResult) -> bool {
     }
 }
 
+/// `Euclide-Sauvegardes/`, next to the data folder (on the key, but outside
+/// what a backup archives).
+pub fn backups_dir() -> PathBuf {
+    let data = data_dir();
+    data.parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| data.clone())
+        .join("Euclide-Sauvegardes")
+}
+
 pub fn db_path() -> PathBuf {
     data_dir().join("euclide.db")
 }
