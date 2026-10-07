@@ -11,7 +11,7 @@ import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
 import { useAppearance } from "../lib/theme";
 import { useToast } from "./ui";
 import { errorMessage } from "../lib/errors";
-import { logged, reportError } from "../lib/report";
+import { reportError } from "../lib/report";
 
 import {
   BellIcon,
@@ -34,6 +34,7 @@ import {
 } from "./icons";
 
 const NO_LINKS: QuickLink[] = [];
+const NO_RESULTS: SearchResult[] = [];
 
 interface Action {
   id: string;
@@ -87,7 +88,6 @@ function CommandPalette({
   const { projection, toggleProjection } = useAppearance();
 
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
   const queryClient = useQueryClient();
   const links = useQuery({ ...q.links(), enabled: open }).data ?? NO_LINKS;
   const keepAwake = useQuery({ ...q.keepAwake(), enabled: open }).data ?? null;
@@ -95,32 +95,40 @@ function CommandPalette({
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // A fresh palette each time it opens.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setQuery("");
+      setSel(0);
+    }
+  }
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setResults([]);
-    setSel(0);
-    setTimeout(() => inputRef.current?.focus(), 30);
+    if (open) window.setTimeout(() => inputRef.current?.focus(), 30);
   }, [open]);
 
-  // global search across courses, files (name + content) and notes
-  useEffect(() => {
-    const { term: searchTerm, scope: searchScope } = scopeOf(query);
-    if (searchScope === "commands") {
-      setResults([]);
-      return;
-    }
-    const h = setTimeout(() => {
-      if (searchTerm.trim().length < 2) return setResults([]);
-      api
-        .globalSearch(searchTerm.trim())
-        .then((r) => setResults(Array.isArray(r) ? r : []))
-        .catch(logged("palette.search"));
-    }, 130);
-    return () => clearTimeout(h);
-  }, [query]);
-
   const { scope, term } = scopeOf(query);
+
+  // Search courses, files (names and contents) and notes once typing pauses.
+  // Each term is its own query: a slow answer for « fo » cannot replace the
+  // one for « fonc ».
+  const [searchTerm, setSearchTerm] = useState("");
+  useEffect(() => {
+    const h = window.setTimeout(() => setSearchTerm(term.trim()), 130);
+    return () => window.clearTimeout(h);
+  }, [term]);
+  const searching = open && scope !== "commands" && searchTerm.length >= 2;
+  const search = useQuery({
+    queryKey: ["search", searchTerm],
+    queryFn: () => api.globalSearch(searchTerm),
+    enabled: searching,
+    staleTime: 30_000,
+  });
+  useEffect(() => {
+    if (search.error) reportError("palette.search", search.error);
+  }, [search.error]);
+  const results = (searching && search.data) || NO_RESULTS;
 
   const baseActions = useMemo<Action[]>(() => {
     const go = (kind: any, title?: string, params?: any) => () => {
@@ -394,7 +402,12 @@ function CommandPalette({
 
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setSel(0), [query, results]);
+  // The cursor goes back to the top when the list changes.
+  const [listFor, setListFor] = useState({ query, results });
+  if (listFor.query !== query || listFor.results !== results) {
+    setListFor({ query, results });
+    setSel(0);
+  }
 
   useEffect(() => {
     const el = listRef.current?.querySelector<HTMLElement>(`[data-sel="${sel}"]`);

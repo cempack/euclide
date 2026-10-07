@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, memo } from "react";
+import { useMemo, useState, useCallback, memo } from "react";
 import { api, type Course, type FileItem, type Note } from "../lib/api";
 import { tabs } from "../stores/tabs";
 import { useImportFiles } from "../shell/useImportFiles";
@@ -27,6 +27,12 @@ const NO_NOTES: Note[] = [];
 const NO_COURSES: Course[] = [];
 
 type Filter = { kind: "all" } | { kind: "type"; value: string } | { kind: "class"; courseId: number };
+
+function filterFromHint(hint: string | undefined): Filter {
+  return hint === "note" || hint === "pdf" || hint === "image" || hint === "board"
+    ? { kind: "type", value: hint }
+    : { kind: "all" };
+}
 
 type DocItem = { t: "file"; f: FileItem; date: string } | { t: "note"; n: Note; date: string };
 
@@ -194,7 +200,7 @@ export default function Documents({
   const docs = useQuery({ ...q.files(null), ...live }).data ?? NO_FILES;
   const notes = useQuery({ ...q.notes(), ...live }).data ?? NO_NOTES;
   const courses = useQuery({ ...q.courses(), ...live }).data ?? NO_COURSES;
-  const [filter, setFilter] = useState<Filter>({ kind: "all" });
+  const [filter, setFilter] = useState<Filter>(() => filterFromHint(filterHint));
   const [search, setSearch] = useState("");
 
   // Rename state (supports notes + every file kind: pdf/image/board/doc/sheet/etc.)
@@ -205,13 +211,12 @@ export default function Documents({
   }>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  useEffect(() => {
-    if (filterHint === "note" || filterHint === "pdf" || filterHint === "image" || filterHint === "board") {
-      setFilter({ kind: "type", value: filterHint });
-    } else {
-      setFilter({ kind: "all" });
-    }
-  }, [filterHint]);
+  // Opened with a type to show (« Documents » from a note…): start on it.
+  const [hintFor, setHintFor] = useState(filterHint);
+  if (hintFor !== filterHint) {
+    setHintFor(filterHint);
+    setFilter(filterFromHint(filterHint));
+  }
 
   const courseName = useCallback((id: number | null) => courses.find((c) => c.id === id)?.name, [courses]);
 

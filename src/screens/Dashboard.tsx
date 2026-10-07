@@ -4,7 +4,7 @@ import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
 import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
-import { tr, trList } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import {
@@ -18,6 +18,7 @@ import {
   minutesUntil,
   relativeTime,
   greeting,
+  cheer,
 } from "../lib/format";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
@@ -118,8 +119,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       await api.toggleReminder(r.id, markingDone);
       if (markingDone) {
         api.logEvent("reminder_done", r.title, r.course_id);
-        const cheers = trList("dashboard.cheers");
-        toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
+        toast(cheer(), "success");
       }
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
     } catch (err) {

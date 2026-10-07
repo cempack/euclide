@@ -755,6 +755,18 @@ function handle(cmd: string, args: Args): unknown {
       return sequences
         .filter((s) => s.course_id === num(args, "courseId"))
         .sort((a, b) => a.position - b.position);
+    case "create_sequence": {
+      const courseId = num(args, "courseId") ?? 0;
+      const created: Sequence = {
+        id: Math.max(0, ...sequences.map((x) => x.id)) + 1,
+        course_id: courseId,
+        title: String(args?.title ?? ""),
+        position: sequences.filter((x) => x.course_id === courseId).length,
+        created_at: sqlUtc(new Date()),
+      };
+      sequences.push(created);
+      return created;
+    }
     case "list_sequence_items": {
       const courseId = num(args, "courseId");
       const ids = new Set(sequences.filter((s) => s.course_id === courseId).map((s) => s.id));
