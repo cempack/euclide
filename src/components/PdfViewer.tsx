@@ -59,7 +59,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fileId, legacyMode]);
 
   // Listen for messages from the embedded PDF.js viewer (ready, saved buffer).
@@ -113,9 +115,15 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           // save back to the CURRENT document (in-place update, with internal versioning backup)
           await api.updateFile(fileId, dataUrl);
           // refresh versions list
-          api.getFileVersions(fileId).then(setVersions).catch(() => {});
+          api
+            .getFileVersions(fileId)
+            .then(setVersions)
+            .catch(() => {});
           window.dispatchEvent(new CustomEvent("eu:library-changed"));
-          toast(get("pdf.annotationsSaved", "Annotations enregistrées dans {name}").replace("{name}", fileName), "success");
+          toast(
+            get("pdf.annotationsSaved", "Annotations enregistrées dans {name}").replace("{name}", fileName),
+            "success",
+          );
         } catch {
           toast("Erreur lors de l'enregistrement des annotations", "error");
         }
@@ -140,7 +148,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   useEffect(() => {
     if (!showPages || thumbnails.length === 0) return;
     const el = document.querySelector(`[title="Page ${currentPage}"]`);
-    if (el) (el as HTMLElement).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (el) (el as HTMLElement).scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [currentPage, showPages, thumbnails.length]);
 
   const loadPdfIntoViewer = async () => {
@@ -164,7 +172,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
       const timeout = setTimeout(() => {
         if (!pdfLoadedRef.current) {
-          console.warn('[PdfViewer] pdf-loaded message not received in time, forcing loaded state');
+          console.warn("[PdfViewer] pdf-loaded message not received in time, forcing loaded state");
           setPdfLoaded(true);
           setCurrentEditorMode(0);
         }
@@ -210,12 +218,17 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       ov.height = cv.height;
       cv.getContext("2d")!.drawImage(img, 0, 0, cv.width, cv.height);
       // load saved annots if any
-      api.readAnnotations(fileId).then((saved) => {
-        if (saved) {
-          try { legacyAnnots.current = JSON.parse(saved); } catch {}
-        }
-        drawLegacy();
-      }).catch(() => {});
+      api
+        .readAnnotations(fileId)
+        .then((saved) => {
+          if (saved) {
+            try {
+              legacyAnnots.current = JSON.parse(saved);
+            } catch {}
+          }
+          drawLegacy();
+        })
+        .catch(() => {});
     };
     img.src = pdfSrc;
   };
@@ -260,7 +273,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       tool: tool === "eraser" ? "eraser" : "pen",
       color,
       size: tool === "eraser" ? 16 : 2.5,
-      pts: [legacyPt(e)]
+      pts: [legacyPt(e)],
     };
     (e.target as any).setPointerCapture(e.pointerId);
   };
@@ -299,11 +312,13 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     const ov = legacyOverlay.current;
     if (!cv) return;
     const merged = document.createElement("canvas");
-    merged.width = cv.width; merged.height = cv.height;
+    merged.width = cv.width;
+    merged.height = cv.height;
     const m = merged.getContext("2d")!;
-    m.fillStyle = "#fff"; m.fillRect(0,0,merged.width,merged.height);
-    m.drawImage(cv,0,0);
-    if (ov) m.drawImage(ov,0,0);
+    m.fillStyle = "#fff";
+    m.fillRect(0, 0, merged.width, merged.height);
+    m.drawImage(cv, 0, 0);
+    if (ov) m.drawImage(ov, 0, 0);
     const dataUrl = merged.toDataURL("image/png");
     const base = fileName.replace(/\.[^.]+$/, "");
     try {
@@ -320,7 +335,18 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
   // RENDER
   if (legacyMode) {
-    const PALETTE = ["#000000", "#FFFFFF", "#FF0000", "#00AA00", "#0066FF", "#FFAA00", "#AA00FF", "#00FFFF", "#007aff", "#333333"];
+    const PALETTE = [
+      "#000000",
+      "#FFFFFF",
+      "#FF0000",
+      "#00AA00",
+      "#0066FF",
+      "#FFAA00",
+      "#AA00FF",
+      "#00FFFF",
+      "#007aff",
+      "#333333",
+    ];
     // stash for pointer handlers (no prop drilling)
     (window as any).__euclideImageTool = legacyTool;
     (window as any).__euclideImageColor = legacyColor;
@@ -328,32 +354,62 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     return (
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-2 px-5 py-2.5 border-b border-line flex-wrap bg-panel">
-          {(["pen","eraser"] as const).map((t) => (
-            <button key={t} onClick={() => setLegacyTool(t)}
-              className={`eu-btn-ghost text-sm ${legacyTool===t ? "bg-panel-alt text-accent" : ""}`}>
+          {(["pen", "eraser"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setLegacyTool(t)}
+              className={`eu-btn-ghost text-sm ${legacyTool === t ? "bg-panel-alt text-accent" : ""}`}
+            >
               {t === "pen" ? "Stylo" : "Gomme"}
             </button>
           ))}
           <div className="flex items-center gap-1.5 ml-2">
             {PALETTE.map((c) => (
-              <button key={c} onClick={() => setLegacyColor(c)}
-                className={`w-6 h-6 rounded-full border border-line transition-all ${legacyColor===c ? "ring-2 ring-accent" : "hover:ring-1 hover:ring-hairline"}`}
-                style={{ background: c }} />
+              <button
+                key={c}
+                onClick={() => setLegacyColor(c)}
+                className={`w-6 h-6 rounded-full border border-line transition-all ${legacyColor === c ? "ring-2 ring-accent" : "hover:ring-1 hover:ring-hairline"}`}
+                style={{ background: c }}
+              />
             ))}
-            <div className="w-3.5 h-3.5 rounded border border-line" style={{ background: legacyColor }} title={`Couleur active : ${legacyColor}`} />
+            <div
+              className="w-3.5 h-3.5 rounded border border-line"
+              style={{ background: legacyColor }}
+              title={`Couleur active : ${legacyColor}`}
+            />
           </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => setLegacyZoom(z => Math.max(0.5, z-0.1))} className="eu-btn-ghost px-2.5">−</button>
-              <span className="text-xs text-ink-muted w-10 text-center tabular-nums">{Math.round(legacyZoom*100)}%</span>
-              <button onClick={() => setLegacyZoom(z => Math.min(3, z+0.1))} className="eu-btn-ghost px-2.5">+</button>
+              <button
+                onClick={() => setLegacyZoom((z) => Math.max(0.5, z - 0.1))}
+                className="eu-btn-ghost px-2.5"
+              >
+                −
+              </button>
+              <span className="text-xs text-ink-muted w-10 text-center tabular-nums">
+                {Math.round(legacyZoom * 100)}%
+              </span>
+              <button
+                onClick={() => setLegacyZoom((z) => Math.min(3, z + 0.1))}
+                className="eu-btn-ghost px-2.5"
+              >
+                +
+              </button>
             </div>
             <OpenWithButton fileId={fileId} className="eu-btn-ghost" />
-            <button onClick={legacyExport} className="eu-btn-ghost"><DownloadIcon className="w-4 h-4" /></button>
-            <button onClick={legacySave} className="eu-btn-primary">Enregistrer</button>
+            <button onClick={legacyExport} className="eu-btn-ghost">
+              <DownloadIcon className="w-4 h-4" />
+            </button>
+            <button onClick={legacySave} className="eu-btn-primary">
+              Enregistrer
+            </button>
           </div>
         </div>
-        <div ref={legacyContainerRef} className="flex-1 overflow-auto bg-stage p-6" style={{ zoom: legacyZoom }}>
+        <div
+          ref={legacyContainerRef}
+          className="flex-1 overflow-auto bg-stage p-6"
+          style={{ zoom: legacyZoom }}
+        >
           <div className="relative mx-auto shadow-pop bg-white inline-block rounded">
             <canvas ref={(el) => (legacyPageCanvas.current = el)} className="block" />
             <canvas
@@ -365,7 +421,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               className="absolute inset-0 touch-none"
               style={{ cursor: "crosshair" }}
             />
-            <button onClick={legacyClear} className="absolute top-2 right-2 text-xs eu-btn-ghost bg-panel/80">Effacer</button>
+            <button onClick={legacyClear} className="absolute top-2 right-2 text-xs eu-btn-ghost bg-panel/80">
+              Effacer
+            </button>
           </div>
         </div>
       </div>
@@ -436,7 +494,18 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     }
   };
 
-  const PALETTE = ["#000000", "#FFFFFF", "#FF0000", "#00AA00", "#0066FF", "#FFAA00", "#AA00FF", "#00FFFF", "#007aff", "#333333"];
+  const PALETTE = [
+    "#000000",
+    "#FFFFFF",
+    "#FF0000",
+    "#00AA00",
+    "#0066FF",
+    "#FFAA00",
+    "#AA00FF",
+    "#00FFFF",
+    "#007aff",
+    "#333333",
+  ];
 
   return (
     <div className="h-full flex flex-col">
@@ -539,7 +608,10 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                     ifr.contentWindow.postMessage({ type: "euclide-open", buffer }, "*", [buffer]);
                     setPdfLoaded(false);
                     // keep viewerReady true (iframe is still alive); the pdf-loaded msg will re-enable toolbar
-                    toast(get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"), "success");
+                    toast(
+                      get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"),
+                      "success",
+                    );
                   }
                 } catch {
                   toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
@@ -599,7 +671,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         {!legacyMode && showPages && (
           <div className="w-[150px] flex-shrink-0 border-r border-white/10 bg-stage-alt overflow-y-auto p-1.5">
             {thumbnails.length === 0 ? (
-              <div className="p-2 font-mono text-[10px] text-white/50">{get("pdf.thumbnailsLoading", "Chargement des pages…")}</div>
+              <div className="p-2 font-mono text-[10px] text-white/50">
+                {get("pdf.thumbnailsLoading", "Chargement des pages…")}
+              </div>
             ) : (
               thumbnails.map((t) => (
                 <button
@@ -615,7 +689,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                   title={`Page ${t.page}`}
                 >
                   <img src={t.dataUrl} className="w-full h-auto block" alt={`p${t.page}`} />
-                  <div className="text-center font-mono text-[10px] leading-none py-1 text-white/50 bg-stage-alt">{t.page}</div>
+                  <div className="text-center font-mono text-[10px] leading-none py-1 text-white/50 bg-stage-alt">
+                    {t.page}
+                  </div>
                 </button>
               ))
             )}
@@ -642,7 +718,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                 // Fallback: force ready if 'euclide-viewer-ready' post missed.
                 setTimeout(() => {
                   if (!viewerReady) {
-                    console.warn('[PdfViewer] euclide-viewer-ready message missed after iframe load, forcing ready');
+                    console.warn(
+                      "[PdfViewer] euclide-viewer-ready message missed after iframe load, forcing ready",
+                    );
                     setViewerReady(true);
                   }
                 }, 1200);

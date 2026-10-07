@@ -5,14 +5,7 @@ import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import {
-  BellIcon,
-  CheckIcon,
-  RepeatIcon,
-  TrashIcon,
-  PlusIcon,
-  SearchIcon,
-} from "../components/icons";
+import { BellIcon, CheckIcon, RepeatIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
 import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
 
 const REPEAT_LABELS: Record<RepeatRule, string> = {
@@ -49,7 +42,9 @@ const ReminderRow = memo(function ReminderRow({
         aria-label={`${
           isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")
         } — ${r.title}`}
-        title={isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")}
+        title={
+          isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")
+        }
         className={`shrink-0 w-5 h-5 grid place-items-center rounded-sm border transition-colors duration-fast ${
           isDone
             ? "bg-ok-solid border-ok-solid text-panel"
@@ -137,7 +132,10 @@ export default function Reminders() {
 
   useEffect(() => {
     refresh();
-    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
+    api
+      .listCourses()
+      .then((c) => setCourses(Array.isArray(c) ? c : []))
+      .catch(() => {});
     const onChange = () => refresh({ silent: true });
     window.addEventListener("eu:reminders-changed", onChange);
     return () => window.removeEventListener("eu:reminders-changed", onChange);
@@ -151,7 +149,7 @@ export default function Reminders() {
         newTitle.trim(),
         due,
         newCourse === "" ? null : Number(newCourse),
-        newRepeat
+        newRepeat,
       );
       if (!created?.id) {
         toast(t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel", "error");
@@ -199,7 +197,7 @@ export default function Reminders() {
         toast(get("messages.genericError", "Erreur"), "error");
       }
     },
-    [toast, refresh]
+    [toast, refresh],
   );
 
   const deleteOne = useCallback(
@@ -219,7 +217,7 @@ export default function Reminders() {
         toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
       }
     },
-    [toast, confirm, refresh]
+    [toast, confirm, refresh],
   );
 
   const clearDone = async () => {
@@ -329,9 +327,7 @@ export default function Reminders() {
             aria-expanded={showDetails}
             className="eu-btn-ghost eu-btn-sm"
           >
-            {showDetails
-              ? get("reminders.hideDetails", "Moins")
-              : get("reminders.showDetails", "Détails")}
+            {showDetails ? get("reminders.hideDetails", "Moins") : get("reminders.showDetails", "Détails")}
           </button>
           <button onClick={addReminder} disabled={!newTitle.trim()} className="eu-btn-primary eu-btn-sm">
             <PlusIcon className="w-3.5 h-3.5" />
@@ -353,11 +349,7 @@ export default function Reminders() {
                   {t.dashboard?.dueInWeek || "+1 sem"}
                 </button>
                 {newDue && (
-                  <button
-                    type="button"
-                    onClick={() => setQuickDue(null)}
-                    className="eu-btn-quiet eu-btn-sm"
-                  >
+                  <button type="button" onClick={() => setQuickDue(null)} className="eu-btn-quiet eu-btn-sm">
                     {t.dashboard?.dueNone || "Aucune"}
                   </button>
                 )}
@@ -453,7 +445,7 @@ export default function Reminders() {
                 ? get("reminders.noResultHint", "Essayez un autre mot-clé ou changez de filtre.")
                 : get(
                     "reminders.emptyHint",
-                    "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies."
+                    "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies.",
                   )
             }
           />

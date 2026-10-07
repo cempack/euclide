@@ -9,7 +9,11 @@ export type PaletteSearchItem = {
   aliases?: string[];
 };
 
-const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const fold = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
 /**
  * Rank palette rows with Fuse.js (fuzzy, accent-insensitive, alias-aware).

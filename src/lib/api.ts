@@ -61,8 +61,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("eu:quicklinks-changed", onChange);
 }
 
-export const isTauri = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const isTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Prefix https:// when the teacher typed a bare host (google.com). */
 export function normalizeExternalUrl(url: string): string {
@@ -160,11 +159,7 @@ function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
       time_by_area: [],
     } as unknown as T;
   }
-  if (
-    cmd === "pronote_status" ||
-    cmd === "pronote_qr_login" ||
-    cmd === "pronote_password_login"
-  ) {
+  if (cmd === "pronote_status" || cmd === "pronote_qr_login" || cmd === "pronote_password_login") {
     return { connected: false, account_name: null, last_sync: null } as unknown as T;
   }
   if (cmd === "keep_awake_status") return true as unknown as T;
@@ -375,19 +370,24 @@ export const api = {
       }
       return c;
     }),
-  updateCourse: (course: Course) => invoke<void>("update_course", { course }).then(() => {
-    // optimistic patch
-    const key = "listCourses";
-    const cached = getCached<Course[]>(key);
-    if (cached) {
-      setCached(key, cached.map((c) => (c.id === course.id ? { ...c, ...course } : c)));
-    }
-    return;
-  }),
-  deleteCourse: (id: number) => invoke<void>("delete_course", { id }).then(() => {
-    invalidateCache("listCourses");
-    invalidateCache("listCourseClasses");
-  }),
+  updateCourse: (course: Course) =>
+    invoke<void>("update_course", { course }).then(() => {
+      // optimistic patch
+      const key = "listCourses";
+      const cached = getCached<Course[]>(key);
+      if (cached) {
+        setCached(
+          key,
+          cached.map((c) => (c.id === course.id ? { ...c, ...course } : c)),
+        );
+      }
+      return;
+    }),
+  deleteCourse: (id: number) =>
+    invoke<void>("delete_course", { id }).then(() => {
+      invalidateCache("listCourses");
+      invalidateCache("listCourseClasses");
+    }),
 
   // Course classes: casier is the course's files; per attached class (exact Pronote name) we track progress + prof notes
   listCourseClasses: (courseId: number) => {
@@ -446,18 +446,14 @@ export const api = {
     invoke<Sequence>("create_sequence", { courseId, title }).then(afterSequenceChange),
   renameSequence: (id: number, title: string) =>
     invoke<void>("rename_sequence", { id, title }).then(afterSequenceChange),
-  deleteSequence: (id: number) =>
-    invoke<void>("delete_sequence", { id }).then(afterSequenceChange),
+  deleteSequence: (id: number) => invoke<void>("delete_sequence", { id }).then(afterSequenceChange),
   moveSequence: (courseId: number, id: number, delta: number) =>
     invoke<void>("move_sequence", { courseId, id, delta }).then(afterSequenceChange),
   createSequenceItem: (sequenceId: number, title: string, fileId: number | null) =>
-    invoke<SequenceItem>("create_sequence_item", { sequenceId, title, fileId }).then(
-      afterSequenceChange
-    ),
+    invoke<SequenceItem>("create_sequence_item", { sequenceId, title, fileId }).then(afterSequenceChange),
   updateSequenceItem: (id: number, title: string, fileId: number | null) =>
     invoke<void>("update_sequence_item", { id, title, fileId }).then(afterSequenceChange),
-  deleteSequenceItem: (id: number) =>
-    invoke<void>("delete_sequence_item", { id }).then(afterSequenceChange),
+  deleteSequenceItem: (id: number) => invoke<void>("delete_sequence_item", { id }).then(afterSequenceChange),
   moveSequenceItem: (sequenceId: number, id: number, delta: number) =>
     invoke<void>("move_sequence_item", { sequenceId, id, delta }).then(afterSequenceChange),
   updateCourseClassNotes: (courseId: number, className: string, notes: string) =>
@@ -545,14 +541,14 @@ export const api = {
     title: string,
     dueAt: string | null,
     courseId: number | null = null,
-    repeatRule: RepeatRule = "none"
+    repeatRule: RepeatRule = "none",
   ) => invoke<Reminder>("create_reminder", { title, dueAt, courseId, repeatRule }),
   updateReminder: (
     id: number,
     title: string,
     dueAt: string | null,
     courseId: number | null,
-    repeatRule: RepeatRule
+    repeatRule: RepeatRule,
   ) => invoke<Reminder>("update_reminder", { id, title, dueAt, courseId, repeatRule }),
   toggleReminder: (id: number, done: boolean) => invoke<void>("toggle_reminder", { id, done }),
   deleteReminder: (id: number) => invoke<void>("delete_reminder", { id }),
@@ -599,12 +595,8 @@ export const api = {
   deleteScheduleEntry: (id: number) => invoke<void>("delete_schedule_entry", { id }),
 
   // Whiteboard (editable .euboard vector format)
-  saveBoard: (save: {
-    file_id?: number | null;
-    course_id?: number | null;
-    name?: string;
-    json: string;
-  }) => invoke<FileItem>("save_board", { save }),
+  saveBoard: (save: { file_id?: number | null; course_id?: number | null; name?: string; json: string }) =>
+    invoke<FileItem>("save_board", { save }),
   readBoard: (id: number) => invoke<string>("read_board", { id }),
   exportBoardPng: (courseId: number | null, name: string, dataUrl: string) =>
     invoke<FileItem>("export_board_png", { courseId, name, dataUrl }),
@@ -615,8 +607,7 @@ export const api = {
   ensureOriginalVersion: (fileId: number) => invoke<void>("ensure_original_version", { fileId }),
 
   // PDF annotations
-  saveAnnotations: (fileId: number, json: string) =>
-    invoke<void>("save_annotations", { fileId, json }),
+  saveAnnotations: (fileId: number, json: string) => invoke<void>("save_annotations", { fileId, json }),
   readAnnotations: (fileId: number) => invoke<string | null>("read_annotations", { fileId }),
 
   // Python scripts
@@ -634,11 +625,11 @@ export const api = {
   runCode: (code: string) => invoke<PythonResult>("run_python_code", { code }),
   pythonComplete: (code: string, line: number, column: number, filename?: string) =>
     invoke<PythonCompletion[]>("python_complete", { code, line, column, filename }),
-  createScript: (name: string, code: string) =>
-    invoke<PythonDemo>("create_python_script", { name, code }),
+  createScript: (name: string, code: string) => invoke<PythonDemo>("create_python_script", { name, code }),
   saveScript: (path: string, code: string) => invoke<void>("save_python_script", { path, code }),
   deleteScript: (path: string) => invoke<void>("delete_python_script", { path }),
-  renameScript: (path: string, newName: string) => invoke<PythonDemo>("rename_python_script", { path, newName }),
+  renameScript: (path: string, newName: string) =>
+    invoke<PythonDemo>("rename_python_script", { path, newName }),
   importScript: () => invoke<PythonDemo | null>("import_python_script"),
 
   // Keep awake
@@ -651,7 +642,10 @@ export const api = {
     const cached = getCached<PronoteStatus>(key);
     if (cached) return Promise.resolve(cached);
     // 30s TTL is fine; status changes only on login/logout/sync
-    return invoke<PronoteStatus>("pronote_status").then((data) => { setCached(key, data); return data; });
+    return invoke<PronoteStatus>("pronote_status").then((data) => {
+      setCached(key, data);
+      return data;
+    });
   },
   pronoteQrLogin: (qrJson: string, pin: string) =>
     invoke<PronoteStatus>("pronote_qr_login", { qrJson, pin }).then((data) => {
@@ -659,10 +653,12 @@ export const api = {
       return data;
     }),
   pronotePasswordLogin: (url: string, username: string, password: string, pin?: string) =>
-    invoke<PronoteStatus>("pronote_password_login", { url, username, password, pin: pin || null }).then((data) => {
-      setCached("pronoteStatus", data);
-      return data;
-    }),
+    invoke<PronoteStatus>("pronote_password_login", { url, username, password, pin: pin || null }).then(
+      (data) => {
+        setCached("pronoteStatus", data);
+        return data;
+      },
+    ),
   pronoteSync: () =>
     invoke<number>("pronote_sync").then((data) => {
       invalidateCache("pronoteStatus");
@@ -676,11 +672,7 @@ export const api = {
   // pronote_contents: returns sidecar response {ok, contents: [...], matieres: [...], ...}
   // Matches the "Contenu de mes cours" / "Vision élève" style data (chronological lesson contents).
   // All filters optional. className supports class names like "3A". fromDate supports "YYYY-MM-DD" or "DD/MM/YYYY".
-  pronoteContents: (
-    subject?: string | null,
-    className?: string | null,
-    fromDate?: string | null
-  ) =>
+  pronoteContents: (subject?: string | null, className?: string | null, fromDate?: string | null) =>
     invoke<any>("pronote_contents", { subject, className, fromDate }),
   // Returns prof's available classes from Pronote (for dropdowns when attaching to courses)
   pronoteClasses: () => invoke<any>("pronote_classes"),

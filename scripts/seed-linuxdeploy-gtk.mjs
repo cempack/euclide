@@ -53,10 +53,10 @@ export function patchLinuxdeployGtk(body) {
 
 function selfTest() {
   const sample = [
-    "cat > \"$HOOKFILE\" <<\\EOF",
+    'cat > "$HOOKFILE" <<\\EOF',
     "#! /usr/bin/env bash",
     "export GDK_BACKEND=x11 # Crash with Wayland backend on Wayland - We tested it without it and ended up with this: https://github.com/tauri-apps/tauri/issues/8541",
-    "export XDG_DATA_DIRS=\"$APPDIR/usr/share:/usr/share:$XDG_DATA_DIRS\"",
+    'export XDG_DATA_DIRS="$APPDIR/usr/share:/usr/share:$XDG_DATA_DIRS"',
     "EOF",
     "",
   ].join("\n");

@@ -29,13 +29,7 @@ import {
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { COURSE_ICONS, EmptyState, useToast, useConfirm } from "../components/ui";
-import {
-  MetaDot,
-  PageHeader,
-  Panel,
-  StatStrip,
-  StatTile,
-} from "../components/layout";
+import { MetaDot, PageHeader, Panel, StatStrip, StatTile } from "../components/layout";
 import {
   BellIcon,
   BookIcon,
@@ -78,7 +72,13 @@ const DASHBOARD_EVENTS = [
  * the mini activity recap — now lives in the window status bar and in Outils,
  * so it is reachable from every screen instead of only from this one.
  */
-export default function Dashboard({ info: _info, visible = true }: { info?: AppInfo | null; visible?: boolean }) {
+export default function Dashboard({
+  info: _info,
+  visible = true,
+}: {
+  info?: AppInfo | null;
+  visible?: boolean;
+}) {
   const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();
@@ -103,16 +103,46 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
   }, []);
 
   const refresh = useCallback(() => {
-    api.getTodayClasses().then(setClasses).catch(() => {});
-    api.listReminders().then((r) => setReminders(Array.isArray(r) ? r : [])).catch(() => {});
-    api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
-    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
-    api.listFiles(null).then((f) => setDocCount(Array.isArray(f) ? f.length : 0)).catch(() => {});
-    api.listLinks().then((l) => setLinks(Array.isArray(l) ? l : [])).catch(() => {});
-    api.recentFiles(6).then((f) => setRecentFiles(Array.isArray(f) ? f : [])).catch(() => {});
-    api.pronoteStatus().then(setPronoteStatus).catch(() => {});
-    api.getRecap("today").then(setRecap).catch(() => {});
-    api.getSetting("remote_favicons").then((v) => setRemoteIcons(remoteFaviconsEnabled(v))).catch(() => {});
+    api
+      .getTodayClasses()
+      .then(setClasses)
+      .catch(() => {});
+    api
+      .listReminders()
+      .then((r) => setReminders(Array.isArray(r) ? r : []))
+      .catch(() => {});
+    api
+      .allNotes()
+      .then((n) => setNotes(Array.isArray(n) ? n : []))
+      .catch(() => {});
+    api
+      .listCourses()
+      .then((c) => setCourses(Array.isArray(c) ? c : []))
+      .catch(() => {});
+    api
+      .listFiles(null)
+      .then((f) => setDocCount(Array.isArray(f) ? f.length : 0))
+      .catch(() => {});
+    api
+      .listLinks()
+      .then((l) => setLinks(Array.isArray(l) ? l : []))
+      .catch(() => {});
+    api
+      .recentFiles(6)
+      .then((f) => setRecentFiles(Array.isArray(f) ? f : []))
+      .catch(() => {});
+    api
+      .pronoteStatus()
+      .then(setPronoteStatus)
+      .catch(() => {});
+    api
+      .getRecap("today")
+      .then(setRecap)
+      .catch(() => {});
+    api
+      .getSetting("remote_favicons")
+      .then((v) => setRemoteIcons(remoteFaviconsEnabled(v)))
+      .catch(() => {});
   }, []);
 
   useVisibleRefresh(visible, refresh, DASHBOARD_EVENTS);
@@ -172,7 +202,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
         courses.find((c) => c.matiere && sub.includes(c.matiere.toLowerCase().slice(0, 8)))
       );
     },
-    [courses]
+    [courses],
   );
 
   const openFromSchedule = useCallback(
@@ -187,7 +217,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
         const hit = attached.find(
           (cc) =>
             (entry.subject || "").toLowerCase().includes(cc.class_name.toLowerCase()) ||
-            (entry.subject || "").includes(cc.class_name)
+            (entry.subject || "").includes(cc.class_name),
         );
         if (hit) {
           tabs.open({
@@ -202,7 +232,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
       }
       tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } });
     },
-    [courseForEntry, tabs]
+    [courseForEntry, tabs],
   );
 
   const openFile = useCallback(
@@ -216,7 +246,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
         api.openFile(f.id);
       }
     },
-    [tabs]
+    [tabs],
   );
 
   const importDocs = async () => {
@@ -268,17 +298,14 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
     if (!focus) return undefined;
     const subject = (focus.entry.subject || "").toLowerCase();
     return focusClasses.find(
-      (cc) => subject.includes(cc.class_name.toLowerCase()) || focus.entry.subject.includes(cc.class_name)
+      (cc) => subject.includes(cc.class_name.toLowerCase()) || focus.entry.subject.includes(cc.class_name),
     );
   }, [focus, focusClasses]);
 
   return (
     <>
       <PageHeader
-        title={greeting(
-          nowTick,
-          pronoteStatus?.connected ? pronoteStatus.account_name : null
-        )}
+        title={greeting(nowTick, pronoteStatus?.connected ? pronoteStatus.account_name : null)}
         meta={
           <>
             <span>{longDate(nowTick)}</span>
@@ -289,9 +316,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                 : fmt(get("dashboard.metaClasses", "{count} cours"), { count: classes.length })}
             </span>
             <MetaDot />
-            <span>
-              {fmt(get("dashboard.metaReminders", "{count} rappels"), { count: pending.length })}
-            </span>
+            <span>{fmt(get("dashboard.metaReminders", "{count} rappels"), { count: pending.length })}</span>
             {pronoteStatus && (
               <>
                 <MetaDot />
@@ -366,10 +391,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
             title={get("dashboard.todayTitle", "Aujourd'hui")}
             icon={<CalendarIcon className="w-3.5 h-3.5" />}
             action={
-              <button
-                className="eu-btn-quiet eu-btn-sm"
-                onClick={() => tabs.open({ kind: "settings" })}
-              >
+              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
                 {get("dashboard.schedule", "Emploi du temps")}
                 <ChevronRightIcon className="w-3 h-3" />
               </button>
@@ -384,10 +406,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                   "Profitez du calme — ou ajoutez vos cours dans l'emploi du temps."
                 }
                 action={
-                  <button
-                    className="eu-btn-ghost eu-btn-sm"
-                    onClick={() => tabs.open({ kind: "settings" })}
-                  >
+                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
                     {get("dashboard.schedule", "Emploi du temps")}
                   </button>
                 }
@@ -422,13 +441,10 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                 title={get("dashboard.noLinksTitle", "Aucun lien rapide")}
                 hint={get(
                   "dashboard.noLinksHint",
-                  "Ajoutez depuis Outils les adresses que vous ouvrez tous les jours."
+                  "Ajoutez depuis Outils les adresses que vous ouvrez tous les jours.",
                 )}
                 action={
-                  <button
-                    className="eu-btn-ghost eu-btn-sm"
-                    onClick={() => tabs.open({ kind: "tools" })}
-                  >
+                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
                     {get("common.add", "Ajouter")}
                   </button>
                 }
@@ -440,9 +456,11 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                     key={l.id}
                     type="button"
                     onClick={() => {
-                      void api.openUrl(l.url).catch(() =>
-                        toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error")
-                      );
+                      void api
+                        .openUrl(l.url)
+                        .catch(() =>
+                          toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error"),
+                        );
                     }}
                     className="eu-btn-ghost eu-btn-sm"
                     title={l.url}
@@ -475,10 +493,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                 title={get("dashboard.noRemindersTitle", "Rien à retenir")}
                 hint={t.dashboard?.noReminders || "Aucun rappel en attente."}
                 action={
-                  <button
-                    className="eu-btn-ghost eu-btn-sm"
-                    onClick={() => tabs.open({ kind: "reminders" })}
-                  >
+                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "reminders" })}>
                     {t.common?.newReminder || "Nouveau rappel"}
                   </button>
                 }
@@ -510,8 +525,8 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                             due.tone === "over"
                               ? "eu-chip-danger"
                               : due.tone === "soon"
-                              ? "eu-chip-warn"
-                              : "eu-chip"
+                                ? "eu-chip-warn"
+                                : "eu-chip"
                           }
                         >
                           {due.text}
@@ -536,10 +551,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
             title={get("dashboard.resumeTitle", "Reprendre")}
             icon={<ClockIcon className="w-3.5 h-3.5" />}
             action={
-              <button
-                className="eu-btn-quiet eu-btn-sm"
-                onClick={() => tabs.open({ kind: "documents" })}
-              >
+              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "documents" })}>
                 {t.nav?.documents || "Documents"}
                 <ChevronRightIcon className="w-3 h-3" />
               </button>
@@ -550,7 +562,7 @@ export default function Dashboard({ info: _info, visible = true }: { info?: AppI
                 title={get("dashboard.noRecentTitle", "Rien d'ouvert récemment")}
                 hint={get(
                   "dashboard.noRecentHint",
-                  "Importez des PDF, des images ou créez un tableau : ils apparaîtront ici."
+                  "Importez des PDF, des images ou créez un tableau : ils apparaîtront ici.",
                 )}
                 action={
                   <button className="eu-btn-ghost eu-btn-sm" onClick={importDocs}>
@@ -783,10 +795,10 @@ function ScheduleRow({
         {isCurrent
           ? get("dashboard.inProgress", "en cours")
           : status === "past"
-          ? get("dashboard.past", "passé")
-          : mins != null
-          ? fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(mins) })
-          : ""}
+            ? get("dashboard.past", "passé")
+            : mins != null
+              ? fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(mins) })
+              : ""}
       </span>
     </button>
   );

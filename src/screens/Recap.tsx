@@ -82,11 +82,31 @@ export default function Recap() {
 
   const stats = data
     ? [
-        { icon: <FileIcon className="w-5 h-5" />, value: data.files_opened, label: t.recap?.stats?.filesOpened || "fichiers ouverts" },
-        { icon: <PenIcon className="w-5 h-5" />, value: data.notes_written, label: t.recap?.stats?.notesWritten || "notes écrites" },
-        { icon: <PlayIcon className="w-5 h-5" />, value: data.demos_run, label: t.recap?.stats?.demosRun || "démos lancées" },
-        { icon: <CheckIcon className="w-5 h-5" />, value: data.reminders_done, label: t.recap?.stats?.remindersDone || "rappels faits" },
-        { icon: <ClockIcon className="w-5 h-5" />, value: data.active_minutes, label: t.recap?.stats?.activeMinutes || "minutes actives" },
+        {
+          icon: <FileIcon className="w-5 h-5" />,
+          value: data.files_opened,
+          label: t.recap?.stats?.filesOpened || "fichiers ouverts",
+        },
+        {
+          icon: <PenIcon className="w-5 h-5" />,
+          value: data.notes_written,
+          label: t.recap?.stats?.notesWritten || "notes écrites",
+        },
+        {
+          icon: <PlayIcon className="w-5 h-5" />,
+          value: data.demos_run,
+          label: t.recap?.stats?.demosRun || "démos lancées",
+        },
+        {
+          icon: <CheckIcon className="w-5 h-5" />,
+          value: data.reminders_done,
+          label: t.recap?.stats?.remindersDone || "rappels faits",
+        },
+        {
+          icon: <ClockIcon className="w-5 h-5" />,
+          value: data.active_minutes,
+          label: t.recap?.stats?.activeMinutes || "minutes actives",
+        },
       ]
     : [];
 
@@ -121,31 +141,48 @@ export default function Recap() {
       icon: meta.icon,
     };
   });
-  const totalAreaMinutes = timeByArea.reduce((sum: number, a: { minutes: number }) => sum + a.minutes, 0) || 1;
+  const totalAreaMinutes =
+    timeByArea.reduce((sum: number, a: { minutes: number }) => sum + a.minutes, 0) || 1;
 
   // Build highlights client-side so all text comes from the central JSON (src/locales/strings.json)
   const highlights: string[] = [];
   if (data) {
     if (data.files_opened > 0) {
-      highlights.push(fmt(t.recap?.highlightFiles || "Vous avez ouvert {count} fichier(s).", { count: data.files_opened }));
+      highlights.push(
+        fmt(t.recap?.highlightFiles || "Vous avez ouvert {count} fichier(s).", { count: data.files_opened }),
+      );
     }
     if (data.notes_written > 0) {
-      highlights.push(fmt(t.recap?.highlightNotes || "{count} nouvelle(s) note(s) préparée(s).", { count: data.notes_written }));
+      highlights.push(
+        fmt(t.recap?.highlightNotes || "{count} nouvelle(s) note(s) préparée(s).", {
+          count: data.notes_written,
+        }),
+      );
     }
     if (data.top_courses?.length > 0) {
       const top = data.top_courses[0];
-      highlights.push(fmt(t.recap?.highlightTopCourse || "Cours le plus actif : {name}.", { name: top.name }));
+      highlights.push(
+        fmt(t.recap?.highlightTopCourse || "Cours le plus actif : {name}.", { name: top.name }),
+      );
     }
     if (data.top_documents?.length > 0) {
       const top = data.top_documents[0];
-      highlights.push(fmt(t.recap?.highlightTopDoc || "Document le plus consulté : {name}.", { name: top.name }));
+      highlights.push(
+        fmt(t.recap?.highlightTopDoc || "Document le plus consulté : {name}.", { name: top.name }),
+      );
     }
     if (data.top_tools?.length > 0) {
       const top = data.top_tools[0];
-      highlights.push(fmt(t.recap?.highlightTopTool || "Outil le plus utilisé : {name}.", { name: top.name }));
+      highlights.push(
+        fmt(t.recap?.highlightTopTool || "Outil le plus utilisé : {name}.", { name: top.name }),
+      );
     }
     if (data.reminders_done > 0) {
-      highlights.push(fmt(t.recap?.highlightReminders || "{count} rappel(s) accompli(s). Bravo !", { count: data.reminders_done }));
+      highlights.push(
+        fmt(t.recap?.highlightReminders || "{count} rappel(s) accompli(s). Bravo !", {
+          count: data.reminders_done,
+        }),
+      );
     }
     if (highlights.length === 0) {
       highlights.push(t.recap?.highlightEmpty || "Rien d'enregistré pour cette période. Bonne classe !");
@@ -189,9 +226,7 @@ export default function Recap() {
             <StatTile
               icon={<ClockIcon className="w-4 h-4" />}
               value={
-                totalMin >= 60
-                  ? `${hours}\u00a0h\u00a0${String(mins).padStart(2, "0")}`
-                  : `${mins}\u00a0min`
+                totalMin >= 60 ? `${hours}\u00a0h\u00a0${String(mins).padStart(2, "0")}` : `${mins}\u00a0min`
               }
               label={t.recap?.activityTime || "Temps actif"}
               hint={PERIOD_LABELS[period]}

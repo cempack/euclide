@@ -1,4 +1,4 @@
-name: 'preview'
+name: "preview"
 
 # Test builds of any branch, for trying a change on a school PC before it
 # reaches main. Run it by hand from the Actions tab and pick the branch.
@@ -19,12 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'windows-latest'
-            target: 'x86_64-pc-windows-msvc'
-            args: '--target x86_64-pc-windows-msvc --no-bundle'
-          - platform: 'ubuntu-22.04'
-            target: 'x86_64-unknown-linux-gnu'
-            args: '--target x86_64-unknown-linux-gnu --bundles appimage'
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            args: "--target x86_64-pc-windows-msvc --no-bundle"
+          - platform: "ubuntu-22.04"
+            target: "x86_64-unknown-linux-gnu"
+            args: "--target x86_64-unknown-linux-gnu --bundles appimage"
 
     runs-on: ${{ matrix.platform }}
     env:
@@ -44,13 +44,13 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: lts/*
-          cache: 'npm'
+          cache: "npm"
 
       - run: npm ci
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: sidecar/requirements.txt
 
@@ -58,7 +58,7 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: 'src-tauri -> target'
+          workspaces: "src-tauri -> target"
           shared-key: preview-${{ matrix.target }}
           cache-on-failure: true
 

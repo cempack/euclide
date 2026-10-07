@@ -48,7 +48,8 @@ export default function ClassContent({
     const lower = (m || "").toLowerCase();
     if (lower.includes("experte")) return "MATHÉMATIQUES EXPERTES";
     if (lower.includes("math")) return "MATHÉMATIQUES";
-    if (lower.includes("nsi") || lower.includes("informatique") || lower.includes("numérique")) return "INFORM";  // robust substring for "NUMERIQUE SC.INFORM." etc.
+    if (lower.includes("nsi") || lower.includes("informatique") || lower.includes("numérique"))
+      return "INFORM"; // robust substring for "NUMERIQUE SC.INFORM." etc.
     return m || ""; // fallback, partial match will try
   };
 
@@ -71,7 +72,9 @@ export default function ClassContent({
 
     const noMatiere = !c?.matiere && !matiere;
     if (noMatiere) {
-      setError("Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes.");
+      setError(
+        "Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes.",
+      );
       setContents([]);
       setLoading(false);
       setIsRefreshing(false);
@@ -120,7 +123,9 @@ export default function ClassContent({
       setLastRefresh(rt);
       contentCache.set(cacheKey, { data: items, ts: rt.getTime() });
     } catch (e: any) {
-      setError(e?.message || "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof).");
+      setError(
+        e?.message || "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof).",
+      );
       if (!hasStale) {
         setContents([]);
       }
@@ -141,11 +146,14 @@ export default function ClassContent({
 
   const copyUrl = (url?: string) => {
     if (!url) return;
-    navigator.clipboard?.writeText(url).then(() => {
-      toast(get("classContent.linkCopied", "Lien copié dans le presse-papiers"), "success");
-    }).catch(() => {
-      toast(get("classContent.linkFallback", "Lien : {url}").replace("{url}", url), "success");
-    });
+    navigator.clipboard
+      ?.writeText(url)
+      .then(() => {
+        toast(get("classContent.linkCopied", "Lien copié dans le presse-papiers"), "success");
+      })
+      .catch(() => {
+        toast(get("classContent.linkFallback", "Lien : {url}").replace("{url}", url), "success");
+      });
   };
 
   const effectiveMatiere = matiere || course?.matiere || "—";
@@ -164,7 +172,11 @@ export default function ClassContent({
         onBack={() => {
           // Navigate back to the parent course tab; close self first to avoid id races.
           const selfId = tabs.activeId;
-          tabs.open({ kind: "course", title: course?.name || get("nav.courses", "Cours"), params: { courseId } });
+          tabs.open({
+            kind: "course",
+            title: course?.name || get("nav.courses", "Cours"),
+            params: { courseId },
+          });
           if (selfId) tabs.close(selfId);
         }}
         backLabel={course?.name || get("classContent.back", "Retour au cours")}
@@ -210,7 +222,9 @@ export default function ClassContent({
       {error && (
         <div className="eu-panel border-danger/30 bg-danger-soft p-[14px] flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <p className="eu-t-section text-danger">{get("classContent.errorTitle", "Contenu indisponible")}</p>
+            <p className="eu-t-section text-danger">
+              {get("classContent.errorTitle", "Contenu indisponible")}
+            </p>
             <p className="eu-t-body text-danger/90 mt-1">{error}</p>
           </div>
           <button className="eu-btn-ghost eu-btn-sm shrink-0" onClick={retryLoad}>
@@ -266,9 +280,7 @@ export default function ClassContent({
                       {c.title || "(sans titre)"}
                     </span>
                     {c.category && (
-                      <span className="eu-chip text-[10px] py-px tracking-wide">
-                        {c.category}
-                      </span>
+                      <span className="eu-chip text-[10px] py-px tracking-wide">{c.category}</span>
                     )}
                     {c.subject && c.subject !== effectiveMatiere && (
                       <span className="text-[10px] text-ink-muted">({c.subject})</span>
@@ -276,18 +288,10 @@ export default function ClassContent({
                   </div>
 
                   {/* Description — the actual lesson content */}
-                  {c.description && (
-                    <p className="text-[13px] text-ink leading-relaxed">
-                      {c.description}
-                    </p>
-                  )}
+                  {c.description && <p className="text-[13px] text-ink leading-relaxed">{c.description}</p>}
 
                   {/* Meta */}
-                  {c.groups && (
-                    <div className="text-[11px] text-ink-muted">
-                      Groupes : {c.groups}
-                    </div>
-                  )}
+                  {c.groups && <div className="text-[11px] text-ink-muted">Groupes : {c.groups}</div>}
 
                   {/* Documents — now a distinctive attachment block */}
                   {c.documents && c.documents.length > 0 && (

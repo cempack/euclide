@@ -19,7 +19,6 @@ import {
   BookIcon,
   CheckIcon,
   ChevronDownIcon,
-
   FileIcon,
   FileKindIcon,
   LayersIcon,
@@ -54,7 +53,7 @@ function isMainClass(name: string): boolean {
 function sanitizePronoteClasses(raw: any[]): any[] {
   const seen = new Set<string>();
   const out: any[] = [];
-  for (const c of (raw || [])) {
+  for (const c of raw || []) {
     if (!c || typeof c.name !== "string") continue;
     const n = c.name.trim();
     if (!isMainClass(n) || seen.has(n)) continue;
@@ -88,12 +87,20 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   const { resolved } = useAppearance();
 
   const refreshNotes = useCallback(
-    () => api.listNotes(courseId).then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {}),
-    [courseId]
+    () =>
+      api
+        .listNotes(courseId)
+        .then((n) => setNotes(Array.isArray(n) ? n : []))
+        .catch(() => {}),
+    [courseId],
   );
   const refreshFiles = useCallback(
-    () => api.listFiles(courseId).then((f) => setFiles(Array.isArray(f) ? f : [])).catch(() => {}),
-    [courseId]
+    () =>
+      api
+        .listFiles(courseId)
+        .then((f) => setFiles(Array.isArray(f) ? f : []))
+        .catch(() => {}),
+    [courseId],
   );
   const refreshClasses = useCallback(
     () =>
@@ -101,7 +108,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
         .listCourseClasses(courseId)
         .then((c) => setCourseClasses(Array.isArray(c) ? c : []))
         .catch(() => {}),
-    [courseId]
+    [courseId],
   );
   const refreshAll = useCallback(() => {
     refreshFiles();
@@ -194,8 +201,6 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
     });
   }, [pronoteClasses, courseClasses]);
 
-
-
   const attachClass = async () => {
     const useSelect = availablePronoteClasses.length > 0;
     const classToAttach = (useSelect ? selectedPronoteClass : newClassName).trim();
@@ -206,7 +211,10 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
         toast(get("messages.genericError", "Erreur"), "error");
         return;
       }
-      toast(fmt(t.courseDetail?.attachSuccess || 'Classe "{name}" attachée', { name: classToAttach }), "success");
+      toast(
+        fmt(t.courseDetail?.attachSuccess || 'Classe "{name}" attachée', { name: classToAttach }),
+        "success",
+      );
       setNewClassName("");
       setSelectedPronoteClass("");
       refreshClasses();
@@ -238,12 +246,9 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   const openAttachModal = async () => {
     try {
       // Load global docs + this course's current casier so we can exclude already-attached ones
-      const [docs, currentCasier] = await Promise.all([
-        api.listFiles(null),
-        api.listFiles(courseId),
-      ]);
-      const attachedNames = new Set((currentCasier || []).map((f: any) => (f.name || '').toLowerCase()));
-      const available = (docs || []).filter((d: any) => !attachedNames.has((d.name || '').toLowerCase()));
+      const [docs, currentCasier] = await Promise.all([api.listFiles(null), api.listFiles(courseId)]);
+      const attachedNames = new Set((currentCasier || []).map((f: any) => (f.name || "").toLowerCase()));
+      const available = (docs || []).filter((d: any) => !attachedNames.has((d.name || "").toLowerCase()));
       setAttachDocs(available);
       setAttachSelected([]);
       setShowAttach(true);
@@ -253,9 +258,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   };
 
   const toggleAttachDoc = (id: number) => {
-    setAttachSelected((sel) =>
-      sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]
-    );
+    setAttachSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
   };
 
   const doAttachDocs = async () => {
@@ -277,7 +280,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
         added.forEach((f) => api.logEvent("file_import", f.name, courseId));
         toast(
           fmt(t.courseDetail?.importedFilesToast || "{count} importé(s)", { count: added.length }),
-          "success"
+          "success",
         );
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       }
@@ -302,14 +305,16 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   if (!course) {
     return (
       <div className="py-20">
-        <EmptyState title={t.courseDetail?.notFoundTitle || "Cours introuvable"} hint={t.courseDetail?.notFoundHint || "Il a peut-être été supprimé."} />
+        <EmptyState
+          title={t.courseDetail?.notFoundTitle || "Cours introuvable"}
+          hint={t.courseDetail?.notFoundHint || "Il a peut-être été supprimé."}
+        />
       </div>
     );
   }
 
   const visual = courseVisual(course.color, resolved === "dark");
-  const CourseIcon =
-    COURSE_ICONS.find((i) => i.key === (course.emoji || "book"))?.Icon ?? BookIcon;
+  const CourseIcon = COURSE_ICONS.find((i) => i.key === (course.emoji || "book"))?.Icon ?? BookIcon;
 
   return (
     <>
@@ -331,9 +336,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
               {fmt(get("courseDetail.metaClasses", "{count} classes"), { count: courseClasses.length })}
             </span>
             <MetaDot />
-            <span>
-              {fmt(get("courseDetail.metaFiles", "{count} documents"), { count: files.length })}
-            </span>
+            <span>{fmt(get("courseDetail.metaFiles", "{count} documents"), { count: files.length })}</span>
             <MetaDot />
             <span>{fmt(get("courseDetail.metaNotes", "{count} notes"), { count: notes.length })}</span>
             {course.description && (
@@ -365,7 +368,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                   }),
                   message: get(
                     "courseDetail.confirmDeleteCourseBody",
-                    "Le casier, les notes et les séquences de ce cours seront supprimés."
+                    "Le casier, les notes et les séquences de ce cours seront supprimés.",
                   ),
                   confirmLabel: get("common.delete", "Supprimer"),
                   danger: true,
@@ -557,7 +560,8 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       >
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
-            {t.courseDetail?.attachDocsHint || "Sélectionnez des fichiers de la bibliothèque Documents pour les copier dans le casier de ce cours."}
+            {t.courseDetail?.attachDocsHint ||
+              "Sélectionnez des fichiers de la bibliothèque Documents pour les copier dans le casier de ce cours."}
           </p>
           {attachDocs.length === 0 ? (
             <p className="text-sm text-ink-muted">Aucun document dans la bibliothèque globale.</p>
@@ -568,7 +572,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                 return (
                   <div
                     key={d.id}
-                    className={`flex items-center gap-3 p-2 text-sm hover:bg-panel-alt cursor-pointer ${isSel ? 'bg-panel-alt' : ''}`}
+                    className={`flex items-center gap-3 p-2 text-sm hover:bg-panel-alt cursor-pointer ${isSel ? "bg-panel-alt" : ""}`}
                     onClick={() => toggleAttachDoc(d.id)}
                   >
                     <input
@@ -597,12 +601,10 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
             <button onClick={() => setShowAttach(false)} className="eu-btn-ghost">
               Annuler
             </button>
-            <button
-              onClick={doAttachDocs}
-              disabled={attachSelected.length === 0}
-              className="eu-btn-primary"
-            >
-              {attachSelected.length > 0 ? `Attacher ${attachSelected.length} document(s)` : "Attacher des documents"}
+            <button onClick={doAttachDocs} disabled={attachSelected.length === 0} className="eu-btn-primary">
+              {attachSelected.length > 0
+                ? `Attacher ${attachSelected.length} document(s)`
+                : "Attacher des documents"}
             </button>
           </div>
         </div>
@@ -679,9 +681,7 @@ function FilesPane({
               if (!ok) return;
               try {
                 await api.deleteFile(f.id);
-                tabs.tabs
-                  .filter((tab) => tab.params.fileId === f.id)
-                  .forEach((tab) => tabs.close(tab.id));
+                tabs.tabs.filter((tab) => tab.params.fileId === f.id).forEach((tab) => tabs.close(tab.id));
                 window.dispatchEvent(new CustomEvent("eu:library-changed"));
                 onChanged();
               } catch (err: any) {
@@ -734,10 +734,7 @@ function SequencePane({
 
   const load = useCallback(async () => {
     try {
-      const [s, i] = await Promise.all([
-        api.listSequences(courseId),
-        api.listSequenceItems(courseId),
-      ]);
+      const [s, i] = await Promise.all([api.listSequences(courseId), api.listSequenceItems(courseId)]);
       setSequences(Array.isArray(s) ? s : []);
       setItems(Array.isArray(i) ? i : []);
     } catch {
@@ -842,7 +839,7 @@ function SequencePane({
           title={get("sequences.emptyTitle", "Aucune séquence")}
           hint={get(
             "sequences.emptyHint",
-            "Découpez le cours en séquences (chapitres) puis en étapes : activité, cours, exercices, évaluation. Chaque classe peut ensuite être positionnée sur une étape."
+            "Découpez le cours en séquences (chapitres) puis en étapes : activité, cours, exercices, évaluation. Chaque classe peut ensuite être positionnée sur une étape.",
           )}
         />
       ) : (
@@ -894,7 +891,7 @@ function SequencePane({
                           title: get("sequences.deleteTitle", "Supprimer la séquence"),
                           message: fmt(
                             get("sequences.deleteMessage", "Supprimer « {name} » et ses étapes ?"),
-                            { name: seq.title }
+                            { name: seq.title },
                           ),
                           confirmLabel: get("common.delete", "Supprimer"),
                           danger: true,

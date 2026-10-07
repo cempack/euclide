@@ -1,15 +1,15 @@
-name: 'publish'
+name: "publish"
 
 on:
   push:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Publish a GitHub release. Merges into main (when app/packaging source changed) cut the next v* tag. Version tags and manual runs also publish Latest.'
+        description: "Publish a GitHub release. Merges into main (when app/packaging source changed) cut the next v* tag. Version tags and manual runs also publish Latest."
         required: false
         default: true
         type: boolean
@@ -160,18 +160,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # Apple Silicon (aarch64) - standard .app (no dmg setup)
-            target: 'aarch64-apple-darwin'
-            arch: 'aarch64'
-            args: '--target aarch64-apple-darwin --bundles app'
-          - platform: 'ubuntu-22.04' # Linux - portable AppImage (no deb/rpm setups)
-            target: 'x86_64-unknown-linux-gnu'
-            arch: 'x86_64'
-            args: '--target x86_64-unknown-linux-gnu --bundles appimage'
-          - platform: 'windows-latest' # Windows - NSIS for installed copies + portable zip for USB in-place updates
-            target: 'x86_64-pc-windows-msvc'
-            arch: 'x86_64'
-            args: '--target x86_64-pc-windows-msvc'
+          - platform: "macos-latest" # Apple Silicon (aarch64) - standard .app (no dmg setup)
+            target: "aarch64-apple-darwin"
+            arch: "aarch64"
+            args: "--target aarch64-apple-darwin --bundles app"
+          - platform: "ubuntu-22.04" # Linux - portable AppImage (no deb/rpm setups)
+            target: "x86_64-unknown-linux-gnu"
+            arch: "x86_64"
+            args: "--target x86_64-unknown-linux-gnu --bundles appimage"
+          - platform: "windows-latest" # Windows - NSIS for installed copies + portable zip for USB in-place updates
+            target: "x86_64-pc-windows-msvc"
+            arch: "x86_64"
+            args: "--target x86_64-pc-windows-msvc"
 
     runs-on: ${{ matrix.platform }}
     env:
@@ -194,7 +194,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
-          cache: 'npm'
+          cache: "npm"
 
       - name: install frontend dependencies
         run: npm ci
@@ -202,7 +202,7 @@ jobs:
       - name: setup python for sidecar
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: sidecar/requirements.txt
 
@@ -214,7 +214,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: 'src-tauri -> target'
+          workspaces: "src-tauri -> target"
           shared-key: release-${{ matrix.target }}
           cache-on-failure: true
 

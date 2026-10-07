@@ -3,16 +3,81 @@ import { api, type PythonCompletion } from "../lib/api";
 
 // Tiny Python keyword + builtin set for autocomplete + coloring
 const PYTHON_KEYWORDS = new Set([
-  "def", "class", "if", "elif", "else", "for", "while", "in", "import", "from", "as",
-  "return", "yield", "try", "except", "finally", "with", "pass", "break", "continue",
-  "True", "False", "None", "and", "or", "not", "lambda", "global", "nonlocal", "assert",
-  "del", "raise", "is", "async", "await",
+  "def",
+  "class",
+  "if",
+  "elif",
+  "else",
+  "for",
+  "while",
+  "in",
+  "import",
+  "from",
+  "as",
+  "return",
+  "yield",
+  "try",
+  "except",
+  "finally",
+  "with",
+  "pass",
+  "break",
+  "continue",
+  "True",
+  "False",
+  "None",
+  "and",
+  "or",
+  "not",
+  "lambda",
+  "global",
+  "nonlocal",
+  "assert",
+  "del",
+  "raise",
+  "is",
+  "async",
+  "await",
 ]);
 const PYTHON_BUILTINS = new Set([
-  "print", "len", "range", "int", "str", "list", "dict", "set", "tuple", "bool", "float",
-  "open", "input", "abs", "min", "max", "sum", "sorted", "enumerate", "zip", "map", "filter",
-  "self", "super", "type", "isinstance", "hasattr", "getattr", "setattr", "dir", "help",
-  "repr", "str", "chr", "ord", "hex", "bin", "oct",
+  "print",
+  "len",
+  "range",
+  "int",
+  "str",
+  "list",
+  "dict",
+  "set",
+  "tuple",
+  "bool",
+  "float",
+  "open",
+  "input",
+  "abs",
+  "min",
+  "max",
+  "sum",
+  "sorted",
+  "enumerate",
+  "zip",
+  "map",
+  "filter",
+  "self",
+  "super",
+  "type",
+  "isinstance",
+  "hasattr",
+  "getattr",
+  "setattr",
+  "dir",
+  "help",
+  "repr",
+  "str",
+  "chr",
+  "ord",
+  "hex",
+  "bin",
+  "oct",
 ]);
 
 type Token = { text: string; type: "keyword" | "builtin" | "string" | "comment" | "number" | "plain" };
@@ -78,7 +143,11 @@ function tokenizePython(src: string): Token[] {
       let j = i;
       while (j < len && /[\w_]/.test(src[j])) j++;
       const w = src.slice(i, j);
-      const type: Token["type"] = PYTHON_KEYWORDS.has(w) ? "keyword" : PYTHON_BUILTINS.has(w) ? "builtin" : "plain";
+      const type: Token["type"] = PYTHON_KEYWORDS.has(w)
+        ? "keyword"
+        : PYTHON_BUILTINS.has(w)
+          ? "builtin"
+          : "plain";
       tokens.push({ text: w, type });
       i = j;
       continue;
@@ -92,10 +161,7 @@ function tokenizePython(src: string): Token[] {
 }
 
 // Very small autocomplete list (keywords + builtins)
-const AUTOCOMPLETE_LIST = [
-  ...Array.from(PYTHON_KEYWORDS),
-  ...Array.from(PYTHON_BUILTINS),
-].sort();
+const AUTOCOMPLETE_LIST = [...Array.from(PYTHON_KEYWORDS), ...Array.from(PYTHON_BUILTINS)].sort();
 
 export default function CodeEditor({
   value,
@@ -310,8 +376,7 @@ export default function CodeEditor({
   function localFilter(word: string): PythonCompletion[] {
     if (!word || word.length < 2) return [];
     const lower = word.toLowerCase();
-    return AUTOCOMPLETE_LIST
-      .filter((w) => w.toLowerCase().startsWith(lower) && w !== word)
+    return AUTOCOMPLETE_LIST.filter((w) => w.toLowerCase().startsWith(lower) && w !== word)
       .slice(0, 8)
       .map((name) => ({ name }));
   }
@@ -429,7 +494,9 @@ export default function CodeEditor({
   }, [value]);
 
   return (
-    <div className={`code-editor flex h-full rounded-lg border border-line bg-panel overflow-hidden eu-no-drag ${className || ''}`}>
+    <div
+      className={`code-editor flex h-full rounded-lg border border-line bg-panel overflow-hidden eu-no-drag ${className || ""}`}
+    >
       {/* gutter */}
       <div
         ref={gutterRef}
@@ -437,7 +504,9 @@ export default function CodeEditor({
         style={{ minWidth: 42 }}
       >
         {Array.from({ length: lines }).map((_, i) => (
-          <div key={i} className="gutter-line">{i + 1}</div>
+          <div key={i} className="gutter-line">
+            {i + 1}
+          </div>
         ))}
       </div>
 
@@ -493,7 +562,11 @@ export default function CodeEditor({
                 >
                   <div className="flex items-baseline gap-1.5">
                     <span className="font-medium tabular-nums">{label}</span>
-                    {extra && <span className={`text-[10px] ${isSel ? "text-accent/80" : "text-ink-muted"} truncate`}>{extra}</span>}
+                    {extra && (
+                      <span className={`text-[10px] ${isSel ? "text-accent/80" : "text-ink-muted"} truncate`}>
+                        {extra}
+                      </span>
+                    )}
                   </div>
                   {isSel && s.doc && (
                     <div className="text-[9px] text-ink-muted/80 pl-0.5 pr-2 line-clamp-2 border-l border-line/60 ml-0.5">

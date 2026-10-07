@@ -250,7 +250,7 @@ function CommandPalette({
                 next
                   ? t.tools?.keepAwakeOn || "L'écran reste allumé"
                   : t.tools?.keepAwakeOff || "Verrouillage écran normal",
-                next ? "success" : "info"
+                next ? "success" : "info",
               );
             } catch {
               toast(get("messages.genericError", "Erreur"), "error");
@@ -313,9 +313,9 @@ function CommandPalette({
         aliases: [...cmdAliases("links"), link.url],
         icon: <LinkIcon className="w-4 h-4" />,
         run: () => {
-          api.openUrl(link.url).catch(() =>
-            toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error")
-          );
+          api
+            .openUrl(link.url)
+            .catch(() => toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error"));
           onClose();
         },
       });
@@ -346,7 +346,11 @@ function CommandPalette({
           hint: get("documents.noteKind", "note"),
           icon: <NoteIcon className="w-4 h-4" />,
           run: () => {
-            tabs.open({ kind: "note", title: r.title || get("notes.newTitle", "Note"), params: { noteId: r.id } });
+            tabs.open({
+              kind: "note",
+              title: r.title || get("notes.newTitle", "Note"),
+              params: { noteId: r.id },
+            });
             onClose();
           },
         };
@@ -358,7 +362,8 @@ function CommandPalette({
         snippet: r.snippet || undefined,
         icon: <DocIcon className="w-4 h-4" />,
         run: () => {
-          if (r.file_kind === "board") tabs.open({ kind: "whiteboard", title: r.title, params: { fileId: r.id } });
+          if (r.file_kind === "board")
+            tabs.open({ kind: "whiteboard", title: r.title, params: { fileId: r.id } });
           else if (r.file_kind === "pdf" || r.file_kind === "image")
             tabs.open({ kind: "pdf", title: r.title, params: { fileId: r.id, fileName: r.title } });
           else api.openFile(r.id);
@@ -373,7 +378,9 @@ function CommandPalette({
     const wantResults = scope !== "commands";
 
     if (!term.trim()) {
-      return wantCommands ? baseActions.filter((a) => a.group === get("palette.groupCommands", "Commandes")).slice(0, 9) : [];
+      return wantCommands
+        ? baseActions.filter((a) => a.group === get("palette.groupCommands", "Commandes")).slice(0, 9)
+        : [];
     }
 
     const commands = wantCommands ? rankPaletteItems(baseActions, term) : [];
@@ -482,9 +489,7 @@ function CommandPalette({
                         <span className="min-w-0 flex-1">
                           <span className="eu-t-body block truncate">{a.label}</span>
                           {a.snippet && (
-                            <span
-                              className={`block eu-t-meta truncate ${i === sel ? "text-panel/70" : ""}`}
-                            >
+                            <span className={`block eu-t-meta truncate ${i === sel ? "text-panel/70" : ""}`}>
                               {a.snippet}
                             </span>
                           )}

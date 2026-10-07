@@ -121,7 +121,7 @@ export function isNoPublishedUpdate(err: unknown): boolean {
 function progressFromEvent(
   event: DownloadEvent,
   downloaded: number,
-  contentLength: number | null
+  contentLength: number | null,
 ): { downloaded: number; contentLength: number | null } {
   switch (event.event) {
     case "Started":
@@ -172,7 +172,7 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateInfo | 
 }
 
 export async function installPendingUpdate(
-  onProgress?: (progress: UpdateDownloadProgress) => void
+  onProgress?: (progress: UpdateDownloadProgress) => void,
 ): Promise<void> {
   if (!pending) {
     throw new Error("Aucune mise à jour en attente.");

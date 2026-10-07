@@ -34,11 +34,7 @@ export function PageHeader({
   return (
     <header className="flex flex-col gap-3">
       {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="eu-btn-quiet eu-btn-sm self-start -ml-2.5"
-        >
+        <button type="button" onClick={onBack} className="eu-btn-quiet eu-btn-sm self-start -ml-2.5">
           <ArrowRightIcon className="w-3.5 h-3.5 rotate-180" />
           {backLabel}
         </button>
@@ -59,11 +55,7 @@ export function PageHeader({
 
 /** Mono context line under a page title. Children separated by `<MetaDot/>`. */
 export function MetaLine({ children }: { children: ReactNode }) {
-  return (
-    <div className="eu-t-label mt-2 flex items-center gap-2.5 flex-wrap leading-normal">
-      {children}
-    </div>
-  );
+  return <div className="eu-t-label mt-2 flex items-center gap-2.5 flex-wrap leading-normal">{children}</div>;
 }
 
 export function MetaDot() {
@@ -116,13 +108,7 @@ export function Panel({
 // Python all used to hand-roll this).
 // ---------------------------------------------------------------------------
 
-export function Toolbar({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function Toolbar({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
       role="toolbar"
@@ -182,7 +168,11 @@ export function Segmented<T extends string | number>({
   className?: string;
 }) {
   return (
-    <div className={`eu-segment ${grow ? "eu-segment-fill" : ""} ${className}`} role="tablist" aria-label={label}>
+    <div
+      className={`eu-segment ${grow ? "eu-segment-fill" : ""} ${className}`}
+      role="tablist"
+      aria-label={label}
+    >
       {options.map((o) => (
         <button
           key={String(o.value)}
@@ -239,7 +229,12 @@ export function StatTile({
   const base =
     "eu-stat-tile flex-1 flex items-center gap-3 px-4 border-r border-line last:border-r-0 text-left";
   return onClick ? (
-    <button type="button" onClick={onClick} title={title} className={`${base} hover:bg-panel-alt transition-colors duration-fast`}>
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`${base} hover:bg-panel-alt transition-colors duration-fast`}
+    >
       {inner}
     </button>
   ) : (

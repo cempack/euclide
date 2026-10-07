@@ -5,7 +5,18 @@ import prettier from "eslint-config-prettier";
 import globals from "globals";
 
 export default tseslint.config(
-  { ignores: ["dist", "public/pdfjs", "src-tauri", "sidecar", ".delta", ".shots", "test-results", "playwright-report"] },
+  {
+    ignores: [
+      "dist",
+      "public/pdfjs",
+      "src-tauri",
+      "sidecar",
+      ".delta",
+      ".shots",
+      "test-results",
+      "playwright-report",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,

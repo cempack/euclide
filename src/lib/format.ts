@@ -97,7 +97,7 @@ export type ClassStatus = "past" | "current" | "next" | "upcoming";
 
 export function getClassStatus(
   entry: { start_time: string; end_time: string },
-  now: Date = new Date()
+  now: Date = new Date(),
 ): ClassStatus {
   const cur = now.getHours() * 60 + now.getMinutes();
   const s = parseMinutes(entry.start_time);
@@ -139,7 +139,7 @@ export function minutesUntil(start_time: string, now: Date = new Date()): number
 /** Minutes left before a class ends (null once it is over). */
 export function minutesRemaining(
   entry: { start_time: string; end_time: string },
-  now: Date = new Date()
+  now: Date = new Date(),
 ): number | null {
   const cur = now.getHours() * 60 + now.getMinutes();
   const end = parseMinutes(entry.end_time);
@@ -150,7 +150,7 @@ export function minutesRemaining(
 /** How far through a class we are, 0..100. */
 export function classProgress(
   entry: { start_time: string; end_time: string },
-  now: Date = new Date()
+  now: Date = new Date(),
 ): number {
   const s = parseMinutes(entry.start_time);
   const e = parseMinutes(entry.end_time);
@@ -166,7 +166,7 @@ export function classProgress(
  */
 export function focusClass<T extends { start_time: string; end_time: string }>(
   classes: T[],
-  now: Date = new Date()
+  now: Date = new Date(),
 ): { entry: T; state: "current" | "next" } | null {
   const sorted = [...classes].sort((a, b) => a.start_time.localeCompare(b.start_time));
   const current = sorted.find((c) => getClassStatus(c, now) === "current");
@@ -212,9 +212,14 @@ function calendarDayDiff(due: Date, now: Date): number {
   return Math.round((a - b) / 86_400_000);
 }
 
-export function formatDueLabel(dueIso: string | null | undefined): { text: string; tone: "default" | "soon" | "over" } {
+export function formatDueLabel(dueIso: string | null | undefined): {
+  text: string;
+  tone: "default" | "soon" | "over";
+} {
   if (!dueIso) return { text: "", tone: "default" };
-  const normalized = dueIso.includes("T") ? dueIso : dueIso.replace(" ", "T") + (dueIso.includes("Z") ? "" : "Z");
+  const normalized = dueIso.includes("T")
+    ? dueIso
+    : dueIso.replace(" ", "T") + (dueIso.includes("Z") ? "" : "Z");
   const d = new Date(normalized);
   if (Number.isNaN(d.getTime())) return { text: "", tone: "default" };
   const now = new Date();

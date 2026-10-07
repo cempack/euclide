@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "./api";
 
 /**
@@ -79,9 +71,7 @@ function systemPrefersDark(): boolean {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [pref, setPrefState] = useState<ThemePref>(() => readLocal(LS_THEME, isThemePref, "auto"));
-  const [density, setDensityState] = useState<Density>(() =>
-    readLocal(LS_DENSITY, isDensity, "comfortable")
-  );
+  const [density, setDensityState] = useState<Density>(() => readLocal(LS_DENSITY, isDensity, "comfortable"));
   const [projection, setProjectionState] = useState(false);
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
 
@@ -160,7 +150,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setProjection,
       toggleProjection,
     }),
-    [pref, resolved, setPref, density, setDensity, projection, setProjection, toggleProjection]
+    [pref, resolved, setPref, density, setDensity, projection, setProjection, toggleProjection],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

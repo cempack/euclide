@@ -65,11 +65,7 @@
     "upcoming": "à venir",
     "past": "passé",
     "newTabWhiteboard": "Nouveau tableau",
-    "cheers": [
-      "Bien joué !",
-      "Fait !",
-      "Nickel !"
-    ],
+    "cheers": ["Bien joué !", "Fait !", "Nickel !"],
     "confirmDeleteReminder": "Supprimer le rappel ?",
     "errorDeleteReminder": "Suppression impossible",
     "toastReminderAdded": "Rappel ajouté",
@@ -104,14 +100,7 @@
     "openContent": "Cahier de textes",
     "linkCourse": "Associer un cours"
   },
-  "greetings": [
-    "Bonjour",
-    "Prêt ?",
-    "On y va ?",
-    "Bonjour !",
-    "Bonne journée",
-    "En forme ?"
-  ],
+  "greetings": ["Bonjour", "Prêt ?", "On y va ?", "Bonjour !", "Bonne journée", "En forme ?"],
   "greetingsNamed": [
     "Bonjour {name}",
     "Prêt {name} ?",
@@ -334,15 +323,7 @@
     "emptyScheduleTitle": "Planning vide",
     "emptyScheduleHint": "Ajoutez à la main ou via Pronote.",
     "toastScheduleAdded": "Cours ajouté",
-    "dayLabels": [
-      "Lundi",
-      "Mardi",
-      "Mercredi",
-      "Jeudi",
-      "Vendredi",
-      "Samedi",
-      "Dimanche"
-    ],
+    "dayLabels": ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"],
     "addCourseModalTitle": "Ajouter",
     "subjectPlaceholder": "Matière",
     "startTime": "Début",

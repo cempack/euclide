@@ -8,7 +8,9 @@ import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { MOD, isMac } from "../lib/shortcuts";
 import { CodeIcon, PlayIcon, PlusIcon, TrashIcon } from "../components/icons";
 
-const STARTER_CODE = (t.tools?.starterCode as string) || `# Nouveau script Python\n# Tout ce qui est affiché avec print() apparaîtra ci-dessous.\n\nprint("Bonjour la classe !")\n\nfor i in range(1, 6):\n    print(i, "x 7 =", i * 7)\n`;
+const STARTER_CODE =
+  (t.tools?.starterCode as string) ||
+  `# Nouveau script Python\n# Tout ce qui est affiché avec print() apparaîtra ci-dessous.\n\nprint("Bonjour la classe !")\n\nfor i in range(1, 6):\n    print(i, "x 7 =", i * 7)\n`;
 
 export default function Python() {
   const toast = useToast();
@@ -209,9 +211,7 @@ export default function Python() {
         const nameToUse = openScript.name;
         await api.saveScript(pathToUse, openScript.code);
         setDemos((prev) =>
-          prev.map((d) =>
-            d.path === pathToUse ? { ...d, code: openScript.code, name: nameToUse } : d
-          )
+          prev.map((d) => (d.path === pathToUse ? { ...d, code: openScript.code, name: nameToUse } : d)),
         );
 
         setOpenScript({
@@ -253,8 +253,12 @@ export default function Python() {
     if (!openScript) return;
     if (openScript.path) {
       const ok = await confirm.ask({
-        title: fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: openScript.name }),
-        message: fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', { name: openScript.name }),
+        title: fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', {
+          name: openScript.name,
+        }),
+        message: fmt(t.tools?.confirmDeleteScript || 'Supprimer le script "{name}" ?', {
+          name: openScript.name,
+        }),
         confirmLabel: get("common.delete", "Supprimer"),
         danger: true,
       });
@@ -320,7 +324,7 @@ export default function Python() {
                 path: updated.path,
                 isDirty: prev.isDirty,
               }
-            : null
+            : null,
         );
       } else {
         // Temporary buffer: just update the name in memory (will be used on first save)
@@ -485,9 +489,7 @@ export default function Python() {
           </Toolbar>
         ) : (
           <Toolbar className="h-9 py-0">
-            <span className="eu-t-meta">
-              {t.tools?.noScriptSelected || "Aucun script ouvert"}
-            </span>
+            <span className="eu-t-meta">{t.tools?.noScriptSelected || "Aucun script ouvert"}</span>
           </Toolbar>
         )}
 
@@ -504,9 +506,7 @@ export default function Python() {
             <div className="h-full grid place-items-center">
               <div className="max-w-[46ch] text-center">
                 <p className="font-mono text-2xl text-ink-faint opacity-50 mb-3">{"</>"}</p>
-                <p className="eu-t-section text-ink">
-                  {get("python.emptyTitle", "Aucun script ouvert")}
-                </p>
+                <p className="eu-t-section text-ink">{get("python.emptyTitle", "Aucun script ouvert")}</p>
                 <p className="eu-t-body text-ink-muted mt-1.5">
                   {t.tools?.emptyEditorHint ||
                     "Créez un script temporaire, ou sélectionnez-en un à gauche. « Enregistrer » le rend permanent."}
