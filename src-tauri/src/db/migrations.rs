@@ -13,10 +13,10 @@ use crate::error::{AppError, AppResult};
 use rusqlite::{params, Connection, Transaction};
 use std::path::Path;
 
-pub const LATEST: i64 = 1;
+pub const LATEST: i64 = 2;
 
 type Up = fn(&Transaction, &Path) -> AppResult<()>;
-const MIGRATIONS: &[(i64, Up)] = &[(1, v1)];
+const MIGRATIONS: &[(i64, Up)] = &[(1, v1), (2, v2)];
 
 /// Columns added by releases that predate versioned migrations. Each statement
 /// fails harmlessly when the column already exists.
@@ -275,6 +275,46 @@ fn import_versions(tx: &Transaction, data_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// v2
+// ---------------------------------------------------------------------------
+
+/// What a lesson step needs in class: several documents, notes, Python
+/// scripts and links instead of one document. The step's old `file_id`
+/// becomes its first resource; the column stays, unused, for one release.
+fn v2(tx: &Transaction, _data_dir: &Path) -> AppResult<()> {
+    tx.execute_batch(
+        "CREATE TABLE IF NOT EXISTS sequence_item_resources (
+             id       INTEGER PRIMARY KEY AUTOINCREMENT,
+             item_id  INTEGER NOT NULL REFERENCES sequence_items(id) ON DELETE CASCADE,
+             kind     TEXT NOT NULL CHECK (kind IN ('file', 'note', 'script', 'link')),
+             -- files.id, notes.id or links.id; scripts go by file name.
+             ref_id   INTEGER,
+             ref_name TEXT NOT NULL DEFAULT '',
+             position INTEGER NOT NULL DEFAULT 0,
+             UNIQUE (item_id, kind, ref_id, ref_name)
+         );
+         CREATE INDEX IF NOT EXISTS idx_step_resources_item
+             ON sequence_item_resources(item_id, position);
+
+         -- A resource goes with the document, note or link it points at.
+         CREATE TRIGGER IF NOT EXISTS step_resources_file_gone AFTER DELETE ON files BEGIN
+             DELETE FROM sequence_item_resources WHERE kind = 'file' AND ref_id = OLD.id;
+         END;
+         CREATE TRIGGER IF NOT EXISTS step_resources_note_gone AFTER DELETE ON notes BEGIN
+             DELETE FROM sequence_item_resources WHERE kind = 'note' AND ref_id = OLD.id;
+         END;
+         CREATE TRIGGER IF NOT EXISTS step_resources_link_gone AFTER DELETE ON links BEGIN
+             DELETE FROM sequence_item_resources WHERE kind = 'link' AND ref_id = OLD.id;
+         END;
+
+         INSERT OR IGNORE INTO sequence_item_resources (item_id, kind, ref_id, position)
+             SELECT id, 'file', file_id, 0 FROM sequence_items
+             WHERE file_id IN (SELECT id FROM files);",
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,6 +332,35 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("documents/.versions")).unwrap();
         dir
+    }
+
+    #[test]
+    fn v2_turns_step_documents_into_resources() {
+        let mut conn = legacy_db();
+        conn.execute_batch(
+            "INSERT INTO courses (id, name, emoji, color, description, matiere) VALUES (1, 'Maths', 'book', '#000', '', '');
+             INSERT INTO files (id, course_id, name, rel_path, kind, size) VALUES (5, 1, 'cours.pdf', 'documents/cours.pdf', 'pdf', 1);
+             INSERT INTO sequences (id, course_id, title) VALUES (1, 1, 'Fonctions');
+             INSERT INTO sequence_items (id, sequence_id, title, file_id) VALUES (1, 1, 'Carré', 5), (2, 1, 'Inverse', NULL);",
+        )
+        .unwrap();
+        migrate(&mut conn, Path::new("/nonexistent"), None).unwrap();
+        let rows: Vec<(i64, String, i64)> = conn
+            .prepare("SELECT item_id, kind, ref_id FROM sequence_item_resources")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(rows, [(1, "file".to_string(), 5)]);
+        // Deleting the document takes the resource with it.
+        conn.execute("DELETE FROM files WHERE id = 5", []).unwrap();
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sequence_item_resources", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(left, 0);
     }
 
     #[test]
@@ -337,7 +406,7 @@ mod tests {
 
         let snaps = dir.join("snapshots");
         migrate(&mut conn, &dir, Some(&snaps)).unwrap();
-        assert_eq!(user_version(&conn).unwrap(), 1);
+        assert_eq!(user_version(&conn).unwrap(), LATEST);
         assert_eq!(std::fs::read_dir(&snaps).unwrap().count(), 1);
 
         let rel: String = conn

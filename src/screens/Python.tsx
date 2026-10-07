@@ -36,7 +36,7 @@ function fileName(script: { name: string; path?: string }): string {
   return `${slug || "script"}.py`;
 }
 
-export default function Python() {
+export default function Python({ request }: { request?: { script: string; at: number } }) {
   const toast = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -136,6 +136,22 @@ export default function Python() {
       isDirty: false,
     });
   };
+
+  // A lesson opens one of the scripts (lesson.ts): select it once the list is in.
+  const requestAt = request?.at;
+  const requested = request?.script;
+  const [handledRequest, setHandledRequest] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (requestAt == null || requestAt === handledRequest || !scriptsQ.isSuccess) return;
+    const d = demos.find((x) => x.path.split(/[\\/]/).pop() === requested);
+    void Promise.resolve().then(() => {
+      setHandledRequest(requestAt);
+      if (d && d.path !== openScript?.path) void select(d);
+      else if (!d) toast(tr("python.scriptMissing", { name: requested ?? "" }), "error");
+    });
+    // select and openScript are read at the time of the request only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestAt, requested, handledRequest, scriptsQ.isSuccess, demos]);
 
   const create = async () => {
     if (openScript?.isDirty) {

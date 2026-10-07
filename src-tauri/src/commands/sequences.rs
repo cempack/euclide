@@ -1,15 +1,28 @@
 //! Sequences: the teaching progression of a course, made of ordered steps.
+//! Each step (a lesson) lists what it needs in class: documents, notes,
+//! Python scripts, links.
+
+use std::collections::HashMap;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::models::{Sequence, SequenceItem};
-use rusqlite::{params, Connection, Row};
+use crate::models::{Sequence, SequenceItem, StepResource};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 use tauri::State;
 
 const SEQUENCE_COLS: &str = "id, course_id, title, position, created_at";
 const ITEM_SELECT: &str =
-    "SELECT si.id, si.sequence_id, si.title, si.position, si.file_id, f.name, f.kind \
-     FROM sequence_items si LEFT JOIN files f ON f.id = si.file_id";
+    "SELECT si.id, si.sequence_id, si.title, si.position FROM sequence_items si";
+/// A step's resources with what they point at; rows whose target is gone
+/// (a script deleted outside Euclide) still come back, named after it.
+const RESOURCE_SELECT: &str = "SELECT r.id, r.item_id, r.kind, r.ref_id, r.ref_name, \
+            CASE r.kind WHEN 'file' THEN f.name WHEN 'note' THEN n.title \
+                        WHEN 'link' THEN l.label ELSE r.ref_name END, \
+            f.kind, l.url \
+     FROM sequence_item_resources r \
+     LEFT JOIN files f ON r.kind = 'file' AND f.id = r.ref_id \
+     LEFT JOIN notes n ON r.kind = 'note' AND n.id = r.ref_id \
+     LEFT JOIN links l ON r.kind = 'link' AND l.id = r.ref_id";
 
 fn map_sequence(r: &Row) -> rusqlite::Result<Sequence> {
     Ok(Sequence {
@@ -27,10 +40,56 @@ fn map_item(r: &Row) -> rusqlite::Result<SequenceItem> {
         sequence_id: r.get(1)?,
         title: r.get(2)?,
         position: r.get(3)?,
-        file_id: r.get(4)?,
-        file_name: r.get(5)?,
-        file_kind: r.get(6)?,
+        resources: vec![],
     })
+}
+
+fn map_resource(r: &Row) -> rusqlite::Result<StepResource> {
+    let ref_name: String = r.get(4)?;
+    let name: Option<String> = r.get(5)?;
+    Ok(StepResource {
+        id: r.get(0)?,
+        item_id: r.get(1)?,
+        kind: r.get(2)?,
+        ref_id: r.get(3)?,
+        name: name.unwrap_or_else(|| ref_name.clone()),
+        ref_name,
+        file_kind: r.get(6)?,
+        url: r.get(7)?,
+    })
+}
+
+/// The resources of every step of a course, by step.
+fn resources_of_course(
+    conn: &Connection,
+    course_id: i64,
+) -> AppResult<HashMap<i64, Vec<StepResource>>> {
+    let mut stmt = conn.prepare_cached(&format!(
+        "{RESOURCE_SELECT} \
+         JOIN sequence_items si ON si.id = r.item_id \
+         JOIN sequences sq ON sq.id = si.sequence_id \
+         WHERE sq.course_id = ?1 ORDER BY r.item_id, r.position, r.id"
+    ))?;
+    let mut by_item: HashMap<i64, Vec<StepResource>> = HashMap::new();
+    for res in stmt.query_map([course_id], map_resource)? {
+        let res = res?;
+        by_item.entry(res.item_id).or_default().push(res);
+    }
+    Ok(by_item)
+}
+
+fn resources_of_item(conn: &Connection, item_id: i64) -> AppResult<Vec<StepResource>> {
+    let mut stmt = conn.prepare_cached(&format!(
+        "{RESOURCE_SELECT} WHERE r.item_id = ?1 ORDER BY r.position, r.id"
+    ))?;
+    let rows = stmt.query_map([item_id], map_resource)?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+fn item(conn: &Connection, id: i64) -> AppResult<SequenceItem> {
+    let mut item = conn.query_row(&format!("{ITEM_SELECT} WHERE si.id = ?1"), [id], map_item)?;
+    item.resources = resources_of_item(conn, id)?;
+    Ok(item)
 }
 
 fn clean_title(title: &str) -> AppResult<&str> {
@@ -50,18 +109,24 @@ pub fn list(conn: &Connection, course_id: i64) -> AppResult<Vec<Sequence>> {
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-/// Every step of every sequence of a course, in display order.
+/// Every step of every sequence of a course, in display order, with its
+/// resources.
 pub fn list_items(conn: &Connection, course_id: i64) -> AppResult<Vec<SequenceItem>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT si.id, si.sequence_id, si.title, si.position, si.file_id, f.name, f.kind \
+        "SELECT si.id, si.sequence_id, si.title, si.position \
          FROM sequence_items si \
          JOIN sequences sq ON sq.id = si.sequence_id \
-         LEFT JOIN files f ON f.id = si.file_id \
          WHERE sq.course_id = ?1 \
          ORDER BY sq.position, sq.id, si.position, si.id",
     )?;
-    let rows = stmt.query_map([course_id], map_item)?;
-    Ok(rows.collect::<Result<_, _>>()?)
+    let mut items: Vec<SequenceItem> = stmt
+        .query_map([course_id], map_item)?
+        .collect::<Result<_, _>>()?;
+    let mut resources = resources_of_course(conn, course_id)?;
+    for item in &mut items {
+        item.resources = resources.remove(&item.id).unwrap_or_default();
+    }
+    Ok(items)
 }
 
 pub fn create(conn: &Connection, course_id: i64, title: &str) -> AppResult<Sequence> {
@@ -85,16 +150,91 @@ pub fn create_item(
     file_id: Option<i64>,
 ) -> AppResult<SequenceItem> {
     let title = clean_title(title)?;
-    conn.execute(
-        "INSERT INTO sequence_items (sequence_id, title, file_id, position) VALUES (?1, ?2, ?3, \
+    // The step and its document together, or neither.
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "INSERT INTO sequence_items (sequence_id, title, position) VALUES (?1, ?2, \
          (SELECT COALESCE(MAX(position) + 1, 0) FROM sequence_items WHERE sequence_id = ?1))",
-        params![sequence_id, title, file_id],
+        params![sequence_id, title],
+    )?;
+    let id = tx.last_insert_rowid();
+    if let Some(file_id) = file_id {
+        add_resource(&tx, id, "file", Some(file_id), "")?;
+    }
+    tx.commit()?;
+    item(conn, id)
+}
+
+/// Adds a resource at the end of a step's list; adding one twice keeps the
+/// first. A script goes by its file name in the Python folder.
+pub fn add_resource(
+    conn: &Connection,
+    item_id: i64,
+    kind: &str,
+    ref_id: Option<i64>,
+    ref_name: &str,
+) -> AppResult<StepResource> {
+    let (ref_id, ref_name) = match kind {
+        "file" | "note" | "link" => {
+            let id = ref_id.ok_or_else(|| AppError::user("Élément à ajouter manquant."))?;
+            let table = match kind {
+                "file" => "files",
+                "note" => "notes",
+                _ => "links",
+            };
+            let exists = conn
+                .query_row(
+                    &format!("SELECT 1 FROM {table} WHERE id = ?1"),
+                    [id],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            if !exists {
+                return Err(AppError::not_found("Cet élément n'existe plus."));
+            }
+            (Some(id), String::new())
+        }
+        "script" => {
+            let name = crate::fsx::plain_file_name(ref_name.trim())?;
+            if !name.ends_with(".py") {
+                return Err(AppError::user("Ce n'est pas un script Python."));
+            }
+            (None, name.to_string())
+        }
+        _ => return Err(AppError::user("Type de ressource inconnu.")),
+    };
+    conn.execute(
+        "INSERT OR IGNORE INTO sequence_item_resources (item_id, kind, ref_id, ref_name, position) \
+         VALUES (?1, ?2, ?3, ?4, \
+         (SELECT COALESCE(MAX(position) + 1, 0) FROM sequence_item_resources WHERE item_id = ?1))",
+        params![item_id, kind, ref_id, ref_name],
     )?;
     Ok(conn.query_row(
-        &format!("{ITEM_SELECT} WHERE si.id = ?1"),
-        [conn.last_insert_rowid()],
-        map_item,
+        &format!(
+            "{RESOURCE_SELECT} WHERE r.item_id = ?1 AND r.kind = ?2 \
+             AND r.ref_id IS ?3 AND r.ref_name = ?4"
+        ),
+        params![item_id, kind, ref_id, ref_name],
+        map_resource,
     )?)
+}
+
+/// A script renamed or deleted in the Python workspace: its resources follow
+/// (`to` None removes them).
+pub fn script_renamed(conn: &Connection, from: &str, to: Option<&str>) -> AppResult<()> {
+    match to {
+        Some(to) => conn.execute(
+            "UPDATE OR IGNORE sequence_item_resources SET ref_name = ?2 \
+             WHERE kind = 'script' AND ref_name = ?1",
+            params![from, to],
+        )?,
+        None => conn.execute(
+            "DELETE FROM sequence_item_resources WHERE kind = 'script' AND ref_name = ?1",
+            [from],
+        )?,
+    };
+    Ok(())
 }
 
 /// Move a row of `table` among its siblings (same `parent` value) by `delta`
@@ -203,19 +343,64 @@ pub async fn create_sequence_item(
 }
 
 #[tauri::command]
-pub async fn update_sequence_item(
-    db: State<'_, Db>,
-    id: i64,
-    title: String,
-    file_id: Option<i64>,
-) -> AppResult<()> {
+pub async fn rename_sequence_item(db: State<'_, Db>, id: i64, title: String) -> AppResult<()> {
     db.write(move |conn| {
         let title = clean_title(&title)?;
         conn.execute(
-            "UPDATE sequence_items SET title = ?1, file_id = ?2 WHERE id = ?3",
-            params![title, file_id, id],
+            "UPDATE sequence_items SET title = ?1 WHERE id = ?2",
+            params![title, id],
         )?;
         Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn add_step_resource(
+    db: State<'_, Db>,
+    item_id: i64,
+    kind: String,
+    ref_id: Option<i64>,
+    ref_name: Option<String>,
+) -> AppResult<StepResource> {
+    db.write(move |conn| {
+        add_resource(
+            conn,
+            item_id,
+            &kind,
+            ref_id,
+            ref_name.as_deref().unwrap_or(""),
+        )
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn remove_step_resource(db: State<'_, Db>, id: i64) -> AppResult<()> {
+    db.write(move |conn| {
+        conn.execute("DELETE FROM sequence_item_resources WHERE id = ?1", [id])?;
+        Ok(())
+    })
+    .await
+}
+
+/// Move a resource earlier (-1) or later (+1) in its step.
+#[tauri::command]
+pub async fn move_step_resource(
+    db: State<'_, Db>,
+    item_id: i64,
+    id: i64,
+    delta: i64,
+) -> AppResult<()> {
+    db.write(move |conn| {
+        reorder(
+            conn,
+            "sequence_item_resources",
+            "item_id",
+            item_id,
+            id,
+            delta,
+        )
     })
     .await
 }
@@ -254,8 +439,7 @@ mod tests {
     use super::*;
 
     fn mem() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(crate::db::SCHEMA).unwrap();
+        let conn = crate::db::migrations_for_tests();
         conn.execute(
             "INSERT INTO courses (name, emoji, color, description, matiere) VALUES ('Maths', 'calc', '#000', '', '')",
             [],
@@ -309,5 +493,51 @@ mod tests {
             [second.id, first.id]
         );
         assert!(list_items(&conn, 2).unwrap().is_empty());
+    }
+
+    #[test]
+    fn steps_hold_several_resources() {
+        let conn = mem();
+        conn.execute_batch(
+            "INSERT INTO files (id, course_id, name, rel_path, kind) VALUES (5, 1, 'cours.pdf', 'documents/cours.pdf', 'pdf');
+             INSERT INTO notes (id, course_id, title, body) VALUES (8, 1, 'Fiche', '');
+             INSERT INTO links (id, label, url) VALUES (3, 'GeoGebra', 'https://www.geogebra.org');",
+        )
+        .unwrap();
+        let s = create(&conn, 1, "Fonctions").unwrap();
+        let step = create_item(&conn, s.id, "Carré", Some(5)).unwrap();
+        assert_eq!(step.resources.len(), 1);
+        assert_eq!(step.resources[0].name, "cours.pdf");
+        add_resource(&conn, step.id, "note", Some(8), "").unwrap();
+        add_resource(&conn, step.id, "link", Some(3), "").unwrap();
+        let script = add_resource(&conn, step.id, "script", None, "tri.py").unwrap();
+        assert_eq!(script.name, "tri.py");
+        // Twice is once; unknown targets and kinds are refused.
+        add_resource(&conn, step.id, "note", Some(8), "").unwrap();
+        assert_eq!(
+            add_resource(&conn, step.id, "note", Some(99), "")
+                .unwrap_err()
+                .code(),
+            "not_found"
+        );
+        assert!(add_resource(&conn, step.id, "script", None, "../x.py").is_err());
+        assert!(add_resource(&conn, step.id, "video", Some(1), "").is_err());
+
+        let items = list_items(&conn, 1).unwrap();
+        let kinds: Vec<_> = items[0].resources.iter().map(|r| r.kind.as_str()).collect();
+        assert_eq!(kinds, ["file", "note", "link", "script"]);
+        assert_eq!(
+            items[0].resources[2].url.as_deref(),
+            Some("https://www.geogebra.org")
+        );
+
+        script_renamed(&conn, "tri.py", Some("tri_selection.py")).unwrap();
+        assert_eq!(
+            item(&conn, step.id).unwrap().resources[3].name,
+            "tri_selection.py"
+        );
+        script_renamed(&conn, "tri_selection.py", None).unwrap();
+        conn.execute("DELETE FROM notes WHERE id = 8", []).unwrap();
+        assert_eq!(item(&conn, step.id).unwrap().resources.len(), 2);
     }
 }

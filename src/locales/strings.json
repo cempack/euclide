@@ -255,7 +255,9 @@
     "noDocument": "— Aucun document —",
     "classNotes": "Notes pour cette classe",
     "contentTab": "Contenu {name}",
-    "showPronoteContentsTitle": "Cahier de textes et documents Pronote"
+    "showPronoteContentsTitle": "Cahier de textes et documents Pronote",
+    "sections": "Parties du cours",
+    "lockerShort": "Casier"
   },
   "settings": {
     "pronoteTitle": "Pronote",
@@ -638,9 +640,32 @@
     "markClass": "Marquer une classe ici",
     "markClassShort": "Classe ici…",
     "stepPlaceholder": "Titre de l'étape",
-    "stepFile": "Document lié",
-    "noFile": "— Sans document —",
-    "addStep": "Ajouter une étape"
+    "addStep": "Ajouter une étape",
+    "resources": "Ressources",
+    "addResource": "Ajouter ce qu'il faut pour la séance",
+    "editResources": "Modifier",
+    "removeResource": "Retirer « {name} »",
+    "resourceRemoved": "« {name} » retiré de l'étape",
+    "pickerTitle": "Pour la séance « {name} »",
+    "pickerSearch": "Rechercher un document, une note, un script…",
+    "pickerAll": "Tout",
+    "pickerFiles": "Documents",
+    "pickerNotes": "Notes",
+    "pickerScripts": "Scripts",
+    "pickerLinks": "Liens",
+    "groupCourseFiles": "Casier du cours",
+    "groupLibrary": "Bibliothèque",
+    "groupNotes": "Notes",
+    "groupScripts": "Scripts Python",
+    "groupLinks": "Liens",
+    "added": "Ajouté",
+    "pickerEmpty": "Rien ne correspond.",
+    "done": "Terminé",
+    "classHere": "La classe {name} en est là",
+    "renameStep": "Renommer l'étape",
+    "renameHint": "Double-clic ou F2 pour renommer",
+    "deleteStepTitle": "Supprimer l'étape « {name} » ?",
+    "deleteStepMessage": "Les documents, notes et scripts de l'étape restent dans la bibliothèque."
   },
   "reminders": {
     "markDone": "Marquer fait",
@@ -711,7 +736,8 @@
     "noTimeLimit": "Sans limite",
     "clear": "Effacer",
     "resize": "Redimensionner la console",
-    "editorLabel": "Code Python : {name}"
+    "editorLabel": "Code Python : {name}",
+    "scriptMissing": "Le script « {name} » n'existe plus."
   },
   "colors": {
     "black": "Noir",
@@ -768,5 +794,19 @@
     "replaceTitle": "Remplacer le texte de la note ?",
     "replaceMessage": "Le modèle « {name} » prendra la place du texte actuel.",
     "replace": "Remplacer"
+  },
+  "lesson": {
+    "open": "Ouvrir la séance",
+    "openTitle": "Ouvre les documents, notes et scripts de « {name} »",
+    "done": "Séance faite",
+    "doneTitle": "La prochaine fois, {name} passe à l'étape suivante",
+    "advanced": "{name} passe à « {step} »",
+    "lastStep": "{name} est à la dernière étape de la progression.",
+    "prepare": "Préparer la séance",
+    "prepareProgression": "Préparer la progression",
+    "stepOf": "{sequence} · étape {n}/{total} :",
+    "attachClass": "Suivre {name} dans ce cours",
+    "attached": "{name} est suivie dans « {course} »",
+    "chooseCourse": "Associer {name} à un cours"
   }
 }

@@ -7,8 +7,10 @@ use crate::models::{PythonCompletion, PythonDemo};
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
+
+use crate::db::Db;
 
 #[tauri::command(async)]
 pub fn list_python_demos() -> AppResult<Vec<PythonDemo>> {
@@ -96,17 +98,42 @@ pub fn save_python_script(path: String, code: String) -> AppResult<()> {
     Ok(())
 }
 
-#[tauri::command(async)]
-pub fn delete_python_script(path: String) -> AppResult<()> {
-    let p = script_in_python_dir(&path)?;
-    fs::remove_file(&p)?;
-    Ok(())
+fn file_name_of(p: &std::path::Path) -> String {
+    p.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
-#[tauri::command(async)]
-pub fn rename_python_script(path: String, new_name: String) -> AppResult<PythonDemo> {
-    let dir = crate::paths::python_dir();
+/// Deletes a script; lesson steps that opened it forget it.
+#[tauri::command]
+pub async fn delete_python_script(db: State<'_, Db>, path: String) -> AppResult<()> {
     let p = script_in_python_dir(&path)?;
+    fs::remove_file(&p)?;
+    let name = file_name_of(&p);
+    db.write(move |conn| crate::commands::sequences::script_renamed(conn, &name, None))
+        .await
+}
+
+/// Renames a script; lesson steps that open it follow.
+#[tauri::command]
+pub async fn rename_python_script(
+    db: State<'_, Db>,
+    path: String,
+    new_name: String,
+) -> AppResult<PythonDemo> {
+    let renamed = rename_script(&path, &new_name)?;
+    let from = file_name_of(&script_in_python_dir(&path).unwrap_or_default());
+    let to = file_name_of(std::path::Path::new(&renamed.path));
+    if from != to {
+        db.write(move |conn| crate::commands::sequences::script_renamed(conn, &from, Some(&to)))
+            .await?;
+    }
+    Ok(renamed)
+}
+
+fn rename_script(path: &str, new_name: &str) -> AppResult<PythonDemo> {
+    let dir = crate::paths::python_dir();
+    let p = script_in_python_dir(path)?;
     if !p.exists() {
         return Err("Script introuvable.".into());
     }
@@ -117,14 +144,14 @@ pub fn rename_python_script(path: String, new_name: String) -> AppResult<PythonD
     if stem == ".scratch" {
         return Err("Impossible de renommer un script temporaire interne.".into());
     }
-    let new_stem = slugify(&new_name);
+    let new_stem = slugify(new_name);
     if new_stem == stem {
         // Effectively the same name after slugify, just return current
         let code = fs::read_to_string(&p).unwrap_or_default();
         let display = stem.replace('_', " ");
         return Ok(PythonDemo {
             name: display,
-            path: path.clone(),
+            path: path.to_string(),
             code,
         });
     }
