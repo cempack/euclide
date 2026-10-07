@@ -30,6 +30,11 @@ async function boot(page: Page, v: Variant) {
 
 async function settle(page: Page) {
   await page.evaluate(() => document.fonts.ready);
+  // Data that depends on other data (the class's lesson) arrives in a second
+  // round: wait until no query is loading (src/api/client.ts).
+  await page.waitForFunction(
+    () => (window as unknown as { __euQueries?: { isFetching(): number } }).__euQueries?.isFetching() === 0,
+  );
   await page.waitForTimeout(400);
 }
 

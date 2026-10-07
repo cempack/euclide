@@ -22,6 +22,10 @@ export const queryClient = new QueryClient({
   },
 });
 
+// Dev builds: the visual tests wait until nothing is loading before a
+// screenshot (tests/visual/screens.spec.ts).
+if (import.meta.env.DEV) (window as unknown as { __euQueries?: QueryClient }).__euQueries = queryClient;
+
 /**
  * Screens not moved to the data layer yet announce their changes with
  * `eu:*-changed` window events: each one invalidates the queries it covers,

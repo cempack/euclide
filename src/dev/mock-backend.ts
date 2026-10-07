@@ -44,8 +44,9 @@ function addHours(hours: number): Date {
   return new Date(now.getTime() + hours * 3_600_000);
 }
 /** SQLite `datetime('now')` format: UTC, space separated. */
+/** To the minute: the data loads a second or two after the screenshots' clock starts. */
 function sqlUtc(d: Date): string {
-  return d.toISOString().slice(0, 19).replace("T", " ");
+  return `${d.toISOString().slice(0, 16).replace("T", " ")}:00`;
 }
 
 let nextId = 1000;
