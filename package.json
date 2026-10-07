@@ -16,10 +16,11 @@
     "shots": "playwright test",
     "shots:update": "playwright test --update-snapshots",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/design-lint.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint:design": "node scripts/design-lint.mjs"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",

@@ -33,11 +33,22 @@ import { startReporting } from "./lib/report";
 startReporting();
 startPerf();
 
+// Development only: ?gallery shows the UI kit (dev/Gallery.tsx) instead of
+// the app. Production builds drop the branch and its chunk.
+const Gallery = import.meta.env.DEV ? React.lazy(() => import("./dev/GalleryRoot")) : null;
+const showGallery = Gallery !== null && new URLSearchParams(location.search).has("gallery");
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
       <ThemeProvider>
-        <App />
+        {showGallery && Gallery ? (
+          <React.Suspense fallback={null}>
+            <Gallery />
+          </React.Suspense>
+        ) : (
+          <App />
+        )}
       </ThemeProvider>
     </ErrorBoundary>
   </React.StrictMode>,
