@@ -3,6 +3,7 @@ mod boot;
 mod commands;
 mod db;
 mod error;
+mod exit;
 mod fsx;
 mod jobs;
 mod keepawake;
@@ -38,6 +39,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Before any window exists: its close button goes through the gate.
+        .manage(exit::ExitGate::default())
         .register_asynchronous_uri_scheme_protocol(protocol::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
@@ -250,10 +253,23 @@ pub fn run() {
             applog::log_errors,
             portable_update::apply_windows_portable_update,
             relaunch::relaunch_after_update,
+            exit::close_ack,
+            exit::app_exit,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Euclide")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::CloseRequested { api, .. },
+                ..
+            } = &event
+            {
+                if label == "main" {
+                    exit::on_close_requested(app_handle, api);
+                }
+                return;
+            }
             if let tauri::RunEvent::Exit = event {
                 // Windows does not end child processes with their parent: a
                 // Python left running would hold the sidecar's files.

@@ -19,6 +19,7 @@ import { Sidebar, ProjectionRail } from "./shell/Sidebar";
 import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
+import { useExitGuard } from "./shell/exitGuard";
 import { TooltipLayer } from "./ui/Tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { q } from "./api/queries";
@@ -327,6 +328,8 @@ function Shell() {
   const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
+
+  useExitGuard(confirm, toast);
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const { projection, toggleProjection } = useAppearance();

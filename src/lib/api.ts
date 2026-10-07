@@ -737,6 +737,10 @@ export const api = {
   // Settings
   logPerf: (lines: string[]) => invoke<void>("log_perf", { lines }),
   logErrors: (lines: string[]) => invoke<void>("log_errors", { lines }),
+  /** The page has the window's close request in hand (src-tauri/src/exit.rs). */
+  closeAck: (request: number) => invoke<void>("close_ack", { request }),
+  /** Quit, once the open work is saved or abandoned on purpose. */
+  appExit: () => invoke<void>("app_exit"),
   getSetting: (key: string): Promise<string | null> => {
     // Settings saved at launch arrive with the page (lib/boot.ts): the first
     // read of each costs no round trip.

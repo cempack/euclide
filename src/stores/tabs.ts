@@ -438,6 +438,11 @@ export const useTabLimit = () => ({
   max: useTabsStore(maxTabsOf),
 });
 
+let saveSessionNow = async () => {};
+
+/** Writes the open tabs now rather than after the pause (quitting). */
+export const saveTabSession = () => saveSessionNow();
+
 /**
  * Reads the saved session when it did not come with the page (a reload, the
  * browser), then saves the open tabs whenever they change. Returns the stop.
@@ -480,21 +485,26 @@ export function startTabSession(): () => void {
   }
 
   let timer = 0;
+  const save = async () => {
+    window.clearTimeout(timer);
+    if (!state().hydrated) return;
+    const { tabs: list, activeId } = state();
+    const payload = sessionPayload(list, activeId);
+    if (payload === saved) return;
+    saved = payload;
+    await api.setSetting("open_tabs", payload).catch(() => {});
+  };
+  saveSessionNow = save;
   const unsubscribe = useTabsStore.subscribe((s, prev) => {
     if (!s.hydrated) return;
     if (s.tabs === prev.tabs && s.activeId === prev.activeId && s.hydrated === prev.hydrated) return;
     window.clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      const { tabs: list, activeId } = state();
-      const payload = sessionPayload(list, activeId);
-      if (payload === saved) return;
-      saved = payload;
-      api.setSetting("open_tabs", payload).catch(() => {});
-    }, 450);
+    timer = window.setTimeout(() => void save(), 450);
   });
   return () => {
     cancelled = true;
     window.clearTimeout(timer);
+    saveSessionNow = async () => {};
     unsubscribe();
   };
 }
