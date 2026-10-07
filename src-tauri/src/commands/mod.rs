@@ -8,5 +8,6 @@ pub mod courses;
 pub mod legacy;
 pub mod notes;
 pub mod reminders;
+pub mod sequences;
 
 pub(crate) use legacy::{get_setting_raw, set_setting_raw};
