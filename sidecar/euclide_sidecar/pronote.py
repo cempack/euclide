@@ -32,12 +32,17 @@ def _lessons_for_week(client):
     seen = set()
     today = dt.date.today()
     monday = today - dt.timedelta(days=today.weekday())
-    for offset in range(7):
-        day = monday + dt.timedelta(days=offset)
-        try:
-            day_lessons = client.lessons(day)
-        except Exception:  # noqa: BLE001
-            continue
+    try:
+        # The whole week in one request (seven on a slow school network cost seconds).
+        week = [(None, client.lessons(monday, monday + dt.timedelta(days=6)))]
+    except Exception:  # noqa: BLE001 - an older server: one day at a time
+        week = []
+        for offset in range(7):
+            try:
+                week.append((offset, client.lessons(monday + dt.timedelta(days=offset))))
+            except Exception:  # noqa: BLE001
+                continue
+    for offset, day_lessons in week:
         for les in day_lessons:
             if getattr(les, "canceled", False):
                 continue
@@ -46,7 +51,12 @@ def _lessons_for_week(client):
             subject = getattr(getattr(les, "subject", None), "name", None) or "Cours"
             room = getattr(les, "classroom", "") or ""
             group = _clean_group(getattr(les, "group_names", None))
-            dow = (start.weekday() + 1) if start else (offset + 1)
+            if start:
+                dow = start.weekday() + 1
+            elif offset is not None:
+                dow = offset + 1
+            else:
+                continue
             start_s = start.strftime("%H:%M") if start else ""
             end_s = end.strftime("%H:%M") if end else ""
             key = (dow, start_s, end_s, subject, group)
