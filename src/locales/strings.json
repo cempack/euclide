@@ -516,7 +516,8 @@
     "middleClick": "Clic milieu",
     "groupPalette": "Dans la palette",
     "navigateList": "Parcourir les résultats",
-    "checkPython": "Vérifier le script Python"
+    "checkPython": "Vérifier le script Python",
+    "present": "Présenter la note"
   },
   "confirm": {
     "unsavedTitle": "Modifications non enregistrées",
@@ -715,5 +716,11 @@
     "purple": "Violet",
     "yellow": "Jaune",
     "pink": "Rose"
+  },
+  "slides": {
+    "label": "Présentation : {title}",
+    "empty": "Cette note est vide.",
+    "present": "Présenter",
+    "presentTitle": "Présenter la note en diapositives (--- sépare les diapositives)"
   }
 }

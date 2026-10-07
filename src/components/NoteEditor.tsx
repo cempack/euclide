@@ -1,4 +1,7 @@
-import { memo, useEffect, useRef, useState, useCallback } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useCallback } from "react";
+import { Presentation } from "lucide-react";
+import { Icon } from "../ui/Icon";
+import { useActiveId } from "../stores/tabs";
 import { tabs } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
@@ -8,15 +11,12 @@ import { tr } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { useSetting } from "../api/hooks";
 import { isMac } from "../lib/shortcuts";
-import { keysOf } from "../lib/keymap";
+import { keysOf, useShortcut } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { relativeTime } from "../lib/format";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import { Markdown } from "../features/notes/Markdown";
 
 interface NoteEditorProps {
   tabId: string;
@@ -25,39 +25,9 @@ interface NoteEditorProps {
   initialCourseId?: number;
 }
 
-// Built once: new plugin arrays or components on each render made
-// react-markdown parse the note and re-render all its formulas on every
-// keystroke, even while the preview text itself had not changed.
 type NoteView = "edit" | "split" | "preview";
 
-const REMARK_PLUGINS = [remarkMath];
-const REHYPE_PLUGINS = [rehypeKatex];
-const MARKDOWN_COMPONENTS = {
-  a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-    <a {...props} target="_blank" rel="noopener noreferrer" />
-  ),
-};
-
-/** The rendered note; renders again only when its text changes. */
-const MarkdownPreview = memo(function MarkdownPreview({
-  body,
-  centered,
-}: {
-  body: string;
-  centered: boolean;
-}) {
-  return (
-    <div className={`eu-prose max-w-[68ch] ${centered ? "mx-auto" : ""}`}>
-      <ReactMarkdown
-        remarkPlugins={REMARK_PLUGINS}
-        rehypePlugins={REHYPE_PLUGINS}
-        components={MARKDOWN_COMPONENTS}
-      >
-        {body}
-      </ReactMarkdown>
-    </div>
-  );
-});
+const Slides = lazy(() => import("../features/notes/Slides"));
 
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const toast = useToast();
@@ -93,6 +63,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const [savedView, setView] = useSetting("note_view");
   const view: NoteView = savedView === "edit" || savedView === "preview" ? savedView : "split";
   const [linkPopupOpen, setLinkPopupOpen] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  useShortcut("present", () => setPresenting(true), useActiveId() === tabId);
   const [linkTextInput, setLinkTextInput] = useState("");
   const [linkUrlInput, setLinkUrlInput] = useState("https://");
   const [linkSelection, setLinkSelection] = useState<{ start: number; end: number } | null>(null);
@@ -458,6 +430,14 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           ))}
         </select>
         <ToolGroup>
+          <button
+            onClick={() => setPresenting(true)}
+            className="eu-btn-quiet eu-btn-sm"
+            {...tip(tr("slides.presentTitle"), keysOf("present"))}
+          >
+            <Icon icon={Presentation} size={14} />
+            <span className="hidden @3xl:inline">{tr("slides.present")}</span>
+          </button>
           <button onClick={exportPdf} className="eu-btn-quiet eu-btn-sm" data-tip={tr("notes.exportPdf")}>
             <DownloadIcon className="w-3.5 h-3.5" /> PDF
           </button>
@@ -630,7 +610,10 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             )}
             <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
               {previewBody ? (
-                <MarkdownPreview body={previewBody} centered={view === "preview"} />
+                <Markdown
+                  body={previewBody}
+                  className={`max-w-[68ch] ${view === "preview" ? "mx-auto" : ""}`}
+                />
               ) : (
                 <p className="eu-t-body text-ink-faint italic">{tr("notes.previewEmpty")}</p>
               )}
@@ -638,6 +621,16 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           </div>
         )}
       </div>
+
+      {presenting && (
+        <Suspense fallback={null}>
+          <Slides
+            markdown={draft.body || ""}
+            title={draft.title || tr("notes.newTitle")}
+            onClose={() => setPresenting(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Status */}
       <div className="shrink-0 flex items-center gap-2 px-3 h-6 border-t border-line bg-panel-alt">
