@@ -5,7 +5,7 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
@@ -729,7 +729,7 @@ pub async fn import_paths(
     Ok(imported)
 }
 
-fn unique_dest(dir: &PathBuf, name: &str) -> PathBuf {
+fn unique_dest(dir: &Path, name: &str) -> PathBuf {
     let mut dest = dir.join(name);
     if !dest.exists() {
         return dest;
@@ -774,7 +774,7 @@ fn register_file(state: &State<Db>, course_id: Option<i64>, dest: &PathBuf) -> R
 
 /// Path relative to the Euclide-Data folder, stored so the USB stays portable.
 /// Always written with `/`: a key filled on Windows must open on Linux/macOS.
-fn rel_path(abs: &PathBuf) -> String {
+fn rel_path(abs: &Path) -> String {
     let base = crate::paths::data_dir();
     abs.strip_prefix(&base)
         .map(|p| p.to_string_lossy().replace('\\', "/"))
@@ -1252,13 +1252,7 @@ fn build_fts_query(query: &str) -> String {
         .join(" ")
 }
 
-async fn index_pdf(
-    app: &AppHandle,
-    state: &State<'_, Db>,
-    file_id: i64,
-    name: &str,
-    path: &PathBuf,
-) {
+async fn index_pdf(app: &AppHandle, state: &State<'_, Db>, file_id: i64, name: &str, path: &Path) {
     let text = crate::sidecar::call(
         app,
         "extract_pdf",
@@ -2856,10 +2850,8 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
                 count: r.get(2)?,
             })
         }) {
-            for r in rows {
-                if let Ok(tc) = r {
-                    top_courses.push(tc);
-                }
+            for tc in rows.flatten() {
+                top_courses.push(tc);
             }
         }
     }
@@ -2870,10 +2862,8 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
          GROUP BY label ORDER BY cnt DESC LIMIT 5"
     )) {
         if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
-            for r in rows {
-                if let Ok(ti) = r {
-                    top_documents.push(ti);
-                }
+            for ti in rows.flatten() {
+                top_documents.push(ti);
             }
         }
     }
@@ -2884,10 +2874,8 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
          GROUP BY label ORDER BY cnt DESC"
     )) {
         if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
-            for r in rows {
-                if let Ok(ti) = r {
-                    top_tools.push(ti);
-                }
+            for ti in rows.flatten() {
+                top_tools.push(ti);
             }
         }
     }
@@ -2898,10 +2886,8 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
          GROUP BY label ORDER BY cnt DESC"
     )) {
         if let Ok(rows) = stmt.query_map([], |r| Ok(TopItem { name: r.get(0)?, count: r.get(1)? })) {
-            for r in rows {
-                if let Ok(ti) = r {
-                    time_by_area.push(ti);
-                }
+            for ti in rows.flatten() {
+                time_by_area.push(ti);
             }
         }
     }
@@ -3171,7 +3157,7 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
     if let Some(lessons) = res.get("lessons").and_then(|x| x.as_array()) {
         for l in lessons {
             let day = l.get("day_of_week").and_then(|x| x.as_i64()).unwrap_or(0);
-            if day < 1 || day > 7 {
+            if !(1..=7).contains(&day) {
                 continue;
             }
             let start = l.get("start_time").and_then(|x| x.as_str()).unwrap_or("");
@@ -3801,7 +3787,12 @@ mod hardening_tests {
 
     #[test]
     fn plain_file_names_only() {
-        for ok in ["cours.pdf", "Théorème de Pythagore.pdf", "a..b.txt", ".hidden"] {
+        for ok in [
+            "cours.pdf",
+            "Théorème de Pythagore.pdf",
+            "a..b.txt",
+            ".hidden",
+        ] {
             assert!(plain_file_name(ok).is_ok(), "{ok} should be accepted");
         }
         for bad in [

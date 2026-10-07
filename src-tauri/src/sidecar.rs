@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -100,9 +100,7 @@ impl Sidecar {
                 let g = self.inner.lock().await;
                 if g.is_none() {
                     drop(g);
-                    if let Err(e) = self.start().await {
-                        return Err(e);
-                    }
+                    self.start().await?;
                 }
             }
 
@@ -202,7 +200,7 @@ fn resolve(app: &AppHandle) -> Result<(String, Vec<String>), String> {
 /// Picks the dev Python interpreter, preferring (1) the EUCLIDE_PYTHON override,
 /// then (2) a `sidecar/.venv` next to the project (where pronotepy/pypdf are
 /// installed), and finally (3) the system Python.
-fn dev_python(script: &PathBuf) -> String {
+fn dev_python(script: &Path) -> String {
     if let Ok(p) = std::env::var("EUCLIDE_PYTHON") {
         if !p.trim().is_empty() {
             return p;

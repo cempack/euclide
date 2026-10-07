@@ -7,7 +7,8 @@ edition = "2021"
 
 [lib]
 name = "euclide_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop only: the binary links this crate; no mobile static/dynamic libs.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

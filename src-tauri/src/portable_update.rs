@@ -227,12 +227,10 @@ fn detect_wrapper(paths: &[PathBuf]) -> Option<String> {
     if is_app_root_name(&wrap) {
         return None;
     }
-    Some(
-        paths[0]
-            .components()
-            .next()
-            .map(|c| c.as_os_str().to_string_lossy().into_owned())?,
-    )
+    paths[0]
+        .components()
+        .next()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
 }
 
 pub fn is_allowed_overlay_rel(path: &Path) -> bool {
@@ -320,13 +318,24 @@ pub fn is_update_leftover_name(name: &str) -> bool {
 }
 
 fn clear_readonly(path: &Path) {
-    if let Ok(meta) = std::fs::metadata(path) {
-        let mut perms = meta.permissions();
-        if perms.readonly() {
-            perms.set_readonly(false);
-            let _ = std::fs::set_permissions(path, perms);
-        }
+    let Ok(meta) = std::fs::metadata(path) else {
+        return;
+    };
+    let mut perms = meta.permissions();
+    if !perms.readonly() {
+        return;
     }
+    #[cfg(unix)]
+    {
+        // Owner write only: `set_readonly(false)` would make it world-writable.
+        use std::os::unix::fs::PermissionsExt;
+        perms.set_mode(perms.mode() | 0o200);
+    }
+    #[cfg(not(unix))]
+    #[allow(clippy::permissions_set_readonly_false)]
+    // Windows: only clears the read-only attribute
+    perms.set_readonly(false);
+    let _ = std::fs::set_permissions(path, perms);
 }
 
 /// Windows `remove_file` fails on read-only leftovers (zip/USB) and on a
