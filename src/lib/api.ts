@@ -1,4 +1,4 @@
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { recordIpc } from "./perf";
 
 // Simple in-memory cache for snappy UX (avoids repeated SQLite roundtrips on re-renders / tab switches).
@@ -115,6 +115,27 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
     if (cmd !== "log_perf") recordIpc(cmd, performance.now() - t0);
   }
 }
+
+/** Send file bytes as the raw request body (no base64 in JSON); the other
+ *  arguments travel as `x-eu-*` headers. */
+async function invokeBytes<T>(
+  cmd: string,
+  bytes: ArrayBuffer | Uint8Array,
+  headers: Record<string, string>,
+): Promise<T> {
+  if (!isTauri()) return invoke<T>(cmd, { headers, size: bytes.byteLength });
+  const t0 = performance.now();
+  try {
+    return await tauriInvoke<T>(cmd, bytes, { headers });
+  } finally {
+    recordIpc(cmd, performance.now() - t0);
+  }
+}
+
+/** URL of a library document for the webview (`<img>`, `fetch`, PDF.js). */
+export const fileUrl = (id: number) => convertFileSrc(`file/${id}`, "eufile");
+/** URL of a saved version of a document. */
+export const versionUrl = (versionId: number) => convertFileSrc(`version/${versionId}`, "eufile");
 
 function asList<T>(data: unknown): T[] {
   return Array.isArray(data) ? (data as T[]).filter((x) => x != null) : [];
@@ -521,16 +542,13 @@ export const api = {
   revealFile: (id: number) => invoke<void>("reveal_file", { id }),
   listOpeners: (id: number) => invoke<Opener[]>("list_openers", { id }),
   filePath: (id: number) => invoke<string>("file_path", { id }),
+  /** Copy library documents into a course locker. */
+  attachFilesToCourse: (courseId: number, fileIds: number[]) =>
+    invoke<FileItem[]>("attach_files_to_course", { courseId, fileIds }),
   deleteFile: (id: number) => invoke<void>("delete_file", { id }),
   renameFile: (id: number, name: string) => invoke<FileItem>("rename_file", { id, newName: name }),
   globalSearch: (query: string) => invoke<SearchResult[]>("global_search", { query }),
   reindexDocuments: () => invoke<number>("reindex_documents"),
-  indexFiles: (ids: number[]) => invoke<number>("index_files", { ids }),
-  indexImportedPdfs: async (files: FileItem[]) => {
-    const ids = files.filter((f) => f.kind === "pdf").map((f) => f.id);
-    if (!ids.length) return 0;
-    return invoke<number>("index_files", { ids });
-  },
 
   // Reminders
   listReminders: () => {
@@ -604,13 +622,21 @@ export const api = {
   saveBoard: (save: { file_id?: number | null; course_id?: number | null; name?: string; json: string }) =>
     invoke<FileItem>("save_board", { save }),
   readBoard: (id: number) => invoke<string>("read_board", { id }),
-  exportBoardPng: (courseId: number | null, name: string, dataUrl: string) =>
-    invoke<FileItem>("export_board_png", { courseId, name, dataUrl }),
-  saveExport: (name: string, dataUrl: string) => invoke<FileItem>("save_export", { name, dataUrl }),
-  updateFile: (fileId: number, dataUrl: string) => invoke<FileItem>("update_file", { fileId, dataUrl }),
-  getFileVersions: (fileId: number) => invoke<any[]>("get_file_versions", { fileId }),
-  readVersionData: (name: string) => invoke<string>("read_version_data", { name }),
-  ensureOriginalVersion: (fileId: number) => invoke<void>("ensure_original_version", { fileId }),
+  /** Replace a document's content; the previous content becomes a version. */
+  writeFileBytes: (fileId: number, bytes: ArrayBuffer | Uint8Array) =>
+    invokeBytes<FileItem>("write_file_bytes", bytes, { "x-eu-file-id": String(fileId) }),
+  /** Add a new document (exports, saved copies) to the library or a course. */
+  createFileBytes: (
+    name: string,
+    bytes: ArrayBuffer | Uint8Array,
+    opts: { courseId?: number | null; folder?: "documents" | "whiteboards" } = {},
+  ) =>
+    invokeBytes<FileItem>("create_file_bytes", bytes, {
+      "x-eu-name": encodeURIComponent(name),
+      ...(opts.courseId != null ? { "x-eu-course-id": String(opts.courseId) } : {}),
+      ...(opts.folder ? { "x-eu-folder": opts.folder } : {}),
+    }),
+  getFileVersions: (fileId: number) => invoke<FileVersion[]>("get_file_versions", { fileId }),
 
   // PDF annotations
   saveAnnotations: (fileId: number, json: string) => invoke<void>("save_annotations", { fileId, json }),
@@ -695,6 +721,17 @@ export const api = {
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
   setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
 };
+
+/** A saved version of a document, served at `versionUrl(id)`. */
+export interface FileVersion {
+  id: number;
+  version: number;
+  /** "original", or the save time "YYYYMMDD_HHMMSS". */
+  timestamp: string;
+  label: string;
+  created_at: string;
+  size: number;
+}
 
 export interface Opener {
   name: string;

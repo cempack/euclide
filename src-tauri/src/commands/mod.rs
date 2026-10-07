@@ -6,12 +6,16 @@
 
 pub mod app;
 pub mod courses;
+pub mod editing;
+pub mod files;
 pub mod legacy;
 pub mod links;
 pub mod notes;
+pub mod python;
 pub mod recap;
 pub mod reminders;
 pub mod schedule;
+pub mod search;
 pub mod sequences;
 pub mod settings;
 

@@ -61,6 +61,16 @@ impl Db {
         lock(&self.0.writer)
     }
 
+    /// Run `f` on a read-only connection, for code already on a blocking thread.
+    pub fn read_blocking<T>(&self, f: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
+        let pool = &self.0;
+        if pool.readers.is_empty() {
+            return f(&lock(&pool.writer));
+        }
+        let i = pool.next.fetch_add(1, Ordering::Relaxed) % pool.readers.len();
+        f(&lock(&pool.readers[i]))
+    }
+
     /// Run `f` on a read-only connection, off the UI thread.
     pub async fn read<T, F>(&self, f: F) -> AppResult<T>
     where
@@ -119,6 +129,16 @@ pub fn seed_python_demos() {
             "n = 7\nfor i in range(1, 11):\n    print(f\"{n} x {i:>2} = {n*i}\")\n",
         );
     }
+}
+
+/// An in-memory database at the latest format, for tests.
+#[cfg(test)]
+pub fn migrations_for_tests() -> Connection {
+    let mut conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(SCHEMA).unwrap();
+    migrations::add_legacy_columns(&conn);
+    migrations::migrate(&mut conn, Path::new("."), None).unwrap();
+    conn
 }
 
 #[cfg(test)]

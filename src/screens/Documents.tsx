@@ -228,7 +228,6 @@ export default function Documents({
           fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }),
           "success",
         );
-        await api.indexImportedPdfs(added).catch(() => {});
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       } else {
         toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");

@@ -1,12 +1,15 @@
 mod commands;
 mod db;
 mod error;
+mod fsx;
+mod jobs;
 mod keepawake;
 mod linux_env;
 mod models;
 mod paths;
 mod perf;
 mod portable_update;
+mod protocol;
 mod relaunch;
 mod sidecar;
 
@@ -27,6 +30,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .register_asynchronous_uri_scheme_protocol(protocol::SCHEME, |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                responder.respond(protocol::handle(&app, &request));
+            });
+        })
         .setup(|app| {
             use tauri::Manager;
             #[cfg(desktop)]
@@ -58,6 +67,8 @@ pub fn run() {
             let _ = commands::recap::prune(&db.lock());
             app.manage(db);
             app.manage(KeepAwake::default());
+            app.manage(jobs::indexer::Indexer::default());
+            jobs::indexer::spawn(app.handle().clone());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
 
             // Keep screen from locking / sleeping by default ("Ne pas verrouiller l'écran").
@@ -100,6 +111,15 @@ pub fn run() {
 
             perf::append(&[format!("rust.setup_done_ms={}", perf::uptime_ms())]);
 
+            // PDFs left unindexed by a previous session: resume once startup has settled.
+            {
+                let indexer = app.state::<jobs::indexer::Indexer>().inner().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                    indexer.kick();
+                });
+            }
+
             // Pre-start the Python sidecar *once* at launch and keep the process warm forever.
             // All Python work (Pronote, scripts, Jedi, PDF index...) now goes through a single
             // long-lived process using fast stdin/stdout JSON lines. No more per-call spawn,
@@ -129,19 +149,20 @@ pub fn run() {
             commands::notes::rename_note,
             commands::notes::get_note,
             commands::notes::list_note_summaries,
-            commands::legacy::list_files,
-            commands::legacy::recent_files,
-            commands::legacy::import_files,
-            commands::legacy::import_paths,
-            commands::legacy::file_path,
-            commands::legacy::open_file,
-            commands::legacy::reveal_file,
-            commands::legacy::list_openers,
-            commands::legacy::delete_file,
-            commands::legacy::rename_file,
-            commands::legacy::global_search,
-            commands::legacy::reindex_documents,
-            commands::legacy::index_files,
+            commands::files::list_files,
+            commands::files::recent_files,
+            commands::files::import_files,
+            commands::files::import_paths,
+            commands::files::file_path,
+            commands::files::open_file,
+            commands::files::reveal_file,
+            commands::files::list_openers,
+            commands::files::delete_file,
+            commands::files::rename_file,
+            commands::files::attach_files_to_course,
+            commands::search::global_search,
+            commands::files::reindex_documents,
+            commands::files::index_files,
             commands::reminders::list_reminders,
             commands::reminders::create_reminder,
             commands::reminders::update_reminder,
@@ -165,25 +186,22 @@ pub fn run() {
             commands::schedule::get_today_classes,
             commands::schedule::save_schedule_entry,
             commands::schedule::delete_schedule_entry,
-            commands::legacy::save_board,
-            commands::legacy::read_board,
-            commands::legacy::export_board_png,
-            commands::legacy::save_annotations,
-            commands::legacy::read_annotations,
-            commands::legacy::save_export,
-            commands::legacy::update_file,
-            commands::legacy::get_file_versions,
-            commands::legacy::read_version_data,
-            commands::legacy::ensure_original_version,
-            commands::legacy::list_python_demos,
-            commands::legacy::create_python_script,
-            commands::legacy::save_python_script,
-            commands::legacy::delete_python_script,
-            commands::legacy::rename_python_script,
-            commands::legacy::import_python_script,
-            commands::legacy::run_python_demo,
-            commands::legacy::run_python_code,
-            commands::legacy::python_complete,
+            commands::editing::save_board,
+            commands::editing::read_board,
+            commands::editing::save_annotations,
+            commands::editing::read_annotations,
+            commands::editing::get_file_versions,
+            commands::editing::write_file_bytes,
+            commands::editing::create_file_bytes,
+            commands::python::list_python_demos,
+            commands::python::create_python_script,
+            commands::python::save_python_script,
+            commands::python::delete_python_script,
+            commands::python::rename_python_script,
+            commands::python::import_python_script,
+            commands::python::run_python_demo,
+            commands::python::run_python_code,
+            commands::python::python_complete,
             commands::legacy::choose_data_dir,
             commands::legacy::reset_data_dir,
             commands::legacy::backup_data_dir,

@@ -169,8 +169,6 @@ const FULL_BLEED: TabKind[] = ["python", "whiteboard", "pdf", "note"];
 async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "success" | "error") => void) {
   if (!added.length) return;
   added.forEach((f) => api.logEvent("file_import", f.name, null));
-  toast(get("messages.indexing", "Indexation…"), "info");
-  await api.indexImportedPdfs(added).catch(() => {});
   window.dispatchEvent(new CustomEvent("eu:library-changed"));
   toast(get("messages.imported", "{count} importé(s)").replace("{count}", String(added.length)), "success");
 }

@@ -257,7 +257,6 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         return;
       }
       toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
-      await api.indexImportedPdfs(Array.isArray(added) ? added : []).catch(() => {});
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
     } catch {
       toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");

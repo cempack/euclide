@@ -364,9 +364,10 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       .replace(/\$[^$]+\$/g, "[formule]");
     const lines = doc.splitTextToSize(body || " ", 500);
     doc.text(lines, 48, 84);
-    const dataUrl = doc.output("dataurlstring");
     try {
-      const f = await api.saveExport(`${title}.pdf`, dataUrl);
+      const f = await api.createFileBytes(`${title}.pdf`, doc.output("arraybuffer"), {
+        courseId: draft.course_id ?? null,
+      });
       if (!f?.id) {
         doc.save(`${title}.pdf`);
         toast(get("notes.exported", "Exporté : {name}").replace("{name}", `${title}.pdf`), "success");

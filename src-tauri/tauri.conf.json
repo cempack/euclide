@@ -23,17 +23,17 @@
       }
     ],
     "security": {
-      "csp": null,
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["$APPDATA/**", "$RESOURCE/**", "**/Euclide-Data/**", "**"]
-      }
+      "csp": null
     }
   },
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["app", "appimage", "nsis"],
+    "targets": [
+      "app",
+      "appimage",
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,7 +41,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["resources/euclide-sidecar"],
+    "resources": [
+      "resources/euclide-sidecar"
+    ],
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"
