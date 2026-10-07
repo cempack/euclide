@@ -277,6 +277,46 @@ mod tests {
     }
 
     #[test]
+    fn each_class_has_its_own_progress_with_step_and_document() {
+        let conn = crate::db::migrations_for_tests();
+        let c = create(&conn, "NSI", "code", "#1f6f65", "", "NSI").unwrap();
+        conn.execute_batch(&format!(
+            "INSERT INTO sequences (id, course_id, title) VALUES (1, {id}, 'Listes');
+             INSERT INTO files (id, course_id, name, rel_path, kind) VALUES (1, {id}, 'cours.pdf', 'courses/1/cours.pdf', 'pdf');
+             INSERT INTO sequence_items (id, sequence_id, title, file_id, position) VALUES (1, 1, 'Intro', 1, 0), (2, 1, 'TP', NULL, 1);",
+            id = c.id
+        ))
+        .unwrap();
+        attach_class(&conn, c.id, "2NDE4").unwrap();
+        attach_class(&conn, c.id, "2NDE7").unwrap();
+        conn.execute(
+            "UPDATE course_classes SET last_item_id = 1, last_file_id = 1 WHERE class_name = '2NDE4'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE course_classes SET last_item_id = 2 WHERE class_name = '2NDE7'",
+            [],
+        )
+        .unwrap();
+        let classes = list_classes(&conn, c.id).unwrap();
+        let a = &classes[0];
+        assert_eq!(
+            (
+                a.last_item_title.as_deref(),
+                a.last_sequence_title.as_deref(),
+                a.last_file_name.as_deref()
+            ),
+            (Some("Intro"), Some("Listes"), Some("cours.pdf"))
+        );
+        assert_eq!(classes[1].last_item_title.as_deref(), Some("TP"));
+        // Deleting the step clears the pointer instead of leaving it dangling.
+        conn.execute("DELETE FROM sequence_items WHERE id = 2", [])
+            .unwrap();
+        assert_eq!(list_classes(&conn, c.id).unwrap()[1].last_item_id, None);
+    }
+
+    #[test]
     fn attaching_a_class_twice_keeps_one_row() {
         let conn = mem();
         let c = create(&conn, "Maths", "calc", "#2c62a8", "", "Mathématiques").unwrap();

@@ -36,6 +36,8 @@ zip = { version = "4", default-features = false, features = ["deflate-flate2-zli
 minisign-verify = "0.2"
 
 [target.'cfg(windows)'.dependencies]
+# DPAPI, to keep Pronote passwords encrypted for the Windows user (already in the tree via Tauri).
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "stream"] }
 futures-util = "0.3"
 
