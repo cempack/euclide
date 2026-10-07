@@ -303,7 +303,7 @@ function LinksSection() {
                   className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                   title={l.url}
                 >
-                  <Favicon url={l.url} className="w-5 h-5 text-[10px]" remote={remoteIcons} />
+                  <Favicon url={l.url} className="w-5 h-5 text-[0.625rem]" remote={remoteIcons} />
                   <span className="eu-t-body text-ink truncate">{l.label}</span>
                   <span className="eu-t-meta truncate hidden sm:inline">{l.url}</span>
                 </button>

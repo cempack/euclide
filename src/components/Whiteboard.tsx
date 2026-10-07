@@ -867,7 +867,7 @@ export default function Whiteboard({
 
         {/* Versions: load an earlier snapshot, then Enregistrer to promote it. */}
         <select
-          className="eu-select h-7 w-[130px] text-[11.5px] eu-no-drag"
+          className="eu-select eu-field-sm w-[130px] eu-no-drag"
           value=""
           aria-label={get("pdf.versions", "Versions")}
           onChange={async (e) => {
@@ -933,7 +933,7 @@ export default function Whiteboard({
           <select
             value={courseId ?? ""}
             onChange={(e) => setCourseId(e.target.value ? Number(e.target.value) : null)}
-            className="eu-select h-7 w-[130px] text-[11.5px] eu-no-drag"
+            className="eu-select eu-field-sm w-[130px] eu-no-drag"
             aria-label={get("whiteboard.course", "Cours")}
           >
             <option value="">{get("whiteboard.noCourse", "Sans cours")}</option>
@@ -1001,7 +1001,7 @@ export default function Whiteboard({
               }}
               onBlur={commitPendingText}
               onFocus={(e) => e.target.select()}
-              className="absolute bg-paper text-paper-ink border-2 border-accent px-1.5 py-0.5 text-sm outline-hidden shadow-pop"
+              className="absolute bg-paper text-paper-ink border-2 border-accent px-1.5 py-0.5 text-body outline-hidden shadow-pop"
               style={{
                 left: `${pendingText.normX * pageSize.w}px`,
                 top: `${pendingText.normY * pageSize.h}px`,

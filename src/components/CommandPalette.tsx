@@ -436,7 +436,7 @@ function CommandPalette({
         {scope === "all" ? (
           <SearchIcon className="w-4 h-4 text-ink-faint shrink-0" />
         ) : (
-          <span className="font-mono text-[14px] font-semibold text-accent shrink-0 w-4 text-center">
+          <span className="font-mono text-body font-semibold text-accent shrink-0 w-4 text-center">
             {query.charAt(0)}
           </span>
         )}

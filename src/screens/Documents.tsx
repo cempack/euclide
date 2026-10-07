@@ -80,7 +80,7 @@ function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowPr
         </span>
         <span className="eu-t-body text-ink truncate">{title}</span>
       </button>
-      <span className="eu-t-label normal-case tracking-normal shrink-0 hidden sm:block">{meta}</span>
+      <span className="eu-t-caption shrink-0 hidden sm:block">{meta}</span>
       <button
         onClick={onRename}
         aria-label={`${get("common.rename", "Renommer")} — ${title}`}
