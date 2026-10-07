@@ -40,5 +40,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         </ThemeProvider>
       </MotionConfig>
     </ErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

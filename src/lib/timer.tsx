@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useToast } from "../components/ui";
 import { get } from "./i18n";
 
@@ -112,7 +104,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const controls = useMemo<TimerControls>(
     () => ({ running, start, toggle, add, stop }),
-    [running, start, toggle, add, stop]
+    [running, start, toggle, add, stop],
   );
 
   useEffect(() => {

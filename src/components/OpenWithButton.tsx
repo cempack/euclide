@@ -64,11 +64,7 @@ export function OpenWithButton({
 
   return (
     <div className="relative inline-block" onBlur={() => setTimeout(() => setOpen(false), 150)}>
-      <button
-        onClick={handleClick}
-        className={className}
-        title={get("openWith.title", "Ouvrir dehors")}
-      >
+      <button onClick={handleClick} className={className} title={get("openWith.title", "Ouvrir dehors")}>
         {label || get("openWith.label", "Ouvrir dehors")}
       </button>
       {open && options && (

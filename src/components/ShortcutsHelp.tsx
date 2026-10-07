@@ -4,12 +4,7 @@ import { get } from "../lib/i18n";
 
 export default function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={get("app.shortcutsTitle", "Raccourcis")}
-      width="max-w-2xl"
-    >
+    <Modal open={open} onClose={onClose} title={get("app.shortcutsTitle", "Raccourcis")} width="max-w-2xl">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
         {SHORTCUTS.map((group) => (
           <div key={group.group}>

@@ -50,8 +50,11 @@ export function UpdateAvailablePopup({
     const ok = await confirmDlg.ask({
       title: get("updater.install", "Installer"),
       message: fmt(
-        get("updater.confirmInstall", "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le."),
-        { version: update.version }
+        get(
+          "updater.confirmInstall",
+          "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le.",
+        ),
+        { version: update.version },
       ),
       confirmLabel: get("updater.install", "Installer"),
     });
@@ -71,7 +74,9 @@ export function UpdateAvailablePopup({
       toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
     } catch (err) {
       setBusy(false);
-      setError(installErrorMessage(err) || get("updater.installFailed", "Impossible d'installer la mise à jour."));
+      setError(
+        installErrorMessage(err) || get("updater.installFailed", "Impossible d'installer la mise à jour."),
+      );
     }
   };
 
@@ -120,9 +125,7 @@ export function UpdateAvailablePopup({
           <div className="flex justify-end gap-2 mt-3 flex-wrap">
             {!busy && (
               <button type="button" onClick={dismiss} className="eu-btn-quiet eu-btn-sm shrink-0">
-                {done
-                  ? get("updater.popupDismiss", "Fermer")
-                  : get("updater.popupLater", "Plus tard")}
+                {done ? get("updater.popupDismiss", "Fermer") : get("updater.popupLater", "Plus tard")}
               </button>
             )}
             {!done && (

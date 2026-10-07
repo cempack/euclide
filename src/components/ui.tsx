@@ -39,7 +39,10 @@ interface ErrorBoundaryState {
   info: ErrorInfo | null;
 }
 
-export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  { children: ReactNode; fallback?: ReactNode },
+  ErrorBoundaryState
+> {
   constructor(props: any) {
     super(props);
     this.state = { error: null, info: null };
@@ -112,7 +115,7 @@ const FOCUSABLE = "button, [href], input, select, textarea, [tabindex]:not([tabi
 function trapFocus(container: HTMLElement, e: KeyboardEvent) {
   if (e.key !== "Tab") return;
   const items = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1 && el.offsetParent !== null
+    (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1 && el.offsetParent !== null,
   );
   if (!items.length) return;
   const first = items[0];
@@ -242,17 +245,23 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     setState(next);
   }, []);
 
-  const ask = useCallback((opts: ConfirmAskOpts) => {
-    return new Promise<boolean>((resolve) => {
-      show({ mode: "ask", opts, resolve });
-    });
-  }, [show]);
+  const ask = useCallback(
+    (opts: ConfirmAskOpts) => {
+      return new Promise<boolean>((resolve) => {
+        show({ mode: "ask", opts, resolve });
+      });
+    },
+    [show],
+  );
 
-  const dirty = useCallback((opts: ConfirmDirtyOpts) => {
-    return new Promise<"save" | "discard" | "cancel">((resolve) => {
-      show({ mode: "dirty", opts, resolve });
-    });
-  }, [show]);
+  const dirty = useCallback(
+    (opts: ConfirmDirtyOpts) => {
+      return new Promise<"save" | "discard" | "cancel">((resolve) => {
+        show({ mode: "dirty", opts, resolve });
+      });
+    },
+    [show],
+  );
 
   const api = useMemo<ConfirmApi>(() => ({ ask, dirty }), [ask, dirty]);
 
@@ -390,14 +399,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               toast.tone === "error"
                 ? "border-l-2 border-l-danger"
                 : toast.tone === "success"
-                ? "border-l-2 border-l-ok"
-                : "";
+                  ? "border-l-2 border-l-ok"
+                  : "";
             const iconClass =
               toast.tone === "error"
                 ? "text-danger"
                 : toast.tone === "success"
-                ? "text-ok"
-                : "text-ink-faint";
+                  ? "text-ok"
+                  : "text-ink-faint";
             const Icon =
               toast.tone === "success" ? (
                 <CheckCircleIcon className="w-4 h-4 shrink-0" />
@@ -510,7 +519,13 @@ export const COURSE_ICONS: Array<{ key: string; label: string; Icon: React.Compo
  *  Use everywhere we wait for data (courses, cours detail, contenu, etc).
  *  Prevents "freeze" feel by being lightweight + lets parent keep interactive chrome (tabs, sidebar, drag).
  */
-export function Loading({ label = "Chargement…", size = "default" }: { label?: string; size?: "default" | "small" }) {
+export function Loading({
+  label = "Chargement…",
+  size = "default",
+}: {
+  label?: string;
+  size?: "default" | "small";
+}) {
   const isSmall = size === "small";
   return (
     <motion.div
@@ -532,7 +547,9 @@ export function Loading({ label = "Chargement…", size = "default" }: { label?:
         />
       </div>
       {label && (
-        <p className={`${isSmall ? "text-[11px]" : "text-sm"} text-ink-muted font-mono tracking-tight`}>{label}</p>
+        <p className={`${isSmall ? "text-[11px]" : "text-sm"} text-ink-muted font-mono tracking-tight`}>
+          {label}
+        </p>
       )}
     </motion.div>
   );

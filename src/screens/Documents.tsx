@@ -7,7 +7,15 @@ import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import { DocIcon, NoteIcon, PenIcon, PlusIcon, SearchIcon, FileKindIcon, TrashIcon } from "../components/icons";
+import {
+  DocIcon,
+  NoteIcon,
+  PenIcon,
+  PlusIcon,
+  SearchIcon,
+  FileKindIcon,
+  TrashIcon,
+} from "../components/icons";
 import { useVisibleRefresh } from "../lib/visible-refresh";
 
 const DOCUMENTS_EVENTS = ["eu:library-changed"] as const;
@@ -160,7 +168,13 @@ const MemoNoteItem = memo(function MemoNoteItem({
   );
 });
 
-export default function Documents({ filterHint, visible = true }: { filterHint?: string; visible?: boolean }) {
+export default function Documents({
+  filterHint,
+  visible = true,
+}: {
+  filterHint?: string;
+  visible?: boolean;
+}) {
   const toast = useToast();
   const tabs = useTabs();
   const confirm = useConfirm();
@@ -171,13 +185,26 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
   const [search, setSearch] = useState("");
 
   // Rename state (supports notes + every file kind: pdf/image/board/doc/sheet/etc.)
-  const [renameTarget, setRenameTarget] = useState<null | { kind: "file" | "note"; id: number; current: string }>(null);
+  const [renameTarget, setRenameTarget] = useState<null | {
+    kind: "file" | "note";
+    id: number;
+    current: string;
+  }>(null);
   const [renameValue, setRenameValue] = useState("");
 
   const refresh = useCallback(() => {
-    api.listFiles(null).then((f) => setDocs(Array.isArray(f) ? f : [])).catch(() => {});
-    api.allNotes().then((n) => setNotes(Array.isArray(n) ? n : [])).catch(() => {});
-    api.listCourses().then((c) => setCourses(Array.isArray(c) ? c : [])).catch(() => {});
+    api
+      .listFiles(null)
+      .then((f) => setDocs(Array.isArray(f) ? f : []))
+      .catch(() => {});
+    api
+      .allNotes()
+      .then((n) => setNotes(Array.isArray(n) ? n : []))
+      .catch(() => {});
+    api
+      .listCourses()
+      .then((c) => setCourses(Array.isArray(c) ? c : []))
+      .catch(() => {});
   }, []);
   useVisibleRefresh(visible, refresh, DOCUMENTS_EVENTS);
 
@@ -197,7 +224,10 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
       const added = (await api.importFiles(null)) ?? [];
       if (added.length) {
         added.forEach((f) => api.logEvent("file_import", f.name, null));
-        toast(fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }), "success");
+        toast(
+          fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }),
+          "success",
+        );
         await api.indexImportedPdfs(added).catch(() => {});
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       } else {
@@ -230,52 +260,56 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
     setRenameValue(f.name);
   }, []);
   const startRenameNote = useCallback((n: Note) => {
-    const cur = n.title || (t.documents?.noteFallbackTitle || "Note");
+    const cur = n.title || t.documents?.noteFallbackTitle || "Note";
     setRenameTarget({ kind: "note", id: n.id, current: cur });
     setRenameValue(cur);
   }, []);
   const handleRenameFile = useCallback((f: FileItem) => startRenameFile(f), [startRenameFile]);
   const handleRenameNote = useCallback((n: Note) => startRenameNote(n), [startRenameNote]);
 
-  const deleteFileItem = useCallback(async (f: FileItem) => {
-    const ok = await confirm.ask({
-      title: get("common.delete", "Supprimer"),
-      message: `Supprimer le fichier « ${f.name} » ?`,
-      confirmLabel: get("common.delete", "Supprimer"),
-      danger: true,
-    });
-    if (!ok) return;
-    try {
-      await api.deleteFile(f.id);
-      tabs.tabs
-        .filter((t) => t.params.fileId === f.id)
-        .forEach((t) => tabs.close(t.id));
-      toast(get("documents.toastDeleted", "Supprimé"), "success");
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    } catch (err: any) {
-      toast(err?.message || get("messages.genericError", "Erreur"), "error");
-    }
-  }, [confirm, tabs, toast]);
+  const deleteFileItem = useCallback(
+    async (f: FileItem) => {
+      const ok = await confirm.ask({
+        title: get("common.delete", "Supprimer"),
+        message: `Supprimer le fichier « ${f.name} » ?`,
+        confirmLabel: get("common.delete", "Supprimer"),
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await api.deleteFile(f.id);
+        tabs.tabs.filter((t) => t.params.fileId === f.id).forEach((t) => tabs.close(t.id));
+        toast(get("documents.toastDeleted", "Supprimé"), "success");
+        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      } catch (err: any) {
+        toast(err?.message || get("messages.genericError", "Erreur"), "error");
+      }
+    },
+    [confirm, tabs, toast],
+  );
 
-  const deleteNoteItem = useCallback(async (n: Note) => {
-    const ok = await confirm.ask({
-      title: get("notes.deleteConfirm", "Supprimer cette note ?"),
-      message: get("notes.deleteConfirm", "Supprimer cette note ?"),
-      confirmLabel: get("common.delete", "Supprimer"),
-      danger: true,
-    });
-    if (!ok) return;
-    try {
-      await api.deleteNote(n.id);
-      tabs.tabs
-        .filter((t) => t.kind === "note" && t.params.noteId === n.id)
-        .forEach((t) => tabs.close(t.id, { discard: true }));
-      toast(get("notes.deleted", "Note supprimée"), "success");
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    } catch (err: any) {
-      toast(err?.message || get("messages.genericError", "Erreur"), "error");
-    }
-  }, [confirm, tabs, toast]);
+  const deleteNoteItem = useCallback(
+    async (n: Note) => {
+      const ok = await confirm.ask({
+        title: get("notes.deleteConfirm", "Supprimer cette note ?"),
+        message: get("notes.deleteConfirm", "Supprimer cette note ?"),
+        confirmLabel: get("common.delete", "Supprimer"),
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await api.deleteNote(n.id);
+        tabs.tabs
+          .filter((t) => t.kind === "note" && t.params.noteId === n.id)
+          .forEach((t) => tabs.close(t.id, { discard: true }));
+        toast(get("notes.deleted", "Note supprimée"), "success");
+        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      } catch (err: any) {
+        toast(err?.message || get("messages.genericError", "Erreur"), "error");
+      }
+    },
+    [confirm, tabs, toast],
+  );
 
   const closeRename = useCallback(() => {
     setRenameTarget(null);
@@ -311,10 +345,11 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
           updated.kind === "board"
             ? `whiteboard:${updated.id}`
             : updated.kind === "pdf" || updated.kind === "image"
-            ? `pdf:${updated.id}`
-            : null;
+              ? `pdf:${updated.id}`
+              : null;
         if (tid && tabs.tabs.some((t) => t.id === tid)) {
-          const patch = updated.kind === "pdf" || updated.kind === "image" ? { fileName: newName } : undefined;
+          const patch =
+            updated.kind === "pdf" || updated.kind === "image" ? { fileName: newName } : undefined;
           tabs.rename(tid, newName, patch);
         }
         api.logEvent("file_rename", newName, updated.course_id ?? null);
@@ -381,11 +416,10 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
       const c = courses.find((x) => x.id === courseId);
       return c ? courseVisual(c.color, resolved === "dark").fg : undefined;
     },
-    [courses, resolved]
+    [courses, resolved],
   );
 
-  const chipClass = (active: boolean) =>
-    `eu-btn-sm eu-btn ${active ? "eu-btn-primary" : "eu-btn-ghost"}`;
+  const chipClass = (active: boolean) => `eu-btn-sm eu-btn ${active ? "eu-btn-primary" : "eu-btn-ghost"}`;
 
   const totalSize = docs.reduce((sum, d) => sum + (d.size || 0), 0);
 
@@ -494,7 +528,7 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
               search.trim() || filter.kind !== "all"
                 ? get(
                     "documents.noResultHint",
-                    "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents."
+                    "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents.",
                   )
                 : t.documents?.nothingHint ||
                   "Importez des fichiers (ou glissez-les dans la fenêtre), ou écrivez des notes dans vos cours."
@@ -536,7 +570,7 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
                         courseName={courseName}
                         accent={accentFor(it.n.course_id)}
                       />
-                    )
+                    ),
                   )}
                 </div>
               </Panel>

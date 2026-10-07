@@ -116,12 +116,7 @@ function keyOf(spec: OpenSpec): string {
   return `${spec.kind}:${Math.random().toString(36).slice(2)}`;
 }
 
-function evictToLimit(
-  prev: Tab[],
-  limit: number,
-  activeId: string,
-  dirty: Record<string, boolean>
-): Tab[] {
+function evictToLimit(prev: Tab[], limit: number, activeId: string, dirty: Record<string, boolean>): Tab[] {
   if (limit <= 0 || prev.length <= limit) return prev;
   const next = [...prev];
   while (next.length > limit) {
@@ -364,9 +359,12 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [hydrated, tabs, activeId]);
 
-  const setTabDirty = useCallback((id: string, dirty: boolean) => {
-    dirtyStore.set(id, dirty);
-  }, [dirtyStore]);
+  const setTabDirty = useCallback(
+    (id: string, dirty: boolean) => {
+      dirtyStore.set(id, dirty);
+    },
+    [dirtyStore],
+  );
 
   const isDirty = useCallback((id: string) => !!dirtyStore.getSnapshot()[id], [dirtyStore]);
 
@@ -435,12 +433,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
 
         let nextTabs = prev;
         if (effectiveMaxTabs > 0 && prev.length >= effectiveMaxTabs) {
-          nextTabs = evictToLimit(
-            prev,
-            effectiveMaxTabs - 1,
-            activeIdRef.current,
-            dirtyStore.getSnapshot()
-          );
+          nextTabs = evictToLimit(prev, effectiveMaxTabs - 1, activeIdRef.current, dirtyStore.getSnapshot());
         }
         return [...nextTabs, { id, kind: spec.kind, title, params: newParams, mountId: newMountId() }];
       });
@@ -450,7 +443,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       }
       return id;
     },
-    [effectiveMaxTabs, dirtyStore]
+    [effectiveMaxTabs, dirtyStore],
   );
 
   const setTabFitCapacity = useCallback((n: number) => {
@@ -458,53 +451,62 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     setTabFitCapacityState((prev) => (prev === count ? prev : count));
   }, []);
 
-  const setMaxTabsMode = useCallback((mode: MaxTabsMode, fixed?: number) => {
-    const nextFixed =
-      typeof fixed === "number" && Number.isFinite(fixed)
-        ? Math.max(TAB_FIT_MIN, Math.min(MAX_TABS_FIXED_CAP, Math.floor(fixed)))
-        : null;
-    if (nextFixed != null) {
-      setMaxTabsFixed(nextFixed);
-      api.setSetting("max_tabs", String(nextFixed)).catch(() => {});
-    }
-    setMaxTabsModeState(mode);
-    api.setSetting("max_tabs_mode", mode).catch(() => {});
-    if (mode === "unlimited") {
-      api.setSetting("max_tabs", "0").catch(() => {});
-    } else {
-      const cap = nextFixed ?? maxTabsFixed;
-      api.setSetting("max_tabs", String(cap)).catch(() => {});
-      if (mode === "fixed") {
-        setTabs((prev) => evictToLimit(prev, cap, activeIdRef.current, dirtyStore.getSnapshot()));
+  const setMaxTabsMode = useCallback(
+    (mode: MaxTabsMode, fixed?: number) => {
+      const nextFixed =
+        typeof fixed === "number" && Number.isFinite(fixed)
+          ? Math.max(TAB_FIT_MIN, Math.min(MAX_TABS_FIXED_CAP, Math.floor(fixed)))
+          : null;
+      if (nextFixed != null) {
+        setMaxTabsFixed(nextFixed);
+        api.setSetting("max_tabs", String(nextFixed)).catch(() => {});
       }
-    }
-  }, [maxTabsFixed, dirtyStore]);
-
-  const updateMaxTabs = useCallback((n: number) => {
-    if (n <= 0) setMaxTabsMode("unlimited");
-    else setMaxTabsMode("fixed", n);
-  }, [setMaxTabsMode]);
-
-  const close = useCallback((id: string, opts?: { discard?: boolean }) => {
-    if (opts?.discard) discarded.current.add(id);
-    dirtyStore.clear(id);
-    flushFns.current.delete(id);
-    setTabs((prev) => {
-      const idx = prev.findIndex((t) => t.id === id);
-      if (idx === -1) return prev;
-      const next = prev.filter((t) => t.id !== id);
-      if (next.length === 0) {
-        setActiveId("dashboard");
-        return [{ ...HOME, mountId: newMountId() }];
+      setMaxTabsModeState(mode);
+      api.setSetting("max_tabs_mode", mode).catch(() => {});
+      if (mode === "unlimited") {
+        api.setSetting("max_tabs", "0").catch(() => {});
+      } else {
+        const cap = nextFixed ?? maxTabsFixed;
+        api.setSetting("max_tabs", String(cap)).catch(() => {});
+        if (mode === "fixed") {
+          setTabs((prev) => evictToLimit(prev, cap, activeIdRef.current, dirtyStore.getSnapshot()));
+        }
       }
-      setActiveId((cur) => {
-        if (cur !== id) return cur;
-        const fallback = next[Math.max(0, idx - 1)];
-        return fallback.id;
+    },
+    [maxTabsFixed, dirtyStore],
+  );
+
+  const updateMaxTabs = useCallback(
+    (n: number) => {
+      if (n <= 0) setMaxTabsMode("unlimited");
+      else setMaxTabsMode("fixed", n);
+    },
+    [setMaxTabsMode],
+  );
+
+  const close = useCallback(
+    (id: string, opts?: { discard?: boolean }) => {
+      if (opts?.discard) discarded.current.add(id);
+      dirtyStore.clear(id);
+      flushFns.current.delete(id);
+      setTabs((prev) => {
+        const idx = prev.findIndex((t) => t.id === id);
+        if (idx === -1) return prev;
+        const next = prev.filter((t) => t.id !== id);
+        if (next.length === 0) {
+          setActiveId("dashboard");
+          return [{ ...HOME, mountId: newMountId() }];
+        }
+        setActiveId((cur) => {
+          if (cur !== id) return cur;
+          const fallback = next[Math.max(0, idx - 1)];
+          return fallback.id;
+        });
+        return next;
       });
-      return next;
-    });
-  }, [dirtyStore]);
+    },
+    [dirtyStore],
+  );
 
   const takeDiscarded = useCallback((id: string) => discarded.current.delete(id), []);
 
@@ -517,7 +519,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           title,
           params: paramsPatch ? { ...t.params, ...paramsPatch } : t.params,
         };
-      })
+      }),
     );
   }, []);
 
@@ -549,7 +551,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         flushFns.current.set(newId, fn);
       }
     },
-    [rename, dirtyStore]
+    [rename, dirtyStore],
   );
 
   const focusIndex = useCallback((i: number) => {
@@ -646,7 +648,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       registerFlush,
       flush,
       hydrated,
-    ]
+    ],
   );
 
   return (

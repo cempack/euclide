@@ -101,39 +101,239 @@ const sequences: Sequence[] = [
 ];
 
 const files: FileItem[] = [
-  { id: 1, course_id: 1, name: "Chapitre 3 — Fonctions de référence.pdf", rel_path: "courses/1/chapitre-3.pdf", kind: "pdf", size: 482_311, added_at: sqlUtc(addHours(-26)) },
-  { id: 2, course_id: 1, name: "Exercices — Fonction carré.pdf", rel_path: "courses/1/exercices-carre.pdf", kind: "pdf", size: 155_204, added_at: sqlUtc(addDays(-2)) },
-  { id: 3, course_id: 2, name: "TP — Piles et files.pdf", rel_path: "courses/2/tp-piles.pdf", kind: "pdf", size: 231_870, added_at: sqlUtc(addDays(-3)) },
-  { id: 4, course_id: 2, name: "Cours — Arbres binaires.pdf", rel_path: "courses/2/arbres.pdf", kind: "pdf", size: 1_204_551, added_at: sqlUtc(addDays(-6)) },
-  { id: 5, course_id: null, name: "Programme officiel de seconde.pdf", rel_path: "documents/programme-2nde.pdf", kind: "pdf", size: 3_811_002, added_at: sqlUtc(addDays(-20)) },
-  { id: 6, course_id: 1, name: "Tableau — Vecteurs.euboard", rel_path: "whiteboards/vecteurs.euboard", kind: "board", size: 48_120, added_at: sqlUtc(addHours(-2)) },
-  { id: 7, course_id: 3, name: "DM 2 — Congruences.pdf", rel_path: "courses/3/dm2.pdf", kind: "pdf", size: 98_310, added_at: sqlUtc(addDays(-9)) },
-  { id: 8, course_id: null, name: "Photo du tableau.jpg", rel_path: "documents/photo-tableau.jpg", kind: "image", size: 2_301_998, added_at: sqlUtc(addDays(-1)) },
-  { id: 9, course_id: 4, name: "Fiche méthode — Suites.pdf", rel_path: "courses/4/fiche-suites.pdf", kind: "pdf", size: 120_442, added_at: sqlUtc(addDays(-14)) },
-  { id: 10, course_id: 2, name: "Sujet bac NSI 2026.pdf", rel_path: "courses/2/bac-2026.pdf", kind: "pdf", size: 640_118, added_at: sqlUtc(addDays(-35)) },
-  { id: 11, course_id: 4, name: "Progression annuelle.xlsx", rel_path: "courses/4/progression.xlsx", kind: "sheet", size: 22_016, added_at: sqlUtc(addDays(-31)) },
+  {
+    id: 1,
+    course_id: 1,
+    name: "Chapitre 3 — Fonctions de référence.pdf",
+    rel_path: "courses/1/chapitre-3.pdf",
+    kind: "pdf",
+    size: 482_311,
+    added_at: sqlUtc(addHours(-26)),
+  },
+  {
+    id: 2,
+    course_id: 1,
+    name: "Exercices — Fonction carré.pdf",
+    rel_path: "courses/1/exercices-carre.pdf",
+    kind: "pdf",
+    size: 155_204,
+    added_at: sqlUtc(addDays(-2)),
+  },
+  {
+    id: 3,
+    course_id: 2,
+    name: "TP — Piles et files.pdf",
+    rel_path: "courses/2/tp-piles.pdf",
+    kind: "pdf",
+    size: 231_870,
+    added_at: sqlUtc(addDays(-3)),
+  },
+  {
+    id: 4,
+    course_id: 2,
+    name: "Cours — Arbres binaires.pdf",
+    rel_path: "courses/2/arbres.pdf",
+    kind: "pdf",
+    size: 1_204_551,
+    added_at: sqlUtc(addDays(-6)),
+  },
+  {
+    id: 5,
+    course_id: null,
+    name: "Programme officiel de seconde.pdf",
+    rel_path: "documents/programme-2nde.pdf",
+    kind: "pdf",
+    size: 3_811_002,
+    added_at: sqlUtc(addDays(-20)),
+  },
+  {
+    id: 6,
+    course_id: 1,
+    name: "Tableau — Vecteurs.euboard",
+    rel_path: "whiteboards/vecteurs.euboard",
+    kind: "board",
+    size: 48_120,
+    added_at: sqlUtc(addHours(-2)),
+  },
+  {
+    id: 7,
+    course_id: 3,
+    name: "DM 2 — Congruences.pdf",
+    rel_path: "courses/3/dm2.pdf",
+    kind: "pdf",
+    size: 98_310,
+    added_at: sqlUtc(addDays(-9)),
+  },
+  {
+    id: 8,
+    course_id: null,
+    name: "Photo du tableau.jpg",
+    rel_path: "documents/photo-tableau.jpg",
+    kind: "image",
+    size: 2_301_998,
+    added_at: sqlUtc(addDays(-1)),
+  },
+  {
+    id: 9,
+    course_id: 4,
+    name: "Fiche méthode — Suites.pdf",
+    rel_path: "courses/4/fiche-suites.pdf",
+    kind: "pdf",
+    size: 120_442,
+    added_at: sqlUtc(addDays(-14)),
+  },
+  {
+    id: 10,
+    course_id: 2,
+    name: "Sujet bac NSI 2026.pdf",
+    rel_path: "courses/2/bac-2026.pdf",
+    kind: "pdf",
+    size: 640_118,
+    added_at: sqlUtc(addDays(-35)),
+  },
+  {
+    id: 11,
+    course_id: 4,
+    name: "Progression annuelle.xlsx",
+    rel_path: "courses/4/progression.xlsx",
+    kind: "sheet",
+    size: 22_016,
+    added_at: sqlUtc(addDays(-31)),
+  },
 ];
 
 const sequenceItems: SequenceItem[] = [
-  { id: 1, sequence_id: 1, title: "Fonction carré", position: 0, file_id: 2, file_name: null, file_kind: null },
-  { id: 2, sequence_id: 1, title: "Fonction inverse", position: 1, file_id: 1, file_name: null, file_kind: null },
-  { id: 3, sequence_id: 1, title: "Variations et extremums", position: 2, file_id: null, file_name: null, file_kind: null },
-  { id: 4, sequence_id: 2, title: "Moyenne et médiane", position: 0, file_id: null, file_name: null, file_kind: null },
-  { id: 5, sequence_id: 2, title: "Écart interquartile", position: 1, file_id: null, file_name: null, file_kind: null },
+  {
+    id: 1,
+    sequence_id: 1,
+    title: "Fonction carré",
+    position: 0,
+    file_id: 2,
+    file_name: null,
+    file_kind: null,
+  },
+  {
+    id: 2,
+    sequence_id: 1,
+    title: "Fonction inverse",
+    position: 1,
+    file_id: 1,
+    file_name: null,
+    file_kind: null,
+  },
+  {
+    id: 3,
+    sequence_id: 1,
+    title: "Variations et extremums",
+    position: 2,
+    file_id: null,
+    file_name: null,
+    file_kind: null,
+  },
+  {
+    id: 4,
+    sequence_id: 2,
+    title: "Moyenne et médiane",
+    position: 0,
+    file_id: null,
+    file_name: null,
+    file_kind: null,
+  },
+  {
+    id: 5,
+    sequence_id: 2,
+    title: "Écart interquartile",
+    position: 1,
+    file_id: null,
+    file_name: null,
+    file_kind: null,
+  },
   { id: 6, sequence_id: 3, title: "Translations", position: 0, file_id: 6, file_name: null, file_kind: null },
-  { id: 7, sequence_id: 4, title: "Piles et files", position: 0, file_id: 3, file_name: null, file_kind: null },
-  { id: 8, sequence_id: 4, title: "Arbres binaires", position: 1, file_id: 4, file_name: null, file_kind: null },
+  {
+    id: 7,
+    sequence_id: 4,
+    title: "Piles et files",
+    position: 0,
+    file_id: 3,
+    file_name: null,
+    file_kind: null,
+  },
+  {
+    id: 8,
+    sequence_id: 4,
+    title: "Arbres binaires",
+    position: 1,
+    file_id: 4,
+    file_name: null,
+    file_kind: null,
+  },
   { id: 9, sequence_id: 4, title: "Graphes", position: 2, file_id: null, file_name: null, file_kind: null },
-  { id: 10, sequence_id: 5, title: "Modèle relationnel", position: 0, file_id: null, file_name: null, file_kind: null },
-  { id: 11, sequence_id: 6, title: "Divisibilité et congruences", position: 0, file_id: 7, file_name: null, file_kind: null },
+  {
+    id: 10,
+    sequence_id: 5,
+    title: "Modèle relationnel",
+    position: 0,
+    file_id: null,
+    file_name: null,
+    file_kind: null,
+  },
+  {
+    id: 11,
+    sequence_id: 6,
+    title: "Divisibilité et congruences",
+    position: 0,
+    file_id: 7,
+    file_name: null,
+    file_kind: null,
+  },
 ];
 
 const courseClasses: CourseClass[] = [
-  { id: 1, course_id: 1, class_name: "2NDE4", last_file_id: 2, last_item_id: 1, progress_updated_at: sqlUtc(addDays(-1)), notes: "Reprendre l'exercice 12 : beaucoup d'erreurs sur les signes." },
-  { id: 2, course_id: 1, class_name: "2NDE7", last_file_id: 1, last_item_id: 2, progress_updated_at: sqlUtc(addDays(-2)), notes: "" },
-  { id: 3, course_id: 2, class_name: "TNSI", last_file_id: 4, last_item_id: 8, progress_updated_at: sqlUtc(addDays(-3)), notes: "Projet arbres : groupes de trois, rendu vendredi." },
-  { id: 4, course_id: 3, class_name: "TEXP1", last_file_id: 7, last_item_id: 11, progress_updated_at: sqlUtc(addDays(-6)), notes: "" },
-  { id: 5, course_id: 4, class_name: "1SPE3", last_file_id: 9, last_item_id: null, progress_updated_at: sqlUtc(addDays(-8)), notes: "" },
+  {
+    id: 1,
+    course_id: 1,
+    class_name: "2NDE4",
+    last_file_id: 2,
+    last_item_id: 1,
+    progress_updated_at: sqlUtc(addDays(-1)),
+    notes: "Reprendre l'exercice 12 : beaucoup d'erreurs sur les signes.",
+  },
+  {
+    id: 2,
+    course_id: 1,
+    class_name: "2NDE7",
+    last_file_id: 1,
+    last_item_id: 2,
+    progress_updated_at: sqlUtc(addDays(-2)),
+    notes: "",
+  },
+  {
+    id: 3,
+    course_id: 2,
+    class_name: "TNSI",
+    last_file_id: 4,
+    last_item_id: 8,
+    progress_updated_at: sqlUtc(addDays(-3)),
+    notes: "Projet arbres : groupes de trois, rendu vendredi.",
+  },
+  {
+    id: 4,
+    course_id: 3,
+    class_name: "TEXP1",
+    last_file_id: 7,
+    last_item_id: 11,
+    progress_updated_at: sqlUtc(addDays(-6)),
+    notes: "",
+  },
+  {
+    id: 5,
+    course_id: 4,
+    class_name: "1SPE3",
+    last_file_id: 9,
+    last_item_id: null,
+    progress_updated_at: sqlUtc(addDays(-8)),
+    notes: "",
+  },
 ];
 
 const notes: Note[] = [
@@ -152,8 +352,7 @@ const notes: Note[] = [
     id: 2,
     course_id: 2,
     title: "Piles : exemples en classe",
-    body:
-      "Une pile suit le principe **LIFO**.\n\n```python\npile = []\npile.append(3)\npile.append(7)\nprint(pile.pop())  # 7\n```\n\nApplication : vérifier un parenthésage.\n",
+    body: "Une pile suit le principe **LIFO**.\n\n```python\npile = []\npile.append(3)\npile.append(7)\nprint(pile.pop())  # 7\n```\n\nApplication : vérifier un parenthésage.\n",
     updated_at: sqlUtc(addDays(-1)),
   },
   {
@@ -173,12 +372,60 @@ const notes: Note[] = [
 ];
 
 const reminders: Reminder[] = [
-  { id: 1, title: "Rendre les copies du DS de 2NDE4", due_at: addDays(0, 17).toISOString(), done: false, created_at: sqlUtc(addDays(-3)), course_id: 1, repeat_rule: "none" },
-  { id: 2, title: "Préparer le TP arbres binaires", due_at: addDays(1, 8).toISOString(), done: false, created_at: sqlUtc(addDays(-2)), course_id: 2, repeat_rule: "none" },
-  { id: 3, title: "Saisir les notes du trimestre", due_at: addDays(-2, 18).toISOString(), done: false, created_at: sqlUtc(addDays(-10)), course_id: null, repeat_rule: "none" },
-  { id: 4, title: "Réunion parents-professeurs", due_at: addDays(6, 18).toISOString(), done: false, created_at: sqlUtc(addDays(-5)), course_id: null, repeat_rule: "none" },
-  { id: 5, title: "Photocopies pour la semaine", due_at: addDays(3, 7, 30).toISOString(), done: false, created_at: sqlUtc(addDays(-20)), course_id: null, repeat_rule: "weekly" },
-  { id: 6, title: "Envoyer le sujet du DM aux 1SPE3", due_at: addDays(-1, 12).toISOString(), done: true, created_at: sqlUtc(addDays(-6)), course_id: 4, repeat_rule: "none" },
+  {
+    id: 1,
+    title: "Rendre les copies du DS de 2NDE4",
+    due_at: addDays(0, 17).toISOString(),
+    done: false,
+    created_at: sqlUtc(addDays(-3)),
+    course_id: 1,
+    repeat_rule: "none",
+  },
+  {
+    id: 2,
+    title: "Préparer le TP arbres binaires",
+    due_at: addDays(1, 8).toISOString(),
+    done: false,
+    created_at: sqlUtc(addDays(-2)),
+    course_id: 2,
+    repeat_rule: "none",
+  },
+  {
+    id: 3,
+    title: "Saisir les notes du trimestre",
+    due_at: addDays(-2, 18).toISOString(),
+    done: false,
+    created_at: sqlUtc(addDays(-10)),
+    course_id: null,
+    repeat_rule: "none",
+  },
+  {
+    id: 4,
+    title: "Réunion parents-professeurs",
+    due_at: addDays(6, 18).toISOString(),
+    done: false,
+    created_at: sqlUtc(addDays(-5)),
+    course_id: null,
+    repeat_rule: "none",
+  },
+  {
+    id: 5,
+    title: "Photocopies pour la semaine",
+    due_at: addDays(3, 7, 30).toISOString(),
+    done: false,
+    created_at: sqlUtc(addDays(-20)),
+    course_id: null,
+    repeat_rule: "weekly",
+  },
+  {
+    id: 6,
+    title: "Envoyer le sujet du DM aux 1SPE3",
+    due_at: addDays(-1, 12).toISOString(),
+    done: true,
+    created_at: sqlUtc(addDays(-6)),
+    course_id: 4,
+    repeat_rule: "none",
+  },
 ];
 
 const links: QuickLink[] = [
@@ -195,7 +442,16 @@ const sched = (
   end: string,
   subject: string,
   room: string,
-): ScheduleEntry => ({ id, day_of_week: day, start_time: start, end_time: end, subject, room, course_id: null, source: "pronote" });
+): ScheduleEntry => ({
+  id,
+  day_of_week: day,
+  start_time: start,
+  end_time: end,
+  subject,
+  room,
+  course_id: null,
+  source: "pronote",
+});
 
 const schedule: ScheduleEntry[] = [
   sched(1, 1, "08:00", "09:00", "MATHEMATIQUES · 2NDE4", "B204"),
@@ -244,7 +500,18 @@ const pronote: PronoteStatus = {
 };
 
 if (empty) {
-  for (const list of [courses, sequences, files, sequenceItems, courseClasses, notes, reminders, links, schedule, pythonDemos] as unknown[][]) {
+  for (const list of [
+    courses,
+    sequences,
+    files,
+    sequenceItems,
+    courseClasses,
+    notes,
+    reminders,
+    links,
+    schedule,
+    pythonDemos,
+  ] as unknown[][]) {
     list.length = 0;
   }
   pronote.connected = false;
@@ -291,16 +558,42 @@ function search(query: string): SearchResult[] {
   const has = (s: string) => s.toLowerCase().includes(q);
   const out: SearchResult[] = [];
   for (const c of courses) {
-    if (has(c.name)) out.push({ kind: "course", id: c.id, title: c.name, subtitle: c.matiere, snippet: c.description, course_id: c.id, file_kind: "" });
+    if (has(c.name))
+      out.push({
+        kind: "course",
+        id: c.id,
+        title: c.name,
+        subtitle: c.matiere,
+        snippet: c.description,
+        course_id: c.id,
+        file_kind: "",
+      });
   }
   for (const f of files) {
-    if (has(f.name)) out.push({ kind: "file", id: f.id, title: f.name, subtitle: "Document", snippet: "", course_id: f.course_id, file_kind: f.kind });
+    if (has(f.name))
+      out.push({
+        kind: "file",
+        id: f.id,
+        title: f.name,
+        subtitle: "Document",
+        snippet: "",
+        course_id: f.course_id,
+        file_kind: f.kind,
+      });
   }
   for (const n of notes) {
     if (has(n.title) || has(n.body)) {
       const i = n.body.toLowerCase().indexOf(q);
       const snippet = i >= 0 ? n.body.slice(Math.max(0, i - 30), i + 60) : "";
-      out.push({ kind: "note", id: n.id, title: n.title, subtitle: "Note", snippet, course_id: n.course_id, file_kind: "" });
+      out.push({
+        kind: "note",
+        id: n.id,
+        title: n.title,
+        subtitle: "Note",
+        snippet,
+        course_id: n.course_id,
+        file_kind: "",
+      });
     }
   }
   return out.slice(0, 20);
@@ -347,7 +640,13 @@ function pronoteContents(args: Args) {
       start_time: "08:00",
       end_time: "09:00",
       subject: "MATHEMATIQUES",
-      title: ["Fonction carré : variations", "Fonction inverse", "Exercices de synthèse", "Évaluation : fonctions affines", "Correction du DS"][i],
+      title: [
+        "Fonction carré : variations",
+        "Fonction inverse",
+        "Exercices de synthèse",
+        "Évaluation : fonctions affines",
+        "Correction du DS",
+      ][i],
       description:
         "Activité d'introduction puis cours. Exercices 12, 14 et 15 page 87 à terminer pour la prochaine séance.",
       category: i === 3 ? "Évaluation" : "Cours",
@@ -422,13 +721,18 @@ function handle(cmd: string, args: Args): unknown {
       return courseClasses.filter((c) => id == null || c.course_id === id).map(withProgress);
     }
     case "pronote_classes":
-      return { ok: true, classes: ["2NDE4", "2NDE7", "TNSI", "TEXP1", "1SPE3", "2NDE1"].map((name) => ({ name })) };
+      return {
+        ok: true,
+        classes: ["2NDE4", "2NDE7", "TNSI", "TEXP1", "1SPE3", "2NDE1"].map((name) => ({ name })),
+      };
     case "pronote_contents":
       return pronoteContents(args);
 
     // Sequences
     case "list_sequences":
-      return sequences.filter((s) => s.course_id === num(args, "courseId")).sort((a, b) => a.position - b.position);
+      return sequences
+        .filter((s) => s.course_id === num(args, "courseId"))
+        .sort((a, b) => a.position - b.position);
     case "list_sequence_items": {
       const courseId = num(args, "courseId");
       const ids = new Set(sequences.filter((s) => s.course_id === courseId).map((s) => s.id));
@@ -473,7 +777,10 @@ function handle(cmd: string, args: Args): unknown {
       return files.filter((f) => id == null || f.course_id === id);
     }
     case "recent_files":
-      return files.slice().sort((a, b) => b.added_at.localeCompare(a.added_at)).slice(0, num(args, "limit") ?? 8);
+      return files
+        .slice()
+        .sort((a, b) => b.added_at.localeCompare(a.added_at))
+        .slice(0, num(args, "limit") ?? 8);
     case "global_search":
       return search(str(args, "query"));
     case "file_path":
@@ -495,7 +802,7 @@ function handle(cmd: string, args: Args): unknown {
         done: false,
         created_at: sqlUtc(new Date()),
         course_id: num(args, "courseId"),
-        repeat_rule: ((args?.repeatRule as Reminder["repeat_rule"]) ?? "none"),
+        repeat_rule: (args?.repeatRule as Reminder["repeat_rule"]) ?? "none",
       };
       reminders.push(r);
       return r;
@@ -530,12 +837,27 @@ function handle(cmd: string, args: Args): unknown {
       return schedule.slice();
     case "get_today_classes": {
       const day = isoDay(new Date());
-      return schedule.filter((s) => s.day_of_week === day).sort((a, b) => a.start_time.localeCompare(b.start_time));
+      return schedule
+        .filter((s) => s.day_of_week === day)
+        .sort((a, b) => a.start_time.localeCompare(b.start_time));
     }
 
     // Recap
     case "get_recap":
-      return empty ? { ...recap, files_opened: 0, notes_written: 0, demos_run: 0, reminders_done: 0, active_minutes: 0, top_courses: [], top_documents: [], top_tools: [], time_by_area: [] } : recap;
+      return empty
+        ? {
+            ...recap,
+            files_opened: 0,
+            notes_written: 0,
+            demos_run: 0,
+            reminders_done: 0,
+            active_minutes: 0,
+            top_courses: [],
+            top_documents: [],
+            top_tools: [],
+            time_by_area: [],
+          }
+        : recap;
 
     // Pronote
     case "pronote_status":

@@ -1,13 +1,18 @@
 import { get } from "./i18n";
 
-export const isMac = typeof navigator !== "undefined" &&
+export const isMac =
+  typeof navigator !== "undefined" &&
   /Macintosh|Mac OS X|Mac|iPod|iPhone|iPad/.test(navigator.userAgent || navigator.platform || "");
 
-export const isWindows = typeof navigator !== "undefined" &&
+export const isWindows =
+  typeof navigator !== "undefined" &&
   /Windows|Win32|Win64|WOW64/.test(navigator.userAgent || navigator.platform || "");
 
-export const isLinux = typeof navigator !== "undefined" &&
-  /Linux|X11/.test(navigator.userAgent || navigator.platform || "") && !isMac && !isWindows;
+export const isLinux =
+  typeof navigator !== "undefined" &&
+  /Linux|X11/.test(navigator.userAgent || navigator.platform || "") &&
+  !isMac &&
+  !isWindows;
 
 export const MOD = isMac ? "⌘" : "Ctrl";
 const SHIFT = isMac ? "⇧" : "Maj";
@@ -52,9 +57,18 @@ export const SHORTCUTS: { group: string; items: ShortcutDoc[] }[] = [
   {
     group: get("shortcuts.groupTabs", "Barre d'onglets"),
     items: [
-      { keys: [get("shortcuts.doubleClick", "Double-clic")], label: get("shortcuts.pinTab", "Épingler l'onglet") },
-      { keys: [get("shortcuts.drag", "Glisser")], label: get("shortcuts.reorderTab", "Réordonner les onglets") },
-      { keys: [get("shortcuts.middleClick", "Clic milieu")], label: get("shortcuts.closeTab", "Fermer l'onglet") },
+      {
+        keys: [get("shortcuts.doubleClick", "Double-clic")],
+        label: get("shortcuts.pinTab", "Épingler l'onglet"),
+      },
+      {
+        keys: [get("shortcuts.drag", "Glisser")],
+        label: get("shortcuts.reorderTab", "Réordonner les onglets"),
+      },
+      {
+        keys: [get("shortcuts.middleClick", "Clic milieu")],
+        label: get("shortcuts.closeTab", "Fermer l'onglet"),
+      },
     ],
   },
   {

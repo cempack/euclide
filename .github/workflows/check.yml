@@ -1,4 +1,4 @@
-name: 'check'
+name: "check"
 
 # Build and test every branch and pull request. Never publishes anything.
 on:
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: lts/*
-          cache: 'npm'
+          cache: "npm"
       - run: npm ci
       - name: typecheck and build
         run: npm run build
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: ['ubuntu-22.04', 'windows-latest']
+        platform: ["ubuntu-22.04", "windows-latest"]
     runs-on: ${{ matrix.platform }}
     env:
       CARGO_INCREMENTAL: 0
@@ -45,7 +45,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: 'src-tauri -> target'
+          workspaces: "src-tauri -> target"
           shared-key: check-${{ matrix.platform }}
           cache-on-failure: true
       # tauri-build requires bundle.resources to exist; the real sidecar is
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       # test_3d_contents.py needs a live Pronote account: not run here.
       - name: unit tests
         run: |

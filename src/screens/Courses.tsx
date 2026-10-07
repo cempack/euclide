@@ -3,14 +3,7 @@ import { motion } from "framer-motion";
 import { useTabs } from "../lib/tabs";
 import { api, type Course } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
-import {
-  COURSE_COLORS,
-  COURSE_ICONS,
-  EmptyState,
-  Loading,
-  Modal,
-  useToast,
-} from "../components/ui";
+import { COURSE_COLORS, COURSE_ICONS, EmptyState, Loading, Modal, useToast } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
@@ -45,11 +38,7 @@ const CourseCard = memo(function CourseCard({
       className="eu-panel group relative flex overflow-hidden hover:border-line-strong transition-colors duration-fast"
     >
       <span aria-hidden className="w-1 shrink-0" style={{ background: visual.fg }} />
-      <button
-        type="button"
-        onClick={() => onOpen(c)}
-        className="flex-1 min-w-0 text-left p-[14px] pr-9"
-      >
+      <button type="button" onClick={() => onOpen(c)} className="flex-1 min-w-0 text-left p-[14px] pr-9">
         <span
           className="grid place-items-center w-8 h-8 rounded border"
           style={{ background: visual.tint, borderColor: visual.border, color: visual.fg }}
@@ -300,7 +289,7 @@ export default function Courses() {
     (c: Course) => {
       tabs.open({ kind: "course", title: c.name, params: { courseId: c.id } });
     },
-    [tabs]
+    [tabs],
   );
 
   return (
@@ -332,7 +321,7 @@ export default function Courses() {
             title={get("courses.emptyTitle", "Aucun cours pour le moment")}
             hint={get(
               "courses.emptyHint",
-              "Un cours rassemble un casier de documents, des notes, une progression par séquences, et les classes qui le suivent (noms Pronote exacts)."
+              "Un cours rassemble un casier de documents, des notes, une progression par séquences, et les classes qui le suivent (noms Pronote exacts).",
             )}
             action={
               <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
@@ -378,9 +367,7 @@ export default function Courses() {
           dark={resolved === "dark"}
           onCancel={close}
           onSubmit={submit}
-          submitLabel={
-            dialog === "edit" ? get("common.save", "Enregistrer") : t.common?.add || "Ajouter"
-          }
+          submitLabel={dialog === "edit" ? get("common.save", "Enregistrer") : t.common?.add || "Ajouter"}
         />
       </Modal>
     </>

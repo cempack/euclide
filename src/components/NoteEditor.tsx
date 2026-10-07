@@ -92,7 +92,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [noteId, isNew, initialCourseId, toast, commitDraft, commitDirty]);
 
   useEffect(() => {
@@ -252,9 +254,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     const sel = body.substring(lineStart, lineEnd);
     const after = body.substring(lineEnd);
     const lines = sel.split("\n");
-    const newLines = lines.map((l) =>
-      prefix + l.replace(/^(#{1,6}\s*|- \s*|\* \s*|\+ \s*|\d+\.\s*)/, "")
-    );
+    const newLines = lines.map((l) => prefix + l.replace(/^(#{1,6}\s*|- \s*|\* \s*|\+ \s*|\d+\.\s*)/, ""));
     const newSel = newLines.join("\n");
     const newBody = before + newSel + after;
     markDirty({ body: newBody });
@@ -262,7 +262,10 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       if (ta) {
         ta.focus();
         ta.selectionStart = lineStart + prefix.length;
-        ta.selectionEnd = lineStart + prefix.length + (lines[0]?.replace(/^(#{1,6}\s*|- \s*|\* \s*|\+ \s*|\d+\.\s*)/, "").length || 0);
+        ta.selectionEnd =
+          lineStart +
+          prefix.length +
+          (lines[0]?.replace(/^(#{1,6}\s*|- \s*|\* \s*|\+ \s*|\d+\.\s*)/, "").length || 0);
       }
     }, 0);
   };
@@ -356,7 +359,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     doc.text(title, 48, 56);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
-    const body = (draft.body || "").replace(/\$\$[\s\S]*?\$\$/g, "[formule]").replace(/\$[^$]+\$/g, "[formule]");
+    const body = (draft.body || "")
+      .replace(/\$\$[\s\S]*?\$\$/g, "[formule]")
+      .replace(/\$[^$]+\$/g, "[formule]");
     const lines = doc.splitTextToSize(body || " ", 500);
     doc.text(lines, 48, 84);
     const dataUrl = doc.output("dataurlstring");
@@ -446,22 +451,52 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       <div className="relative shrink-0">
         <Toolbar className="h-8 py-0 gap-0.5">
           <ToolGroup className="gap-0" label={get("notes.format", "Mise en forme")}>
-            <button onClick={insertBold} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.bold", "Gras")} aria-label={get("notes.bold", "Gras")}>
+            <button
+              onClick={insertBold}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              title={get("notes.bold", "Gras")}
+              aria-label={get("notes.bold", "Gras")}
+            >
               <span className="font-bold text-[13px]">B</span>
             </button>
-            <button onClick={insertItalic} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.italic", "Italique")} aria-label={get("notes.italic", "Italique")}>
+            <button
+              onClick={insertItalic}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              title={get("notes.italic", "Italique")}
+              aria-label={get("notes.italic", "Italique")}
+            >
               <span className="italic text-[13px]">I</span>
             </button>
-            <button onClick={insertTitle} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.heading", "Titre")} aria-label={get("notes.heading", "Titre")}>
+            <button
+              onClick={insertTitle}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              title={get("notes.heading", "Titre")}
+              aria-label={get("notes.heading", "Titre")}
+            >
               <span className="font-semibold text-[13px]">H</span>
             </button>
-            <button onClick={insertList} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.list", "Liste")} aria-label={get("notes.list", "Liste")}>
+            <button
+              onClick={insertList}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              title={get("notes.list", "Liste")}
+              aria-label={get("notes.list", "Liste")}
+            >
               <span className="text-[13px]">•</span>
             </button>
-            <button onClick={insertCode} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.code", "Code")} aria-label={get("notes.code", "Code")}>
+            <button
+              onClick={insertCode}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              title={get("notes.code", "Code")}
+              aria-label={get("notes.code", "Code")}
+            >
               <CodeIcon className="w-4 h-4" />
             </button>
-            <button onClick={openLinkPopup} className="eu-btn-quiet eu-btn-icon eu-btn-sm" title={get("notes.link", "Lien")} aria-label={get("notes.link", "Lien")}>
+            <button
+              onClick={openLinkPopup}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              title={get("notes.link", "Lien")}
+              aria-label={get("notes.link", "Lien")}
+            >
               <LinkIcon className="w-4 h-4" />
             </button>
           </ToolGroup>
@@ -537,9 +572,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <p className="eu-t-label px-3 py-1.5 border-b border-line">
-            {get("notes.preview", "Aperçu")}
-          </p>
+          <p className="eu-t-label px-3 py-1.5 border-b border-line">{get("notes.preview", "Aperçu")}</p>
           <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
             {previewBody ? (
               <div className="eu-prose max-w-[68ch]">
@@ -547,9 +580,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
                   remarkPlugins={[remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                   components={{
-                    a: (props) => (
-                      <a {...props} target="_blank" rel="noopener noreferrer" />
-                    ),
+                    a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
                   }}
                 >
                   {previewBody}
