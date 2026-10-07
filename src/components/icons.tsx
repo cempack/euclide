@@ -98,13 +98,6 @@ export const CodeIcon = (p: IconProps) => (
   </svg>
 );
 
-export const TagIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M3 11.5V5a2 2 0 0 1 2-2h6.5a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8l-6.5 6.5a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 11.5z" />
-    <circle cx="7.5" cy="7.5" r="1.2" />
-  </svg>
-);
-
 export const NoteIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M5 3h9l5 5v13a0 0 0 0 1 0 0H5a0 0 0 0 1 0 0V3z" />
@@ -204,13 +197,6 @@ export const HelpIcon = (p: IconProps) => (
   </svg>
 );
 
-export const UserIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="8" r="4" />
-    <path d="M5 20c0-3.5 3.5-6.5 7-6.5s7 3 7 6.5" />
-  </svg>
-);
-
 export const DownloadIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M12 4v11M8 11l4 4 4-4" />
@@ -225,24 +211,11 @@ export const UndoIcon = (p: IconProps) => (
   </svg>
 );
 
-export const PointerIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M3 3 10.5 20.5 12 12 20.5 10.5 3 3z" />
-  </svg>
-);
-
 export const GlobeIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <circle cx="12" cy="12" r="10" />
     <path d="M2 12h20" />
     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10" />
-  </svg>
-);
-
-export const EyeIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
@@ -265,13 +238,6 @@ export const CheckCircleIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <circle cx="12" cy="12" r="10" />
     <path d="m9 12 2 2 4-4" />
-  </svg>
-);
-
-export const ScheduleIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 6v6l4 2" />
   </svg>
 );
 

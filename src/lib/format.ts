@@ -108,26 +108,6 @@ export function getClassStatus(
 }
 
 /** Returns the first upcoming (or current) class index, for highlighting "next". */
-export function findNextClassIndex(classes: Array<{ start_time: string; end_time: string }>): number {
-  const now = new Date();
-  let nextIdx = -1;
-  let soonest = Infinity;
-  classes.forEach((c, i) => {
-    const s = parseMinutes(c.start_time);
-    const cur = now.getHours() * 60 + now.getMinutes();
-    if (cur < s && s < soonest) {
-      soonest = s;
-      nextIdx = i;
-    }
-  });
-  // if no upcoming, perhaps the current one as "active"
-  if (nextIdx === -1) {
-    const curIdx = classes.findIndex((c) => getClassStatus(c, now) === "current");
-    if (curIdx >= 0) nextIdx = curIdx;
-  }
-  return nextIdx;
-}
-
 /** Human label for how far a class is (for upcoming). */
 export function minutesUntil(start_time: string, now: Date = new Date()): number | null {
   const cur = now.getHours() * 60 + now.getMinutes();

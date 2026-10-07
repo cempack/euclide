@@ -25,10 +25,10 @@ type Filter = { kind: "all" } | { kind: "type"; value: string } | { kind: "class
 type DocItem = { t: "file"; f: FileItem; date: string } | { t: "note"; n: Note; date: string };
 
 const TYPE_CHIPS = [
-  { value: "pdf", label: "PDF", emoji: "" },
-  { value: "image", label: "Images", emoji: "" },
-  { value: "board", label: "Tableaux", emoji: "" },
-  { value: "note", label: "Notes", emoji: "" },
+  { value: "pdf", label: "PDF" },
+  { value: "image", label: "Images" },
+  { value: "board", label: "Tableaux" },
+  { value: "note", label: "Notes" },
 ];
 
 // Pure helper: buckets dates for library organization (recency first, then calendar months)

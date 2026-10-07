@@ -12,7 +12,6 @@ export function fmt(template: string, vars: Record<string, string | number> = {}
 }
 
 export const t = strings as any; // runtime object from JSON (all strings + arrays)
-export type Strings = typeof t;
 
 /**
  * Safe deep getter for i18n strings/arrays/objects.
@@ -34,6 +33,3 @@ export function get(path: string, fallback: any = ""): any {
   }
   return cur ?? fallback;
 }
-
-// Back-compat alias if some code prefers tt()
-export const tt = get;

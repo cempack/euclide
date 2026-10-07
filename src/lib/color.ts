@@ -40,7 +40,7 @@ export function parseColor(input: string | null | undefined): Rgb | null {
 
 const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
 
-export function toHex({ r, g, b }: Rgb): string {
+function toHex({ r, g, b }: Rgb): string {
   return `#${[r, g, b].map((v) => clamp(v).toString(16).padStart(2, "0")).join("")}`;
 }
 
@@ -57,7 +57,7 @@ const WHITE: Rgb = { r: 255, g: 255, b: 255 };
 const BLACK: Rgb = { r: 0, g: 0, b: 0 };
 
 /** Relative luminance (WCAG). */
-export function luminance({ r, g, b }: Rgb): number {
+function luminance({ r, g, b }: Rgb): number {
   const f = (v: number) => {
     const x = v / 255;
     return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);

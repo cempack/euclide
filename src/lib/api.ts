@@ -64,7 +64,7 @@ if (typeof window !== "undefined") {
 export const isTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Prefix https:// when the teacher typed a bare host (google.com). */
-export function normalizeExternalUrl(url: string): string {
+function normalizeExternalUrl(url: string): string {
   const u = url.trim();
   if (!u) return "";
   const lower = u.toLowerCase();
@@ -80,7 +80,7 @@ export function normalizeExternalUrl(url: string): string {
 }
 
 /** Open a quick link in the system browser. Throws if nothing could launch. */
-export async function openExternalUrl(url: string): Promise<void> {
+async function openExternalUrl(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) throw new Error("empty url");
   if (!isTauri()) {
@@ -96,7 +96,7 @@ export async function openExternalUrl(url: string): Promise<void> {
  * `vite` without the Tauri shell) it resolves to a sensible empty value so the
  * UI still renders for design work instead of crashing.
  */
-export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
     // The dev server runs against an in-memory backend with realistic data;
     // production builds never include it.
@@ -230,13 +230,13 @@ export interface FileItem {
   added_at: string;
 }
 
-export interface TopCourse {
+interface TopCourse {
   name: string;
   emoji: string;
   count: number;
 }
 
-export interface TopItem {
+interface TopItem {
   name: string;
   count: number;
 }
