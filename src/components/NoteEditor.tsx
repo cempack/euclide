@@ -10,7 +10,6 @@ import { relativeTime } from "../lib/format";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { jsPDF } from "jspdf";
 import "katex/dist/katex.min.css";
 
 interface NoteEditorProps {
@@ -352,6 +351,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   };
 
   const exportPdf = async () => {
+    const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const title = draft.title || "Note";
     doc.setFont("helvetica", "bold");
