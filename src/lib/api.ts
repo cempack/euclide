@@ -74,8 +74,9 @@ async function invokeBytes<T>(
 }
 
 /** Browser mode (development): the mock backend says where a file's bytes are. */
-let devFiles: ((kind: "file" | "version", id: number) => string) | null = null;
-export function serveDevFiles(resolve: (kind: "file" | "version", id: number) => string) {
+type DevKind = "file" | "version" | "thumb";
+let devFiles: ((kind: DevKind, id: number) => string) | null = null;
+export function serveDevFiles(resolve: (kind: DevKind, id: number) => string) {
   devFiles = resolve;
 }
 
@@ -84,6 +85,8 @@ export const fileUrl = (id: number) => devFiles?.("file", id) ?? convertFileSrc(
 /** URL of a saved version of a document. */
 export const versionUrl = (versionId: number) =>
   devFiles?.("version", versionId) ?? convertFileSrc(`version/${versionId}`, "eufile");
+/** URL of a document's preview (thumbs.rs); a 404 until it is drawn. */
+export const thumbUrl = (id: number) => devFiles?.("thumb", id) ?? convertFileSrc(`thumb/${id}`, "eufile");
 
 function asList<T>(data: unknown): T[] {
   return Array.isArray(data) ? (data as T[]).filter((x) => x != null) : [];
@@ -318,6 +321,9 @@ export type RunEvent =
       reason?: "stopped" | "timeout" | "output" | "crash";
     };
 
+/** A document waiting for its preview (src-tauri/src/thumbs.rs). */
+export type ThumbJob = { id: number; kind: string; name: string };
+
 export type RunRequest = { name: string; code: string; checks: boolean; timeoutS: number };
 
 export interface PythonCompletion {
@@ -461,6 +467,10 @@ export const api = {
       ...(opts.courseId != null ? { "x-eu-course-id": String(opts.courseId) } : {}),
       ...(opts.folder ? { "x-eu-folder": opts.folder } : {}),
     }),
+  /** Documents waiting for a preview (a few at a time). */
+  missingThumbnails: () => invoke<ThumbJob[]>("missing_thumbnails").then(asList<ThumbJob>),
+  saveThumbnail: (fileId: number, jpeg: ArrayBuffer) =>
+    invokeBytes<void>("save_thumbnail", jpeg, { "x-eu-file-id": String(fileId) }),
   getFileVersions: (fileId: number) => invoke<FileVersion[]>("get_file_versions", { fileId }),
 
   // PDF annotations

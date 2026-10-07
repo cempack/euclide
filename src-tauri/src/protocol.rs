@@ -1,5 +1,6 @@
 //! `eufile://` serves the library to the webview by id:
-//! `/file/<id>` (a document) and `/version/<id>` (a saved version).
+//! `/file/<id>` (a document), `/version/<id>` (a saved version) and
+//! `/thumb/<id>` (a document's preview, thumbs.rs).
 //!
 //! The webview never handles absolute paths, and nothing outside the data
 //! folder can be reached. Range requests are answered with partial content,
@@ -48,7 +49,7 @@ fn resolve(app: &AppHandle, path: &str) -> AppResult<PathBuf> {
         return Err(AppError::user("Adresse de fichier invalide."));
     };
     let table = match kind {
-        "file" => "files",
+        "file" | "thumb" => "files",
         "version" => "file_versions",
         _ => return Err(AppError::user("Adresse de fichier invalide.")),
     };
@@ -60,7 +61,12 @@ fn resolve(app: &AppHandle, path: &str) -> AppResult<PathBuf> {
             |r| r.get(0),
         )?)
     })?;
-    crate::fsx::abs_path(&rel)
+    let path = crate::fsx::abs_path(&rel)?;
+    if kind == "thumb" {
+        return crate::thumbs::current(id, &path)
+            .ok_or_else(|| AppError::not_found("Pas encore d'aperçu."));
+    }
+    Ok(path)
 }
 
 /// `bytes=start-end`, `bytes=start-` or `bytes=-suffix`, clamped to the file.

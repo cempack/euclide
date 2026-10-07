@@ -1060,8 +1060,10 @@ const fileUrls = new Map<number, string>();
 const versionUrls = new Map<number, string>();
 const fileVersions = new Map<number, import("../lib/api").FileVersion[]>();
 
-function devFileUrl(kind: "file" | "version", id: number): string {
+function devFileUrl(kind: "file" | "version" | "thumb", id: number): string {
   if (kind === "version") return versionUrls.get(id) ?? samplePdf;
+  // No previews in browser mode: the grid shows the type's icon.
+  if (kind === "thumb") return "";
   const saved = fileUrls.get(id);
   if (saved) return saved;
   const f = files.find((x) => x.id === id);

@@ -91,10 +91,12 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
         }
     }
 
+    // Content hits: the matched words come wrapped in \u{2} … \u{3}, which
+    // the page shows highlighted (no markup, so no escaping to get wrong).
     let fts = fts_query(q);
     if !fts.is_empty() {
         let mut stmt = conn.prepare_cached(
-            "SELECT n.id, n.title, snippet(note_fts, 1, '', '', '…', 10), n.course_id \
+            "SELECT n.id, n.title, snippet(note_fts, 1, char(2), char(3), '…', 10), n.course_id \
              FROM note_fts JOIN notes n ON n.id = note_fts.rowid \
              WHERE note_fts MATCH ?1 ORDER BY rank LIMIT 10",
         )?;
@@ -111,7 +113,7 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
         }
 
         let mut stmt = conn.prepare_cached(
-            "SELECT f.id, f.name, f.kind, f.course_id, snippet(doc_fts, 1, '', '', '…', 10) \
+            "SELECT f.id, f.name, f.kind, f.course_id, snippet(doc_fts, 1, char(2), char(3), '…', 10) \
              FROM doc_fts JOIN files f ON f.id = doc_fts.rowid \
              WHERE doc_fts MATCH ?1 ORDER BY rank LIMIT 10",
         )?;
@@ -323,6 +325,10 @@ mod tests {
         );
         assert!(kinds("x").is_empty());
         let hit = &search(&conn, "carree").unwrap()[0];
-        assert!(hit.snippet.contains("carrée"));
+        assert!(
+            hit.snippet.contains("\u{2}carrée\u{3}"),
+            "{:?}",
+            hit.snippet
+        );
     }
 }

@@ -172,7 +172,13 @@
     "filterAll": "Tout",
     "noResult": "Aucun résultat",
     "noResultHint": "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents.",
-    "newName": "Nouveau nom"
+    "newName": "Nouveau nom",
+    "viewLabel": "Présentation",
+    "viewList": "Liste",
+    "viewGrid": "Grille avec aperçus",
+    "inContent": "Trouvé dans le contenu · {count}",
+    "deleteFileTitle": "Supprimer le document",
+    "deleteMessage": "Supprimer « {name} » ? Il reste 30 jours dans la corbeille des sauvegardes."
   },
   "whiteboard": {
     "saved": "Enregistré",

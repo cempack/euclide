@@ -12,6 +12,7 @@ import { useAppearance } from "../lib/theme";
 import { useToast } from "./ui";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
+import { Highlight } from "../ui/Highlight";
 
 import {
   BellIcon,
@@ -474,7 +475,7 @@ function CommandPalette({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="eu-t-body block truncate">{a.label}</span>
-                    {a.snippet && <span className="block eu-t-meta truncate">{a.snippet}</span>}
+                    {a.snippet && <Highlight text={a.snippet} className="block eu-t-meta truncate" />}
                   </span>
                   {a.hint && <span className="eu-t-caption shrink-0 mt-0.5">{a.hint}</span>}
                 </button>

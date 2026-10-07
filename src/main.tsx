@@ -33,12 +33,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, startDataBridge } from "./api/client";
 import { startTabSession } from "./stores/tabs";
 import { startShortcuts } from "./lib/keymap";
+import { startThumbnailer } from "./features/previews/thumbnailer";
 
 startReporting();
 startPerf();
 startDataBridge();
 startTabSession();
 startShortcuts();
+startThumbnailer();
 
 // Development only: ?gallery shows the UI kit (dev/Gallery.tsx) instead of
 // the app. Production builds drop the branch and its chunk.
