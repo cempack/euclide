@@ -75,7 +75,9 @@ const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }> = [
     name: "palette",
     go: async (p) => {
       await p.keyboard.press("Control+k");
-      await p.keyboard.type("fonc");
+      await p.getByRole("textbox", { name: /Rechercher un cours/ }).fill("fonc");
+      // The search is debounced and asynchronous: wait for its results.
+      await p.getByText("Fonction carré — cours").waitFor();
       await settle(p);
     },
   },
