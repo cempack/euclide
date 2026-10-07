@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct AppInfo {
     pub teacher_name: String,
     pub author: String,
@@ -12,7 +12,7 @@ pub struct AppInfo {
     pub windows_portable: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
     pub id: i64,
     pub name: String,
@@ -25,7 +25,7 @@ pub struct Course {
 
 /// Attachment of a course to a Pronote class/group. Stores per-class progress (last document)
 /// and professor notes specific to how far that class has gone in the course.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CourseClass {
     #[serde(default)]
     pub id: i64,
@@ -50,7 +50,7 @@ pub struct CourseClass {
     pub notes: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Note {
     #[serde(default)]
     pub id: i64,
@@ -63,7 +63,7 @@ pub struct Note {
     pub updated_at: String,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct FileItem {
     pub id: i64,
     pub course_id: Option<i64>,
@@ -74,7 +74,7 @@ pub struct FileItem {
     pub added_at: String,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Reminder {
     pub id: i64,
     pub title: String,
@@ -88,7 +88,7 @@ pub struct Reminder {
 }
 
 /// A chapter of a course's progression.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Sequence {
     pub id: i64,
     pub course_id: i64,
@@ -98,7 +98,7 @@ pub struct Sequence {
 }
 
 /// A step inside a sequence, optionally bound to a document of the locker.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct SequenceItem {
     pub id: i64,
     pub sequence_id: i64,
@@ -109,7 +109,7 @@ pub struct SequenceItem {
     pub file_kind: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct QuickLink {
     pub id: i64,
     pub label: String,
@@ -117,7 +117,7 @@ pub struct QuickLink {
     pub icon: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ScheduleEntry {
     #[serde(default)]
     pub id: i64,
@@ -137,21 +137,21 @@ pub fn default_source() -> String {
     "manual".into()
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PronoteStatus {
     pub connected: bool,
     pub account_name: Option<String>,
     pub last_sync: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PythonDemo {
     pub name: String,
     pub path: String,
     pub code: String,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct SearchResult {
     pub kind: String, // note | file | course
     pub id: i64,
@@ -162,14 +162,14 @@ pub struct SearchResult {
     pub file_kind: String,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PythonResult {
     pub ok: bool,
     pub stdout: String,
     pub stderr: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct PythonCompletion {
     pub name: String,
     pub complete: Option<String>,
@@ -179,20 +179,20 @@ pub struct PythonCompletion {
     pub doc: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TopCourse {
     pub name: String,
     pub emoji: String,
     pub count: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TopItem {
     pub name: String,
     pub count: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct RecapData {
     pub period_label: Option<String>,
     pub files_opened: i64,

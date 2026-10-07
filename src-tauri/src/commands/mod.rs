@@ -4,6 +4,7 @@
 //!
 //! `legacy` still holds the commands that have not been converted yet.
 
+pub mod courses;
 pub mod legacy;
 
 pub(crate) use legacy::{get_setting_raw, set_setting_raw};
