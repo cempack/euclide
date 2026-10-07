@@ -1,0 +1,71 @@
+name: 'check'
+
+# Build and test every branch and pull request. Never publishes anything.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - run: npm ci
+      - name: typecheck and build
+        run: npm run build
+
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ['ubuntu-22.04', 'windows-latest']
+    runs-on: ${{ matrix.platform }}
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v6
+      - name: install dependencies (ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+          shared-key: check-${{ matrix.platform }}
+          cache-on-failure: true
+      # tauri-build requires bundle.resources to exist; the real sidecar is
+      # only built for releases.
+      - name: sidecar placeholder
+        shell: bash
+        run: mkdir -p src-tauri/resources/euclide-sidecar
+      - name: test
+        working-directory: src-tauri
+        run: cargo test
+
+  sidecar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      # test_3d_contents.py needs a live Pronote account: not run here.
+      - name: unit tests
+        run: |
+          python sidecar/test_pronote_login.py
+          python sidecar/test_run_demo.py

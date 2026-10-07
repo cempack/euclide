@@ -1006,13 +1006,15 @@ function Shell() {
  message: get("confirm.unsavedMessage", "Enregistrer avant de fermer cet onglet ?"),
  });
  if (choice === "cancel") return;
- if (choice === "save") {
+ if (choice === "discard") {
+ tabs.close(id, { discard: true });
+ return;
+ }
  try {
  await tabs.flush(id);
  } catch {
  toast(get("messages.genericError", "Erreur"), "error");
  return;
- }
  }
  }
  tabs.close(id);
@@ -1198,6 +1200,12 @@ function Shell() {
  useEffect(() => {
  const onKey = (e: KeyboardEvent) => {
  const mod = isMac ? e.metaKey : e.ctrlKey;
+ // Shortcuts that mean something while typing (Ctrl+B for bold, Ctrl+F,
+ // Ctrl+digit…) belong to the focused field, not to the app.
+ const el = e.target as HTMLElement | null;
+ const typing =
+ !!el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");
+ if (typing && mod && !e.shiftKey && /^[bndft1-9]$/i.test(e.key)) return;
  // Save the active editor. The tab system already knows how: notes, the
  // whiteboard and the Python editor each register a flush function, which
  // is what the « unsaved changes » prompt uses when closing a tab.
@@ -1249,7 +1257,8 @@ function Shell() {
  setHelp((h) => !h);
  } else if (e.key === "Escape" && projection) {
  // Escape is the way out of projection mode; overlays handle their own.
- if (!palette && !help && !captureOpen) {
+ const dialogOpen = !!document.querySelector('[role="dialog"], [aria-modal="true"]');
+ if (!palette && !help && !captureOpen && !dialogOpen) {
  e.preventDefault();
  toggleProjection();
  }
