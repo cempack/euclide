@@ -4,7 +4,7 @@ use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::fsx::{abs_path, kind_from_ext, plain_file_name, rel_path, unique_dest};
 use crate::jobs::indexer::Indexer;
-use crate::models::FileItem;
+use crate::models::{FileItem, LibraryStats};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use std::fs;
@@ -120,6 +120,26 @@ pub async fn recent_files(db: State<'_, Db>, limit: i64) -> AppResult<Vec<FileIt
         Ok(rows.collect::<Result<_, _>>()?)
     })
     .await
+}
+
+pub(crate) fn library_stats_of(conn: &Connection) -> AppResult<LibraryStats> {
+    let (files, bytes) = conn.query_row(
+        "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let notes = conn.query_row("SELECT COUNT(*) FROM notes", [], |r| r.get(0))?;
+    Ok(LibraryStats {
+        files,
+        notes,
+        bytes,
+    })
+}
+
+/// Counts for the dashboard and the Documents header, without the lists.
+#[tauri::command]
+pub async fn library_stats(db: State<'_, Db>) -> AppResult<LibraryStats> {
+    db.read(library_stats_of).await
 }
 
 /// Ask the teacher for files to import (system dialog).
@@ -356,4 +376,37 @@ pub async fn rename_file(
     let item = db.write(move |conn| rename(conn, id, &new_name)).await?;
     indexer.kick();
     Ok(item)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn library_stats_count_every_file_and_note() {
+        let conn = crate::db::migrations_for_tests();
+        assert_eq!(
+            library_stats_of(&conn).unwrap(),
+            LibraryStats {
+                files: 0,
+                notes: 0,
+                bytes: 0
+            }
+        );
+        conn.execute_batch(
+            "INSERT INTO courses (id, name) VALUES (1, 'Maths');
+             INSERT INTO files (course_id, name, rel_path, size) VALUES (NULL, 'a.pdf', 'documents/a.pdf', 100);
+             INSERT INTO files (course_id, name, rel_path, size) VALUES (1, 'b.pdf', 'documents/b.pdf', 50);
+             INSERT INTO notes (course_id, title) VALUES (1, 'Fonction carré');",
+        )
+        .unwrap();
+        assert_eq!(
+            library_stats_of(&conn).unwrap(),
+            LibraryStats {
+                files: 2,
+                notes: 1,
+                bytes: 150
+            }
+        );
+    }
 }

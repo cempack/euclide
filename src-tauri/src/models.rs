@@ -215,3 +215,11 @@ pub struct RecapData {
     pub top_tools: Vec<TopItem>,
     pub time_by_area: Vec<TopItem>,
 }
+
+/// What the library holds, for counters (no list needed).
+#[derive(Debug, Serialize, PartialEq)]
+pub struct LibraryStats {
+    pub files: i64,
+    pub notes: i64,
+    pub bytes: i64,
+}

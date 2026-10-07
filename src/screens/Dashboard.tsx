@@ -1,17 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useTabs } from "../lib/tabs";
-import {
-  api,
-  type Course,
-  type CourseClass,
-  type FileItem,
-  type Note,
-  type PronoteStatus,
-  type QuickLink,
-  type Reminder,
-  type ScheduleEntry,
-  type RecapData,
-} from "../lib/api";
+import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
 import { t, get, fmt } from "../lib/i18n";
 import {
@@ -47,17 +36,11 @@ import {
   TrashIcon,
 } from "../components/icons";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
-import { useVisibleRefresh } from "../lib/visible-refresh";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
 
-const DASHBOARD_EVENTS = [
-  "eu:library-changed",
-  "eu:quicklinks-changed",
-  "eu:schedule-changed",
-  "eu:reminders-changed",
-  "eu:course-changed",
-  "eu:pronote-changed",
-  "eu:settings-changed",
-] as const;
+/** One empty list for every query still loading: stable, so memos hold. */
+const NONE: never[] = [];
 
 /**
  * Le tableau de bord.
@@ -78,16 +61,30 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
   const confirm = useConfirm();
   const { resolved } = useAppearance();
 
-  const [classes, setClasses] = useState<ScheduleEntry[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [docCount, setDocCount] = useState(0);
-  const [links, setLinks] = useState<QuickLink[]>([]);
-  const [recentFiles, setRecentFiles] = useState<FileItem[]>([]);
-  const [pronoteStatus, setPronoteStatus] = useState<PronoteStatus | null>(null);
-  const [recap, setRecap] = useState<RecapData | null>(null);
-  const [remoteIcons, setRemoteIcons] = useState(true);
+  // Data. Each query is shared with the other screens and refreshed when
+  // something changes it; a hidden dashboard stops listening and catches up
+  // when shown again.
+  const queryClient = useQueryClient();
+  const live = { subscribed: visible };
+  const classesQ = useQuery({ ...q.todayClasses(), ...live });
+  const remindersQ = useQuery({ ...q.reminders(), ...live });
+  const coursesQ = useQuery({ ...q.courses(), ...live });
+  const statsQ = useQuery({ ...q.libraryStats(), ...live });
+  const linksQ = useQuery({ ...q.links(), ...live });
+  const recentQ = useQuery({ ...q.recentFiles(6), ...live });
+  const pronoteQ = useQuery({ ...q.pronoteStatus(), ...live });
+  const recapQ = useQuery({ ...q.recap("today"), ...live });
+  const faviconsQ = useQuery({ ...q.setting("remote_favicons"), ...live });
+  const classes = classesQ.data ?? NONE;
+  const reminders = remindersQ.data ?? NONE;
+  const courses = coursesQ.data ?? NONE;
+  const links = linksQ.data ?? NONE;
+  const recentFiles = recentQ.data ?? NONE;
+  const pronoteStatus = pronoteQ.data ?? null;
+  const recap = recapQ.data ?? null;
+  const remoteIcons = remoteFaviconsEnabled(faviconsQ.data ?? null);
+  const docCount = statsQ.data?.files ?? 0;
+  const noteCount = statsQ.data?.notes ?? 0;
 
   // Live tick so "in progress", countdowns and the gauge move without a refetch.
   const [nowTick, setNowTick] = useState(() => new Date());
@@ -96,60 +93,22 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
     return () => window.clearInterval(id);
   }, []);
 
-  const refresh = useCallback(() => {
-    const loads = [
-      api
-        .getTodayClasses()
-        .then(setClasses)
-        .catch(() => {}),
-      api
-        .listReminders()
-        .then((r) => setReminders(Array.isArray(r) ? r : []))
-        .catch(() => {}),
-      api
-        .allNotes()
-        .then((n) => setNotes(Array.isArray(n) ? n : []))
-        .catch(() => {}),
-      api
-        .listCourses()
-        .then((c) => setCourses(Array.isArray(c) ? c : []))
-        .catch(() => {}),
-      api
-        .listFiles(null)
-        .then((f) => setDocCount(Array.isArray(f) ? f.length : 0))
-        .catch(() => {}),
-      api
-        .listLinks()
-        .then((l) => setLinks(Array.isArray(l) ? l : []))
-        .catch(() => {}),
-      api
-        .recentFiles(6)
-        .then((f) => setRecentFiles(Array.isArray(f) ? f : []))
-        .catch(() => {}),
-      api
-        .pronoteStatus()
-        .then(setPronoteStatus)
-        .catch(() => {}),
-      api
-        .getRecap("today")
-        .then(setRecap)
-        .catch(() => {}),
-      api
-        .getSetting("remote_favicons")
-        .then((v) => setRemoteIcons(remoteFaviconsEnabled(v)))
-        .catch(() => {}),
-    ];
-    // The dashboard is the first screen: once its data is in, the app is usable.
-    void Promise.allSettled(loads).then(() => appReady());
-  }, []);
-
-  useVisibleRefresh(visible, refresh, DASHBOARD_EVENTS);
+  // The dashboard is the first screen: once its data is in, the app is usable.
+  const loaded = [classesQ, remindersQ, coursesQ, statsQ, linksQ, recentQ, pronoteQ, recapQ].every(
+    (r) => !r.isPending,
+  );
+  useEffect(() => {
+    if (loaded) appReady();
+  }, [loaded]);
 
   // ---- reminders -----------------------------------------------------------
 
   const toggle = async (r: Reminder) => {
     const markingDone = !r.done;
-    setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: markingDone } : x)));
+    const key = q.reminders().queryKey;
+    const setDone = (done: boolean) =>
+      queryClient.setQueryData(key, (prev) => prev?.map((x) => (x.id === r.id ? { ...x, done } : x)));
+    setDone(markingDone);
     try {
       await api.toggleReminder(r.id, markingDone);
       if (markingDone) {
@@ -160,7 +119,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       }
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
     } catch {
-      setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: !markingDone } : x)));
+      setDone(!markingDone);
       toast(get("messages.genericError", "Erreur"), "error");
     }
   };
@@ -177,7 +136,6 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
     try {
       await api.deleteReminder(id);
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-      refresh();
     } catch {
       toast(t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression", "error");
     }
@@ -267,29 +225,14 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
   const focus = useMemo(() => focusClass(classes, nowTick), [classes, nowTick]);
   const focusCourse = focus ? courseForEntry(focus.entry) : undefined;
-  const [focusClasses, setFocusClasses] = useState<CourseClass[]>([]);
-
   // Per-class progress for the class in front of us: this is the data that
-  // powers « Reprendre ». It already existed but was only visible three clicks
-  // deep, inside the course page.
-  useEffect(() => {
-    if (!focusCourse) {
-      setFocusClasses([]);
-      return;
-    }
-    let cancelled = false;
-    api
-      .listCourseClasses(focusCourse.id)
-      .then((list) => {
-        if (!cancelled) setFocusClasses(Array.isArray(list) ? list : []);
-      })
-      .catch(() => {
-        if (!cancelled) setFocusClasses([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [focusCourse?.id]);
+  // powers « Reprendre ».
+  const focusClassesQ = useQuery({
+    ...q.courseClasses(focusCourse?.id ?? -1),
+    enabled: focusCourse != null,
+    ...live,
+  });
+  const focusClasses = focusCourse ? (focusClassesQ.data ?? NONE) : NONE;
 
   const focusClassRow = useMemo(() => {
     if (!focus) return undefined;
@@ -603,7 +546,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         />
         <StatTile
           icon={<NoteIcon className="w-4 h-4" />}
-          value={notes.length}
+          value={noteCount}
           label={get("nav.notes", "Notes")}
           onClick={() => tabs.open({ kind: "documents", params: { filter: "note" } })}
         />
