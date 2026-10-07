@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, invalidateCache, type PythonDemo, type PythonResult } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { logged, reportError } from "../lib/report";
 import { useToast, useConfirm } from "../components/ui";
 import { useActiveKind } from "../stores/tabs";
 import { editors } from "../stores/editors";
@@ -193,7 +195,7 @@ export default function Python() {
 
         invalidateCache("listDemos");
         // Still refresh in background to fully reconcile list + ensure selection (in case of races or external changes).
-        refresh(created.path).catch(() => {});
+        refresh(created.path).catch(logged("python.refresh"));
 
         toast(t.tools?.toastScriptSaved || "Script enregistré", "success");
         return; // we already promoted the openScript + list; don't fall through to the old common set
@@ -213,8 +215,12 @@ export default function Python() {
         });
         toast(t.tools?.toastScriptSaved || "Script enregistré", "success");
       }
-    } catch {
-      toast(get("tools.toastScriptSaveError", "Impossible d'enregistrer le script"), "error");
+    } catch (err) {
+      reportError("python.save", err);
+      toast(
+        errorMessage(err, get("tools.toastScriptSaveError", "Impossible d'enregistrer le script")),
+        "error",
+      );
     }
   };
 
@@ -233,8 +239,9 @@ export default function Python() {
           : await api.runCode(openScript.code);
       setResult(res);
       if (!res?.ok) toast(t.tools?.toastScriptError || "Le script a renvoyé une erreur", "error");
-    } catch {
-      toast(t.tools?.toastScriptRunError || "Impossible de lancer le script", "error");
+    } catch (err) {
+      reportError("python.run", err);
+      toast(errorMessage(err, t.tools?.toastScriptRunError || "Impossible de lancer le script"), "error");
     } finally {
       setRunning(false);
     }
@@ -322,8 +329,9 @@ export default function Python() {
         setOpenScript((prev) => (prev ? { ...prev, name: newName } : null));
       }
       toast(fmt(t.tools?.toastScriptRenamed || 'Script renommé en "{name}"', { name: newName }), "success");
-    } catch {
-      toast("Impossible de renommer le script", "error");
+    } catch (err) {
+      reportError("python.rename", err);
+      toast(errorMessage(err, "Impossible de renommer le script"), "error");
     } finally {
       setIsEditingName(false);
       setEditingName("");

@@ -9,6 +9,8 @@ import { get, fmt, t } from "../lib/i18n";
 import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
 import { useAppearance } from "../lib/theme";
 import { useToast } from "./ui";
+import { errorMessage } from "../lib/errors";
+import { logged, reportError } from "../lib/report";
 
 import {
   BellIcon,
@@ -112,7 +114,7 @@ function CommandPalette({
       api
         .globalSearch(searchTerm.trim())
         .then((r) => setResults(Array.isArray(r) ? r : []))
-        .catch(() => {});
+        .catch(logged("palette.search"));
     }, 130);
     return () => clearTimeout(h);
   }, [query]);
@@ -250,8 +252,9 @@ function CommandPalette({
                   : t.tools?.keepAwakeOff || "Verrouillage écran normal",
                 next ? "success" : "info",
               );
-            } catch {
-              toast(get("messages.genericError", "Erreur"), "error");
+            } catch (err) {
+              reportError("palette.keepAwake", err);
+              toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
             }
             onClose();
           })();
@@ -311,9 +314,10 @@ function CommandPalette({
         aliases: [...cmdAliases("links"), link.url],
         icon: <LinkIcon className="w-4 h-4" />,
         run: () => {
-          api
-            .openUrl(link.url)
-            .catch(() => toast(get("messages.openUrlError", "Impossible d'ouvrir le lien"), "error"));
+          api.openUrl(link.url).catch((err) => {
+            reportError("palette.openUrl", err);
+            toast(errorMessage(err, get("messages.openUrlError", "Impossible d'ouvrir le lien")), "error");
+          });
           onClose();
         },
       });

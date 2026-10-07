@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { reportError } from "../lib/report";
 import { COURSE_COLORS, COURSE_ICONS, EmptyState, Loading, Modal, useToast } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
@@ -266,8 +268,9 @@ export default function Courses() {
       window.dispatchEvent(new CustomEvent("eu:course-changed"));
       close();
       refresh();
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("courses.save", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 

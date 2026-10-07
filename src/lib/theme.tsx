@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, isTauri } from "./api";
 import { bootSetting } from "./boot";
+import { logged } from "./report";
 
 /**
  * Appearance: theme (auto / light / dark), density and projection mode.
@@ -58,6 +59,7 @@ function readSaved<T>(setting: string, localKey: string, guard: (v: unknown) => 
     const v = localStorage.getItem(localKey);
     return guard(v) ? v : fallback;
   } catch {
+    // Storage disabled: the database value arrives just after.
     return fallback;
   }
 }
@@ -134,7 +136,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!isTauri()) return;
     void import("@tauri-apps/api/window")
       .then(({ getCurrentWindow }) => getCurrentWindow().setTheme(pref === "auto" ? null : pref))
-      .catch(() => {});
+      .catch(logged("theme.titleBar"));
   }, [pref]);
 
   useEffect(() => {
@@ -145,13 +147,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setPref = useCallback((p: ThemePref) => {
     setPrefState(p);
     writeLocal(LS_THEME, p);
-    api.setSetting(SETTING_THEME, p).catch(() => {});
+    api.setSetting(SETTING_THEME, p).catch(logged("settings.theme"));
   }, []);
 
   const setDensity = useCallback((d: Density) => {
     setDensityState(d);
     writeLocal(LS_DENSITY, d);
-    api.setSetting(SETTING_DENSITY, d).catch(() => {});
+    api.setSetting(SETTING_DENSITY, d).catch(logged("settings.density"));
   }, []);
 
   const setProjection = useCallback((on: boolean) => setProjectionState(on), []);

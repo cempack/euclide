@@ -28,6 +28,7 @@ export function chime(volume = 0.07) {
       osc.start(t);
       osc.stop(t + 0.8);
     }
+    // The chime has played; a context that will not close changes nothing.
     window.setTimeout(() => ctx.close().catch(() => {}), 1400);
   } catch {
     // no audio device / autoplay blocked: silence is an acceptable outcome

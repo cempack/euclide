@@ -5,6 +5,8 @@ import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 import { takeBootUpdate } from "./lib/boot";
+import { errorMessage } from "./lib/errors";
+import { logged, reportError } from "./lib/report";
 import { chime } from "./lib/sound";
 import { onTimerDone } from "./stores/timer";
 import { appReady, tabSwitchEnd } from "./lib/perf";
@@ -254,8 +256,9 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
         toast(get("capture.reminderSaved", "Rappel ajouté"), "success");
         onClose();
       }
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("capture.save", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
@@ -379,8 +382,9 @@ function Shell() {
         }
         try {
           await editors.flush(id);
-        } catch {
-          toast(get("messages.genericError", "Erreur"), "error");
+        } catch (err) {
+          reportError("tabs.closeSave", err);
+          toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
           return;
         }
       }
@@ -390,10 +394,7 @@ function Shell() {
   );
 
   useEffect(() => {
-    api
-      .appInfo()
-      .then(setInfo)
-      .catch(() => {});
+    api.appInfo().then(setInfo).catch(logged("app.info"));
   }, []);
 
   useEffect(() => {
@@ -522,8 +523,9 @@ function Shell() {
               toast(get("messages.importing", "Import…"), "info");
               const added = await api.importPaths(paths, null);
               await afterImport(added, toast);
-            } catch {
-              toast(get("messages.genericError", "Erreur"), "error");
+            } catch (err) {
+              reportError("app.dropImport", err);
+              toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
             }
           } else {
             setDragging(false);
@@ -534,7 +536,7 @@ function Shell() {
         if (active) unlisten = u;
         else u();
       })
-      .catch(() => {});
+      .catch(logged("app.dragDrop"));
     return () => {
       active = false;
       unlisten?.();
@@ -547,6 +549,7 @@ function Shell() {
       if (!appFocusedRef.current) return;
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       const ctx = activityContextRef.current;
+      // Every minute: a lost tick is not worth a log line.
       api.logEvent("active_tick", ctx.area, ctx.courseId).catch(() => {});
     };
     const seed = window.setTimeout(tick, 2500);
@@ -570,13 +573,14 @@ function Shell() {
           setTimeout(() => {
             if (document.visibilityState === "visible") {
               const ctx = activityContextRef.current;
+              // Like the minute tick: losing one is harmless.
               api.logEvent("active_tick", ctx.area, ctx.courseId).catch(() => {});
             }
           }, 1500);
         });
         unlistenBlur = await win.listen("tauri://blur", () => setAppFocused(false));
-      } catch {
-        // ignore
+      } catch (err) {
+        reportError("app.focusListen", err);
       }
     })();
     return () => {
@@ -615,7 +619,10 @@ function Shell() {
     editors
       .flush(id)
       .then(() => toast(get("messages.saved", "Enregistré"), "success"))
-      .catch(() => toast(get("messages.genericError", "Erreur"), "error"));
+      .catch((err) => {
+        reportError("editor.save", err);
+        toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      });
   });
   // Escape is the way out of projection mode; open dialogs close first.
   useShortcut(

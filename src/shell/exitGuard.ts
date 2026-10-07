@@ -3,6 +3,7 @@ import { api, isTauri } from "../lib/api";
 import { fmt, get } from "../lib/i18n";
 import { editors } from "../stores/editors";
 import { saveTabSession, tabs } from "../stores/tabs";
+import { logged } from "../lib/report";
 import type { useConfirm, useToast } from "../components/ui";
 
 type Confirm = ReturnType<typeof useConfirm>;
@@ -64,7 +65,7 @@ export function useExitGuard(confirm: Confirm, toast: Toast) {
     let unlisten: (() => void) | undefined;
     const onRequest = async (request: number) => {
       // Say so at once: past two seconds without an answer, Rust quits anyway.
-      api.closeAck(request).catch(() => {});
+      api.closeAck(request).catch(logged("exit.closeAck"));
       if (handling) return;
       handling = true;
       try {

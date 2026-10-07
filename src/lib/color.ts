@@ -121,6 +121,7 @@ export function domainBadge(url: string, dark: boolean): SiteBadge {
   try {
     host = new URL(url.startsWith("http") ? url : `https://${url}`).hostname;
   } catch {
+    // Not a URL: badge whatever was typed.
     host = url;
   }
   const clean = host.replace(/^www\./, "");

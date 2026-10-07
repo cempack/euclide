@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, openWith, type Opener } from "../lib/api";
 import { FolderIcon, GlobeIcon, FileIcon } from "./icons";
 import { get } from "../lib/i18n";
+import { reportError } from "../lib/report";
 
 export function OpenWithButton({
   fileId,
@@ -22,7 +23,8 @@ export function OpenWithButton({
       const list = await api.listOpeners(fileId);
       setOptions(list);
       return list;
-    } catch {
+    } catch (err) {
+      reportError("openWith.list", err);
       // fallback minimal
       const fb: Opener[] = [
         { name: get("openWith.browser", "Navigateur"), app: undefined, is_reveal: false },
@@ -44,8 +46,8 @@ export function OpenWithButton({
     setOpen(false);
     try {
       await openWith(fileId, opt);
-    } catch {
-      // silent
+    } catch (err) {
+      reportError("openWith.open", err);
     }
   };
 

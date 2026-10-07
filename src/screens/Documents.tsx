@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import { api, type Course, type FileItem, type Note } from "../lib/api";
 import { tabs } from "../stores/tabs";
 import { t, fmt, get } from "../lib/i18n";
+import { errorMessage } from "../lib/errors";
+import { reportError } from "../lib/report";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel } from "../components/layout";
@@ -225,8 +227,9 @@ export default function Documents({
       } else {
         toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
       }
-    } catch {
-      toast(get("messages.genericError", "Erreur"), "error");
+    } catch (err) {
+      reportError("documents.import", err);
+      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
     }
   };
 
