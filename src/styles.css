@@ -684,6 +684,23 @@
   .eu-nav-item[aria-current="page"] .eu-nav-keys {
     @apply opacity-100;
   }
+  /* A toolbar toggle is flat until pressed, then raised paper with its glyph
+     in the accent colour; a filter chip the same, without the accent. */
+  .eu-btn-toggle[aria-pressed="true"],
+  .eu-btn-toggle[aria-checked="true"],
+  .eu-filter[aria-pressed="true"] {
+    @apply bg-panel border-line text-ink shadow-raised hover:bg-panel;
+  }
+  .eu-btn-toggle[aria-pressed="true"] svg,
+  .eu-btn-toggle[aria-checked="true"] svg {
+    @apply text-accent;
+  }
+  .eu-filter {
+    @apply inline-flex items-center gap-1.5 px-2.5 rounded-md border border-transparent text-small font-medium
+      text-ink-muted whitespace-nowrap transition-colors duration-fast hover:bg-hover hover:text-ink;
+    height: var(--eu-control-sm);
+  }
+
   /* The current screen: raised paper, its glyph in the accent colour. */
   .eu-nav-item[aria-current="page"],
   .eu-current-raised[aria-current="page"],

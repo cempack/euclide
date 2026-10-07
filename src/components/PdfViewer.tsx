@@ -500,7 +500,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           <button
             onClick={() => setEditorMode(0)}
             aria-pressed={currentEditorMode === 0}
-            className={`eu-btn-sm ${currentEditorMode === 0 ? "eu-btn-primary" : "eu-btn-quiet"}`}
+            className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
             title={get("pdf.selectTitle", "Sélection : visualiser sans annoter")}
           >
@@ -509,7 +509,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           <button
             onClick={() => setEditorMode(15)}
             aria-pressed={currentEditorMode === 15}
-            className={`eu-btn-sm ${currentEditorMode === 15 ? "eu-btn-primary" : "eu-btn-quiet"}`}
+            className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
             title={get("pdf.penTitle", "Stylo : dessin à main levée")}
           >
@@ -520,7 +520,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             onClick={togglePagesSidebar}
             aria-pressed={showPages}
             aria-label={get("pdf.pages", "Pages")}
-            className={`eu-btn-icon eu-btn-sm ${showPages ? "eu-btn-primary" : "eu-btn-quiet"}`}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
             title={get("pdf.pagesTitle", "Vignettes des pages")}
           >
