@@ -244,6 +244,8 @@ See https://github.com/adobe-type-tools/cmap-resources
           opts.set('disablePreferences', true);
           opts.set('sidebarViewOnLoad', 0);
           opts.set('textLayerMode', 1);
+          // No form JavaScript: the sandbox it needs is not shipped.
+          opts.set('enableScripting', false);
         } catch (e) {}
 
         if (app) {
