@@ -40,6 +40,22 @@ export const q = {
       queryKey: ["library", "notes"],
       queryFn: fresh("allNotes", () => api.allNotes().then(list)),
     }),
+  courseNotes: (courseId: number) =>
+    queryOptions({
+      queryKey: ["library", "notes", "course", courseId],
+      queryFn: fresh(`listNotes:${courseId}`, () => api.listNotes(courseId).then(list)),
+    }),
+  /** Pronote's class list goes through the Python sidecar: kept 10 minutes, one retry. */
+  pronoteClasses: () =>
+    queryOptions({
+      queryKey: ["pronote", "classes"],
+      queryFn: async () => {
+        const r = (await api.pronoteClasses()) as { ok?: boolean; classes?: { name: string }[] } | null;
+        return r?.ok && Array.isArray(r.classes) ? r.classes : [];
+      },
+      staleTime: 10 * 60_000,
+      retry: 1,
+    }),
   libraryStats: () => queryOptions({ queryKey: ["library", "stats"], queryFn: () => api.libraryStats() }),
   recentFiles: (limit: number) =>
     queryOptions({

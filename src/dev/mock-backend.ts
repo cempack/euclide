@@ -720,6 +720,28 @@ function handle(cmd: string, args: Args): unknown {
       const id = num(args, "courseId");
       return courseClasses.filter((c) => id == null || c.course_id === id).map(withProgress);
     }
+    case "attach_class_to_course": {
+      const courseId = num(args, "courseId") ?? 0;
+      const name = str(args, "className");
+      const existing = courseClasses.find((c) => c.course_id === courseId && c.class_name === name);
+      if (existing) return withProgress(existing);
+      const cc: CourseClass = {
+        id: newId(),
+        course_id: courseId,
+        class_name: name,
+        last_file_id: null,
+        last_item_id: null,
+        progress_updated_at: sqlUtc(new Date()),
+        notes: "",
+      };
+      courseClasses.push(cc);
+      return withProgress(cc);
+    }
+    case "detach_course_class": {
+      const i = courseClasses.findIndex((c) => c.id === num(args, "id"));
+      if (i >= 0) courseClasses.splice(i, 1);
+      return null;
+    }
     case "pronote_classes":
       return {
         ok: true,
