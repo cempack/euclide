@@ -6,7 +6,8 @@ import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 import { takeBootUpdate } from "./lib/boot";
-import { TimerProvider, chime } from "./lib/timer";
+import { chime } from "./lib/sound";
+import { onTimerDone } from "./stores/timer";
 import { appReady, tabSwitchEnd } from "./lib/perf";
 
 import { tabs, useActiveTab, useTabsStore, useTabList, type Tab, type TabKind } from "./stores/tabs";
@@ -456,6 +457,15 @@ function Shell() {
     };
   }, [toast, queryClient]);
 
+  useEffect(
+    () =>
+      onTimerDone(() => {
+        chime();
+        toast(get("timer.done", "Minuteur terminé"), "success");
+      }),
+    [toast],
+  );
+
   // First launch after an update: say so, once.
   useEffect(() => {
     const updated = takeBootUpdate();
@@ -706,9 +716,7 @@ export default function App() {
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <TimerProvider>
-          <Shell />
-        </TimerProvider>
+        <Shell />
       </ConfirmProvider>
     </ToastProvider>
   );

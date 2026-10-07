@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type QuickLink, type SearchResult } from "../lib/api";
 import { tabs } from "../stores/tabs";
+import { timer } from "../stores/timer";
 import { get, fmt, t } from "../lib/i18n";
 import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
 import { useAppearance } from "../lib/theme";
@@ -126,7 +127,7 @@ function CommandPalette({
     const G = get("palette.groupCommands", "Commandes");
     const timerTitle = get("tools.timerTitle", "Minuteur de classe");
     const startTimer = (minutes: number) => () => {
-      window.dispatchEvent(new CustomEvent("eu:timer-start", { detail: { minutes } }));
+      timer.start(minutes);
       onClose();
     };
 

@@ -7,6 +7,7 @@ import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, Panel, Section, PageHeader, MetaDot } from "../components/layout";
 import { useAppearance } from "../lib/theme";
 import { tabs } from "../stores/tabs";
+import { timer } from "../stores/timer";
 import {
   CoffeeIcon,
   CodeIcon,
@@ -167,7 +168,7 @@ function ClassroomSection() {
 function TimerSection() {
   const [custom, setCustom] = useState("20");
   const start = (minutes: number) => {
-    window.dispatchEvent(new CustomEvent("eu:timer-start", { detail: { minutes } }));
+    timer.start(minutes);
   };
   const customMinutes = Math.max(1, Math.min(180, parseInt(custom, 10) || 0));
 
