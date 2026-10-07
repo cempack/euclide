@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { tabs } from "../stores/tabs";
 import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
-import { api, type Reminder, type ScheduleEntry } from "../lib/api";
+import { api, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
 import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
@@ -16,11 +16,10 @@ import {
   minutesUntil,
   relativeTime,
   greeting,
-  cheer,
 } from "../lib/format";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import { EmptyState, useToast, useConfirm } from "../components/ui";
+import { EmptyState, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel, StatStrip, StatTile } from "../components/layout";
 import {
   BellIcon,
@@ -40,6 +39,7 @@ import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { NowCard, type NowCardActions } from "../features/classroom/NowCard";
+import { useReminderActions } from "../features/reminders/useReminderActions";
 import { placeEntry, stepAfter, teachingOrder } from "../features/classroom/lesson";
 
 /** One empty list for every query still loading: stable, so memos hold. */
@@ -62,7 +62,6 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
   const toast = useToast();
   const { pick: pickFiles } = useImportFiles();
   const importDocs = () => void pickFiles();
-  const confirm = useConfirm();
   const { resolved } = useAppearance();
 
   // Data. Each query is shared with the other screens and refreshed when
@@ -109,43 +108,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
   // ---- reminders -----------------------------------------------------------
 
-  const toggle = async (r: Reminder) => {
-    const markingDone = !r.done;
-    const key = q.reminders().queryKey;
-    const setDone = (done: boolean) =>
-      queryClient.setQueryData(key, (prev) => prev?.map((x) => (x.id === r.id ? { ...x, done } : x)));
-    setDone(markingDone);
-    try {
-      await api.toggleReminder(r.id, markingDone);
-      if (markingDone) {
-        api.logEvent("reminder_done", r.title, r.course_id);
-        toast(cheer(), "success");
-      }
-      window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-    } catch (err) {
-      reportError("dashboard.toggleReminder", err);
-      setDone(!markingDone);
-      toast(errorMessage(err, tr("messages.genericError")), "error");
-    }
-  };
-
-  const deleteReminder = async (id: number, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const ok = await confirm.ask({
-      title: tr("dashboard.confirmDeleteReminder"),
-      message: tr("dashboard.confirmDeleteReminder"),
-      confirmLabel: tr("common.delete"),
-      danger: true,
-    });
-    if (!ok) return;
-    try {
-      await api.deleteReminder(id);
-      window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-    } catch (err) {
-      reportError("dashboard.deleteReminder", err);
-      toast(errorMessage(err, tr("dashboard.errorDeleteReminder")), "error");
-    }
-  };
+  const { toggle, remove: removeReminder } = useReminderActions();
 
   const pending = reminders.filter((r) => !r.done);
 
@@ -459,7 +422,10 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                         </span>
                       )}
                       <button
-                        onClick={(e) => deleteReminder(r.id, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeReminder(r);
+                        }}
                         aria-label={`${tr("common.delete")} — ${r.title}`}
                         data-tip={tr("common.delete")}
                         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"

@@ -1615,6 +1615,49 @@ input[type="radio"] {
   border-top: 1px solid var(--color-line);
 }
 
+/* Bilan: the period's time on the left, four counts in two rows beside it;
+   hairlines between tiles (the grid's gap shows the line colour). */
+.eu-recap-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--color-line);
+}
+.eu-recap-stats > * {
+  min-width: 0;
+  background: var(--color-panel);
+}
+.eu-recap-stats .eu-stat-tile {
+  border-right-width: 0;
+}
+.eu-recap-hero {
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+}
+.eu-recap-time {
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+@container (width < 40rem) {
+  .eu-recap-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .eu-recap-hero {
+    grid-row: auto;
+    grid-column: span 2;
+  }
+}
+
 /* The resource picker: a search field, then the library by group. */
 .eu-search {
   display: flex;
