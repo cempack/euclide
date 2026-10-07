@@ -12,6 +12,7 @@ export default tseslint.config(
       "src-tauri",
       "sidecar",
       ".delta",
+      ".claude",
       ".shots",
       "test-results",
       "playwright-report",
