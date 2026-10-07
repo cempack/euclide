@@ -19,9 +19,10 @@ __pycache__/
 *.pyc
 
 # do not commit platform-specific sidecar binaries / onedir bundles (built in CI per platform, copied to resources during build)
-src-tauri/resources/euclide-sidecar
 src-tauri/resources/euclide-sidecar.exe
-src-tauri/resources/euclide-sidecar/
+src-tauri/resources/euclide-sidecar/*
+# Placeholder so a fresh clone builds (tauri-build needs bundle.resources to exist).
+!src-tauri/resources/euclide-sidecar/.gitkeep
 
 # os / editor
 .DS_Store
