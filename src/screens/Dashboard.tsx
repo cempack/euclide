@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { tabs } from "../stores/tabs";
+import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
 import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
@@ -60,6 +61,8 @@ const NONE: never[] = [];
  */
 export default function Dashboard({ visible = true }: { visible?: boolean }) {
   const toast = useToast();
+  const { pick: pickFiles } = useImportFiles();
+  const importDocs = () => void pickFiles();
   const confirm = useConfirm();
   const { resolved } = useAppearance();
 
@@ -195,26 +198,6 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
     },
     [courseForEntry],
   );
-
-  const importDocs = async () => {
-    try {
-      toast(get("messages.importing", "Import…"), "info");
-      const added = await api.importFiles(null);
-      const count = Array.isArray(added) ? added.length : 0;
-      if (count === 0) {
-        toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
-        return;
-      }
-      toast(fmt(get("messages.imported", "{count} importé(s)"), { count }), "success");
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    } catch (err) {
-      reportError("dashboard.import", err);
-      toast(
-        errorMessage(err, get("messages.importError", "Import impossible (sélection annulée ?)")),
-        "error",
-      );
-    }
-  };
 
   // ---- « maintenant » -------------------------------------------------------
 
