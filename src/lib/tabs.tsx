@@ -427,7 +427,12 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         } else {
           let nextTabs = prev;
           if (effectiveMaxTabs > 0 && prev.length >= effectiveMaxTabs) {
-            nextTabs = evictToLimit(prev, effectiveMaxTabs - 1, activeIdRef.current, dirtyStore.getSnapshot());
+            nextTabs = evictToLimit(
+              prev,
+              effectiveMaxTabs - 1,
+              activeIdRef.current,
+              dirtyStore.getSnapshot(),
+            );
           }
           commitTabs([...nextTabs, { id, kind: spec.kind, title, params: newParams, mountId: newMountId() }]);
         }
