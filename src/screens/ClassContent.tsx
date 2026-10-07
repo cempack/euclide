@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel } from "../components/layout";
@@ -33,7 +33,6 @@ export default function ClassContent({
   className: string;
   matiere: string;
 }) {
-  const tabs = useTabs();
   const toast = useToast();
   const subjectForPronote = (m: string) => {
     const lower = (m || "").toLowerCase();
@@ -86,7 +85,7 @@ export default function ClassContent({
       <PageHeader
         onBack={() => {
           // Navigate back to the parent course tab; close self first to avoid id races.
-          const selfId = tabs.activeId;
+          const selfId = tabs.activeId();
           tabs.open({
             kind: "course",
             title: course?.name || get("nav.courses", "Cours"),

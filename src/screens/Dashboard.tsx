@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
 import { t, get, fmt } from "../lib/i18n";
@@ -56,7 +56,6 @@ const NONE: never[] = [];
  * so it is reachable from every screen instead of only from this one.
  */
 export default function Dashboard({ visible = true }: { visible?: boolean }) {
-  const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();
   const { resolved } = useAppearance();
@@ -188,22 +187,19 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       }
       tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } });
     },
-    [courseForEntry, tabs],
+    [courseForEntry],
   );
 
-  const openFile = useCallback(
-    (f: { id: number; name: string; kind: string; course_id?: number | null }) => {
-      api.logEvent("file_open", f.name, f.course_id ?? null);
-      if (f.kind === "board") {
-        tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
-      } else if (f.kind === "pdf" || f.kind === "image") {
-        tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
-      } else {
-        api.openFile(f.id);
-      }
-    },
-    [tabs],
-  );
+  const openFile = useCallback((f: { id: number; name: string; kind: string; course_id?: number | null }) => {
+    api.logEvent("file_open", f.name, f.course_id ?? null);
+    if (f.kind === "board") {
+      tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
+    } else if (f.kind === "pdf" || f.kind === "image") {
+      tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
+    } else {
+      api.openFile(f.id);
+    }
+  }, []);
 
   const importDocs = async () => {
     try {

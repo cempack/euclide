@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState, useCallback } from "react";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
+import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
@@ -55,7 +56,6 @@ const MarkdownPreview = memo(function MarkdownPreview({
 });
 
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
-  const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -139,9 +139,6 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     return () => window.clearTimeout(t);
   }, [draft.body]);
 
-  const tabsRef = useRef(tabs);
-  tabsRef.current = tabs;
-
   // Saves run one after another: a second save waits for the first, so a new
   // note is created once and later saves update it instead of duplicating it.
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
@@ -164,7 +161,6 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       (cur.body || "") === sent.body &&
       (cur.course_id ?? null) === sent.course_id;
     if (unchanged) commitDirty(false);
-    const t = tabsRef.current;
     // The tab shows the title being typed, not the one that was just saved.
     const tabTitle = cur.title || saved.title || "Note";
     if (wasNew && saved.id) {
@@ -172,15 +168,15 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       loggedWrite.current = true;
       const nextId = `note:${saved.id}`;
       if (tabId !== nextId) {
-        t.retarget(tabId, nextId, tabTitle, { noteId: saved.id, isNew: false });
+        tabs.retarget(tabId, nextId, tabTitle, { noteId: saved.id, isNew: false });
       }
-      t.rename(nextId, tabTitle, { noteId: saved.id, isNew: false });
+      tabs.rename(nextId, tabTitle, { noteId: saved.id, isNew: false });
     } else if (!loggedWrite.current) {
       api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
       loggedWrite.current = true;
-      t.rename(tabId, tabTitle);
+      tabs.rename(tabId, tabTitle);
     } else {
-      t.rename(tabId, tabTitle);
+      tabs.rename(tabId, tabTitle);
     }
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
     return saved;
@@ -193,15 +189,15 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   }, [persistOnce]);
 
   useEffect(() => {
-    tabs.setTabDirty(tabId, dirty);
-    return () => tabs.setTabDirty(tabId, false);
-  }, [tabId, dirty, tabs]);
+    editors.setDirty(tabId, dirty);
+    return () => editors.setDirty(tabId, false);
+  }, [tabId, dirty]);
 
   useEffect(() => {
-    return tabs.registerFlush(tabId, async () => {
+    return editors.registerFlush(tabId, async () => {
       if (dirtyRef.current) await persist();
     });
-  }, [tabId, tabs, persist]);
+  }, [tabId, persist]);
 
   // Auto save on changes (debounced)
   useEffect(() => {
@@ -219,7 +215,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     return () => {
       // Closing with « Ne pas enregistrer » (or deleting the note) must not
       // write the abandoned draft back.
-      if (tabsRef.current.takeDiscarded(tabId)) return;
+      if (editors.takeDiscarded(tabId)) return;
       if (dirtyRef.current && draftRef.current.title) {
         persist().catch(() => {});
       }

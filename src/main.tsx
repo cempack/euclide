@@ -31,10 +31,12 @@ import { startPerf } from "./lib/perf";
 import { startReporting } from "./lib/report";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, startDataBridge } from "./api/client";
+import { startTabSession } from "./stores/tabs";
 
 startReporting();
 startPerf();
 startDataBridge();
+startTabSession();
 
 // Development only: ?gallery shows the UI kit (dev/Gallery.tsx) instead of
 // the app. Production builds drop the branch and its chunk.

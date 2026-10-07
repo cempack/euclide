@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { useTabs } from "../lib/tabs";
+import { tabs } from "../stores/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import {
@@ -66,7 +66,6 @@ function sanitizePronoteClasses(raw: any[]): any[] {
 }
 
 export default function CourseDetail({ courseId, visible = true }: { courseId: number; visible?: boolean }) {
-  const tabs = useTabs();
   const toast = useToast();
   const confirmDlg = useConfirm();
 
@@ -534,7 +533,6 @@ function FilesPane({
   onChanged: () => void;
   onAttach: () => void;
 }) {
-  const tabs = useTabs();
   const toast = useToast();
   const confirmDlg = useConfirm();
 
@@ -594,7 +592,10 @@ function FilesPane({
               if (!ok) return;
               try {
                 await api.deleteFile(f.id);
-                tabs.tabs.filter((tab) => tab.params.fileId === f.id).forEach((tab) => tabs.close(tab.id));
+                tabs
+                  .list()
+                  .filter((tab) => tab.params.fileId === f.id)
+                  .forEach((tab) => tabs.close(tab.id));
                 window.dispatchEvent(new CustomEvent("eu:library-changed"));
                 onChanged();
               } catch (err: any) {
@@ -634,7 +635,6 @@ function SequencePane({
 }) {
   const toast = useToast();
   const confirmDlg = useConfirm();
-  const tabs = useTabs();
 
   const [sequences, setSequences] = useState<Sequence[]>([]);
   const [items, setItems] = useState<SequenceItem[]>([]);
@@ -979,7 +979,6 @@ function ClassCard({
   onRefresh: () => void;
   onDetach: (cc: CourseClass) => void;
 }) {
-  const tabs = useTabs();
   const [notesDraft, setNotesDraft] = useState(cc.notes);
   const [savingNotes, setSavingNotes] = useState(false);
 

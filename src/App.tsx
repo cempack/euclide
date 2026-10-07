@@ -9,7 +9,8 @@ import { takeBootUpdate } from "./lib/boot";
 import { TimerProvider, chime } from "./lib/timer";
 import { appReady, tabSwitchEnd } from "./lib/perf";
 
-import { TabsProvider, useTabs, type Tab, type TabKind } from "./lib/tabs";
+import { tabs, useActiveTab, useTabsStore, useTabList, type Tab, type TabKind } from "./stores/tabs";
+import { editors } from "./stores/editors";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading } from "./components/ui";
 import { Segmented } from "./components/layout";
 import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
@@ -88,18 +89,20 @@ async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "s
 }
 
 const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }) {
-  const tabs = useTabs();
-  useLayoutEffect(tabSwitchEnd, [tabs.activeId]);
+  const list = useTabList();
+  const active = useActiveTab();
+  const activeId = active?.id;
+  useLayoutEffect(tabSwitchEnd, [activeId]);
   // A pane mounts the first time its tab is shown, then stays mounted.
   // Restoring a session used to start every screen at launch (and a PDF.js
   // per PDF tab) before the teacher had looked at any of them.
   const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set());
-  const activeMount = tabs.active?.mountId;
+  const activeMount = active?.mountId;
   if (activeMount && !shown.has(activeMount)) setShown(new Set(shown).add(activeMount));
   return (
     <div className="flex-1 min-h-0 relative bg-canvas">
-      {tabs.tabs.map((tab) => {
-        const visible = tab.id === tabs.activeId;
+      {list.map((tab) => {
+        const visible = tab.id === activeId;
         if (!visible && !shown.has(tab.mountId)) return null;
         return (
           <div
@@ -216,7 +219,6 @@ function Scroll({ children }: { children: React.ReactNode }) {
 
 function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast();
-  const tabs = useTabs();
   const [text, setText] = useState("");
   const [mode, setMode] = useState<"reminder" | "note">("reminder");
   // A fresh line each time it opens.
@@ -322,7 +324,6 @@ function Shell() {
   useEffect(prefetchScreens, []);
   const [dragging, setDragging] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
-  const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -339,13 +340,19 @@ function Shell() {
     appFocusedRef.current = appFocused;
   }, [appFocused]);
 
+  // What the teacher is looking at, for the activity log (Bilan). Read from
+  // the store directly: the shell itself never re-renders for a tab change.
   useEffect(() => {
-    const tab = tabs.active;
-    activityContextRef.current = {
-      area: tab?.kind ?? "dashboard",
-      courseId: typeof tab?.params?.courseId === "number" ? tab.params.courseId : null,
+    const track = () => {
+      const tab = tabs.active();
+      activityContextRef.current = {
+        area: tab?.kind ?? "dashboard",
+        courseId: typeof tab?.params?.courseId === "number" ? tab.params.courseId : null,
+      };
     };
-  }, [tabs.activeId, tabs.active?.kind, tabs.active?.params?.courseId]);
+    track();
+    return useTabsStore.subscribe(track);
+  }, []);
 
   const handleHelp = useCallback(() => setHelp(true), []);
   const handleSearch = useCallback(() => setPalette(true), []);
@@ -356,7 +363,7 @@ function Shell() {
 
   const requestClose = useCallback(
     async (id: string) => {
-      if (tabs.isDirty(id)) {
+      if (editors.isDirty(id)) {
         const choice = await confirm.dirty({
           title: get("confirm.unsavedTitle", "Modifications non enregistrées"),
           message: get("confirm.unsavedMessage", "Enregistrer avant de fermer cet onglet ?"),
@@ -367,7 +374,7 @@ function Shell() {
           return;
         }
         try {
-          await tabs.flush(id);
+          await editors.flush(id);
         } catch {
           toast(get("messages.genericError", "Erreur"), "error");
           return;
@@ -375,7 +382,7 @@ function Shell() {
       }
       tabs.close(id);
     },
-    [tabs, confirm, toast],
+    [confirm, toast],
   );
 
   useEffect(() => {
@@ -583,10 +590,9 @@ function Shell() {
       // is what the « unsaved changes » prompt uses when closing a tab.
       if (mod && !e.shiftKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        const id = tabs.activeId;
-        if (!id) return;
-        if (!tabs.isDirty(id)) return;
-        void tabs
+        const id = tabs.activeId();
+        if (!editors.isDirty(id)) return;
+        void editors
           .flush(id)
           .then(() => toast(get("messages.saved", "Enregistré"), "success"))
           .catch(() => toast(get("messages.genericError", "Erreur"), "error"));
@@ -601,15 +607,15 @@ function Shell() {
         setPalette((p) => !p);
       } else if (mod && e.key.toLowerCase() === "t") {
         e.preventDefault();
-        if (tabs.active?.kind !== "dashboard") {
+        if (tabs.active()?.kind !== "dashboard") {
           tabs.open({ kind: "dashboard" });
         }
       } else if (mod && e.key.toLowerCase() === "w") {
         e.preventDefault();
-        if (tabs.activeId) void requestClose(tabs.activeId);
+        void requestClose(tabs.activeId());
       } else if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        if (tabs.active?.kind !== "dashboard") {
+        if (tabs.active()?.kind !== "dashboard") {
           tabs.open({ kind: "dashboard" });
         }
       } else if (mod && e.key.toLowerCase() === "f") {
@@ -650,7 +656,7 @@ function Shell() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [tabs, requestClose, toast, toggleProjection, projection, palette, help, captureOpen]);
+  }, [requestClose, toast, toggleProjection, projection, palette, help, captureOpen]);
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-canvas eu-root">
@@ -700,11 +706,9 @@ export default function App() {
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <TabsProvider>
-          <TimerProvider>
-            <Shell />
-          </TimerProvider>
-        </TabsProvider>
+        <TimerProvider>
+          <Shell />
+        </TimerProvider>
       </ConfirmProvider>
     </ToastProvider>
   );
