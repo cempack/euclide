@@ -538,13 +538,13 @@ export default function CodeEditor({
           placeholder={placeholder}
           spellCheck={false}
           wrap="off"
-          className="absolute inset-0 py-3 px-3 resize-none bg-transparent outline-none text-transparent caret-[rgb(var(--eu-ink))] placeholder:text-ink-muted placeholder:opacity-50 selectable eu-no-drag"
+          className="absolute inset-0 py-3 px-3 resize-none bg-transparent outline-hidden text-transparent caret-[rgb(var(--eu-ink))] placeholder:text-ink-muted placeholder:opacity-50 selectable eu-no-drag"
         />
 
         {/* intelligent autocomplete popup (Jedi-powered when available) */}
         {suggestions.length > 0 && (
           <div
-            className="absolute z-30 min-w-[160px] max-w-[320px] rounded-md border border-line bg-panel shadow text-xs py-0.5"
+            className="absolute z-30 min-w-[160px] max-w-[320px] rounded-md border border-line bg-panel shadow-sm text-xs py-0.5"
             style={{ top: popupPos.top, left: popupPos.left }}
           >
             {suggestions.map((s, i) => {

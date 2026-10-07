@@ -254,14 +254,14 @@ const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
                 <div className="eu-t-body font-medium text-ink truncate">
                   {accountName || get("status.pronoteOn", "pronote connecté")}
                 </div>
-                <div className="font-mono text-[9px] tracking-[0.1em] text-ink-faint uppercase">
+                <div className="font-mono text-[9px] tracking-widest text-ink-faint uppercase">
                   v{info?.version ?? "…"}
                 </div>
               </div>
             </>
           ) : (
             <div className="min-w-0 flex-1 px-1.5 leading-tight">
-              <div className="font-mono text-[9px] tracking-[0.1em] text-ink-faint uppercase">
+              <div className="font-mono text-[9px] tracking-widest text-ink-faint uppercase">
                 v{info?.version ?? "…"}
               </div>
             </div>
@@ -952,7 +952,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
                   }
                 }}
                 placeholder={get("capture.placeholder", "Noter quelque chose… (! rappel · # note)")}
-                className="flex-1 bg-transparent outline-none eu-t-body text-ink placeholder:text-ink-faint"
+                className="flex-1 bg-transparent outline-hidden eu-t-body text-ink placeholder:text-ink-faint"
               />
             </div>
             <div className="flex items-center gap-2 px-3.5 py-2.5">
@@ -1338,7 +1338,7 @@ function Shell() {
       <ShortcutsHelp open={help} onClose={closeHelp} />
       <UpdateAvailablePopup update={availableUpdate} onDismiss={dismissUpdate} />
       {dragging && (
-        <div className="fixed inset-0 z-[80] grid place-items-center bg-accent/10 pointer-events-none">
+        <div className="fixed inset-0 z-80 grid place-items-center bg-accent/10 pointer-events-none">
           <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
             <DocIcon className="w-7 h-7 text-accent shrink-0" />
             <div>

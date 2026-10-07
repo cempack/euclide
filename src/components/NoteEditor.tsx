@@ -391,7 +391,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       {/* Title + destination + actions */}
       <Toolbar className="h-11 py-0 gap-2">
         <input
-          className="flex-1 min-w-0 bg-transparent border-none eu-t-section text-[17px] text-ink px-1 -mx-1 py-1 rounded outline-none placeholder:text-ink-faint"
+          className="flex-1 min-w-0 bg-transparent border-none eu-t-section text-[17px] text-ink px-1 -mx-1 py-1 rounded outline-hidden placeholder:text-ink-faint"
           value={draft.title || ""}
           placeholder={get("notes.titlePlaceholder", "Titre de la note")}
           onChange={(e) => onTitleChange(e.target.value)}
@@ -565,7 +565,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               }
             }}
             placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
-            className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-[13px] leading-[1.6] resize-none outline-none selectable"
+            className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-[13px] leading-[1.6] resize-none outline-hidden selectable"
             style={{ whiteSpace: "pre-wrap" }}
             aria-label={get("notes.source", "Source Markdown")}
           />

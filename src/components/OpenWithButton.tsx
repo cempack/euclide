@@ -69,7 +69,7 @@ export function OpenWithButton({
       </button>
       {open && options && (
         <div
-          className="absolute right-0 mt-1 z-[100] min-w-[220px] eu-panel p-1 text-sm bg-panel border border-line shadow-pop"
+          className="absolute right-0 mt-1 z-100 min-w-[220px] eu-panel p-1 text-sm bg-panel border border-line shadow-pop"
           onClick={(e) => e.stopPropagation()}
         >
           {options.map((opt, idx) => (

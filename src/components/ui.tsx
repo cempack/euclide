@@ -307,7 +307,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       <AnimatePresence>
         {state && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-confirm flex items-center justify-center p-6">
             <motion.div
               className="eu-scrim"
               initial={{ opacity: 0 }}
@@ -428,7 +428,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 title={get("common.close", "Fermer")}
               >
                 <span className={`grid place-items-center ${iconClass}`}>{Icon}</span>
-                <span className="break-words">{toast.message}</span>
+                <span className="wrap-break-word">{toast.message}</span>
               </motion.button>
             );
           })}

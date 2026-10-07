@@ -669,7 +669,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
       <div className="flex-1 min-h-0 bg-stage relative flex">
         {!legacyMode && showPages && (
-          <div className="w-[150px] flex-shrink-0 border-r border-white/10 bg-stage-alt overflow-y-auto p-1.5">
+          <div className="w-[150px] shrink-0 border-r border-white/10 bg-stage-alt overflow-y-auto p-1.5">
             {thumbnails.length === 0 ? (
               <div className="p-2 font-mono text-[10px] text-white/50">
                 {get("pdf.thumbnailsLoading", "Chargement des pages…")}
