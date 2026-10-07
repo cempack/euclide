@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "../ui/Dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
-import { api, type QuickLink, type SearchResult } from "../lib/api";
+import { api, type FileItem, type QuickLink, type SearchResult } from "../lib/api";
 import { tabs } from "../stores/tabs";
 import { openFile } from "../lib/files";
 import { timer } from "../stores/timer";
@@ -36,6 +36,7 @@ import {
 
 const NO_LINKS: QuickLink[] = [];
 const NO_RESULTS: SearchResult[] = [];
+const NO_RECENT: FileItem[] = [];
 
 interface Action {
   id: string;
@@ -91,6 +92,7 @@ function CommandPalette({
   const [query, setQuery] = useState("");
   const queryClient = useQueryClient();
   const links = useQuery({ ...q.links(), enabled: open }).data ?? NO_LINKS;
+  const recent = useQuery({ ...q.recentFiles(5), enabled: open }).data ?? NO_RECENT;
   const keepAwake = useQuery({ ...q.keepAwake(), enabled: open }).data ?? null;
   const setKeepAwake = (on: boolean) => queryClient.setQueryData(q.keepAwake().queryKey, on);
   const [sel, setSel] = useState(0);
@@ -371,14 +373,33 @@ function CommandPalette({
     });
   }, [results, onClose]);
 
+  // Before anything is typed: the documents opened last, to go back to them.
+  const recentActions = useMemo<Action[]>(
+    () =>
+      recent.map((f) => ({
+        id: `r${f.id}`,
+        group: tr("palette.groupRecent"),
+        label: f.name,
+        hint: tr("palette.recentHint"),
+        icon: <DocIcon className="w-4 h-4" />,
+        run: () => {
+          openFile({ ...f, courseId: f.course_id });
+          onClose();
+        },
+      })),
+    [recent, onClose],
+  );
+
   const filtered = useMemo(() => {
     const wantCommands = scope === "all" || scope === "commands";
     const wantResults = scope !== "commands";
 
     if (!term.trim()) {
-      return wantCommands
+      const commands = wantCommands
         ? baseActions.filter((a) => a.group === tr("palette.groupCommands")).slice(0, 9)
         : [];
+      const recents = scope === "all" || scope === "documents" ? recentActions : [];
+      return [...recents, ...commands];
     }
 
     const commands = wantCommands ? rankPaletteItems(baseActions, term) : [];
@@ -399,7 +420,7 @@ function CommandPalette({
       out.push(a);
     }
     return out.slice(0, 18);
-  }, [baseActions, resultActions, term, scope]);
+  }, [baseActions, resultActions, recentActions, term, scope]);
 
   const listRef = useRef<HTMLDivElement>(null);
 

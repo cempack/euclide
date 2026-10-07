@@ -613,7 +613,9 @@
       "projection": "projection beamer projecteur video vidéo videoprojecteur vidéoprojecteur presenter présentateur",
       "capture": "capture inbox note rapide quick",
       "links": "liens links favoris bookmarks url"
-    }
+    },
+    "groupRecent": "Récents",
+    "recentHint": "ouvert récemment"
   },
   "sequences": {
     "title": "Progression",
