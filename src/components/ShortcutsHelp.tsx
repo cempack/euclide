@@ -18,7 +18,7 @@ export default function ShortcutsHelp({ open, onClose }: { open: boolean; onClos
                   <span className="eu-t-body text-ink">{s.label}</span>
                   <span className="flex items-center gap-1 shrink-0">
                     {s.keys.map((k) => (
-                      <kbd key={k} className="eu-kbd px-1.5 h-5 text-[10px]">
+                      <kbd key={k} className="eu-kbd">
                         {k}
                       </kbd>
                     ))}

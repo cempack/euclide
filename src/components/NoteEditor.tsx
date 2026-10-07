@@ -392,7 +392,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       {/* Title + destination + actions */}
       <Toolbar className="h-11 py-0 gap-2">
         <input
-          className="flex-1 min-w-0 bg-transparent border-none eu-t-section text-[17px] text-ink px-1 -mx-1 py-1 rounded outline-hidden placeholder:text-ink-faint"
+          className="flex-1 min-w-0 bg-transparent border-none eu-t-title text-ink px-1 -mx-1 py-1 rounded outline-hidden placeholder:text-ink-faint"
           value={draft.title || ""}
           placeholder={get("notes.titlePlaceholder", "Titre de la note")}
           onChange={(e) => onTitleChange(e.target.value)}
@@ -406,7 +406,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         )}
         <ToolSep />
         <select
-          className="eu-select h-7 w-[140px] text-[11.5px]"
+          className="eu-select eu-field-sm w-[140px]"
           value={draft.course_id ?? ""}
           onChange={(e) => onCourseChange(e.target.value ? Number(e.target.value) : null)}
           title={get("notes.courseTitle", "Affecter à un cours")}
@@ -458,7 +458,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               title={get("notes.bold", "Gras")}
               aria-label={get("notes.bold", "Gras")}
             >
-              <span className="font-bold text-[13px]">B</span>
+              <span className="font-bold text-body">B</span>
             </button>
             <button
               onClick={insertItalic}
@@ -466,7 +466,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               title={get("notes.italic", "Italique")}
               aria-label={get("notes.italic", "Italique")}
             >
-              <span className="italic text-[13px]">I</span>
+              <span className="italic text-body">I</span>
             </button>
             <button
               onClick={insertTitle}
@@ -474,7 +474,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               title={get("notes.heading", "Titre")}
               aria-label={get("notes.heading", "Titre")}
             >
-              <span className="font-semibold text-[13px]">H</span>
+              <span className="font-semibold text-body">H</span>
             </button>
             <button
               onClick={insertList}
@@ -482,7 +482,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               title={get("notes.list", "Liste")}
               aria-label={get("notes.list", "Liste")}
             >
-              <span className="text-[13px]">•</span>
+              <span className="text-body">•</span>
             </button>
             <button
               onClick={insertCode}
@@ -502,7 +502,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             </button>
           </ToolGroup>
           <ToolSpacer />
-          <span className="eu-t-label normal-case tracking-normal">
+          <span className="eu-t-caption">
             {get("notes.markdownHint", "Markdown · formules LaTeX entre $…$")}
           </span>
         </Toolbar>
@@ -566,7 +566,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               }
             }}
             placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
-            className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-[13px] leading-[1.6] resize-none outline-hidden selectable"
+            className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-code resize-none outline-hidden selectable"
             style={{ whiteSpace: "pre-wrap" }}
             aria-label={get("notes.source", "Source Markdown")}
           />
@@ -598,7 +598,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
       {/* Status */}
       <div className="shrink-0 flex items-center gap-2 px-3 h-6 border-t border-line bg-panel-alt">
-        <span className="eu-t-label normal-case tracking-normal">
+        <span className="eu-t-caption">
           {draft.updated_at
             ? fmt(get("notes.savedAt", "enregistré {when}"), { when: relativeTime(draft.updated_at) })
             : get("notes.neverSaved", "jamais enregistré")}

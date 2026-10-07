@@ -332,7 +332,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
             {course.description && (
               <>
                 <MetaDot />
-                <span className="normal-case tracking-normal">{course.description}</span>
+                <span className="eu-t-small normal-case tracking-normal">{course.description}</span>
               </>
             )}
           </>
@@ -458,9 +458,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                 <span className="eu-t-body text-ink truncate flex-1">
                   {n.title || t.courseDetail?.noTitle || "Sans titre"}
                 </span>
-                <span className="eu-t-label normal-case tracking-normal shrink-0">
-                  {relativeTime(n.updated_at)}
-                </span>
+                <span className="eu-t-caption shrink-0">{relativeTime(n.updated_at)}</span>
               </button>
             ))}
           </div>
@@ -549,12 +547,12 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
         width="max-w-xl"
       >
         <div className="space-y-3">
-          <p className="text-sm text-ink-muted">
+          <p className="eu-t-body text-ink-muted">
             {t.courseDetail?.attachDocsHint ||
               "Sélectionnez des fichiers de la bibliothèque Documents pour les copier dans le casier de ce cours."}
           </p>
           {attachDocs.length === 0 ? (
-            <p className="text-sm text-ink-muted">Aucun document dans la bibliothèque globale.</p>
+            <p className="eu-t-body text-ink-muted">Aucun document dans la bibliothèque globale.</p>
           ) : (
             <div className="max-h-72 overflow-auto border border-line rounded divide-y divide-line/60">
               {attachDocs.map((d) => {
@@ -562,7 +560,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                 return (
                   <div
                     key={d.id}
-                    className={`flex items-center gap-3 p-2 text-sm hover:bg-panel-alt cursor-pointer ${isSel ? "bg-panel-alt" : ""}`}
+                    className={`flex items-center gap-3 p-2 eu-t-body hover:bg-hover cursor-pointer ${isSel ? "bg-panel-alt" : ""}`}
                     onClick={() => toggleAttachDoc(d.id)}
                   >
                     <input
@@ -578,7 +576,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                     <FileKindIcon kind={d.kind} className="w-4 h-4 text-ink-muted shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="truncate text-ink">{d.name}</div>
-                      <div className="text-[10px] text-ink-muted">
+                      <div className="eu-t-caption text-ink-muted">
                         {fileKindLabel(d.kind)} · {humanSize(d.size)} · {relativeTime(d.added_at)}
                       </div>
                     </div>
@@ -655,7 +653,7 @@ function FilesPane({
             <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
             <span className="eu-t-body text-ink truncate">{f.name}</span>
           </button>
-          <span className="eu-t-label normal-case tracking-normal shrink-0 hidden sm:block">
+          <span className="eu-t-caption shrink-0 hidden sm:block">
             {fileKindLabel(f.kind)} · {humanSize(f.size)} · {relativeTime(f.added_at)}
           </span>
           <button
@@ -801,7 +799,7 @@ function SequencePane({
       action={
         <div className="flex items-center gap-1.5">
           <input
-            className="eu-input h-7 w-[190px] text-[12px]"
+            className="eu-input eu-field-sm w-[190px]"
             placeholder={get("sequences.newPlaceholder", "Nouvelle séquence…")}
             value={newSequence}
             onChange={(e) => setNewSequence(e.target.value)}
@@ -905,9 +903,7 @@ function SequencePane({
                       const here = classesAt(item.id);
                       return (
                         <div key={item.id} className="eu-row group border-t border-line">
-                          <span className="eu-t-num text-[11px] text-ink-faint w-5 shrink-0">
-                            {itemIndex + 1}
-                          </span>
+                          <span className="eu-t-caption w-5 shrink-0">{itemIndex + 1}</span>
                           <span className="eu-t-body text-ink truncate flex-1">{item.title}</span>
                           {item.file_id != null && (
                             <button
@@ -932,7 +928,7 @@ function SequencePane({
                                 onChange={(e) => {
                                   if (e.target.value) void markClassHere(e.target.value, item.id);
                                 }}
-                                className="eu-select h-7 text-[11px] w-[104px]"
+                                className="eu-select eu-field-sm w-[104px]"
                                 aria-label={get("sequences.markClass", "Marquer une classe ici")}
                                 title={get("sequences.markClass", "Marquer une classe ici")}
                               >
@@ -1099,12 +1095,12 @@ function ClassCard({
     <div className="eu-panel-alt p-3.5 flex flex-col gap-3.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line bg-panel font-mono text-[12px] font-semibold text-ink">
+          <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line bg-panel font-mono text-small font-semibold text-ink">
             {cc.class_name.slice(0, 3)}
           </span>
           <div className="min-w-0">
             <p className="eu-t-section text-ink truncate">{cc.class_name}</p>
-            <p className="eu-t-label normal-case tracking-normal">
+            <p className="eu-t-caption">
               {cc.progress_updated_at
                 ? fmt(get("courseDetail.updated", "mise à jour {when}"), {
                     when: relativeTime(cc.progress_updated_at),
@@ -1161,14 +1157,10 @@ function ClassCard({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <p className="eu-t-label">{get("courseDetail.classNotes", "Notes pour cette classe")}</p>
-          {savingNotes && (
-            <span className="eu-t-label normal-case tracking-normal">
-              {get("common.saving", "enregistrement…")}
-            </span>
-          )}
+          {savingNotes && <span className="eu-t-caption">{get("common.saving", "enregistrement…")}</span>}
         </div>
         <textarea
-          className="eu-textarea min-h-[60px] text-[13px]"
+          className="eu-textarea min-h-[60px]"
           placeholder={
             t.courseDetail?.classNotesPlaceholder ||
             "Ex : fini l'exercice p.47, distribuer le DM pour le 12, revoir les fonctions."

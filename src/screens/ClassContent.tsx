@@ -259,10 +259,8 @@ export default function ClassContent({
               <div className="flex items-start gap-3.5">
                 {/* Date rail: the spine of a cahier de textes. */}
                 <div className="w-[92px] shrink-0 eu-panel-alt rounded px-2 py-1.5">
-                  <p className="font-mono text-[11px] text-ink tabular-nums">
-                    {c.date_label || c.date?.slice(0, 10)}
-                  </p>
-                  <p className="font-mono text-[10px] text-ink-faint tabular-nums mt-0.5">
+                  <p className="eu-t-caption text-ink">{c.date_label || c.date?.slice(0, 10)}</p>
+                  <p className="eu-t-caption mt-0.5">
                     {c.start_time}–{c.end_time}
                   </p>
                 </div>
@@ -271,34 +269,28 @@ export default function ClassContent({
                   {/* Title + category — more prominent */}
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <BookIcon className="w-4 h-4 text-ink-muted shrink-0" />
-                    <span className="font-semibold text-[15px] text-ink leading-tight">
-                      {c.title || "(sans titre)"}
-                    </span>
-                    {c.category && (
-                      <span className="eu-chip text-[10px] py-px tracking-wide">{c.category}</span>
-                    )}
+                    <span className="eu-t-title text-ink">{c.title || "(sans titre)"}</span>
+                    {c.category && <span className="eu-chip">{c.category}</span>}
                     {c.subject && c.subject !== effectiveMatiere && (
-                      <span className="text-[10px] text-ink-muted">({c.subject})</span>
+                      <span className="eu-t-caption text-ink-muted">({c.subject})</span>
                     )}
                   </div>
 
                   {/* Description — the actual lesson content */}
-                  {c.description && <p className="text-[13px] text-ink leading-relaxed">{c.description}</p>}
+                  {c.description && <p className="eu-t-body text-ink">{c.description}</p>}
 
                   {/* Meta */}
-                  {c.groups && <div className="text-[11px] text-ink-muted">Groupes : {c.groups}</div>}
+                  {c.groups && <div className="eu-t-small text-ink-muted">Groupes : {c.groups}</div>}
 
                   {/* Documents — now a distinctive attachment block */}
                   {c.documents && c.documents.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-line">
-                      <div className="text-[10px] uppercase tracking-[0.5px] text-ink-muted mb-1.5">
-                        Documents joints ({c.documents.length})
-                      </div>
+                      <div className="eu-t-label mb-1.5">Documents joints ({c.documents.length})</div>
                       <div className="flex flex-wrap gap-1.5">
                         {c.documents.map((d, di) => (
                           <div
                             key={di}
-                            className="flex items-center gap-1.5 text-xs bg-panel-alt border border-line rounded px-2 py-1 max-w-full"
+                            className="flex items-center gap-1.5 eu-t-small bg-panel-alt border border-line rounded px-2 py-1 max-w-full"
                           >
                             <DocIcon className="w-3.5 h-3.5 text-ink-muted shrink-0" />
                             {d.url ? (
@@ -318,15 +310,13 @@ export default function ClassContent({
                             {d.url && (
                               <button
                                 onClick={() => copyUrl(d.url)}
-                                className="eu-btn-ghost text-[10px] px-1.5 py-px ml-1"
+                                className="eu-btn-quiet eu-btn-sm ml-1"
                                 title="Copier le lien direct Pronote"
                               >
                                 copier
                               </button>
                             )}
-                            <span className="text-[10px] text-ink-muted/70 ml-1">
-                              {d.type === 1 ? "fichier" : "lien"}
-                            </span>
+                            <span className="eu-t-caption ml-1">{d.type === 1 ? "fichier" : "lien"}</span>
                           </div>
                         ))}
                       </div>

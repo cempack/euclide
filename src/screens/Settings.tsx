@@ -299,7 +299,7 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
             "Parfait pour une clé USB : choisissez un dossier sur la clé. Le pointeur (euclide-data.json) reste à côté de l'exécutable. Un redémarrage est nécessaire après tout changement. Aucune migration automatique : copiez les anciens fichiers si besoin."
           }
         >
-          <p className="eu-panel-alt rounded px-2.5 py-2 font-mono text-[12px] text-ink-muted break-all selectable">
+          <p className="eu-panel-alt rounded px-2.5 py-2 font-mono text-small text-ink-muted break-all selectable">
             {current || get("settings.dataDirUnknown", "(chemin inconnu)")}
           </p>
         </Field>
@@ -559,7 +559,7 @@ function PronoteSection() {
 
           {method === "qr" ? (
             <>
-              <ol className="text-sm text-ink-muted flex flex-col gap-1.5 list-decimal list-inside">
+              <ol className="eu-t-body text-ink-muted flex flex-col gap-1.5 list-decimal list-inside">
                 <li>Application mobile Pronote : Mon compte &gt; Generer un QR code.</li>
                 <li>Choisissez un code PIN a 4 chiffres (a retenir).</li>
                 <li>Importez la capture d'ecran du QR code ci-dessous.</li>
@@ -581,9 +581,9 @@ function PronoteSection() {
                 </p>
               )}
               <div>
-                <p className="text-ink-muted text-sm mb-1.5">Code PIN (4 chiffres)</p>
+                <p className="eu-t-body text-ink-muted mb-1.5">Code PIN (4 chiffres)</p>
                 <input
-                  className="eu-input tracking-[0.5em] text-center text-lg"
+                  className="eu-input tracking-[0.5em] text-center text-title font-mono"
                   inputMode="numeric"
                   maxLength={4}
                   placeholder="----"
@@ -602,7 +602,7 @@ function PronoteSection() {
             </>
           ) : (
             <>
-              <p className="text-ink-muted text-sm">
+              <p className="eu-t-body text-ink-muted">
                 Connexion directe par identifiant et mot de passe (comptes hors ENT, ou demonstration).
               </p>
               <input
@@ -627,12 +627,12 @@ function PronoteSection() {
               {/* PIN field: shown when the account requires it (auto-detected) or expandable */}
               {needsPin ? (
                 <div className="border border-accent/30 rounded p-3 bg-panel-alt/50">
-                  <p className="text-sm font-medium text-ink mb-1.5">Code PIN du compte</p>
-                  <p className="text-ink-muted text-xs mb-2">
+                  <p className="eu-t-body font-medium text-ink mb-1.5">Code PIN du compte</p>
+                  <p className="eu-t-small text-ink-muted mb-2">
                     Votre compte Pronote exige un code PIN pour les nouveaux appareils.
                   </p>
                   <input
-                    className="eu-input tracking-[0.5em] text-center text-lg"
+                    className="eu-input tracking-[0.5em] text-center text-title font-mono"
                     inputMode="numeric"
                     maxLength={8}
                     placeholder="1234"
@@ -645,7 +645,7 @@ function PronoteSection() {
                 <button
                   type="button"
                   onClick={() => setNeedsPin(true)}
-                  className="text-xs text-ink-muted hover:text-ink transition-colors text-left"
+                  className="eu-t-small text-ink-muted hover:text-ink transition-colors text-left"
                 >
                   + Code PIN du compte (optionnel)
                 </button>
@@ -777,14 +777,14 @@ function ScheduleSection() {
                           className="group rounded border border-line bg-panel px-2 py-1.5 relative"
                           title={`${e.subject}${e.room ? ` · ${e.room}` : ""}`}
                         >
-                          <p className="font-mono text-[10.5px] tabular-nums text-ink-faint">
+                          <p className="eu-t-caption">
                             {e.start_time}–{e.end_time}
                           </p>
                           <p className="eu-t-meta text-ink font-medium truncate mt-0.5">{e.subject}</p>
                           {e.room && <p className="eu-t-label mt-1 normal-case">{e.room}</p>}
                           {e.source === "pronote" ? (
                             <span
-                              className="absolute top-1 right-1 font-mono text-[9px] text-ink-faint"
+                              className="absolute top-1 right-1 eu-t-label"
                               title={get("settings.fromPronote", "Depuis Pronote")}
                             >
                               P
@@ -929,11 +929,11 @@ function TabsSection() {
 
           {mode === "fixed" && (
             <div>
-              <div className="flex items-baseline justify-between text-sm mb-1.5">
+              <div className="flex items-baseline justify-between eu-t-body mb-1.5">
                 <span className="font-medium text-ink">
                   {t.settings?.maxTabsLabel || "Nombre maximum d'onglets"}
                 </span>
-                <span className="font-mono tabular-nums text-ink text-lg leading-none">{sliderVal}</span>
+                <span className="font-mono text-ink text-title leading-none">{sliderVal}</span>
               </div>
               <input
                 type="range"
@@ -944,7 +944,7 @@ function TabsSection() {
                 onChange={(e) => tabsCtx.setMaxTabsMode("fixed", parseInt(e.target.value, 10))}
                 className="w-full accent-accent cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-ink-muted mt-0.5 font-mono tabular-nums">
+              <div className="flex justify-between eu-t-caption text-ink-muted mt-0.5">
                 <span>{MIN}</span>
                 <span>{MAX}</span>
               </div>

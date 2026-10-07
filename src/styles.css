@@ -70,6 +70,9 @@
   --text-label--line-height: 1;
   --text-label--letter-spacing: 0.12em;
   --text-label--font-weight: 600;
+  /* Code and terminal text in editors and the Python console. */
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.6;
   --text-metric: 2rem;
   --text-metric--line-height: 1;
   --text-metric--letter-spacing: -0.02em;
@@ -518,6 +521,11 @@
   .eu-textarea {
     @apply py-2 resize-y;
     height: auto;
+  }
+  /* A field inside a toolbar: the toolbar's control height, small text. */
+  .eu-field-sm {
+    @apply px-2 text-small;
+    height: var(--eu-control-sm);
   }
   .eu-select {
     @apply pr-7 appearance-none bg-no-repeat cursor-pointer;

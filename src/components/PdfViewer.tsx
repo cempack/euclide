@@ -343,7 +343,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             <button
               key={t}
               onClick={() => setLegacyTool(t)}
-              className={`eu-btn-ghost text-sm ${legacyTool === t ? "bg-panel-alt text-accent" : ""}`}
+              className={`eu-btn-ghost ${legacyTool === t ? "bg-panel-alt text-accent" : ""}`}
             >
               {t === "pen" ? "Stylo" : "Gomme"}
             </button>
@@ -371,7 +371,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               >
                 −
               </button>
-              <span className="text-xs text-ink-muted w-10 text-center tabular-nums">
+              <span className="eu-t-small text-ink-muted w-10 text-center">
                 {Math.round(legacyZoom * 100)}%
               </span>
               <button
@@ -406,7 +406,10 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               className="absolute inset-0 touch-none"
               style={{ cursor: "crosshair" }}
             />
-            <button onClick={legacyClear} className="absolute top-2 right-2 text-xs eu-btn-ghost bg-panel/80">
+            <button
+              onClick={legacyClear}
+              className="absolute top-2 right-2 eu-btn-ghost eu-btn-sm bg-panel/80"
+            >
               Effacer
             </button>
           </div>
@@ -579,7 +582,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           <>
             <ToolSep />
             <select
-              className="eu-select h-7 w-[130px] text-[11.5px]"
+              className="eu-select eu-field-sm w-[130px]"
               aria-label={get("pdf.versions", "Versions")}
               onChange={async (e) => {
                 const versionId = Number(e.target.value);

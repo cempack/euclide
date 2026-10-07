@@ -400,7 +400,7 @@ export default function Python() {
         </div>
 
         <div className="px-2.5 py-2 border-t border-line">
-          <p className="eu-t-label normal-case tracking-normal">
+          <p className="eu-t-caption">
             {fmt(t.tools?.scriptsCount || "{count} script{plural} · dossier de données", {
               count: demos.length,
               plural: demos.length === 1 ? "" : "s",
@@ -435,7 +435,7 @@ export default function Python() {
                 <button
                   onClick={startRename}
                   title={get("python.renameTitle", "Cliquer pour renommer")}
-                  className="font-mono text-[12.5px] text-ink truncate px-1 -mx-1 rounded hover:bg-panel-alt"
+                  className="font-mono text-small text-ink truncate px-1 -mx-1 rounded hover:bg-panel-alt"
                 >
                   {openScript.name}
                 </button>
@@ -501,7 +501,7 @@ export default function Python() {
           ) : (
             <div className="h-full grid place-items-center">
               <div className="max-w-[46ch] text-center">
-                <p className="font-mono text-2xl text-ink-faint opacity-50 mb-3">{"</>"}</p>
+                <p className="font-mono eu-t-page text-ink-faint opacity-50 mb-3">{"</>"}</p>
                 <p className="eu-t-section text-ink">{get("python.emptyTitle", "Aucun script ouvert")}</p>
                 <p className="eu-t-body text-ink-muted mt-1.5">
                   {t.tools?.emptyEditorHint ||
@@ -536,7 +536,7 @@ export default function Python() {
               )}
             </div>
           </div>
-          <pre className="selectable h-[152px] overflow-auto px-3 py-2 font-mono text-[12px] leading-[1.45] whitespace-pre-wrap">
+          <pre className="selectable h-[152px] overflow-auto px-3 py-2 font-mono text-code whitespace-pre-wrap">
             {result ? (
               <>
                 {result.stdout || (

@@ -462,7 +462,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     className="eu-btn-ghost eu-btn-sm"
                     title={l.url}
                   >
-                    <Favicon url={l.url} className="w-4 h-4 text-[9px]" remote={remoteIcons} />
+                    <Favicon url={l.url} className="w-4 h-4 text-[0.5625rem]" remote={remoteIcons} />
                     <span className="truncate max-w-[18ch]">{l.label}</span>
                   </button>
                 ))}
@@ -578,9 +578,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                   >
                     <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
                     <span className="eu-t-body text-ink truncate flex-1">{f.name}</span>
-                    <span className="eu-t-label normal-case tracking-normal shrink-0">
-                      {relativeTime(f.added_at)}
-                    </span>
+                    <span className="eu-t-caption shrink-0">{relativeTime(f.added_at)}</span>
                   </button>
                 ))}
               </div>
@@ -613,7 +611,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           value={
             <span className="flex items-baseline gap-0.5">
               {Math.floor((recap?.active_minutes ?? 0) / 60)}
-              <span className="text-[16px] text-ink-faint font-normal">h</span>
+              <span className="text-[1rem] text-ink-faint font-normal">h</span>
               {String((recap?.active_minutes ?? 0) % 60).padStart(2, "0")}
             </span>
           }
@@ -681,12 +679,12 @@ function NowCard({
             {entry.start_time}–{entry.end_time}
           </span>
           {state === "current" && remaining != null && (
-            <span className="eu-t-label normal-case tracking-normal text-warn">
+            <span className="eu-t-caption text-warn">
               {fmt(get("status.remaining", "reste {time}"), { time: humanMinutes(remaining) })}
             </span>
           )}
           {state === "next" && until != null && (
-            <span className="eu-t-label normal-case tracking-normal">
+            <span className="eu-t-caption">
               {fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(until) })}
             </span>
           )}
@@ -699,7 +697,7 @@ function NowCard({
           >
             <Icon className="w-4 h-4" strokeWidth={1.8} />
           </span>
-          <span className="text-[20px] font-semibold tracking-[-0.018em] text-ink truncate">
+          <span className="text-[1.25rem] font-semibold tracking-[-0.018em] text-ink truncate">
             {entry.subject}
           </span>
           {entry.room && <span className="eu-chip shrink-0">{entry.room}</span>}
@@ -783,12 +781,12 @@ function ScheduleRow({
           isCurrent ? "bg-warn-solid" : isFocus ? "bg-line-strong" : "bg-line"
         }`}
       />
-      <span className="eu-t-num text-[11.5px] text-ink-faint w-[86px] shrink-0">
+      <span className="eu-t-caption w-[86px] shrink-0">
         {entry.start_time}–{entry.end_time}
       </span>
       <span className="eu-t-body text-ink font-medium truncate flex-1">{entry.subject}</span>
       {entry.room && <span className="eu-chip shrink-0 hidden sm:inline-flex">{entry.room}</span>}
-      <span className="eu-t-label normal-case tracking-normal shrink-0 w-[78px] text-right">
+      <span className="eu-t-caption shrink-0 w-[78px] text-right">
         {isCurrent
           ? get("dashboard.inProgress", "en cours")
           : status === "past"

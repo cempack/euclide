@@ -222,7 +222,7 @@ export function StatTile({
       <span>
         <span className="eu-t-metric text-ink block">{value}</span>
         <span className="eu-t-label block mt-1.5">{label}</span>
-        {hint && <span className="eu-t-meta block mt-1 normal-case tracking-normal">{hint}</span>}
+        {hint && <span className="eu-t-meta block mt-1">{hint}</span>}
       </span>
     </>
   );
