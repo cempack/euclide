@@ -733,7 +733,7 @@ export default function Whiteboard({
                 aria-pressed={tool === t}
                 aria-label={label}
                 title={label}
-                className={`eu-btn-icon eu-btn-sm eu-no-drag ${tool === t ? "eu-btn-primary" : "eu-btn-quiet"}`}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle eu-no-drag"
               >
                 <Icon className="w-4 h-4" />
               </button>
@@ -807,7 +807,7 @@ export default function Whiteboard({
           aria-checked={opacity < 1}
           aria-label={get("whiteboard.opacity", "Semi-transparent")}
           title={get("whiteboard.opacity", "Semi-transparent")}
-          className={`eu-btn-sm eu-no-drag ${opacity < 1 ? "eu-btn-primary" : "eu-btn-quiet"}`}
+          className="eu-btn-quiet eu-btn-sm eu-btn-toggle eu-no-drag"
         >
           {get("whiteboard.opacityShort", "Opacité")}
         </button>

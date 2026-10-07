@@ -418,7 +418,7 @@ export default function Documents({
     [courses, resolved],
   );
 
-  const chipClass = (active: boolean) => `eu-btn-sm eu-btn ${active ? "eu-btn-primary" : "eu-btn-ghost"}`;
+  const chipProps = (active: boolean) => ({ className: "eu-filter", "aria-pressed": active });
 
   const totalSize = docs.reduce((sum, d) => sum + (d.size || 0), 0);
 
@@ -485,14 +485,14 @@ export default function Documents({
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-          <button onClick={() => setFilter({ kind: "all" })} className={chipClass(filter.kind === "all")}>
+          <button onClick={() => setFilter({ kind: "all" })} {...chipProps(filter.kind === "all")}>
             {get("documents.filterAll", "Tout")}
           </button>
           {TYPE_CHIPS.map((c) => (
             <button
               key={c.value}
               onClick={() => setFilter({ kind: "type", value: c.value })}
-              className={chipClass(filter.kind === "type" && filter.value === c.value)}
+              {...chipProps(filter.kind === "type" && filter.value === c.value)}
             >
               {c.label}
             </button>
@@ -502,7 +502,7 @@ export default function Documents({
             <button
               key={c.id}
               onClick={() => setFilter({ kind: "class", courseId: c.id })}
-              className={chipClass(filter.kind === "class" && filter.courseId === c.id)}
+              {...chipProps(filter.kind === "class" && filter.courseId === c.id)}
             >
               <span
                 className="w-2 h-2 rounded-sm shrink-0"

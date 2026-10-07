@@ -388,15 +388,11 @@ export default function Python() {
                 <button
                   key={d.path}
                   onClick={() => select(d)}
-                  aria-current={isSel ? "true" : undefined}
-                  className={`w-full flex items-center gap-2 px-2 h-7 rounded text-left eu-no-drag transition-colors duration-fast ${
-                    isSel ? "bg-ink text-panel" : "text-ink-muted hover:bg-panel-alt hover:text-ink"
-                  }`}
+                  aria-current={isSel ? "page" : undefined}
+                  className="eu-nav-item w-full h-7 px-2 gap-2 eu-no-drag"
                 >
-                  <CodeIcon className="w-3.5 h-3.5 shrink-0 opacity-80" />
-                  <span className="eu-t-meta truncate" style={isSel ? { color: "inherit" } : undefined}>
-                    {d.name}
-                  </span>
+                  <CodeIcon className="eu-nav-icon w-3.5 h-3.5" />
+                  <span className="eu-t-small truncate">{d.name}</span>
                 </button>
               );
             })
