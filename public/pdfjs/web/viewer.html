@@ -387,7 +387,9 @@ See https://github.com/adobe-type-tools/cmap-resources
       }
 
       window.addEventListener('message', function (ev) {
-        var d = ev && ev.data;
+        // Only the Euclide tab that owns this iframe may drive it.
+        if (!ev || ev.source !== window.parent) return;
+        var d = ev.data;
         if (!d) return;
         var app = window.PDFViewerApplication;
         if (!app) return;

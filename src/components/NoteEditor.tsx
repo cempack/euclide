@@ -5,7 +5,7 @@ import { useToast, useConfirm, Loading } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
 import { get, fmt } from "../lib/i18n";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
-import { MOD } from "../lib/shortcuts";
+import { MOD, isMac } from "../lib/shortcuts";
 import { relativeTime } from "../lib/format";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -37,10 +37,18 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const [previewBody, setPreviewBody] = useState("");
   const loggedWrite = useRef(false);
 
+  // The refs are the source of truth for saving: they are updated synchronously
+  // on every edit, so a save that resolves mid-typing sees the latest draft.
   const draftRef = useRef(draft);
   const dirtyRef = useRef(dirty);
-  useEffect(() => { draftRef.current = draft; }, [draft]);
-  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  const commitDraft = useCallback((next: Partial<Note> & { id?: number }) => {
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
+  const commitDirty = useCallback((value: boolean) => {
+    dirtyRef.current = value;
+    setDirty(value);
+  }, []);
 
   // Link popup state
   const [linkPopupOpen, setLinkPopupOpen] = useState(false);
@@ -65,18 +73,18 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           const all = (await api.allNotes()) ?? [];
           const found = all.find((n) => n.id === noteId);
           if (found && mounted) {
-            setDraft(found);
+            commitDraft(found);
             setPreviewBody(found.body || "");
-            setDirty(false);
+            commitDirty(false);
           }
         } else if (isNew) {
           // new note, preselect if initial
-          setDraft({
+          commitDraft({
             title: "Nouvelle note",
             body: "",
             course_id: initialCourseId ?? null,
           });
-          setDirty(false);
+          commitDirty(false);
         }
       } catch (e) {
         toast(get("notes.loadError", "Erreur de chargement des notes/cours"), "error");
@@ -85,7 +93,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       }
     })();
     return () => { mounted = false; };
-  }, [noteId, isNew, initialCourseId, toast]);
+  }, [noteId, isNew, initialCourseId, toast, commitDraft, commitDirty]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setPreviewBody(draft.body || ""), 180);
@@ -95,40 +103,55 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  const persist = useCallback(async () => {
+  // Saves run one after another: a second save waits for the first, so a new
+  // note is created once and later saves update it instead of duplicating it.
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+
+  const persistOnce = useCallback(async () => {
     const d = draftRef.current;
     if (!d.title) return d;
     const wasNew = d.id == null;
-    const saved = await api.saveNote({
-      id: d.id,
-      title: d.title,
-      body: d.body || "",
-      course_id: d.course_id ?? null,
-    });
+    const sent = { title: d.title, body: d.body || "", course_id: d.course_id ?? null };
+    const saved = await api.saveNote({ id: d.id, ...sent });
     if (!saved?.id) {
       throw new Error("save failed");
     }
-    setDraft(saved);
-    setDirty(false);
+    // Keep whatever was typed while the save was in flight: take back only the
+    // fields the backend owns, and stay dirty if the draft moved on.
+    const cur = draftRef.current;
+    commitDraft({ ...cur, id: saved.id, updated_at: saved.updated_at });
+    const unchanged =
+      cur.title === sent.title &&
+      (cur.body || "") === sent.body &&
+      (cur.course_id ?? null) === sent.course_id;
+    if (unchanged) commitDirty(false);
     const t = tabsRef.current;
+    // The tab shows the title being typed, not the one that was just saved.
+    const tabTitle = cur.title || saved.title || "Note";
     if (wasNew && saved.id) {
       api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
       loggedWrite.current = true;
       const nextId = `note:${saved.id}`;
       if (tabId !== nextId) {
-        t.retarget(tabId, nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
+        t.retarget(tabId, nextId, tabTitle, { noteId: saved.id, isNew: false });
       }
-      t.rename(nextId, saved.title || "Note", { noteId: saved.id, isNew: false });
+      t.rename(nextId, tabTitle, { noteId: saved.id, isNew: false });
     } else if (!loggedWrite.current) {
       api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
       loggedWrite.current = true;
-      t.rename(tabId, saved.title || "Note");
+      t.rename(tabId, tabTitle);
     } else {
-      t.rename(tabId, saved.title || "Note");
+      t.rename(tabId, tabTitle);
     }
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
     return saved;
-  }, [tabId]);
+  }, [tabId, commitDraft, commitDirty]);
+
+  const persist = useCallback(() => {
+    const run = saveChain.current.then(persistOnce, persistOnce);
+    saveChain.current = run.catch(() => undefined);
+    return run;
+  }, [persistOnce]);
 
   useEffect(() => {
     tabs.setTabDirty(tabId, dirty);
@@ -155,15 +178,18 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
   useEffect(() => {
     return () => {
+      // Closing with « Ne pas enregistrer » (or deleting the note) must not
+      // write the abandoned draft back.
+      if (tabsRef.current.takeDiscarded(tabId)) return;
       if (dirtyRef.current && draftRef.current.title) {
         persist().catch(() => {});
       }
     };
-  }, [persist]);
+  }, [persist, tabId]);
 
   const markDirty = (updates: Partial<Note>) => {
-    setDraft((d) => ({ ...d, ...updates }));
-    setDirty(true);
+    commitDraft({ ...draftRef.current, ...updates });
+    commitDirty(true);
   };
 
   // Markdown insert helpers (visible syntax in editor)
@@ -306,7 +332,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     await api.deleteNote(draft.id);
     toast(get("notes.deleted", "Note supprimée"), "success");
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    tabs.close(tabId);
+    tabs.close(tabId, { discard: true });
   };
 
   const doSave = async () => {
@@ -491,6 +517,18 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             ref={textareaRef}
             value={draft.body || ""}
             onChange={(e) => markDirty({ body: e.target.value })}
+            onKeyDown={(e) => {
+              const mod = isMac ? e.metaKey : e.ctrlKey;
+              if (!mod || e.shiftKey || e.altKey) return;
+              const k = e.key.toLowerCase();
+              if (k === "b") {
+                e.preventDefault();
+                insertBold();
+              } else if (k === "i") {
+                e.preventDefault();
+                insertItalic();
+              }
+            }}
             placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
             className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-[13px] leading-[1.6] resize-none outline-none selectable"
             style={{ whiteSpace: "pre-wrap" }}
