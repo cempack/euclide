@@ -78,6 +78,8 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
   const pronoteQ = useQuery({ ...q.pronoteStatus(), ...live });
   const recapQ = useQuery({ ...q.recap("today"), ...live });
   const faviconsQ = useQuery({ ...q.setting("remote_favicons"), ...live });
+  // The name the teacher chose in Réglages, else Pronote's.
+  const displayName = (useQuery({ ...q.setting("teacher_display_name"), ...live }).data ?? "").trim();
   const allClassesQ = useQuery({ ...q.allCourseClasses(), ...live });
   const allClasses = allClassesQ.data ?? NONE;
   const classes = classesQ.data ?? NONE;
@@ -208,7 +210,10 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
   return (
     <>
       <PageHeader
-        title={greeting(nowTick, pronoteStatus?.connected ? pronoteStatus.account_name : null)}
+        title={greeting(
+          nowTick,
+          displayName || (pronoteStatus?.connected ? pronoteStatus.account_name : null),
+        )}
         meta={
           <>
             <span>{longDate(nowTick)}</span>

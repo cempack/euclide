@@ -155,6 +155,8 @@ export interface AppInfo {
   version: string;
   data_dir: string;
   windows_portable: boolean;
+  /** The database format this copy reads and writes. */
+  data_format: number;
 }
 
 export interface Course {
@@ -364,6 +366,9 @@ export const api = {
   clearBackupFolder: () => invoke<void>("clear_backup_folder"),
   /** Applied at the next launch, before the database opens. */
   restoreSnapshot: (name: string) => invoke<void>("restore_snapshot", { name }),
+  cancelRestore: () => invoke<void>("cancel_restore"),
+  /** Opens Euclide's data, backups or logs folder in the file manager. */
+  openFolder: (which: "data" | "backups" | "logs") => invoke<void>("open_folder", { which }),
 
   // Courses
   listCourses: () => invoke<Course[]>("list_courses").then(asList<Course>),

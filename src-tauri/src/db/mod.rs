@@ -1,4 +1,7 @@
 mod migrations;
+
+/// The database format of this build (see migrations.rs).
+pub const DATA_FORMAT: i64 = migrations::LATEST;
 mod schema;
 
 pub(crate) use schema::SCHEMA;
