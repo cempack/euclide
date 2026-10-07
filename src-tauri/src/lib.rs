@@ -1,3 +1,4 @@
+mod applog;
 mod commands;
 mod db;
 mod error;
@@ -26,11 +27,20 @@ pub fn apply_linux_runtime_env() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     perf::start();
+    applog::install_panic_hook();
     apply_linux_runtime_env();
     tauri::Builder::default()
+        // First, so a second launch (a double-click while the window is still
+        // opening) focuses the running window instead of opening the data twice.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_process::init())
         .register_asynchronous_uri_scheme_protocol(protocol::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
@@ -54,7 +64,7 @@ pub fn run() {
             match jobs::backup::apply_pending_restore() {
                 Ok(Some(name)) => perf::append(&[format!("backup.restored={name}")]),
                 Ok(None) => {}
-                Err(e) => eprintln!("[backup] restore: {}", e.message()),
+                Err(e) => applog::warn(format!("[backup] restore: {}", e.message())),
             }
             let db = match db::Db::open(&crate::paths::db_path()) {
                 Ok(db) => db,
@@ -241,6 +251,7 @@ pub fn run() {
             commands::courses::update_course_class_notes,
             commands::pronote::pronote_classes,
             perf::log_perf,
+            applog::log_errors,
             portable_update::apply_windows_portable_update,
             relaunch::relaunch_after_update,
         ])

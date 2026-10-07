@@ -27,13 +27,13 @@ base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 keepawake = "0.6"
 tokio = { version = "1", features = ["process", "io-util", "sync", "time"] }
-tauri-plugin-process = "2.3.1"
 # deflate-flate2 alone leaves flate2 with no compression backend. On Windows,
 # reqwest also depends on flate2 with default-features = false, so the unified
 # graph has no rust_backend/zlib-rs and MSVC CI dies with
 # "You need to choose a zlib backend". zlib-rs is pure Rust (no system zlib).
 zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 minisign-verify = "0.2"
+tauri-plugin-single-instance = "2"
 
 [target.'cfg(windows)'.dependencies]
 # DPAPI, to keep Pronote passwords encrypted for the Windows user (already in the tree via Tauri).

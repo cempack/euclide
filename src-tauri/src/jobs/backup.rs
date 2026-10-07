@@ -271,7 +271,7 @@ fn run_once(app: &AppHandle) {
         Err(e) => e.message(),
     };
     if health != "ok" {
-        eprintln!("[backup] integrity check failed: {health}");
+        crate::applog::warn(format!("[backup] integrity check failed: {health}"));
         let _ = app.emit(
             "eu://integrity",
             serde_json::json!({ "ok": false, "detail": health }),
@@ -284,7 +284,7 @@ fn run_once(app: &AppHandle) {
     // Never snapshot a damaged database over the good ones.
     if health == "ok" {
         if let Err(e) = daily_snapshot(&db) {
-            eprintln!("[backup] snapshot: {}", e.message());
+            crate::applog::warn(format!("[backup] snapshot: {}", e.message()));
         }
     }
     purge_trash();
@@ -305,7 +305,7 @@ fn run_once(app: &AppHandle) {
                     let stamp = Local::now().format("%Y-%m-%d %H:%M").to_string();
                     crate::commands::set_setting_raw(&db.lock(), LAST_MIRROR_KEY, &stamp);
                 }
-                Err(e) => eprintln!("[backup] mirror: {}", e.message()),
+                Err(e) => crate::applog::warn(format!("[backup] mirror: {}", e.message())),
             }
         }
     }

@@ -29,7 +29,9 @@ import "./styles.css";
 import { ErrorBoundary } from "./components/ui";
 import { ThemeProvider } from "./lib/theme";
 import { startPerf } from "./lib/perf";
+import { startReporting } from "./lib/report";
 
+startReporting();
 startPerf();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

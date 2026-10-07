@@ -357,7 +357,25 @@ See https://github.com/adobe-type-tools/cmap-resources
         }
       }
 
-      document.addEventListener('webviewerloaded', setupEuclideIntegration);
+      // pdf.js announces itself with "webviewerloaded" on the parent's document
+      // when the iframe is same-origin (always, in Euclide), and on this document
+      // otherwise. Listen on both and keep only our own event: the viewers of
+      // every PDF tab fire on the same parent document.
+      function onViewerLoaded(e) {
+        if (e && e.detail && e.detail.source && e.detail.source !== window) return;
+        stopListening();
+        setupEuclideIntegration();
+      }
+      function stopListening() {
+        document.removeEventListener('webviewerloaded', onViewerLoaded);
+        try { parent.document.removeEventListener('webviewerloaded', onViewerLoaded); } catch (e) {}
+      }
+      document.addEventListener('webviewerloaded', onViewerLoaded);
+      try {
+        if (parent !== window) parent.document.addEventListener('webviewerloaded', onViewerLoaded);
+      } catch (e) {}
+      // A tab closed before pdf.js started must not leave a listener behind.
+      window.addEventListener('pagehide', stopListening);
 
       // dblclick text editing removed (text tool / FreeText feature removed; only Sélection + Stylo remain)
 

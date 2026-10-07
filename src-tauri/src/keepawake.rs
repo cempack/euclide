@@ -34,13 +34,15 @@ impl Default for KeepAwake {
                             .create()
                         {
                             Ok(g) => guard = Some(g),
-                            Err(e) => eprintln!("[keepawake] failed to enable: {e}"),
+                            Err(e) => {
+                                crate::applog::warn(format!("[keepawake] failed to enable: {e}"))
+                            }
                         }
                     }
                 }
             });
         if let Err(e) = spawned {
-            eprintln!("[keepawake] thread not started: {e}");
+            crate::applog::warn(format!("[keepawake] thread not started: {e}"));
         }
         KeepAwake {
             on: AtomicBool::new(false),

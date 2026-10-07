@@ -49,7 +49,7 @@ pub(crate) fn put(conn: &Connection, key: &str, value: &str) -> AppResult<()> {
 /// For callers that cannot report a failure (startup, best-effort bookkeeping).
 pub(crate) fn set_setting_raw(conn: &Connection, key: &str, value: &str) {
     if let Err(e) = put(conn, key, value) {
-        eprintln!("[settings] {key}: {}", e.message());
+        crate::applog::warn(format!("[settings] {key}: {}", e.message()));
     }
 }
 
