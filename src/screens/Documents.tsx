@@ -16,9 +16,13 @@ import {
   FileKindIcon,
   TrashIcon,
 } from "../components/icons";
-import { useVisibleRefresh } from "../lib/visible-refresh";
+import { useQuery } from "@tanstack/react-query";
+import { q } from "../api/queries";
 
-const DOCUMENTS_EVENTS = ["eu:library-changed"] as const;
+/** Stable empty lists while a query loads, so memos hold. */
+const NO_FILES: FileItem[] = [];
+const NO_NOTES: Note[] = [];
+const NO_COURSES: Course[] = [];
 
 type Filter = { kind: "all" } | { kind: "type"; value: string } | { kind: "class"; courseId: number };
 
@@ -183,9 +187,10 @@ export default function Documents({
   const toast = useToast();
   const tabs = useTabs();
   const confirm = useConfirm();
-  const [docs, setDocs] = useState<FileItem[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const live = { subscribed: visible };
+  const docs = useQuery({ ...q.files(null), ...live }).data ?? NO_FILES;
+  const notes = useQuery({ ...q.notes(), ...live }).data ?? NO_NOTES;
+  const courses = useQuery({ ...q.courses(), ...live }).data ?? NO_COURSES;
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [search, setSearch] = useState("");
 
@@ -196,22 +201,6 @@ export default function Documents({
     current: string;
   }>(null);
   const [renameValue, setRenameValue] = useState("");
-
-  const refresh = useCallback(() => {
-    api
-      .listFiles(null)
-      .then((f) => setDocs(Array.isArray(f) ? f : []))
-      .catch(() => {});
-    api
-      .allNotes()
-      .then((n) => setNotes(Array.isArray(n) ? n : []))
-      .catch(() => {});
-    api
-      .listCourses()
-      .then((c) => setCourses(Array.isArray(c) ? c : []))
-      .catch(() => {});
-  }, []);
-  useVisibleRefresh(visible, refresh, DOCUMENTS_EVENTS);
 
   useEffect(() => {
     if (filterHint === "note" || filterHint === "pdf" || filterHint === "image" || filterHint === "board") {
@@ -237,7 +226,6 @@ export default function Documents({
       } else {
         toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
       }
-      refresh();
     } catch {
       toast(get("messages.genericError", "Erreur"), "error");
     }

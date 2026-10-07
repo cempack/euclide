@@ -29,6 +29,17 @@ export const q = {
       queryKey: ["courses", courseId, "classes"],
       queryFn: fresh(`listCourseClasses:${courseId}`, () => api.listCourseClasses(courseId).then(list)),
     }),
+  /** A course's files, or with null the library (the files of no course). */
+  files: (courseId: number | null) =>
+    queryOptions({
+      queryKey: ["library", "files", courseId],
+      queryFn: fresh(`listFiles:${courseId ?? "all"}`, () => api.listFiles(courseId).then(list)),
+    }),
+  notes: () =>
+    queryOptions({
+      queryKey: ["library", "notes"],
+      queryFn: fresh("allNotes", () => api.allNotes().then(list)),
+    }),
   libraryStats: () => queryOptions({ queryKey: ["library", "stats"], queryFn: () => api.libraryStats() }),
   recentFiles: (limit: number) =>
     queryOptions({
