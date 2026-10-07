@@ -27,7 +27,7 @@ describe("tr", () => {
     expect(trn("sequences.stepCount", 1)).toBe("1 étape");
     expect(trn("sequences.stepCount", 2)).toBe("2 étapes");
     expect(trn("documents.metaFiles", 1200)).toBe("1\u202f200 fichiers");
-    expect(trn("reminders.clearDoneMessage", 1)).toBe("Supprimer le rappel terminé ?");
+    expect(trn("reminders.clearDoneMessage", 1)).toBe("Supprimer le rappel terminé\u00a0?");
   });
 
   it("reads lists", () => {
