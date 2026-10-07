@@ -11,6 +11,7 @@ import { COURSE_ICONS } from "../components/ui";
 import { Icon } from "../ui/Icon";
 import { Kbd } from "../ui/Kbd";
 import { tip } from "../ui/Tooltip";
+import { keysOf } from "../lib/keymap";
 import { KIND_ICONS, iconForFile } from "./nav";
 import { TimerSlot } from "./Timer";
 
@@ -148,7 +149,7 @@ export const TopBar = memo(function TopBar({
                   type="button"
                   onClick={() => onCloseTab(tab.id)}
                   aria-label={`${closeLabel} — ${tab.title}`}
-                  {...tip(closeLabel, "mod+W")}
+                  {...tip(closeLabel, keysOf("closeTab"))}
                   className="eu-tab-close"
                 >
                   <Icon icon={X} size={14} />
@@ -167,7 +168,7 @@ export const TopBar = memo(function TopBar({
             ? tip(
                 `${newTabLabel} · ${get("app.tabLimitHint", "la limite est atteinte : le plus ancien sera fermé")}`,
               )
-            : tip(newTabLabel, "mod+T"))}
+            : tip(newTabLabel, keysOf("newTab")))}
           className="eu-tab-new eu-btn-quiet eu-btn-icon eu-btn-sm"
         >
           <Icon icon={Plus} />
@@ -179,13 +180,13 @@ export const TopBar = memo(function TopBar({
         <button type="button" onClick={onSearch} className="eu-search-button">
           <Icon icon={Search} size={14} />
           <span className="eu-search-label">{get("common.searchEllipsis", "Rechercher…")}</span>
-          <Kbd keys="mod+K" />
+          <Kbd keys={keysOf("palette")} />
         </button>
         <button
           type="button"
           onClick={onHelp}
           aria-label={helpLabel}
-          {...tip(helpLabel, "mod+/")}
+          {...tip(helpLabel, keysOf("help"))}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm"
         >
           <Icon icon={CircleHelp} />

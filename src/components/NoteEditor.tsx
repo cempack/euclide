@@ -7,7 +7,9 @@ import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
 import { get, fmt } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { useSetting } from "../api/hooks";
-import { MOD, isMac } from "../lib/shortcuts";
+import { isMac } from "../lib/shortcuts";
+import { keysOf } from "../lib/keymap";
+import { tip } from "../ui/Tooltip";
 import { relativeTime } from "../lib/format";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -475,7 +477,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             onClick={doSave}
             disabled={!dirty}
             className="eu-btn-primary eu-btn-sm"
-            data-tip={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+            {...tip(get("common.save", "Enregistrer"), keysOf("save"))}
           >
             {get("common.save", "Enregistrer")}
           </button>

@@ -11,6 +11,7 @@ import { tabs, useActiveKind, type TabKind } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
+import { keysOf } from "../lib/keymap";
 import { KIND_ICONS, NAV_TOOLS, NAV_WORK, navKindActive, type NavItem } from "./nav";
 
 const NavButton = memo(function NavButton({
@@ -53,7 +54,7 @@ export const ProjectionRail = memo(function ProjectionRail() {
         onClick={toggleProjection}
         aria-pressed
         aria-label={label}
-        {...tip(label, "esc")}
+        {...tip(label, keysOf("leaveProjection"))}
         data-tip-place="right"
         className="eu-btn-ghost eu-btn-icon"
       >
@@ -167,7 +168,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
           onClick={toggleProjection}
           aria-pressed={projection}
           aria-label={projectionLabel}
-          {...tip(projectionLabel, "mod+shift+P")}
+          {...tip(projectionLabel, keysOf("projection"))}
           data-tip-place={placeFoot}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm"
         >
@@ -178,7 +179,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
           onClick={() => tabs.open({ kind: "settings" })}
           aria-current={isActive("settings") ? "page" : undefined}
           aria-label={settingsLabel}
-          {...tip(settingsLabel, "mod+,")}
+          {...tip(settingsLabel, keysOf("settings"))}
           data-tip-place={placeFoot}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-current-raised"
         >
