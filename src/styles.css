@@ -354,6 +354,13 @@
   padding: var(--eu-pad) var(--eu-page-x) 4rem;
   gap: var(--eu-page-gap);
 }
+/* The main area is a size container (App.tsx): screens adapt to the room
+   they get, not to the window, which the sidebar shares. */
+@container (width < 48rem) {
+  .eu-page {
+    padding: 1rem 1rem 3rem;
+  }
+}
 
 /* Regions the window must not treat as a drag handle (canvas, editors, lists).
    Referenced in Whiteboard/Python/CodeEditor; previously undefined — a no-op. */
@@ -636,6 +643,17 @@
   .group:focus-within .eu-row-actions {
     @apply opacity-100;
   }
+  /* A row's several tools float over its end in a narrow page, instead of
+     holding their room (invisible) beside the title. */
+  @container (width < 48rem) {
+    .eu-row:has(> .eu-row-tools) {
+      @apply relative;
+    }
+    .eu-row-tools {
+      @apply absolute right-2 top-1/2 -translate-y-1/2 pl-6;
+      background: linear-gradient(to right, transparent, var(--color-panel) 1.5rem);
+    }
+  }
   .eu-divide > * + * {
     @apply border-t border-line;
   }
@@ -686,6 +704,43 @@
   .eu-sidebar-foot {
     @apply flex items-center gap-2 border-t border-line shrink-0;
     padding: 0.5rem var(--eu-sidebar-p) 0.5rem calc(var(--eu-sidebar-p) + 0.25rem);
+  }
+  .eu-sidebar-nav {
+    @apply flex flex-col gap-0.5;
+  }
+  /* A narrow window (or a teacher who folds it) gets a rail of icons; each
+     label moves into the item's tooltip. */
+  .eu-sidebar[data-rail] {
+    @apply w-14;
+  }
+  .eu-sidebar[data-rail] .eu-sidebar-head {
+    @apply justify-center px-0;
+  }
+  .eu-sidebar[data-rail] .eu-sidebar-body,
+  .eu-sidebar[data-rail] .eu-sidebar-nav {
+    @apply items-center;
+  }
+  .eu-sidebar[data-rail] .eu-nav-item {
+    @apply justify-center px-0;
+    width: calc(var(--eu-control) + 0.5rem);
+  }
+  .eu-sidebar[data-rail] .eu-sidebar-foot {
+    @apply flex-col gap-1 py-2 px-0;
+  }
+  .eu-sidebar-sep {
+    @apply w-6 my-2.5 self-center border-0 border-t border-line;
+  }
+  /* Folding is occasional: the button shows itself when the sidebar is in
+     use, over the end of the tagline, rather than taking its room. */
+  .eu-sidebar-head {
+    @apply relative;
+  }
+  .eu-sidebar:not([data-rail]) .eu-sidebar-fold {
+    @apply absolute right-2.5 top-1/2 -translate-y-1/2 bg-chrome text-ink-faint opacity-0 transition-opacity
+      duration-fast focus-visible:opacity-100;
+  }
+  .eu-sidebar:hover .eu-sidebar-fold {
+    @apply opacity-100;
   }
   .eu-avatar {
     @apply w-7 h-7 shrink-0 grid place-items-center rounded-full bg-ink text-panel font-mono text-caption font-semibold;
@@ -826,12 +881,12 @@
     background-image: linear-gradient(var(--color-hover), var(--color-hover));
   }
   .eu-search-label {
-    @apply text-small pr-6 hidden sm:inline;
+    @apply text-small pr-6 hidden @2xl:inline;
   }
 
   .eu-statusbar {
-    @apply shrink-0 h-6 flex items-stretch bg-chrome border-t border-line font-mono text-caption text-ink-faint
-      select-none;
+    @apply shrink-0 h-6 flex items-stretch overflow-hidden bg-chrome border-t border-line font-mono text-caption
+      text-ink-faint select-none;
   }
   .eu-status-item {
     @apply flex items-center gap-1.5 px-2.5 border-r border-line whitespace-nowrap;

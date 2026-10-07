@@ -1,9 +1,11 @@
 import { memo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
-import { Projector, Settings } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Projector, Settings } from "lucide-react";
+import { useSetting } from "../api/hooks";
 import type { AppInfo } from "../lib/api";
 import { get } from "../lib/i18n";
+import { NARROW_WINDOW, useMediaQuery } from "../lib/media";
 import { shortcutText } from "../lib/shortcuts";
 import { useTabs, type TabKind } from "../lib/tabs";
 import { useAppearance } from "../lib/theme";
@@ -14,10 +16,13 @@ import { KIND_ICONS, NAV_TOOLS, NAV_WORK, navKindActive, type NavItem } from "./
 const NavButton = memo(function NavButton({
   item,
   active,
+  rail,
   onOpen,
 }: {
   item: NavItem;
   active: boolean;
+  /** Icon only: the label moves into a tooltip. */
+  rail: boolean;
   onOpen: (item: NavItem) => void;
 }) {
   return (
@@ -25,11 +30,14 @@ const NavButton = memo(function NavButton({
       type="button"
       onClick={() => onOpen(item)}
       aria-current={active ? "page" : undefined}
+      {...(rail
+        ? { "aria-label": item.label, ...tip(item.label, item.keys), "data-tip-place": "right" }
+        : {})}
       className="eu-nav-item"
     >
       <Icon icon={KIND_ICONS[item.kind]} className="eu-nav-icon" />
-      <span className="truncate">{item.label}</span>
-      {item.keys && <span className="eu-nav-keys">{shortcutText(item.keys)}</span>}
+      {!rail && <span className="truncate">{item.label}</span>}
+      {!rail && item.keys && <span className="eu-nav-keys">{shortcutText(item.keys)}</span>}
     </button>
   );
 });
@@ -61,6 +69,10 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
   const pronote = useQuery(q.pronoteStatus()).data ?? null;
   const displayName = (useQuery(q.setting("teacher_display_name")).data ?? "").trim();
   const isActive = (kind: TabKind) => navKindActive(kind, tabs.active?.kind);
+  // A narrow window always gets the rail; a wide one, when the teacher folds it.
+  const narrow = useMediaQuery(NARROW_WINDOW);
+  const [saved, setSaved] = useSetting("sidebar");
+  const rail = narrow || saved === "rail";
 
   const name = displayName || (pronote?.connected ? (pronote.account_name ?? "").trim() : "");
 
@@ -83,50 +95,87 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
 
   const projectionLabel = get("appearance.projection", "Mode projection");
   const settingsLabel = get("nav.settings", "Réglages");
+  const foldLabel =
+    saved === "rail"
+      ? get("nav.expand", "Déplier la barre latérale")
+      : get("nav.collapse", "Réduire la barre latérale");
+  const fold = narrow ? null : (
+    <button
+      type="button"
+      onClick={() => setSaved(saved === "rail" ? "open" : "rail")}
+      aria-label={foldLabel}
+      {...tip(foldLabel)}
+      data-tip-place={rail ? "right" : "bottom"}
+      className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-sidebar-fold"
+    >
+      <Icon icon={rail ? PanelLeftOpen : PanelLeftClose} />
+    </button>
+  );
+
+  const placeFoot = rail ? "right" : "top";
+  const groups = [
+    { label: get("nav.groupWork", "Travail"), items: NAV_WORK },
+    { label: get("nav.groupTools", "Outils"), items: NAV_TOOLS },
+  ];
 
   return (
-    <aside className="eu-sidebar">
+    <aside className="eu-sidebar" data-rail={rail || undefined}>
       <div className="eu-sidebar-head">
         <img src="/logo-64.png" alt="" width={24} height={24} className="w-6 h-6 shrink-0 object-contain" />
-        <div className="min-w-0">
-          <div className="eu-wordmark">EUCLIDE</div>
-          <div className="eu-t-caption truncate">{get("app.tagline", "Bureau d'enseignement")}</div>
-        </div>
+        {!rail && (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="eu-wordmark">EUCLIDE</div>
+              <div className="eu-t-caption truncate">{get("app.tagline", "Bureau d'enseignement")}</div>
+            </div>
+            {fold}
+          </>
+        )}
       </div>
 
       <div className="eu-sidebar-body">
-        <p className="eu-t-label px-2.5 pb-2">{get("nav.groupWork", "Travail")}</p>
-        <nav className="flex flex-col gap-0.5" aria-label={get("nav.groupWork", "Travail")}>
-          {NAV_WORK.map((item) => (
-            <NavButton key={item.kind} item={item} active={isActive(item.kind)} onOpen={onOpen} />
-          ))}
-        </nav>
-
-        <p className="eu-t-label px-2.5 pt-5 pb-2">{get("nav.groupTools", "Outils")}</p>
-        <nav className="flex flex-col gap-0.5" aria-label={get("nav.groupTools", "Outils")}>
-          {NAV_TOOLS.map((item) => (
-            <NavButton key={item.kind} item={item} active={isActive(item.kind)} onOpen={onOpen} />
-          ))}
-        </nav>
+        {groups.map((group, i) => (
+          <div key={group.label} className="contents">
+            {rail ? (
+              i > 0 && <hr className="eu-sidebar-sep" />
+            ) : (
+              <p className={`eu-t-label px-2.5 pb-2 ${i > 0 ? "pt-5" : ""}`}>{group.label}</p>
+            )}
+            <nav className="eu-sidebar-nav" aria-label={group.label}>
+              {group.items.map((item) => (
+                <NavButton
+                  key={item.kind}
+                  item={item}
+                  active={isActive(item.kind)}
+                  rail={rail}
+                  onOpen={onOpen}
+                />
+              ))}
+            </nav>
+          </div>
+        ))}
       </div>
 
       <div className="eu-sidebar-foot">
-        {name ? (
+        {!rail && name ? (
           <span className="eu-avatar" aria-hidden>
             {name.charAt(0).toUpperCase()}
           </span>
         ) : null}
-        <div className="min-w-0 flex-1">
-          {name && <div className="eu-t-small font-medium text-ink truncate">{name}</div>}
-          <div className="eu-t-caption">v{info?.version ?? "…"}</div>
-        </div>
+        {!rail && (
+          <div className="min-w-0 flex-1">
+            {name && <div className="eu-t-small font-medium text-ink truncate">{name}</div>}
+            <div className="eu-t-caption">v{info?.version ?? "…"}</div>
+          </div>
+        )}
+        {rail && fold}
         <button
           type="button"
           onClick={toggleProjection}
           aria-pressed={projection}
           aria-label={projectionLabel}
           {...tip(projectionLabel, "mod+shift+P")}
-          data-tip-place="top"
+          data-tip-place={placeFoot}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm"
         >
           <Icon icon={Projector} />
@@ -137,7 +186,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
           aria-current={isActive("settings") ? "page" : undefined}
           aria-label={settingsLabel}
           {...tip(settingsLabel, "mod+,")}
-          data-tip-place="top"
+          data-tip-place={placeFoot}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-current-raised"
         >
           <Icon icon={Settings} />

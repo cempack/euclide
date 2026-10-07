@@ -14,7 +14,9 @@
     "reminders": "Rappels",
     "recap": "Bilan",
     "groupWork": "Travail",
-    "groupTools": "Outils"
+    "groupTools": "Outils",
+    "collapse": "Réduire la barre latérale",
+    "expand": "Déplier la barre latérale"
   },
   "common": {
     "save": "Enregistrer",
@@ -458,7 +460,11 @@
     "markdownHint": "Markdown · formules LaTeX entre $…$",
     "bodyPlaceholder": "Écrivez ici…",
     "savedAt": "enregistré {when}",
-    "neverSaved": "jamais enregistré"
+    "neverSaved": "jamais enregistré",
+    "viewMode": "Affichage",
+    "viewEdit": "Édition",
+    "viewSplit": "Partagé",
+    "viewPreview": "Aperçu"
   },
   "pdf": {
     "loading": "Chargement du PDF…",
@@ -509,7 +515,7 @@
     "available": "Version {version} disponible (actuelle : {current}).",
     "notes": "Notes",
     "install": "Installer",
-    "installing": "Téléchargement… {percent}\u202f%",
+    "installing": "Téléchargement… {percent} %",
     "publishing": "Publication encore en cours pour cette plateforme. Réessayez dans un moment.",
     "confirmInstall": "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le.",
     "installed": "Mise à jour installée. Fermez Euclide, puis rouvrez-le.",

@@ -657,7 +657,7 @@ function Shell() {
       <div className="flex flex-1 min-h-0">
         {/* Projection keeps a slim quit rail; the tab strip and status bar hide. */}
         {projection ? <ProjectionRail /> : <Sidebar info={info} />}
-        <main className="flex-1 h-full flex flex-col min-w-0 bg-canvas eu-main">
+        <main className="@container flex-1 h-full flex flex-col min-w-0 bg-canvas eu-main">
           {!projection && <TopBar onHelp={handleHelp} onSearch={handleSearch} onCloseTab={requestClose} />}
           <MainContent info={info} />
         </main>

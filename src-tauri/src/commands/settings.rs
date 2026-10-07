@@ -18,6 +18,8 @@ pub(crate) const UI_SETTINGS: &[&str] = &[
     "class_end_notice",
     "class_end_lead",
     "teacher_display_name",
+    "sidebar",
+    "note_view",
 ];
 
 fn ui_key(key: &str) -> AppResult<&str> {

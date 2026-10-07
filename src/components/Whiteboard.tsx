@@ -744,7 +744,7 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Colours */}
-        <ToolGroup label={get("whiteboard.colors", "Couleurs")}>
+        <ToolGroup collapse label={get("whiteboard.colors", "Couleurs")}>
           {colorPresets.map((c) => (
             <button
               key={c}
@@ -933,8 +933,8 @@ export default function Whiteboard({
 
         <ToolSpacer />
 
-        {/* Destination course + export + save */}
-        <ToolGroup>
+        {/* Destination course and export leave first when the bar is short; save stays. */}
+        <ToolGroup collapse>
           <select
             value={courseId ?? ""}
             onChange={(e) => setCourseId(e.target.value ? Number(e.target.value) : null)}
@@ -956,6 +956,8 @@ export default function Whiteboard({
           >
             <DownloadIcon className="w-3.5 h-3.5" />
           </button>
+        </ToolGroup>
+        <ToolGroup>
           <button
             onClick={save}
             className="eu-btn-primary eu-btn-sm eu-no-drag"

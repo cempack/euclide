@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api, invalidateCache } from "../lib/api";
+import { bootSetting } from "../lib/boot";
 
 /** One lesson's contents as the Pronote sidecar returns them. */
 export type PronoteContent = {
@@ -107,6 +108,12 @@ export const q = {
     }),
   recap: (period: "today" | "week" | "month") =>
     queryOptions({ queryKey: ["recap", period], queryFn: () => api.getRecap(period), staleTime: 60_000 }),
-  setting: (key: string) => queryOptions({ queryKey: ["settings", key], queryFn: () => api.getSetting(key) }),
+  /** Settings saved at launch are there from the first render: no flash of the default. */
+  setting: (key: string) =>
+    queryOptions({
+      queryKey: ["settings", key],
+      queryFn: () => api.getSetting(key),
+      initialData: () => bootSetting(key),
+    }),
   keepAwake: () => queryOptions({ queryKey: ["keepAwake"], queryFn: () => api.keepAwakeStatus() }),
 };

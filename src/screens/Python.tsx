@@ -342,7 +342,7 @@ export default function Python() {
   return (
     <div className="h-full min-h-0 flex eu-no-drag">
       {/* Script explorer */}
-      <aside className="w-[210px] shrink-0 h-full flex flex-col border-r border-line bg-canvas">
+      <aside className="w-[210px] @max-3xl:w-40 shrink-0 h-full flex flex-col border-r border-line bg-canvas">
         <div className="flex items-center justify-between gap-1 px-2.5 h-9 shrink-0 border-b border-line">
           <span className="eu-t-label">{t.tools?.scripts || "Scripts"}</span>
           <div className="flex items-center gap-0.5">

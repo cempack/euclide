@@ -446,7 +446,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
               }
             />
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-3">
               {courseClasses.map((cc) => (
                 <ClassCard
                   key={cc.id}
@@ -578,7 +578,7 @@ function FilesPane({
             <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
             <span className="eu-t-body text-ink truncate">{f.name}</span>
           </button>
-          <span className="eu-t-caption shrink-0 hidden sm:block">
+          <span className="eu-t-caption shrink-0 hidden @2xl:block">
             {fileKindLabel(f.kind)} · {humanSize(f.size)} · {relativeTime(f.added_at)}
           </span>
           <button
@@ -779,7 +779,7 @@ function SequencePane({
                   <span className="eu-chip shrink-0">
                     {fmt(get("sequences.stepCount", "{count} étapes"), { count: seqItems.length })}
                   </span>
-                  <div className="eu-row-actions flex items-center gap-0.5 shrink-0">
+                  <div className="eu-row-actions eu-row-tools flex items-center gap-0.5 shrink-0">
                     <button
                       onClick={() => void api.moveSequence(courseId, seq.id, -1).then(reload)}
                       disabled={seqIndex === 0}
@@ -829,11 +829,11 @@ function SequencePane({
                       return (
                         <div key={item.id} className="eu-row group border-t border-line">
                           <span className="eu-t-caption w-5 shrink-0">{itemIndex + 1}</span>
-                          <span className="eu-t-body text-ink truncate flex-1">{item.title}</span>
+                          <span className="eu-t-body text-ink truncate flex-1 min-w-24">{item.title}</span>
                           {item.file_id != null && (
                             <button
                               onClick={() => openItemFile(item)}
-                              className="eu-chip hover:text-ink shrink-0 max-w-[22ch]"
+                              className="eu-chip hover:text-ink min-w-0 max-w-[22ch]"
                               data-tip={item.file_name || ""}
                               aria-label={item.file_name || ""}
                             >
@@ -847,7 +847,7 @@ function SequencePane({
                               {cc.class_name}
                             </span>
                           ))}
-                          <div className="eu-row-actions flex items-center gap-0.5 shrink-0">
+                          <div className="eu-row-actions eu-row-tools flex items-center gap-0.5 shrink-0">
                             {courseClasses.length > 0 && (
                               <select
                                 value=""
