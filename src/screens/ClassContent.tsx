@@ -312,7 +312,7 @@ export default function ClassContent({
                                   if (!d.url) return;
                                   api.openUrl(d.url).catch(() => {});
                                 }}
-                                className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-ink focus:outline-none"
+                                className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-ink focus:outline-hidden"
                                 title="Ouvrir dans le navigateur"
                               >
                                 {d.name}

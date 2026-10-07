@@ -1,11 +1,89 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Only src/ holds class names: never scan the vendored PDF.js or local clones. */
+@import "tailwindcss" source("../src");
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tailwind reads colours from the --eu-* tokens below (RGB triples, so the
+   same token feeds rgb(var(--eu-x) / alpha) in plain CSS). */
+@theme {
+  --color-canvas: rgb(var(--eu-canvas));
+  --color-panel: rgb(var(--eu-panel));
+  --color-panel-alt: rgb(var(--eu-panel-alt));
+  --color-ink: rgb(var(--eu-ink));
+  --color-ink-muted: rgb(var(--eu-ink-muted));
+  --color-ink-faint: rgb(var(--eu-ink-faint));
+  --color-line: rgb(var(--eu-line) / var(--eu-line-a));
+  --color-line-strong: rgb(var(--eu-line) / var(--eu-line-a-strong));
+  --color-accent: rgb(var(--eu-accent));
+  --color-accent-soft: rgb(var(--eu-accent-soft));
+  --color-ok: rgb(var(--eu-ok));
+  --color-ok-soft: rgb(var(--eu-ok-soft));
+  --color-warn: rgb(var(--eu-warn));
+  --color-warn-soft: rgb(var(--eu-warn-soft));
+  --color-danger: rgb(var(--eu-danger));
+  --color-danger-soft: rgb(var(--eu-danger-soft));
+  --color-ok-solid: rgb(var(--eu-ok-solid));
+  --color-warn-solid: rgb(var(--eu-warn-solid));
+  --color-danger-solid: rgb(var(--eu-danger-solid));
+  --color-stage: rgb(var(--eu-stage));
+  --color-stage-alt: rgb(var(--eu-stage-alt));
+  --color-stage-ink: rgb(var(--eu-stage-ink));
+
+  --font-sans: IBM Plex Sans, system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-mono: IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-none: 0px;
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --transition-duration-fast: 120ms;
+  --default-transition-duration: 180ms;
+  --transition-duration-base: 180ms;
+  --transition-duration-slow: 260ms;
+
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --shadow-none: none;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 24px -12px rgb(0 0 0 / 0.22);
+
+  --container-col: 1080px;
+
+  --z-index-overlay: 60;
+  --z-index-palette: 70;
+  --z-index-confirm: 90;
+}
+
+/* Tailwind 3 defaults this UI was drawn with; Tailwind 4 changed them. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    opacity: 1;
+    color: var(--color-gray-400);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
 
 /* ===========================================================================
    Design tokens — THE single source of truth for every colour in Euclide.
-   Values are RGB triples so Tailwind can apply alpha: `bg-panel/60` works.
-   tailwind.config.js only *references* these; it never redefines a value.
+   Values are RGB triples, usable as rgb(var(--eu-x) / alpha) in plain CSS.
+   The @theme block above only *references* them; it never redefines a value.
+   In Tailwind 4 an opacity modifier scales the token's own alpha: `line/60`
+   is 60 % of a hairline, not a 60 % opaque line.
    Direction « Atelier »: encre sur papier, hairlines, mono pour les données.
    =========================================================================== */
 :root,
@@ -127,30 +205,52 @@
   --eu-type-scale: 1.15;
 }
 
-* {
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
+/* Element defaults live in the base layer so components and utilities
+   (« outline-hidden », « cursor-pointer »…) can override them. */
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-}
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
 
-html {
-  font-size: calc(16px * var(--eu-type-scale));
-}
+  html {
+    font-size: calc(16px * var(--eu-type-scale));
+  }
 
-body {
-  background-color: rgb(var(--eu-canvas));
-  color: rgb(var(--eu-ink));
-  font-family: theme("fontFamily.sans");
-  font-size: 14px;
-  overflow: hidden;
-  user-select: none;
-  cursor: default;
+  body {
+    background-color: rgb(var(--eu-canvas));
+    color: rgb(var(--eu-ink));
+    font-family: var(--font-sans);
+    font-size: 14px;
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  .selectable {
+    user-select: text;
+    cursor: auto;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  /* One focus ring for the whole application. Visible on keyboard only. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--eu-accent));
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
 }
 
 /* Hide scrollbar on the tab strip for a clean tab bar (still fully scrollable). */
@@ -192,24 +292,6 @@ body {
 .eu-root,
 .eu-main {
   isolation: isolate; /* keeps overlays/z-index local to the shell */
-}
-
-input,
-textarea,
-select,
-[contenteditable="true"],
-.selectable {
-  user-select: text;
-  cursor: auto;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-
-/* One focus ring for the whole application. Visible on keyboard only. */
-:focus-visible {
-  outline: 2px solid rgb(var(--eu-accent));
-  outline-offset: 2px;
-  border-radius: 3px;
 }
 
 /* The command palette input is the whole header — a ring on the field
@@ -290,23 +372,27 @@ select,
      Buttons. `eu-btn` is the base; add one variant. Height is uniform so
      toolbars align without per-site tweaking.
      ------------------------------------------------------------------------- */
-  .eu-btn {
+  .eu-btn,
+  .eu-btn-primary,
+  .eu-btn-ghost,
+  .eu-btn-quiet,
+  .eu-btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded px-3 text-[12.5px] font-medium
       whitespace-nowrap border border-transparent transition-colors duration-fast
       disabled:opacity-45 disabled:pointer-events-none;
     height: var(--eu-btn-h);
   }
   .eu-btn-primary {
-    @apply eu-btn bg-ink text-panel border-ink hover:bg-ink/90 active:bg-ink;
+    @apply bg-ink text-panel border-ink hover:bg-ink/90 active:bg-ink;
   }
   .eu-btn-ghost {
-    @apply eu-btn bg-panel text-ink border-line hover:bg-panel-alt active:bg-line/10;
+    @apply bg-panel text-ink border-line hover:bg-panel-alt active:bg-ink/10;
   }
   .eu-btn-quiet {
-    @apply eu-btn text-ink-muted hover:text-ink hover:bg-panel-alt active:bg-line/10;
+    @apply text-ink-muted hover:text-ink hover:bg-panel-alt active:bg-ink/10;
   }
   .eu-btn-danger {
-    @apply eu-btn bg-danger text-white border-danger hover:bg-danger/90;
+    @apply bg-danger text-white border-danger hover:bg-danger/90;
   }
   .eu-btn-sm {
     @apply px-2.5 text-[11.5px] gap-1.5;
@@ -325,7 +411,9 @@ select,
   /* -------------------------------------------------------------------------
      Form controls.
      ------------------------------------------------------------------------- */
-  .eu-input {
+  .eu-input,
+  .eu-textarea,
+  .eu-select {
     @apply w-full rounded bg-panel border border-line px-2.5 text-[13px] text-ink
       placeholder:text-ink-faint transition-colors duration-fast
       focus:border-accent focus:outline-none focus-visible:outline-none
@@ -333,11 +421,11 @@ select,
     height: var(--eu-btn-h);
   }
   .eu-textarea {
-    @apply eu-input py-2 leading-[1.55] resize-y;
+    @apply py-2 leading-[1.55] resize-y;
     height: auto;
   }
   .eu-select {
-    @apply eu-input pr-7 appearance-none bg-no-repeat cursor-pointer;
+    @apply pr-7 appearance-none bg-no-repeat cursor-pointer;
     height: var(--eu-btn-h);
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7276' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 8px center;
@@ -349,21 +437,25 @@ select,
   /* -------------------------------------------------------------------------
      Chips, badges, keys, segmented control.
      ------------------------------------------------------------------------- */
-  .eu-chip {
+  .eu-chip,
+  .eu-chip-ok,
+  .eu-chip-warn,
+  .eu-chip-danger,
+  .eu-chip-accent {
     @apply inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[10.5px]
       leading-[1.5] border border-line bg-panel-alt text-ink-muted whitespace-nowrap;
   }
   .eu-chip-ok {
-    @apply eu-chip bg-ok-soft border-ok/25 text-ok;
+    @apply bg-ok-soft border-ok/25 text-ok;
   }
   .eu-chip-warn {
-    @apply eu-chip bg-warn-soft border-warn/25 text-warn;
+    @apply bg-warn-soft border-warn/25 text-warn;
   }
   .eu-chip-danger {
-    @apply eu-chip bg-danger-soft border-danger/25 text-danger;
+    @apply bg-danger-soft border-danger/25 text-danger;
   }
   .eu-chip-accent {
-    @apply eu-chip bg-accent-soft border-accent/25 text-accent;
+    @apply bg-accent-soft border-accent/25 text-accent;
   }
   .eu-kbd {
     @apply inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-sm border border-line
@@ -397,13 +489,14 @@ select,
     padding-top: var(--eu-stat-y);
     padding-bottom: var(--eu-stat-y);
   }
-  .eu-row {
+  .eu-row,
+  .eu-row-hover {
     @apply flex items-center gap-2.5 px-[14px] transition-colors duration-fast;
     padding-top: var(--eu-row-y);
     padding-bottom: var(--eu-row-y);
   }
   .eu-row-hover {
-    @apply eu-row hover:bg-panel-alt;
+    @apply hover:bg-panel-alt;
   }
   .eu-row-actions {
     @apply opacity-0 transition-opacity duration-fast;
@@ -420,7 +513,7 @@ select,
 
   /* Gauge / progress bar. */
   .eu-gauge {
-    @apply h-1 rounded-sm bg-line/15 overflow-hidden;
+    @apply h-1 rounded-sm bg-ink/15 overflow-hidden;
   }
   .eu-gauge > i {
     @apply block h-full rounded-sm bg-ink transition-[width] duration-slow;
