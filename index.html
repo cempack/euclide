@@ -13,21 +13,32 @@
     -->
     <script>
       // Apply the saved appearance before first paint so there is no flash.
-      // SQLite (via api.setSetting) stays the source of truth; this is a mirror.
+      // The backend injects the saved settings at launch (src/lib/boot.ts);
+      // after a reload of the page they are stale and the localStorage mirror
+      // kept by lib/theme.tsx is used instead.
       (function () {
+        var root = document.documentElement;
+        var saved = {};
+        var boot = window.__EUCLIDE_BOOT__;
         try {
-          var pref = localStorage.getItem("eu:theme") || "auto";
-          var dark =
-            pref === "dark" ||
-            (pref === "auto" &&
-              window.matchMedia &&
-              window.matchMedia("(prefers-color-scheme: dark)").matches);
-          var root = document.documentElement;
-          root.setAttribute("data-theme", dark ? "dark" : "light");
-          root.setAttribute("data-density", localStorage.getItem("eu:density") || "comfortable");
+          if (boot && boot.settings && sessionStorage.getItem("eu:boot") !== boot.nonce)
+            saved = boot.settings;
         } catch (e) {
-          /* private mode / storage disabled: stay on the light default */
+          if (boot && boot.settings) saved = boot.settings;
         }
+        var local = function (key) {
+          try {
+            return localStorage.getItem(key);
+          } catch (e) {
+            return null;
+          }
+        };
+        var pref = saved.theme || local("eu:theme") || "auto";
+        var dark =
+          pref === "dark" ||
+          (pref === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        root.setAttribute("data-theme", dark ? "dark" : "light");
+        root.setAttribute("data-density", saved.density || local("eu:density") || "comfortable");
       })();
     </script>
   </head>

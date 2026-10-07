@@ -125,14 +125,16 @@ pub fn protect_stored_password(conn: &Connection) {
 
 #[tauri::command]
 pub async fn pronote_status(db: State<'_, Db>) -> AppResult<PronoteStatus> {
-    db.read(|conn| {
-        Ok(PronoteStatus {
-            connected: get_setting_raw(conn, "pronote_connected").as_deref() == Some("1"),
-            account_name: get_setting_raw(conn, "pronote_account"),
-            last_sync: get_setting_raw(conn, "pronote_last_sync"),
-        })
-    })
-    .await
+    db.read(|conn| Ok(status(conn))).await
+}
+
+/// What Settings and the dashboard show; also part of the boot state.
+pub(crate) fn status(conn: &Connection) -> PronoteStatus {
+    PronoteStatus {
+        connected: get_setting_raw(conn, "pronote_connected").as_deref() == Some("1"),
+        account_name: get_setting_raw(conn, "pronote_account"),
+        last_sync: get_setting_raw(conn, "pronote_last_sync"),
+    }
 }
 
 #[tauri::command]

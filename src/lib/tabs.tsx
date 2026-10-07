@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "./api";
+import { bootSetting, forgetBootSetting } from "./boot";
 import { tabSwitchBegin } from "./perf";
 
 export type TabKind =
@@ -243,9 +244,78 @@ const HOME: Tab = {
   mountId: "dashboard",
 };
 
+type TabLimit = { mode: MaxTabsMode; fixed: number | null; migrate: boolean };
+
+/** The tab limit from the saved settings (versions before 0.1.10 only saved max_tabs). */
+export function parseTabLimit(modeRaw: string | null, nRaw: string | null): TabLimit {
+  const n = nRaw != null ? parseInt(nRaw, 10) : NaN;
+  const fixed = Number.isFinite(n) && n >= 3 ? Math.min(MAX_TABS_FIXED_CAP, Math.floor(n)) : null;
+  if (modeRaw === "unlimited") return { mode: "unlimited", fixed, migrate: false };
+  if (modeRaw === "fixed" && Number.isFinite(n) && n > 0) return { mode: "fixed", fixed, migrate: false };
+  if (modeRaw === "auto") return { mode: "auto", fixed, migrate: false };
+  if (nRaw === "0") return { mode: "unlimited", fixed, migrate: false };
+  return { mode: "auto", fixed, migrate: true };
+}
+
+type Session = { tabs: Tab[]; activeId: string };
+
+/** The tabs saved by the previous session, or null when there are none. */
+export function parseSession(raw: string | null): Session | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      activeId?: string;
+      tabs?: Array<{ id: string; kind: TabKind; title: string; params?: TabParams; pinned?: boolean }>;
+    };
+    const tabs: Tab[] = (parsed.tabs || [])
+      .filter((t) => t && t.kind && t.id && isRestorable({ kind: t.kind, params: t.params || {} }))
+      .map((t) => ({
+        id: t.id,
+        kind: t.kind,
+        title: t.title || DEFAULT_TITLES[t.kind] || t.kind,
+        params: t.params || {},
+        mountId: t.id,
+        pinned: !!t.pinned,
+      }));
+    if (!tabs.length) return null;
+    if (!tabs.some((t) => t.kind === "dashboard")) tabs.unshift({ ...HOME, mountId: newMountId() });
+    const activeId =
+      parsed.activeId && tabs.some((t) => t.id === parsed.activeId) ? parsed.activeId : tabs[0].id;
+    return { tabs, activeId };
+  } catch {
+    return null; // corrupt session
+  }
+}
+
+function sessionPayload(tabs: Tab[], activeId: string): string {
+  return JSON.stringify({
+    activeId,
+    tabs: tabs.filter(isRestorable).map((t) => ({
+      id: t.id,
+      kind: t.kind,
+      title: t.title,
+      params: t.params,
+      pinned: t.pinned,
+    })),
+  });
+}
+
+/**
+ * The previous session as saved at launch (lib/boot.ts), so the first render
+ * already shows its tabs; null when only the backend knows (reload, browser).
+ */
+function sessionAtLaunch(): { session: Session | null; limit: TabLimit; raw: string | null } | null {
+  const raw = bootSetting("open_tabs");
+  if (raw === undefined) return null;
+  const limit = parseTabLimit(bootSetting("max_tabs_mode") ?? null, bootSetting("max_tabs") ?? null);
+  for (const key of ["open_tabs", "max_tabs_mode", "max_tabs"]) forgetBootSetting(key);
+  return { session: parseSession(raw), limit, raw };
+}
+
 export function TabsProvider({ children }: { children: ReactNode }) {
-  const [tabs, setTabsState] = useState<Tab[]>([HOME]);
-  const [activeId, setActiveIdState] = useState<string>("dashboard");
+  const [atLaunch] = useState(sessionAtLaunch);
+  const [tabs, setTabsState] = useState<Tab[]>(atLaunch?.session?.tabs ?? [HOME]);
+  const [activeId, setActiveIdState] = useState<string>(atLaunch?.session?.activeId ?? "dashboard");
 
   // The refs are the source of truth and change synchronously, so several
   // actions in one event (open a tab then focus it, close then reopen…) each
@@ -264,10 +334,12 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     activeIdRef.current = id;
     setActiveIdState(id);
   }, []);
-  const [maxTabsMode, setMaxTabsModeState] = useState<MaxTabsMode>("auto");
-  const [maxTabsFixed, setMaxTabsFixed] = useState<number>(TAB_FIT_FALLBACK);
+  const [maxTabsMode, setMaxTabsModeState] = useState<MaxTabsMode>(atLaunch?.limit.mode ?? "auto");
+  const [maxTabsFixed, setMaxTabsFixed] = useState<number>(atLaunch?.limit.fixed ?? TAB_FIT_FALLBACK);
   const [tabFitCapacity, setTabFitCapacityState] = useState<number>(0);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(atLaunch !== null);
+  // What the database holds, so an unchanged session is not written back.
+  const savedSession = useRef<string | null>(atLaunch?.raw ?? null);
   const dirtyStore = useMemo(() => createDirtyStore(), []);
 
   const effectiveMaxTabs =
@@ -283,6 +355,11 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   const discarded = useRef(new Set<string>());
 
   useEffect(() => {
+    if (atLaunch) {
+      if (atLaunch.limit.migrate) api.setSetting("max_tabs_mode", "auto").catch(() => {});
+      return;
+    }
+    // Reload of the page or browser mode: ask the backend.
     let cancelled = false;
     (async () => {
       try {
@@ -291,61 +368,25 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           api.getSetting("max_tabs"),
         ]);
         if (cancelled) return;
-        const n = nRaw != null ? parseInt(nRaw, 10) : NaN;
-        if (Number.isFinite(n) && n >= 3) {
-          setMaxTabsFixed(Math.min(MAX_TABS_FIXED_CAP, Math.floor(n)));
-        }
-        if (modeRaw === "unlimited") {
-          setMaxTabsModeState("unlimited");
-        } else if (modeRaw === "fixed" && Number.isFinite(n) && n > 0) {
-          setMaxTabsModeState("fixed");
-        } else if (modeRaw === "auto") {
-          setMaxTabsModeState("auto");
-        } else if (nRaw === "0") {
-          setMaxTabsModeState("unlimited");
-        } else {
-          setMaxTabsModeState("auto");
-          api.setSetting("max_tabs_mode", "auto").catch(() => {});
-        }
+        const limit = parseTabLimit(modeRaw, nRaw);
+        if (limit.fixed != null) setMaxTabsFixed(limit.fixed);
+        setMaxTabsModeState(limit.mode);
+        if (limit.migrate) api.setSetting("max_tabs_mode", "auto").catch(() => {});
       } catch {
         if (!cancelled) setMaxTabsModeState("auto");
       }
 
       try {
         const raw = await api.getSetting("open_tabs");
-        if (cancelled || !raw) return;
-        const parsed = JSON.parse(raw) as {
-          activeId?: string;
-          tabs?: Array<{
-            id: string;
-            kind: TabKind;
-            title: string;
-            params?: TabParams;
-            pinned?: boolean;
-          }>;
-        };
-        const restored: Tab[] = (parsed.tabs || [])
-          .filter((t) => t && t.kind && t.id && isRestorable({ kind: t.kind, params: t.params || {} }))
-          .map((t) => ({
-            id: t.id,
-            kind: t.kind,
-            title: t.title || DEFAULT_TITLES[t.kind] || t.kind,
-            params: t.params || {},
-            mountId: t.id,
-            pinned: !!t.pinned,
-          }));
-        if (!restored.length) return;
-        if (!restored.some((t) => t.kind === "dashboard")) {
-          restored.unshift({ ...HOME, mountId: newMountId() });
+        if (cancelled) return;
+        savedSession.current = raw;
+        const session = parseSession(raw);
+        if (session) {
+          commitTabs(session.tabs);
+          setActiveId(session.activeId);
         }
-        commitTabs(restored);
-        const nextActive =
-          parsed.activeId && restored.some((t) => t.id === parsed.activeId)
-            ? parsed.activeId
-            : restored[0].id;
-        setActiveId(nextActive);
       } catch {
-        // ignore corrupt session
+        // keep the dashboard
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -353,22 +394,15 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [commitTabs, setActiveId]);
+  }, [atLaunch, commitTabs, setActiveId]);
 
   useEffect(() => {
     if (!hydrated) return;
     const timer = window.setTimeout(() => {
-      const payload = {
-        activeId,
-        tabs: tabs.filter(isRestorable).map((t) => ({
-          id: t.id,
-          kind: t.kind,
-          title: t.title,
-          params: t.params,
-          pinned: t.pinned,
-        })),
-      };
-      api.setSetting("open_tabs", JSON.stringify(payload)).catch(() => {});
+      const payload = sessionPayload(tabs, activeId);
+      if (payload === savedSession.current) return;
+      savedSession.current = payload;
+      api.setSetting("open_tabs", payload).catch(() => {});
     }, 450);
     return () => clearTimeout(timer);
   }, [hydrated, tabs, activeId]);
