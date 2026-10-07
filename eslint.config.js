@@ -40,14 +40,9 @@ export default tseslint.config(
     },
   },
   {
-    // Rewritten in later milestones (PDF viewer M6, Python M5, whiteboard M7):
-    // warnings until then.
-    files: [
-      "src/components/PdfViewer.tsx",
-      "src/components/Whiteboard.tsx",
-      "src/components/CodeEditor.tsx",
-      "src/screens/Python.tsx",
-    ],
+    // Rewritten in later milestones (PDF viewer M6, whiteboard M7): warnings
+    // until then.
+    files: ["src/components/PdfViewer.tsx", "src/components/Whiteboard.tsx"],
     rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/immutability": "warn",

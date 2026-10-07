@@ -223,7 +223,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: sidecar/dist/euclide-sidecar
-          key: sidecar-${{ matrix.platform }}-py3.12-${{ hashFiles('sidecar/requirements.txt', 'src-tauri/resources/euclide_sidecar.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
+          key: sidecar-${{ matrix.platform }}-py3.12-${{ hashFiles('sidecar/requirements.txt', 'sidecar/euclide_sidecar/**', 'sidecar/run_sidecar.py', 'sidecar/build.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
 
       - name: build sidecar binary (non-Windows)
         if: matrix.platform != 'windows-latest' && steps.sidecar-cache.outputs.cache-hit != 'true'
@@ -237,6 +237,14 @@ jobs:
         run: |
           .\sidecar\build_sidecar.ps1
 
+      # What freezing can break (Jedi's data, accents, input(), the shims…).
+      - name: smoke-test the frozen sidecar
+        shell: bash
+        run: |
+          bin=sidecar/dist/euclide-sidecar/euclide-sidecar
+          if [ "${{ runner.os }}" = "Windows" ]; then bin="$bin.exe"; fi
+          python sidecar/smoke_frozen.py "$bin"
+
       - name: copy sidecar binary into tauri resources
         run: |
           mkdir -p src-tauri/resources
@@ -249,8 +257,6 @@ jobs:
           if [ "${{ runner.os }}" != "Windows" ]; then
             chmod +x src-tauri/resources/euclide-sidecar/euclide-sidecar 2>/dev/null || true
           fi
-          # Remove the .py source from the bundle (binary takes precedence at runtime; .py stays in git for dev)
-          rm -f src-tauri/resources/euclide_sidecar.py || true
 
           # Fail fast with debug info if the sidecar bundle wasn't copied (prevents cryptic "glob pattern resources/*" error later)
           if [ ! -d "src-tauri/resources/euclide-sidecar" ]; then

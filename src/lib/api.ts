@@ -1,4 +1,4 @@
-import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { Channel, convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { recordIpc } from "./perf";
 import { bootSetting, forgetBootSetting, takeBootPronote } from "./boot";
 
@@ -293,11 +293,25 @@ export interface SearchResult {
   file_kind: string;
 }
 
-export interface PythonResult {
-  ok: boolean;
-  stdout: string;
-  stderr: string;
-}
+/** One drawing operation of the turtle shim (sidecar/euclide_sidecar/shims/turtle.py). */
+export type TurtleOp = { op: string; [field: string]: unknown };
+
+/** What a running script reports (sidecar/euclide_sidecar/runner.py). */
+export type RunEvent =
+  | { t: "out" | "err"; s: string }
+  | { t: "input"; prompt: string }
+  | { t: "turtle"; ops: TurtleOp[] }
+  | { t: "plot"; svg: string }
+  | { t: "check"; name: string; ok: boolean; message: string }
+  | {
+      t: "done";
+      ok: boolean;
+      code: number | null;
+      /** Set when Euclide ended the run. */
+      reason?: "stopped" | "timeout" | "output" | "crash";
+    };
+
+export type RunRequest = { name: string; code: string; checks: boolean; timeoutS: number };
 
 export interface PythonCompletion {
   name: string;
@@ -448,8 +462,17 @@ export const api = {
 
   // Python scripts
   listDemos: () => invoke<PythonDemo[]>("list_python_demos").then(asList<PythonDemo>),
-  runDemo: (path: string) => invoke<PythonResult>("run_python_demo", { path }),
-  runCode: (code: string) => invoke<PythonResult>("run_python_code", { code }),
+  /** Runs a script in its own process; its events arrive in batches. */
+  pythonRun: async (req: RunRequest, onEvents: (events: RunEvent[]) => void): Promise<number> => {
+    if (!isTauri()) return invoke<number>("python_run", { ...req, onEvent: onEvents });
+    const channel = new Channel<RunEvent[]>();
+    channel.onmessage = onEvents;
+    return invoke<number>("python_run", { ...req, onEvent: channel });
+  },
+  pythonInput: (runId: number, text: string) => invoke<void>("python_input", { runId, text }),
+  pythonStop: (runId: number) => invoke<void>("python_stop", { runId }),
+  /** The Python screen opened: have a process ready for the first run. */
+  pythonPrewarm: () => invoke<void>("python_prewarm"),
   pythonComplete: (code: string, line: number, column: number, filename?: string) =>
     invoke<PythonCompletion[]>("python_complete", { code, line, column, filename }),
   createScript: (name: string, code: string) => invoke<PythonDemo>("create_python_script", { name, code }),

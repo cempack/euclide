@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
-import { api, type PythonDemo, type PythonResult } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import { CircleStop, ListChecks } from "lucide-react";
+import { api, isTauri, type PythonDemo } from "../lib/api";
 import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { useToast, useConfirm } from "../components/ui";
 import { useActiveKind } from "../stores/tabs";
 import { editors } from "../stores/editors";
-import CodeEditor from "../components/CodeEditor";
+import PythonEditor from "../features/python/PythonEditor";
+import { OutputPanel, type OutputTab } from "../features/python/OutputPanel";
+import { useRun } from "../features/python/useRun";
+import { useSetting } from "../api/hooks";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
+import { Icon } from "../ui/Icon";
 import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { keysOf, useShortcut } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
@@ -14,40 +21,81 @@ import { CodeIcon, PlayIcon, PlusIcon, TrashIcon } from "../components/icons";
 
 const STARTER_CODE = tr("tools.starterCode");
 
+const TIME_LIMITS = [10, 30, 60, 300, 0];
+const NO_SCRIPTS: PythonDemo[] = [];
+const OUTPUT_MIN = 96;
+
+/** The file name the runner shows in tracebacks and checks look up. */
+function fileName(script: { name: string; path?: string }): string {
+  const fromPath = script.path?.split(/[\\/]/).pop();
+  if (fromPath) return fromPath;
+  const slug = script.name
+    .trim()
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+  return `${slug || "script"}.py`;
+}
+
 export default function Python() {
   const toast = useToast();
   const confirm = useConfirm();
-  const [demos, setDemos] = useState<PythonDemo[]>([]);
+  const queryClient = useQueryClient();
+  const scriptsQ = useQuery(q.scripts());
+  const demos = scriptsQ.data ?? NO_SCRIPTS;
+  const setDemos = (update: (prev: PythonDemo[]) => PythonDemo[]) =>
+    queryClient.setQueryData(q.scripts().queryKey, (prev) => update(prev ?? []));
   const [openScript, setOpenScript] = useState<{
     name: string;
     code: string;
     path?: string;
     isDirty: boolean;
   } | null>(null);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<PythonResult | null>(null);
+  const runner = useRun();
+  // The editor's text as of the last keystroke: Ctrl+↵ right after typing
+  // must run what is on screen, not the last render's copy.
+  const latestCode = useRef<{ key: string; code: string } | null>(null);
+  const docKey = (script: { name: string; path?: string }) => script.path ?? `temp:${script.name}`;
+  const running = runner.status.state === "running" || runner.status.state === "input";
+  const [tab, setTab] = useState<OutputTab>("console");
+  const [savedLimit, setLimit] = useSetting("python_timeout");
+  const limit = savedLimit != null && TIME_LIMITS.includes(Number(savedLimit)) ? Number(savedLimit) : 30;
+  const [savedHeight, setSavedHeight] = useSetting("python_output_height");
+  const [outputHeight, setOutputHeight] = useState<number | null>(null);
+  const height = outputHeight ?? (Number(savedHeight) || 220);
+  const splitRef = useRef<HTMLDivElement>(null);
+
+  // A drawing arrives while the console is still empty: show it.
+  const hasDrawing = runner.turtle.length > 0 || runner.plots.length > 0;
+  const [drawingSeen, setDrawingSeen] = useState(hasDrawing);
+  if (hasDrawing !== drawingSeen) {
+    setDrawingSeen(hasDrawing);
+    if (hasDrawing && tab === "console" && runner.lines.length === 0) setTab("drawing");
+  }
+
+  // Have Python started before the first run (it takes a moment on a slow PC).
+  useEffect(() => {
+    if (isTauri()) api.pythonPrewarm().catch(logged("python.prewarm"));
+  }, []);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState("");
 
-  // Reset inline rename UI whenever the open script identity changes (selecting another, delete, save-as, etc.)
-  useEffect(() => {
+  // Another script (or a rename, a save-as): the inline rename closes.
+  const identity = `${openScript?.path ?? ""}|${openScript?.name ?? ""}`;
+  const [renameFor, setRenameFor] = useState(identity);
+  if (renameFor !== identity) {
+    setRenameFor(identity);
     setIsEditingName(false);
     setEditingName("");
-  }, [openScript?.path, openScript?.name]);
+  }
 
   useEffect(() => {
     editors.setDirty("python", !!openScript?.isDirty);
     return () => editors.setDirty("python", false);
   }, [openScript?.isDirty]);
 
-  // Ctrl+↵ runs the open script, while the Python tab is the one shown
-  // (every pane stays mounted).
-  useShortcut("runPython", () => void run(), useActiveKind() === "python");
-
   const refresh = async (selectPath?: string): Promise<PythonDemo[]> => {
-    const list = await api.listDemos().catch(() => [] as PythonDemo[]);
-    setDemos(Array.isArray(list) ? list : []);
+    const list = await queryClient.fetchQuery({ ...q.scripts(), staleTime: 0 }).catch(() => NO_SCRIPTS);
 
     if (selectPath) {
       const found = list.find((d) => d.path === selectPath);
@@ -63,42 +111,13 @@ export default function Python() {
     return list;
   };
 
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  // Auto-select first real script on initial load (when nothing open) or when the
-  // currently-open persisted script disappears from disk (e.g. deleted elsewhere).
-  // We deliberately do *not* auto-pick when a temporary unsaved buffer is open
-  // (no path) — the temp stays in control of the editor until explicitly saved or closed.
-  useEffect(() => {
-    if (!openScript && demos.length > 0) {
-      const first = demos[0];
-      setOpenScript({
-        name: first.name,
-        code: first.code,
-        path: first.path,
-        isDirty: false,
-      });
-      return;
-    }
-    if (openScript?.path) {
-      const stillThere = demos.some((d) => d.path === openScript.path);
-      if (!stillThere) {
-        if (demos.length > 0) {
-          const first = demos[0];
-          setOpenScript({
-            name: first.name,
-            code: first.code,
-            path: first.path,
-            isDirty: false,
-          });
-        } else {
-          setOpenScript(null);
-        }
-      }
-    }
-  }, [demos, openScript?.path]);
+  // Nothing open: the first script. The open one deleted elsewhere: the
+  // first one left. An unsaved new buffer (no path) stays as it is.
+  const missing = !!openScript?.path && scriptsQ.isSuccess && !demos.some((d) => d.path === openScript.path);
+  if ((!openScript && demos.length > 0) || missing) {
+    const first = demos[0];
+    setOpenScript(first ? { name: first.name, code: first.code, path: first.path, isDirty: false } : null);
+  }
 
   const select = async (d: PythonDemo) => {
     if (openScript?.isDirty) {
@@ -116,7 +135,6 @@ export default function Python() {
       path: d.path,
       isDirty: false,
     });
-    setResult(null);
   };
 
   const create = async () => {
@@ -136,7 +154,6 @@ export default function Python() {
       code: STARTER_CODE,
       isDirty: true,
     });
-    setResult(null);
   };
 
   const importScript = async () => {
@@ -221,23 +238,41 @@ export default function Python() {
     return editors.registerFlush("python", save);
   }, [openScript]);
 
-  const run = async () => {
+  const run = async (withChecks: boolean) => {
     if (!openScript) return;
-    setRunning(true);
-    api.logEvent("demo_run", openScript.name ?? "scratch", null);
-    try {
-      const res =
-        openScript.path && !openScript.isDirty
-          ? await api.runDemo(openScript.path)
-          : await api.runCode(openScript.code);
-      setResult(res);
-      if (!res?.ok) toast(tr("tools.toastScriptError"), "error");
-    } catch (err) {
-      reportError("python.run", err);
-      toast(errorMessage(err, tr("tools.toastScriptRunError")), "error");
-    } finally {
-      setRunning(false);
-    }
+    api.logEvent("demo_run", openScript.name ?? "scratch", null).catch(logged("python.logRun"));
+    setTab(withChecks ? "checks" : "console");
+    await runner.start({
+      name: fileName(openScript),
+      code: latestCode.current?.key === docKey(openScript) ? latestCode.current.code : openScript.code,
+      checks: withChecks,
+      timeoutS: limit || 3600,
+    });
+  };
+
+  // Ctrl+↵ runs the open script, Ctrl+Maj+↵ checks it, while the Python tab
+  // is the one shown (every pane stays mounted).
+  const shown = useActiveKind() === "python";
+  useShortcut("runPython", () => void run(false), shown);
+  useShortcut("checkPython", () => void run(true), shown);
+
+  // Drag the bar between editor and console; the height is remembered.
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    const box = splitRef.current?.getBoundingClientRect();
+    if (!box) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    let last: number | null = null;
+    const move = (ev: PointerEvent) => {
+      last = Math.round(Math.min(box.height - 80, Math.max(OUTPUT_MIN, box.bottom - ev.clientY)));
+      setOutputHeight(last);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      if (last != null) setSavedHeight(String(last));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   };
 
   const deleteCurrent = async () => {
@@ -257,7 +292,6 @@ export default function Python() {
       await api.deleteScript(openScript.path);
     }
     setOpenScript(null);
-    setResult(null);
     const list = await refresh();
     if (list.length > 0) {
       const first = list[0];
@@ -447,19 +481,51 @@ export default function Python() {
               >
                 {tr("tools.saveBtn")}
               </button>
-              <button
-                onClick={run}
-                disabled={running}
-                className="eu-btn-primary eu-btn-sm"
-                {...tip(tr("tools.execute"), keysOf("runPython"))}
-              >
-                {running ? (
-                  <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                ) : (
+              {running ? (
+                <button onClick={runner.stop} className="eu-btn-danger eu-btn-sm" {...tip(tr("python.stop"))}>
+                  <Icon icon={CircleStop} size={14} />
+                  {tr("python.stop")}
+                </button>
+              ) : (
+                <button
+                  onClick={() => void run(false)}
+                  className="eu-btn-primary eu-btn-sm"
+                  {...tip(tr("tools.execute"), keysOf("runPython"))}
+                >
                   <PlayIcon className="w-3.5 h-3.5" />
-                )}
-                {tr("tools.execute")}
+                  {tr("tools.execute")}
+                </button>
+              )}
+              <button
+                onClick={() => void run(true)}
+                disabled={running}
+                className="eu-btn-ghost eu-btn-sm"
+                {...tip(tr("python.checkTitle"), keysOf("checkPython"))}
+              >
+                <Icon icon={ListChecks} size={14} />
+                {tr("python.check")}
               </button>
+            </ToolGroup>
+            <ToolGroup collapse label={tr("python.timeLimit")}>
+              <select
+                value={String(limit)}
+                onChange={(e) => setLimit(e.target.value)}
+                className="eu-select eu-field-sm w-auto"
+                aria-label={tr("python.timeLimit")}
+                data-tip={tr("python.timeLimit")}
+              >
+                {TIME_LIMITS.map((s) => (
+                  <option key={s} value={String(s)}>
+                    {s === 0
+                      ? tr("python.noTimeLimit")
+                      : s < 60
+                        ? tr("python.timeLimitOption", { s })
+                        : tr("python.timeLimitMinutes", { m: s / 60 })}
+                  </option>
+                ))}
+              </select>
+            </ToolGroup>
+            <ToolGroup collapse>
               <button
                 onClick={deleteCurrent}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
@@ -476,60 +542,55 @@ export default function Python() {
           </Toolbar>
         )}
 
-        <div className="flex-1 min-h-0 p-2">
-          {openScript ? (
-            <CodeEditor
-              value={openScript.code}
-              filename={openScript.path}
-              onChange={(v) => {
-                setOpenScript((prev) => (prev ? { ...prev, code: v, isDirty: true } : null));
-              }}
-            />
-          ) : (
-            <div className="h-full grid place-items-center">
-              <div className="max-w-[46ch] text-center">
-                <p className="font-mono eu-t-page text-ink-faint opacity-50 mb-3">{"</>"}</p>
-                <p className="eu-t-section text-ink">{tr("python.emptyTitle")}</p>
-                <p className="eu-t-body text-ink-muted mt-1.5">{tr("tools.emptyEditorHint")}</p>
-                <button onClick={create} className="eu-btn-primary eu-btn-sm mt-3.5">
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  {tr("python.newScript")}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Output: a real terminal surface, dark in both themes. */}
-        <div className="shrink-0 border-t border-line bg-stage text-stage-ink">
-          <div className="flex items-center justify-between gap-2 px-3 h-7 border-b border-stage-line">
-            <span className="eu-t-label text-stage-muted">{tr("tools.output")}</span>
-            <div className="flex items-center gap-2">
-              {result && (
-                <span className={`eu-t-caption ${result.ok ? "text-ok-solid" : "text-stage-danger"}`}>
-                  {result.ok ? tr("python.ok") : tr("python.failed")}
-                </span>
-              )}
-              {result && (
-                <button
-                  onClick={() => setResult(null)}
-                  className="eu-t-caption text-stage-muted hover:text-stage-ink"
-                >
-                  {tr("tools.clearOutput")}
-                </button>
-              )}
-            </div>
-          </div>
-          <pre className="selectable h-[152px] overflow-auto px-3 py-2 font-mono text-code whitespace-pre-wrap">
-            {result ? (
-              <>
-                {result.stdout || <span className="text-stage-muted">{tr("tools.noOutput")}</span>}
-                {result.stderr && <span className="text-stage-danger">{`\n${result.stderr}`}</span>}
-              </>
+        <div ref={splitRef} className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0">
+            {openScript ? (
+              <PythonEditor
+                docKey={docKey(openScript)}
+                value={openScript.code}
+                filename={openScript.path}
+                label={tr("python.editorLabel", { name: openScript.name })}
+                onChange={(v) => {
+                  latestCode.current = { key: docKey(openScript), code: v };
+                  setOpenScript((prev) => (prev ? { ...prev, code: v, isDirty: true } : null));
+                }}
+              />
             ) : (
-              <span className="text-stage-muted">{tr("tools.runHint")}</span>
+              <div className="h-full grid place-items-center">
+                <div className="max-w-[46ch] text-center">
+                  <p className="font-mono eu-t-page text-ink-faint opacity-50 mb-3">{"</>"}</p>
+                  <p className="eu-t-section text-ink">{tr("python.emptyTitle")}</p>
+                  <p className="eu-t-body text-ink-muted mt-1.5">{tr("tools.emptyEditorHint")}</p>
+                  <button onClick={create} className="eu-btn-primary eu-btn-sm mt-3.5">
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    {tr("python.newScript")}
+                  </button>
+                </div>
+              </div>
             )}
-          </pre>
+          </div>
+
+          {/* The bar between editor and console: drag it to share the height. */}
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label={tr("python.resize")}
+            onPointerDown={startResize}
+            className="shrink-0 h-1.5 -my-0.5 z-1 cursor-row-resize bg-line hover:bg-accent/40 transition-colors duration-fast"
+          />
+          <div className="shrink-0 min-h-0" style={{ height }}>
+            <OutputPanel
+              tab={tab}
+              onTab={setTab}
+              lines={runner.lines}
+              status={runner.status}
+              turtle={runner.turtle}
+              plots={runner.plots}
+              checks={runner.checks}
+              scriptName={openScript ? fileName(openScript) : "script.py"}
+              onAnswer={runner.answer}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -1,9 +1,9 @@
 //! Python scripts of the teacher (python/ folder): list, edit, run through
-//! the sidecar, completions. M5 replaces the runner with a separate process.
+//! completions through the sidecar's tools lane. Running them is runner.rs.
 
 use crate::error::{AppError, AppResult};
 use crate::fsx::unique_dest;
-use crate::models::{PythonCompletion, PythonDemo, PythonResult};
+use crate::models::{PythonCompletion, PythonDemo};
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
@@ -176,62 +176,6 @@ pub async fn import_python_script(app: AppHandle) -> AppResult<Option<PythonDemo
         path: dest.to_string_lossy().to_string(),
         code,
     }))
-}
-
-#[tauri::command]
-pub async fn run_python_demo(app: AppHandle, path: String) -> AppResult<PythonResult> {
-    let path = script_in_python_dir(&path)?;
-    let v = crate::sidecar::call(
-        &app,
-        "run_demo",
-        &json!({ "path": path.to_string_lossy().to_string() }),
-    )
-    .await?;
-    Ok(PythonResult {
-        ok: v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
-        stdout: v
-            .get("stdout")
-            .and_then(|x| x.as_str())
-            .unwrap_or("")
-            .to_string(),
-        stderr: v
-            .get("stderr")
-            .and_then(|x| x.as_str())
-            .unwrap_or("")
-            .to_string(),
-    })
-}
-
-#[tauri::command]
-pub async fn run_python_code(app: AppHandle, code: String) -> AppResult<PythonResult> {
-    // Write to a temp file inside the python dir and run it, so unsaved edits
-    // can be executed immediately. We clean up the scratch file afterwards so it
-    // never appears in the scripts list (we filter dotfiles anyway) and keeps
-    // the python/ folder tidy.
-    let dir = crate::paths::python_dir();
-    let _ = fs::create_dir_all(&dir);
-    let tmp = dir.join(".scratch.py");
-    fs::write(&tmp, code)?;
-    let v = crate::sidecar::call(
-        &app,
-        "run_demo",
-        &json!({ "path": tmp.to_string_lossy().to_string() }),
-    )
-    .await?;
-    let _ = fs::remove_file(&tmp);
-    Ok(PythonResult {
-        ok: v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
-        stdout: v
-            .get("stdout")
-            .and_then(|x| x.as_str())
-            .unwrap_or("")
-            .to_string(),
-        stderr: v
-            .get("stderr")
-            .and_then(|x| x.as_str())
-            .unwrap_or("")
-            .to_string(),
-    })
 }
 
 #[tauri::command]

@@ -1,30 +1,17 @@
 """Login helpers: URL shape, stale device id, and human errors.
 
-Run: python3 sidecar/test_pronote_login.py
+Run from sidecar/: python -m unittest discover -s tests -t .
 """
 
 from __future__ import annotations
 
-import importlib.util
 import unittest
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-SIDECAR = ROOT / "src-tauri" / "resources" / "euclide_sidecar.py"
-
-
-def load_sidecar():
-    spec = importlib.util.spec_from_file_location("euclide_sidecar", SIDECAR)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
+from euclide_sidecar import pronote
 
 
 class PronoteLoginHelpers(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.s = load_sidecar()
+    s = pronote
 
     def test_normalize_adds_professeur_page(self):
         n = self.s._normalize_pronote_url

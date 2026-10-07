@@ -77,6 +77,12 @@ export const KEYMAP = {
     group: "actions",
     inFields: true,
   },
+  checkPython: {
+    keys: "mod+shift+enter",
+    label: tr("shortcuts.checkPython"),
+    group: "actions",
+    inFields: true,
+  },
   projection: {
     keys: "mod+shift+P",
     label: tr("appearance.projection"),

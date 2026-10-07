@@ -20,6 +20,8 @@ pub(crate) const UI_SETTINGS: &[&str] = &[
     "teacher_display_name",
     "sidebar",
     "note_view",
+    "python_timeout",
+    "python_output_height",
 ];
 
 fn ui_key(key: &str) -> AppResult<&str> {

@@ -10,7 +10,6 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="$HERE/../src-tauri/resources/euclide_sidecar.py"
 OUT="$HERE/dist"
 VENV="$HERE/.build-venv"
 BUILD_DIR="$HERE/build"
@@ -28,15 +27,7 @@ echo "Installing deps in venv..."
 python -m pip install --disable-pip-version-check --no-input -r "$HERE/requirements.txt" pyinstaller
 
 echo "Running PyInstaller..."
-python -m PyInstaller \
-  --noconfirm \
-  --onedir \
-  --noconsole \
-  --name euclide-sidecar \
-  --distpath "$OUT" \
-  --workpath "$BUILD_DIR" \
-  --specpath "$BUILD_DIR" \
-  "$SCRIPT"
+python "$HERE/build.py"
 
 if [ ! -d "$OUT/euclide-sidecar" ]; then
   echo "ERROR: PyInstaller did not produce the expected onedir bundle at $OUT/euclide-sidecar"
@@ -49,4 +40,4 @@ deactivate || true
 echo ""
 echo "Sidecar construit : $OUT/euclide-sidecar/ (dossier)"
 echo "Copiez le dossier euclide-sidecar a cote de l'executable Euclide (ou dans les ressources) avant la distribution."
-echo "Le binaire est pour la plateforme courante (macOS dans ce cas)."
+echo "Le binaire est pour la plateforme courante."

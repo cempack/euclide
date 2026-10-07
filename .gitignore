@@ -15,6 +15,7 @@ src-tauri/gen/schemas/
 sidecar/build/
 sidecar/dist/
 sidecar/.venv/
+sidecar/.build-venv/
 __pycache__/
 *.pyc
 

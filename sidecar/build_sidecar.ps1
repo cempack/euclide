@@ -5,20 +5,11 @@
 $ErrorActionPreference = "Stop"
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$script = Join-Path $here "..\src-tauri\resources\euclide_sidecar.py"
 $out = Join-Path $here "dist"
 
 python -m pip install --disable-pip-version-check --no-input -r (Join-Path $here "requirements.txt") pyinstaller
 
-python -m PyInstaller `
-  --noconfirm `
-  --onedir `
-  --noconsole `
-  --name euclide-sidecar `
-  --distpath $out `
-  --workpath (Join-Path $here "build") `
-  --specpath (Join-Path $here "build") `
-  $script
+python (Join-Path $here "build.py")
 
 if (-not (Test-Path "$out\euclide-sidecar")) {
   Write-Error "ERROR: PyInstaller did not produce the expected onedir bundle at $out\euclide-sidecar"

@@ -77,6 +77,8 @@ export const q = {
       staleTime: 10 * 60_000,
       retry: 1,
     }),
+  /** The teacher's Python scripts (python/ folder). */
+  scripts: () => queryOptions({ queryKey: ["python", "scripts"], queryFn: () => api.listDemos() }),
   libraryStats: () => queryOptions({ queryKey: ["library", "stats"], queryFn: () => api.libraryStats() }),
   recentFiles: (limit: number) =>
     queryOptions({

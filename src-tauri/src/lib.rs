@@ -14,6 +14,7 @@ mod perf;
 mod portable_update;
 mod protocol;
 mod relaunch;
+mod runner;
 mod secrets;
 mod sidecar;
 
@@ -108,6 +109,9 @@ pub fn run() {
             let sidecar_swapped =
                 portable_update::apply_staged_sidecar(&exe_dir, &version).is_some();
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
+            app.manage(runner::Runner::default());
+            sidecar::start_reaper(app.handle().clone());
+            runner::start_reaper(app.handle().clone());
             jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());
 
@@ -219,8 +223,10 @@ pub fn run() {
             commands::python::delete_python_script,
             commands::python::rename_python_script,
             commands::python::import_python_script,
-            commands::python::run_python_demo,
-            commands::python::run_python_code,
+            runner::python_run,
+            runner::python_input,
+            runner::python_stop,
+            runner::python_prewarm,
             commands::python::python_complete,
             commands::storage::choose_data_dir,
             commands::storage::reset_data_dir,
@@ -273,6 +279,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 // Windows does not end child processes with their parent: a
                 // Python left running would hold the sidecar's files.
+                if let Some(runner) = app_handle.try_state::<runner::Runner>() {
+                    runner.shutdown(std::time::Duration::from_millis(300));
+                }
                 if let Some(sc) = app_handle.try_state::<sidecar::Sidecar>() {
                     sc.shutdown(std::time::Duration::from_millis(500));
                 }

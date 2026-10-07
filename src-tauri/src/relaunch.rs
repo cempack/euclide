@@ -8,6 +8,9 @@ use tauri::{AppHandle, Manager};
 pub async fn relaunch_after_update(app: AppHandle) {
     let handle = app.clone();
     let _ = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(runner) = handle.try_state::<crate::runner::Runner>() {
+            runner.shutdown(Duration::from_millis(500));
+        }
         if let Some(sc) = handle.try_state::<crate::sidecar::Sidecar>() {
             sc.shutdown(Duration::from_secs(1));
         }
