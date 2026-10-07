@@ -856,6 +856,59 @@
   .eu-pdf-thumb-current {
     @apply border-stage-accent hover:border-stage-accent;
   }
+  /* Documents: rows and cards open on click; date headers stay in sight. */
+  .eu-doc-row {
+    @apply cursor-pointer;
+  }
+  /* The keyboard's cursor shows only while the list has the focus. */
+  [role="listbox"]:not(:focus-within) .eu-doc-row[aria-selected="true"] {
+    @apply bg-transparent;
+  }
+  [role="listbox"]:not(:focus-within) .eu-doc-row[aria-selected="true"]:hover {
+    @apply bg-hover;
+  }
+  .eu-doc-group {
+    /* Off-screen sections skip layout and paint (long libraries). */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 480px;
+  }
+  .eu-doc-group-head {
+    @apply sticky top-0 z-1 -mx-1 px-1 py-1 bg-canvas;
+  }
+  .eu-doc-card {
+    @apply flex flex-col min-w-0 rounded-md border border-line bg-panel overflow-hidden cursor-pointer
+      transition-[box-shadow,border-color] duration-fast hover:border-line-strong hover:shadow-raised;
+  }
+  /* A card's tools sit over its preview, shown on hover or focus. */
+  .eu-doc-card-tools {
+    @apply absolute top-1.5 right-1.5 z-1 rounded-md bg-panel shadow-raised opacity-0 transition-opacity duration-fast;
+  }
+  .eu-doc-card:hover .eu-doc-card-tools,
+  .eu-doc-card:focus-within .eu-doc-card-tools {
+    @apply opacity-100;
+  }
+  .eu-doc-card:focus-visible {
+    outline-offset: 2px;
+  }
+  .eu-doc-card-preview {
+    @apply aspect-[4/3] grid place-items-center bg-panel-alt border-b border-line overflow-hidden;
+  }
+  .eu-doc-card-excerpt {
+    @apply self-start w-full h-full m-0 p-3 bg-paper text-paper-ink text-caption leading-relaxed overflow-hidden
+      normal-case;
+    font-family: var(--font-sans);
+  }
+  .eu-filter-count {
+    @apply font-mono text-caption text-ink-faint tabular-nums;
+  }
+  .eu-filter[aria-pressed="true"] .eu-filter-count {
+    @apply text-ink-muted;
+  }
+
+  /* A searched word inside a snippet. */
+  .eu-mark {
+    @apply bg-accent-soft text-ink rounded-xs px-px font-medium;
+  }
   /* A colour to pick: the chosen one is ringed. */
   .eu-swatch {
     @apply w-5 h-5 shrink-0 rounded-full border border-line transition-transform duration-fast hover:scale-110;

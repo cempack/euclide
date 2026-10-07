@@ -312,6 +312,7 @@ pub async fn delete_file(db: State<'_, Db>, id: i64) -> AppResult<()> {
         if let Some(path) = rel.and_then(|r| abs_path(&r).ok()) {
             crate::jobs::backup::trash(&path);
         }
+        crate::thumbs::forget(id);
         Ok(())
     })
     .await

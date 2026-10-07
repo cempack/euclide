@@ -17,6 +17,7 @@ mod relaunch;
 mod runner;
 mod secrets;
 mod sidecar;
+mod thumbs;
 
 use keepawake::KeepAwake;
 use tauri::Manager;
@@ -133,6 +134,14 @@ pub fn run() {
                     portable_update::remove_stale_staging(&exe_dir);
                     db::seed_python_demos();
                     let _ = commands::recap::prune(&db.lock());
+                    // Previews of documents deleted since.
+                    let ids = db.lock().prepare("SELECT id FROM files").and_then(|mut s| {
+                        s.query_map([], |r| r.get::<_, i64>(0))?
+                            .collect::<Result<std::collections::HashSet<_>, _>>()
+                    });
+                    if let Ok(ids) = ids {
+                        thumbs::prune(&ids);
+                    }
                 })?;
 
             let mut marks = vec![
@@ -223,6 +232,8 @@ pub fn run() {
             commands::python::delete_python_script,
             commands::python::rename_python_script,
             commands::python::import_python_script,
+            thumbs::missing_thumbnails,
+            thumbs::save_thumbnail,
             runner::python_run,
             runner::python_input,
             runner::python_stop,

@@ -122,11 +122,11 @@ pub fn create_from_bytes(
     register(conn, course_id, &dest)
 }
 
-fn header<'a>(request: &'a Request<'_>, name: &str) -> Option<&'a str> {
+pub(crate) fn header<'a>(request: &'a Request<'_>, name: &str) -> Option<&'a str> {
     request.headers().get(name).and_then(|v| v.to_str().ok())
 }
 
-fn raw_body(request: &Request<'_>) -> AppResult<Vec<u8>> {
+pub(crate) fn raw_body(request: &Request<'_>) -> AppResult<Vec<u8>> {
     match request.body() {
         InvokeBody::Raw(bytes) => Ok(bytes.clone()),
         _ => Err(AppError::user("Contenu de fichier invalide.")),
