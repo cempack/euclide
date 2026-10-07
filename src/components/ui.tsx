@@ -86,7 +86,14 @@ export class ErrorBoundary extends Component<
             }}
           >
             <div style={{ maxWidth: 520, width: "100%" }}>
-              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "var(--color-stage-danger, #f58a96)" }}>
+              <div
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  marginBottom: 8,
+                  color: "var(--color-stage-danger, #f58a96)",
+                }}
+              >
                 Euclide — erreur d’affichage
               </div>
               <div style={{ opacity: 0.85, marginBottom: 12, lineHeight: 1.45 }}>
