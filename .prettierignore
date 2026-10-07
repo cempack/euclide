@@ -1,0 +1,10 @@
+node_modules/
+dist/
+public/pdfjs/
+src-tauri/
+sidecar/
+.delta/
+.shots/
+test-results/
+playwright-report/
+package-lock.json

@@ -117,7 +117,7 @@ export type SiteBadge = { initials: string; fg: string; bg: string; host: string
  * works with no network. Initials come from the registrable-ish domain label.
  */
 export function domainBadge(url: string, dark: boolean): SiteBadge {
-  let host = "";
+  let host: string;
   try {
     host = new URL(url.startsWith("http") ? url : `https://${url}`).hostname;
   } catch {

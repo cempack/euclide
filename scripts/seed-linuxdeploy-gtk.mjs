@@ -36,7 +36,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE="\${WEBKIT_DISABLE_COMPOSITING_MODE:-1}"`
 const WAYLAND_SNIPPET = `
 # ${WAYLAND_MARKER}: libwayland must come from the host so it matches Mesa/EGL.
 if [ -n "\${APPDIR:-}" ]; then
-  find "\$APPDIR" -name 'libwayland-*.so*' -delete 2>/dev/null || true
+  find "$APPDIR" -name 'libwayland-*.so*' -delete 2>/dev/null || true
 fi
 `;
 

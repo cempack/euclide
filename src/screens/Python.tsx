@@ -8,7 +8,7 @@ import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { MOD, isMac } from "../lib/shortcuts";
 import { CodeIcon, PlayIcon, PlusIcon, TrashIcon } from "../components/icons";
 
-const STARTER_CODE = (t.tools?.starterCode as string) || `# Nouveau script Python\n# Tout ce qui est affiché avec print() apparaîtra ci-dessous.\n\nprint(\"Bonjour la classe !\")\n\nfor i in range(1, 6):\n    print(i, \"x 7 =\", i * 7)\n`;
+const STARTER_CODE = (t.tools?.starterCode as string) || `# Nouveau script Python\n# Tout ce qui est affiché avec print() apparaîtra ci-dessous.\n\nprint("Bonjour la classe !")\n\nfor i in range(1, 6):\n    print(i, "x 7 =", i * 7)\n`;
 
 export default function Python() {
   const toast = useToast();
