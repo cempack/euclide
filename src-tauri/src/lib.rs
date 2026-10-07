@@ -88,18 +88,12 @@ pub fn run() {
             boot::create_main_window(app, &boot_state)?;
             let window_ms = perf::uptime_ms();
 
+            // Applied by keepawake::spawn_auto once the state is managed:
+            // « during classes » by default, the timetable says when.
             let keep_awake = KeepAwake::default();
-            {
-                // On by default: a projected lesson must not lock the screen.
-                let conn = db.lock();
-                let saved = commands::get_setting_raw(&conn, "keep_awake");
-                if saved.is_none() {
-                    commands::set_setting_raw(&conn, "keep_awake", "1");
-                }
-                keepawake::set(&keep_awake, saved.as_deref() != Some("0"));
-            }
             app.manage(db.clone());
             app.manage(keep_awake);
+            keepawake::spawn_auto(app.handle().clone());
             app.manage(jobs::indexer::Indexer::default());
             app.manage(commands::pronote::PronoteLane::default());
             app.manage(jobs::backup::Health::default());
@@ -248,6 +242,7 @@ pub fn run() {
             commands::storage::clear_backup_folder,
             commands::storage::restore_snapshot,
             commands::settings::set_keep_awake,
+            commands::settings::set_keep_awake_mode,
             commands::settings::keep_awake_status,
             commands::settings::get_setting,
             commands::settings::set_setting,

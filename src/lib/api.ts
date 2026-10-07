@@ -501,6 +501,8 @@ export const api = {
 
   // Keep awake
   setKeepAwake: (on: boolean) => invoke<boolean>("set_keep_awake", { on }),
+  /** « auto » (during classes), « on » or « off »; returns whether it is on now. */
+  setKeepAwakeMode: (mode: "auto" | "on" | "off") => invoke<boolean>("set_keep_awake_mode", { mode }),
   keepAwakeStatus: () => invoke<boolean>("keep_awake_status"),
 
   // Pronote

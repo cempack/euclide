@@ -10,10 +10,12 @@ import { create } from "zustand";
 type TimerState = {
   /** Seconds left; 0 once it ran out; null when no timer is set. */
   sec: number | null;
+  /** The whole duration, for a progress ring; grows with « +1 min ». */
+  total: number | null;
   running: boolean;
 };
 
-const useTimerStore = create<TimerState>()(() => ({ sec: null, running: false }));
+const useTimerStore = create<TimerState>()(() => ({ sec: null, total: null, running: false }));
 const state = useTimerStore.getState;
 const setState = useTimerStore.setState;
 
@@ -53,7 +55,15 @@ if (typeof document !== "undefined") {
 
 export const timer = {
   start(minutes: number) {
-    run(Math.max(1, Math.round(minutes * 60)));
+    const sec = Math.max(1, Math.round(minutes * 60));
+    setState({ total: sec });
+    run(sec);
+  },
+
+  /** The same duration again, from the start. */
+  restart() {
+    const total = state().total;
+    if (total) run(total);
   },
 
   /** Pause or resume; once it has run out, put it away. */
@@ -70,12 +80,14 @@ export const timer = {
     const { sec, running } = state();
     if (sec == null) return;
     const left = running ? Math.max(0, (deadline - Date.now()) / 1000) : Math.max(0, sec);
-    run(Math.round(left + minutes * 60));
+    const next = Math.max(1, Math.round(left + minutes * 60));
+    setState({ total: Math.max(next, (state().total ?? 0) + minutes * 60) });
+    run(next);
   },
 
   stop() {
     halt();
-    setState({ sec: null, running: false });
+    setState({ sec: null, total: null, running: false });
   },
 };
 
@@ -87,6 +99,7 @@ export function onTimerDone(listener: () => void): () => void {
 
 export const useTimerSec = () => useTimerStore((s) => s.sec);
 export const useTimerRunning = () => useTimerStore((s) => s.running);
+export const useTimerTotal = () => useTimerStore((s) => s.total);
 
 export function formatTimer(sec: number) {
   const m = Math.floor(Math.max(0, sec) / 60);

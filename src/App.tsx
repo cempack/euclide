@@ -23,6 +23,7 @@ import { TimerStage } from "./shell/Timer";
 import { useExitGuard } from "./shell/exitGuard";
 import { useImportFiles } from "./shell/useImportFiles";
 import { useShortcut } from "./lib/keymap";
+import { scene, useSceneOpen } from "./stores/scene";
 import { TooltipLayer } from "./ui/Tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { q } from "./api/queries";
@@ -62,6 +63,7 @@ const PdfViewer = lazy(screenModules.pdf);
 const NoteEditor = lazy(screenModules.note);
 const CommandPalette = lazy(screenModules.palette);
 const ShortcutsHelp = lazy(screenModules.shortcuts);
+const ClassroomScene = lazy(() => import("./features/classroom/ClassroomScene"));
 
 /** Load every screen in the background, one at a time, once the app is idle. */
 function prefetchScreens() {
@@ -586,6 +588,8 @@ function Shell() {
   useShortcut("palette", () => setPalette((p) => !p));
   useShortcut("capture", () => setCaptureOpen((c) => !c));
   useShortcut("help", () => setHelp((h) => !h));
+  const sceneOpen = useSceneOpen();
+  useShortcut("scene", scene.open);
   // F5 presents a note (NoteEditor binds it); anywhere else it does nothing,
   // rather than reload the window and lose what is not saved.
   useShortcut("present", () => {});
@@ -651,6 +655,11 @@ function Shell() {
       {helpUsed && (
         <Suspense fallback={null}>
           <ShortcutsHelp open={help} onClose={closeHelp} />
+        </Suspense>
+      )}
+      {sceneOpen && (
+        <Suspense fallback={null}>
+          <ClassroomScene onClose={scene.close} />
         </Suspense>
       )}
       <UpdateAvailablePopup update={availableUpdate} onDismiss={dismissUpdate} />

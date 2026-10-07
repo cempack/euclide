@@ -1,15 +1,20 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type QuickLink } from "../lib/api";
 import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
-import { logged, reportError } from "../lib/report";
+import { reportError } from "../lib/report";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
-import { Field, Panel, Section, PageHeader, MetaDot } from "../components/layout";
+import { Field, Panel, Section, PageHeader, MetaDot, Segmented } from "../components/layout";
+import { useSetting } from "../api/hooks";
 import { useAppearance } from "../lib/theme";
 import { tabs } from "../stores/tabs";
 import { timer } from "../stores/timer";
+import { scene } from "../stores/scene";
+import { keysOf } from "../lib/keymap";
+import { tip } from "../ui/Tooltip";
+import { Maximize2 as MaximizeIcon } from "lucide-react";
 import {
   CoffeeIcon,
   CodeIcon,
@@ -47,18 +52,16 @@ export default function Tools() {
 function ClassroomSection() {
   const toast = useToast();
   const { projection, toggleProjection } = useAppearance();
-  const [on, setOn] = useState(true); // default on (matches backend startup default)
+  const queryClient = useQueryClient();
+  const on = useQuery(q.keepAwake()).data ?? false;
+  const [savedMode] = useSetting("keep_awake_mode");
+  const mode = savedMode === "on" || savedMode === "off" ? savedMode : "auto";
 
-  useEffect(() => {
-    api.keepAwakeStatus().then(setOn).catch(logged("tools.keepAwakeStatus"));
-  }, []);
-
-  const toggle = async () => {
+  const choose = async (next: "auto" | "on" | "off") => {
     try {
-      const next = await api.setKeepAwake(!on);
-      setOn(next);
-      window.dispatchEvent(new CustomEvent("eu:keepawake-changed"));
-      toast(next ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"), next ? "success" : "info");
+      const nowOn = await api.setKeepAwakeMode(next);
+      queryClient.setQueryData(q.setting("keep_awake_mode").queryKey, next);
+      queryClient.setQueryData(q.keepAwake().queryKey, nowOn);
     } catch (err) {
       reportError("tools.keepAwake", err);
       toast(errorMessage(err, tr("messages.genericError")), "error");
@@ -75,25 +78,19 @@ function ClassroomSection() {
             </span>
             <div className="min-w-0">
               <p className="eu-t-body font-medium text-ink">{tr("tools.keepAwake")}</p>
-              <p className="eu-t-meta">{on ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff")}</p>
+              <p className="eu-t-meta">{on ? tr("tools.keepAwakeNowOn") : tr("tools.keepAwakeNowOff")}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={toggle}
-            role="switch"
-            aria-checked={on}
-            aria-label={tr("tools.keepAwake")}
-            className={`relative w-10 h-6 shrink-0 rounded-full border transition-colors duration-fast ${
-              on ? "bg-ok-solid border-ok-solid" : "bg-panel-alt border-line"
-            }`}
-          >
-            <span
-              className={`absolute top-[3px] w-4 h-4 rounded-full bg-panel shadow-pop transition-all duration-fast ${
-                on ? "left-[19px]" : "left-[3px]"
-              }`}
-            />
-          </button>
+          <Segmented
+            value={mode}
+            onChange={(v) => void choose(v)}
+            label={tr("tools.keepAwake")}
+            options={[
+              { value: "auto", label: tr("tools.keepAwakeAuto"), title: tr("tools.keepAwakeAutoHint") },
+              { value: "on", label: tr("tools.keepAwakeAlways") },
+              { value: "off", label: tr("tools.keepAwakeNever") },
+            ]}
+          />
         </div>
 
         <div className="eu-row justify-between border-t border-line">
@@ -155,7 +152,20 @@ function TimerSection() {
   const customMinutes = Math.max(1, Math.min(180, parseInt(custom, 10) || 0));
 
   return (
-    <Section title={tr("tools.timerTitle")}>
+    <Section
+      title={tr("tools.timerTitle")}
+      action={
+        <button
+          type="button"
+          onClick={scene.open}
+          className="eu-btn-ghost eu-btn-sm"
+          {...tip(tr("scene.open"), keysOf("scene"))}
+        >
+          <MaximizeIcon className="w-3.5 h-3.5" />
+          {tr("scene.fullscreen")}
+        </button>
+      }
+    >
       <Panel pad>
         <p className="eu-t-body text-ink-muted mb-3.5 max-w-[62ch]">{tr("tools.timerHint")}</p>
         <div className="flex items-end gap-4 flex-wrap">
