@@ -57,6 +57,16 @@ impl Db {
     }
 
     /// The writer, for setup code and commands not yet converted to `read`/`write`.
+    /// On quit: refresh the query planner's statistics and fold the WAL back
+    /// into euclide.db, so the file on the USB key is complete by itself.
+    /// Quitting does not always close the connections, which would do it.
+    pub fn close(&self) {
+        let conn = self.lock();
+        // A job may still be reading: wait a little, not the usual 5 s.
+        let _ = conn.busy_timeout(Duration::from_millis(300));
+        let _ = conn.execute_batch("PRAGMA optimize; PRAGMA wal_checkpoint(TRUNCATE);");
+    }
+
     pub fn lock(&self) -> MutexGuard<'_, Connection> {
         lock(&self.0.writer)
     }

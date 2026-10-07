@@ -52,3 +52,13 @@ strip = true
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-updater = "2.11.0"
+
+[lints.clippy]
+# App code reports errors (see error.rs) instead of panicking; tests may unwrap
+# (clippy.toml).
+unwrap_used = "warn"
+
+# Dependencies optimized in dev builds too: debugging stays on our crate, but
+# SQLite, image and zip code run at a realistic speed.
+[profile.dev.package."*"]
+opt-level = 2
