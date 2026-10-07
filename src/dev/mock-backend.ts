@@ -773,14 +773,15 @@ function handle(cmd: string, args: Args): unknown {
 
     // Files
     case "list_files": {
-      const id = num(args, "courseId");
-      return files.filter((f) => id == null || f.course_id === id);
+      // Like the backend: no course id means the library, the files of no course.
+      const id = num(args, "courseId") ?? null;
+      return files.filter((f) => (f.course_id ?? null) === id);
     }
     case "library_stats":
       return {
-        files: files.length,
+        files: files.filter((f) => f.course_id == null).length,
         notes: notes.length,
-        bytes: files.reduce((n, f) => n + (f.size || 0), 0),
+        bytes: files.filter((f) => f.course_id == null).reduce((n, f) => n + (f.size || 0), 0),
       };
     case "recent_files":
       return files

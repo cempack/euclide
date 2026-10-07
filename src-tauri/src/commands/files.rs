@@ -123,8 +123,10 @@ pub async fn recent_files(db: State<'_, Db>, limit: i64) -> AppResult<Vec<FileIt
 }
 
 pub(crate) fn library_stats_of(conn: &Connection) -> AppResult<LibraryStats> {
+    // The library is the files of no course: attaching a document to a
+    // course copies it there, so counting those too would count it twice.
     let (files, bytes) = conn.query_row(
-        "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files",
+        "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files WHERE course_id IS NULL",
         [],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
@@ -383,7 +385,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn library_stats_count_every_file_and_note() {
+    fn library_stats_count_the_library_and_every_note() {
         let conn = crate::db::migrations_for_tests();
         assert_eq!(
             library_stats_of(&conn).unwrap(),
@@ -403,9 +405,9 @@ mod tests {
         assert_eq!(
             library_stats_of(&conn).unwrap(),
             LibraryStats {
-                files: 2,
+                files: 1,
                 notes: 1,
-                bytes: 150
+                bytes: 100
             }
         );
     }
