@@ -2,19 +2,17 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { tabs } from "../stores/tabs";
 import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
-import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
+import { api, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
 import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
-import { reportError } from "../lib/report";
+import { logged, reportError } from "../lib/report";
 import {
-  classProgress,
   focusClass,
   formatDueLabel,
   getClassStatus,
   humanMinutes,
   longDate,
-  minutesRemaining,
   minutesUntil,
   relativeTime,
   greeting,
@@ -22,7 +20,7 @@ import {
 } from "../lib/format";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import { COURSE_ICONS, EmptyState, useToast, useConfirm } from "../components/ui";
+import { EmptyState, useToast, useConfirm } from "../components/ui";
 import { MetaDot, PageHeader, Panel, StatStrip, StatTile } from "../components/layout";
 import {
   BellIcon,
@@ -32,17 +30,17 @@ import {
   ClockIcon,
   DescriptionIcon,
   FileKindIcon,
-  LayersIcon,
   LinkIcon,
   NoteIcon,
   PenIcon,
-  PlayIcon,
   PlusIcon,
   TrashIcon,
 } from "../components/icons";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
+import { NowCard, type NowCardActions } from "../features/classroom/NowCard";
+import { placeEntry, stepAfter, teachingOrder } from "../features/classroom/lesson";
 
 /** One empty list for every query still loading: stable, so memos hold. */
 const NONE: never[] = [];
@@ -81,6 +79,8 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
   const pronoteQ = useQuery({ ...q.pronoteStatus(), ...live });
   const recapQ = useQuery({ ...q.recap("today"), ...live });
   const faviconsQ = useQuery({ ...q.setting("remote_favicons"), ...live });
+  const allClassesQ = useQuery({ ...q.allCourseClasses(), ...live });
+  const allClasses = allClassesQ.data ?? NONE;
   const classes = classesQ.data ?? NONE;
   const reminders = remindersQ.data ?? NONE;
   const courses = coursesQ.data ?? NONE;
@@ -151,73 +151,96 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
   // ---- opening things ------------------------------------------------------
 
-  /** Best-effort match between a schedule entry and a course of the library. */
-  const courseForEntry = useCallback(
-    (entry: ScheduleEntry): Course | undefined => {
-      const sub = (entry.subject || "").toLowerCase();
-      if (typeof entry.course_id === "number") {
-        const byId = courses.find((c) => c.id === entry.course_id);
-        if (byId) return byId;
-      }
-      return (
-        courses.find((c) => sub.includes(c.name.toLowerCase())) ||
-        courses.find((c) => c.matiere && sub.includes(c.matiere.toLowerCase().slice(0, 8)))
-      );
-    },
-    [courses],
+  /** The course and class a timetable entry is about (lesson.ts). */
+  const place = useCallback(
+    (entry: ScheduleEntry) => placeEntry(entry, courses, allClasses),
+    [courses, allClasses],
   );
 
   const openFromSchedule = useCallback(
-    async (entry: ScheduleEntry) => {
-      const course = courseForEntry(entry);
-      if (!course) {
+    (entry: ScheduleEntry) => {
+      const placed = place(entry);
+      if (!placed) {
         tabs.open({ kind: "courses" });
-        return;
+      } else if (placed.courseClass) {
+        tabs.open({
+          kind: "class-content",
+          title: placed.courseClass.class_name,
+          params: {
+            courseId: placed.course.id,
+            className: placed.courseClass.class_name,
+            matiere: placed.course.matiere,
+          },
+        });
+      } else {
+        tabs.open({ kind: "course", title: placed.course.name, params: { courseId: placed.course.id } });
       }
-      try {
-        const attached = await api.listCourseClasses(course.id);
-        const hit = attached.find(
-          (cc) =>
-            (entry.subject || "").toLowerCase().includes(cc.class_name.toLowerCase()) ||
-            (entry.subject || "").includes(cc.class_name),
-        );
-        if (hit) {
-          tabs.open({
-            kind: "class-content",
-            title: hit.class_name,
-            params: { courseId: course.id, className: hit.class_name, matiere: course.matiere },
-          });
-          return;
-        }
-      } catch (err) {
-        // fall through to the course page
-        reportError("dashboard.courseClasses", err);
-      }
-      tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } });
     },
-    [courseForEntry],
+    [place],
   );
 
   // ---- « maintenant » -------------------------------------------------------
 
   const focus = useMemo(() => focusClass(classes, nowTick), [classes, nowTick]);
-  const focusCourse = focus ? courseForEntry(focus.entry) : undefined;
-  // Per-class progress for the class in front of us: this is the data that
-  // powers « Reprendre ».
-  const focusClassesQ = useQuery({
-    ...q.courseClasses(focusCourse?.id ?? -1),
+  const focusPlace = focus ? place(focus.entry) : undefined;
+  const focusCourse = focusPlace?.course;
+  // The lesson of the class in front of us: its course's progression.
+  const progressionQ = useQuery({
+    ...q.progression(focusCourse?.id ?? -1),
     enabled: focusCourse != null,
     ...live,
   });
-  const focusClasses = focusCourse ? (focusClassesQ.data ?? NONE) : NONE;
+  const sequences = progressionQ.data?.sequences ?? NONE;
+  const steps = useMemo(
+    () => teachingOrder(progressionQ.data?.sequences ?? NONE, progressionQ.data?.items ?? NONE),
+    [progressionQ.data],
+  );
 
-  const focusClassRow = useMemo(() => {
-    if (!focus) return undefined;
-    const subject = (focus.entry.subject || "").toLowerCase();
-    return focusClasses.find(
-      (cc) => subject.includes(cc.class_name.toLowerCase()) || focus.entry.subject.includes(cc.class_name),
-    );
-  }, [focus, focusClasses]);
+  const refreshClasses = () => queryClient.invalidateQueries({ queryKey: ["courses"] });
+  const nowActions: NowCardActions = {
+    openContent: () => focus && openFromSchedule(focus.entry),
+    openBoard: () =>
+      tabs.open({
+        kind: "whiteboard",
+        title: tr("app.tabWhiteboard"),
+        params: { isNew: true, courseId: focusCourse?.id },
+      }),
+    openCourse: (course) =>
+      tabs.open({ kind: "course", title: course.name, params: { courseId: course.id } }),
+    attachClass: (course, className) =>
+      void api
+        .attachClassToCourse(course.id, className)
+        .then(() => refreshClasses())
+        .then(() => toast(tr("lesson.attached", { name: className, course: course.name }), "success"))
+        .catch((err) => {
+          reportError("dashboard.attachClass", err);
+          toast(errorMessage(err, tr("messages.genericError")), "error");
+        }),
+    markDone: (course, cc, step) => {
+      const next = stepAfter(steps, step.id);
+      if (!next) {
+        toast(tr("lesson.lastStep", { name: cc.class_name }), "info");
+        return;
+      }
+      const back = cc.last_item_id;
+      const move = (itemId: number | null) =>
+        api.setCourseClassItem(course.id, cc.class_name, itemId).then(() => refreshClasses());
+      move(next.id)
+        .then(() =>
+          toast(tr("lesson.advanced", { name: cc.class_name, step: next.title }), "success", {
+            action: {
+              label: tr("common.undo"),
+              run: () => void move(back).catch(logged("dashboard.undoDone")),
+            },
+          }),
+        )
+        .catch((err) => {
+          reportError("dashboard.markDone", err);
+          toast(errorMessage(err, tr("messages.genericError")), "error");
+        });
+    },
+    resumeFile: openFile,
+  };
 
   return (
     <>
@@ -286,17 +309,12 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           state={focus.state}
           now={nowTick}
           course={focusCourse}
-          courseClass={focusClassRow}
+          courseClass={focusPlace?.courseClass}
+          courses={courses}
+          sequences={sequences}
+          steps={steps}
           dark={resolved === "dark"}
-          onOpenContent={() => void openFromSchedule(focus.entry)}
-          onResume={openFile}
-          onOpenBoard={() =>
-            tabs.open({
-              kind: "whiteboard",
-              title: tr("app.tabWhiteboard"),
-              params: { isNew: true, courseId: focusCourse?.id },
-            })
-          }
+          actions={nowActions}
         />
       )}
 
@@ -530,124 +548,6 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         />
       </StatStrip>
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// « Maintenant » — the class in progress (or the next one), and the two actions
-// that matter at that moment: resume the document, open the cahier de textes.
-// ---------------------------------------------------------------------------
-
-function NowCard({
-  entry,
-  state,
-  now,
-  course,
-  courseClass,
-  dark,
-  onOpenContent,
-  onResume,
-  onOpenBoard,
-}: {
-  entry: ScheduleEntry;
-  state: "current" | "next";
-  now: Date;
-  course?: Course;
-  courseClass?: CourseClass;
-  dark: boolean;
-  onOpenContent: () => void;
-  onResume: (f: { id: number; name: string; kind: string; course_id?: number | null }) => void;
-  onOpenBoard: () => void;
-}) {
-  const visual = courseVisual(course?.color, dark);
-  const remaining = state === "current" ? minutesRemaining(entry, now) : null;
-  const until = state === "next" ? minutesUntil(entry.start_time, now) : null;
-  const progress = state === "current" ? classProgress(entry, now) : 0;
-  const resumeFile =
-    courseClass?.last_file_id != null
-      ? {
-          id: courseClass.last_file_id,
-          name: courseClass.last_file_name || tr("common.document"),
-          kind: courseClass.last_file_kind || "file",
-          course_id: course?.id ?? null,
-        }
-      : null;
-  const Icon = COURSE_ICONS.find((i) => i.key === (course?.emoji || "book"))?.Icon ?? BookIcon;
-
-  return (
-    <section className="eu-panel flex overflow-hidden">
-      <span aria-hidden className="w-1 shrink-0" style={{ background: visual.fg }} />
-      <div className="flex-1 min-w-0 p-[18px]">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <span className="eu-t-label">
-            {state === "current" ? tr("dashboard.nowLabel") : tr("dashboard.nextLabel")}
-          </span>
-          <span className={state === "current" ? "eu-chip-warn" : "eu-chip"}>
-            {entry.start_time}–{entry.end_time}
-          </span>
-          {state === "current" && remaining != null && (
-            <span className="eu-t-caption text-warn">
-              {tr("status.remaining", { time: humanMinutes(remaining) })}
-            </span>
-          )}
-          {state === "next" && until != null && (
-            <span className="eu-t-caption">{tr("status.inTime", { time: humanMinutes(until) })}</span>
-          )}
-        </div>
-
-        <h2 className="mt-2 flex items-center gap-2.5 min-w-0">
-          <span
-            className="w-7 h-7 shrink-0 grid place-items-center rounded border"
-            style={{ background: visual.tint, borderColor: visual.border, color: visual.fg }}
-          >
-            <Icon className="w-4 h-4" strokeWidth={1.8} />
-          </span>
-          <span className="text-[1.25rem] font-semibold tracking-[-0.018em] text-ink truncate">
-            {entry.subject}
-          </span>
-          {entry.room && <span className="eu-chip shrink-0">{entry.room}</span>}
-        </h2>
-
-        {state === "current" && (
-          <div className="eu-gauge mt-3.5">
-            <i style={{ width: `${progress}%`, background: visual.fg }} />
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 flex-wrap mt-3.5">
-          {resumeFile ? (
-            <button className="eu-btn-primary eu-btn-sm" onClick={() => onResume(resumeFile)}>
-              <PlayIcon className="w-3.5 h-3.5" />
-              <span className="truncate max-w-[26ch]">
-                {tr("dashboard.resumeFile", { name: resumeFile.name })}
-              </span>
-            </button>
-          ) : (
-            course && (
-              <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenContent}>
-                <LayersIcon className="w-3.5 h-3.5" />
-                {tr("dashboard.setProgress")}
-              </button>
-            )
-          )}
-          <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenContent}>
-            <BookIcon className="w-3.5 h-3.5" />
-            {course ? tr("dashboard.openContent") : tr("dashboard.linkCourse")}
-          </button>
-          <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenBoard}>
-            <PenIcon className="w-3.5 h-3.5" />
-            {tr("nav.whiteboard")}
-          </button>
-          {courseClass?.last_item_title && (
-            <span className="eu-t-meta ml-auto truncate max-w-[34ch]">
-              {courseClass.last_sequence_title
-                ? `${courseClass.last_sequence_title} — ${courseClass.last_item_title}`
-                : courseClass.last_item_title}
-            </span>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 

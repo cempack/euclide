@@ -174,7 +174,13 @@ function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; vis
     case "tools":
       return <Tools />;
     case "python":
-      return <Python />;
+      return (
+        <Python
+          request={
+            tab.params.script ? { script: tab.params.script, at: tab.params.scriptAt ?? 0 } : undefined
+          }
+        />
+      );
     case "settings":
       return <Settings info={info} />;
     case "reminders":

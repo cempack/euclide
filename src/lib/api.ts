@@ -242,15 +242,30 @@ export interface Sequence {
   created_at: string;
 }
 
-/** A step inside a sequence, optionally bound to a document of the locker. */
+/** A step inside a sequence (a lesson), with what it needs in class. */
 export interface SequenceItem {
   id: number;
   sequence_id: number;
   title: string;
   position: number;
-  file_id: number | null;
-  file_name: string | null;
+  resources: StepResource[];
+}
+
+export type ResourceKind = "file" | "note" | "script" | "link";
+
+/** Something a step opens: a document, a note, a Python script or a link. */
+export interface StepResource {
+  id: number;
+  item_id: number;
+  kind: ResourceKind;
+  /** The file, note or link id; null for a script. */
+  ref_id: number | null;
+  /** A script's file name (« tri.py »). */
+  ref_name: string;
+  name: string;
+  /** The document's kind (pdf, image, board…), for its icon. */
   file_kind: string | null;
+  url: string | null;
 }
 
 export interface Reminder {
@@ -360,6 +375,8 @@ export const api = {
   // Course classes: casier is the course's files; per attached class (exact Pronote name) we track progress + prof notes
   listCourseClasses: (courseId: number) =>
     invoke<CourseClass[]>("list_course_classes", { courseId }).then(asList<CourseClass>),
+  /** Every class of every course: how a timetable entry finds its course. */
+  listAllCourseClasses: () => invoke<CourseClass[]>("list_all_course_classes").then(asList<CourseClass>),
   attachClassToCourse: (courseId: number, className: string) =>
     invoke<CourseClass>("attach_class_to_course", { courseId, className }),
   detachCourseClass: (id: number) => invoke<void>("detach_course_class", { id }),
@@ -381,8 +398,17 @@ export const api = {
     invoke<void>("move_sequence", { courseId, id, delta }),
   createSequenceItem: (sequenceId: number, title: string, fileId: number | null) =>
     invoke<SequenceItem>("create_sequence_item", { sequenceId, title, fileId }),
-  updateSequenceItem: (id: number, title: string, fileId: number | null) =>
-    invoke<void>("update_sequence_item", { id, title, fileId }),
+  renameSequenceItem: (id: number, title: string) => invoke<void>("rename_sequence_item", { id, title }),
+  addStepResource: (itemId: number, kind: ResourceKind, ref: { id?: number; name?: string }) =>
+    invoke<StepResource>("add_step_resource", {
+      itemId,
+      kind,
+      refId: ref.id ?? null,
+      refName: ref.name ?? null,
+    }),
+  removeStepResource: (id: number) => invoke<void>("remove_step_resource", { id }),
+  moveStepResource: (itemId: number, id: number, delta: number) =>
+    invoke<void>("move_step_resource", { itemId, id, delta }),
   deleteSequenceItem: (id: number) => invoke<void>("delete_sequence_item", { id }),
   moveSequenceItem: (sequenceId: number, id: number, delta: number) =>
     invoke<void>("move_sequence_item", { sequenceId, id, delta }),

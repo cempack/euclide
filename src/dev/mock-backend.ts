@@ -26,6 +26,7 @@ import type {
   SearchResult,
   Sequence,
   SequenceItem,
+  StepResource,
 } from "../lib/api";
 
 type Args = Record<string, unknown> | undefined;
@@ -204,90 +205,36 @@ const files: FileItem[] = [
   },
 ];
 
-const sequenceItems: SequenceItem[] = [
-  {
-    id: 1,
-    sequence_id: 1,
-    title: "Fonction carré",
-    position: 0,
-    file_id: 2,
-    file_name: null,
-    file_kind: null,
-  },
-  {
-    id: 2,
-    sequence_id: 1,
-    title: "Fonction inverse",
-    position: 1,
-    file_id: 1,
-    file_name: null,
-    file_kind: null,
-  },
-  {
-    id: 3,
-    sequence_id: 1,
-    title: "Variations et extremums",
-    position: 2,
-    file_id: null,
-    file_name: null,
-    file_kind: null,
-  },
-  {
-    id: 4,
-    sequence_id: 2,
-    title: "Moyenne et médiane",
-    position: 0,
-    file_id: null,
-    file_name: null,
-    file_kind: null,
-  },
-  {
-    id: 5,
-    sequence_id: 2,
-    title: "Écart interquartile",
-    position: 1,
-    file_id: null,
-    file_name: null,
-    file_kind: null,
-  },
-  { id: 6, sequence_id: 3, title: "Translations", position: 0, file_id: 6, file_name: null, file_kind: null },
-  {
-    id: 7,
-    sequence_id: 4,
-    title: "Piles et files",
-    position: 0,
-    file_id: 3,
-    file_name: null,
-    file_kind: null,
-  },
-  {
-    id: 8,
-    sequence_id: 4,
-    title: "Arbres binaires",
-    position: 1,
-    file_id: 4,
-    file_name: null,
-    file_kind: null,
-  },
-  { id: 9, sequence_id: 4, title: "Graphes", position: 2, file_id: null, file_name: null, file_kind: null },
-  {
-    id: 10,
-    sequence_id: 5,
-    title: "Modèle relationnel",
-    position: 0,
-    file_id: null,
-    file_name: null,
-    file_kind: null,
-  },
-  {
-    id: 11,
-    sequence_id: 6,
-    title: "Divisibilité et congruences",
-    position: 0,
-    file_id: 7,
-    file_name: null,
-    file_kind: null,
-  },
+const sequenceItems: Omit<SequenceItem, "resources">[] = [
+  { id: 1, sequence_id: 1, title: "Fonction carré", position: 0 },
+  { id: 2, sequence_id: 1, title: "Fonction inverse", position: 1 },
+  { id: 3, sequence_id: 1, title: "Variations et extremums", position: 2 },
+  { id: 4, sequence_id: 2, title: "Moyenne et médiane", position: 0 },
+  { id: 5, sequence_id: 2, title: "Écart interquartile", position: 1 },
+  { id: 6, sequence_id: 3, title: "Translations", position: 0 },
+  { id: 7, sequence_id: 4, title: "Piles et files", position: 0 },
+  { id: 8, sequence_id: 4, title: "Arbres binaires", position: 1 },
+  { id: 9, sequence_id: 4, title: "Graphes", position: 2 },
+  { id: 10, sequence_id: 5, title: "Modèle relationnel", position: 0 },
+  { id: 11, sequence_id: 6, title: "Divisibilité et congruences", position: 0 },
+];
+
+/** What each step opens in class (sequence_item_resources). */
+type MockResource = Pick<StepResource, "id" | "item_id" | "kind" | "ref_id" | "ref_name"> & {
+  position: number;
+};
+const stepResources: MockResource[] = [
+  { id: 1, item_id: 1, kind: "note", ref_id: 1, ref_name: "", position: 0 },
+  { id: 2, item_id: 1, kind: "file", ref_id: 2, ref_name: "", position: 1 },
+  { id: 3, item_id: 1, kind: "link", ref_id: 4, ref_name: "", position: 2 },
+  { id: 4, item_id: 2, kind: "file", ref_id: 1, ref_name: "", position: 0 },
+  { id: 5, item_id: 3, kind: "file", ref_id: 2, ref_name: "", position: 0 },
+  { id: 6, item_id: 6, kind: "file", ref_id: 6, ref_name: "", position: 0 },
+  { id: 7, item_id: 7, kind: "file", ref_id: 3, ref_name: "", position: 0 },
+  { id: 8, item_id: 7, kind: "script", ref_id: null, ref_name: "Pile.py", position: 1 },
+  { id: 9, item_id: 8, kind: "file", ref_id: 4, ref_name: "", position: 0 },
+  { id: 10, item_id: 11, kind: "file", ref_id: 7, ref_name: "", position: 0 },
+  { id: 11, item_id: 11, kind: "note", ref_id: 4, ref_name: "", position: 1 },
 ];
 
 const courseClasses: CourseClass[] = [
@@ -507,6 +454,7 @@ if (empty) {
     sequences,
     files,
     sequenceItems,
+    stepResources,
     courseClasses,
     notes,
     reminders,
@@ -531,9 +479,38 @@ const num = (args: Args, key: string): number | null => {
 };
 const str = (args: Args, key: string): string => String(args?.[key] ?? "");
 
-function withFile(item: SequenceItem): SequenceItem {
-  const f = files.find((x) => x.id === item.file_id);
-  return { ...item, file_name: f?.name ?? null, file_kind: f?.kind ?? null };
+function resource(r: MockResource): StepResource {
+  const file = r.kind === "file" ? files.find((x) => x.id === r.ref_id) : undefined;
+  const note = r.kind === "note" ? notes.find((x) => x.id === r.ref_id) : undefined;
+  const link = r.kind === "link" ? links.find((x) => x.id === r.ref_id) : undefined;
+  return {
+    id: r.id,
+    item_id: r.item_id,
+    kind: r.kind,
+    ref_id: r.ref_id,
+    ref_name: r.ref_name,
+    name: file?.name ?? note?.title ?? link?.label ?? r.ref_name,
+    file_kind: file?.kind ?? null,
+    url: link?.url ?? null,
+  };
+}
+
+function withResources(item: Omit<SequenceItem, "resources">): SequenceItem {
+  const mine = stepResources
+    .filter((r) => r.item_id === item.id)
+    .sort((a, b) => a.position - b.position || a.id - b.id);
+  return { ...item, resources: mine.map(resource) };
+}
+
+/** Moves `id` by `delta` among `list` (already one parent's rows), renumbering. */
+function reorder<T extends { id: number; position: number }>(list: T[], id: number, delta: number) {
+  const sorted = list.slice().sort((a, b) => a.position - b.position || a.id - b.id);
+  const from = sorted.findIndex((x) => x.id === id);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= sorted.length) return;
+  const [moved] = sorted.splice(from, 1);
+  sorted.splice(to, 0, moved);
+  sorted.forEach((x, i) => (x.position = i));
 }
 
 function withProgress(cc: CourseClass): CourseClass {
@@ -722,6 +699,8 @@ function handle(cmd: string, args: Args): unknown {
       const id = num(args, "courseId");
       return courseClasses.filter((c) => id == null || c.course_id === id).map(withProgress);
     }
+    case "list_all_course_classes":
+      return courseClasses.map(withProgress);
     case "attach_class_to_course": {
       const courseId = num(args, "courseId") ?? 0;
       const name = str(args, "className");
@@ -771,11 +750,98 @@ function handle(cmd: string, args: Args): unknown {
     }
     case "list_sequence_items": {
       const courseId = num(args, "courseId");
-      const ids = new Set(sequences.filter((s) => s.course_id === courseId).map((s) => s.id));
+      // Chapter by chapter, step by step, like the backend.
+      const own = sequences
+        .filter((s) => s.course_id === courseId)
+        .sort((a, b) => a.position - b.position || a.id - b.id);
+      const rank = new Map(own.map((s, i) => [s.id, i]));
       return sequenceItems
-        .filter((i) => ids.has(i.sequence_id))
-        .sort((a, b) => a.position - b.position)
-        .map(withFile);
+        .filter((i) => rank.has(i.sequence_id))
+        .sort(
+          (a, b) =>
+            rank.get(a.sequence_id)! - rank.get(b.sequence_id)! || a.position - b.position || a.id - b.id,
+        )
+        .map(withResources);
+    }
+    case "create_sequence_item": {
+      const sequenceId = num(args, "sequenceId") ?? 0;
+      const item = {
+        id: newId(),
+        sequence_id: sequenceId,
+        title: str(args, "title"),
+        position: sequenceItems.filter((i) => i.sequence_id === sequenceId).length,
+      };
+      sequenceItems.push(item);
+      const fileId = num(args, "fileId");
+      if (fileId != null)
+        stepResources.push({
+          id: newId(),
+          item_id: item.id,
+          kind: "file",
+          ref_id: fileId,
+          ref_name: "",
+          position: 0,
+        });
+      return withResources(item);
+    }
+    case "rename_sequence_item": {
+      const item = sequenceItems.find((i) => i.id === num(args, "id"));
+      if (item) item.title = str(args, "title");
+      return null;
+    }
+    case "delete_sequence_item": {
+      const i = sequenceItems.findIndex((x) => x.id === num(args, "id"));
+      if (i >= 0) sequenceItems.splice(i, 1);
+      return null;
+    }
+    case "move_sequence_item":
+      reorder(
+        sequenceItems.filter((i) => i.sequence_id === num(args, "sequenceId")),
+        num(args, "id") ?? 0,
+        num(args, "delta") ?? 0,
+      );
+      return null;
+    case "add_step_resource": {
+      const itemId = num(args, "itemId") ?? 0;
+      const kind = str(args, "kind") as StepResource["kind"];
+      const refId = num(args, "refId");
+      const refName = kind === "script" ? str(args, "refName") : "";
+      const same = stepResources.find(
+        (r) => r.item_id === itemId && r.kind === kind && r.ref_id === refId && r.ref_name === refName,
+      );
+      if (same) return resource(same);
+      const r: MockResource = {
+        id: newId(),
+        item_id: itemId,
+        kind,
+        ref_id: kind === "script" ? null : refId,
+        ref_name: refName,
+        position: stepResources.filter((x) => x.item_id === itemId).length,
+      };
+      stepResources.push(r);
+      return resource(r);
+    }
+    case "remove_step_resource": {
+      const i = stepResources.findIndex((r) => r.id === num(args, "id"));
+      if (i >= 0) stepResources.splice(i, 1);
+      return null;
+    }
+    case "move_step_resource":
+      reorder(
+        stepResources.filter((r) => r.item_id === num(args, "itemId")),
+        num(args, "id") ?? 0,
+        num(args, "delta") ?? 0,
+      );
+      return null;
+    case "set_course_class_item": {
+      const cc = courseClasses.find(
+        (c) => c.course_id === num(args, "courseId") && c.class_name === str(args, "className"),
+      );
+      if (cc) {
+        cc.last_item_id = num(args, "itemId");
+        cc.progress_updated_at = sqlUtc(new Date());
+      }
+      return null;
     }
 
     // Notes

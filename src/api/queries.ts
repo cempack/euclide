@@ -24,6 +24,12 @@ export const q = {
       queryKey: ["courses", courseId, "classes"],
       queryFn: () => api.listCourseClasses(courseId),
     }),
+  /** Every course's classes: how a timetable entry finds its course and class. */
+  allCourseClasses: () =>
+    queryOptions({
+      queryKey: ["courses", "all-classes"],
+      queryFn: () => api.listAllCourseClasses(),
+    }),
   /** A course's progression: its sequences (chapters) and their steps. */
   progression: (courseId: number) =>
     queryOptions({

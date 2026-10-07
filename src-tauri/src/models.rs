@@ -107,16 +107,33 @@ pub struct Sequence {
     pub created_at: String,
 }
 
-/// A step inside a sequence, optionally bound to a document of the locker.
+/// A step inside a sequence (a lesson), with what it needs in class.
 #[derive(Debug, Serialize)]
 pub struct SequenceItem {
     pub id: i64,
     pub sequence_id: i64,
     pub title: String,
     pub position: i64,
-    pub file_id: Option<i64>,
-    pub file_name: Option<String>,
+    pub resources: Vec<StepResource>,
+}
+
+/// Something a step opens: a document, a note, a Python script or a link.
+#[derive(Debug, Serialize)]
+pub struct StepResource {
+    pub id: i64,
+    pub item_id: i64,
+    /// "file", "note", "script" or "link".
+    pub kind: String,
+    /// The file, note or link id; None for a script.
+    pub ref_id: Option<i64>,
+    /// A script's file name (scripts are not in the database).
+    pub ref_name: String,
+    /// What to show: the document's or note's name, the link's label.
+    pub name: String,
+    /// The document's kind (pdf, image, board…), for its icon.
     pub file_kind: Option<String>,
+    /// A link's address.
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

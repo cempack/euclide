@@ -161,6 +161,19 @@ pub async fn list_course_classes(db: State<'_, Db>, course_id: i64) -> AppResult
     db.read(move |conn| list_classes(conn, course_id)).await
 }
 
+/// Every class of every course: how a timetable entry finds its course.
+#[tauri::command]
+pub async fn list_all_course_classes(db: State<'_, Db>) -> AppResult<Vec<CourseClass>> {
+    db.read(|conn| {
+        let mut stmt = conn.prepare_cached(&format!(
+            "{CLASS_SELECT} ORDER BY cc.course_id, cc.class_name"
+        ))?;
+        let rows = stmt.query_map([], map_class)?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn attach_class_to_course(
     db: State<'_, Db>,

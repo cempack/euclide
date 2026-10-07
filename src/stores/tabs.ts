@@ -30,6 +30,9 @@ export interface TabParams {
   matiere?: string;
   noteId?: number;
   filter?: string;
+  /** Python: a script to open (its file name), and when it was asked for. */
+  script?: string;
+  scriptAt?: number;
 }
 
 export interface Tab {
