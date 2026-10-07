@@ -395,7 +395,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           className="flex-1 overflow-auto bg-stage p-6"
           style={{ zoom: legacyZoom }}
         >
-          <div className="relative mx-auto shadow-pop bg-white inline-block rounded">
+          <div className="relative mx-auto shadow-pop bg-paper inline-block rounded">
             <canvas ref={legacyPageCanvas} className="block" />
             <canvas
               ref={legacyOverlay}
@@ -652,9 +652,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
       <div className="flex-1 min-h-0 bg-stage relative flex">
         {!legacyMode && showPages && (
-          <div className="w-[150px] shrink-0 border-r border-white/10 bg-stage-alt overflow-y-auto p-1.5">
+          <div className="w-[150px] shrink-0 border-r border-stage-line bg-stage-alt overflow-y-auto p-1.5">
             {thumbnails.length === 0 ? (
-              <div className="p-2 font-mono text-[10px] text-white/50">
+              <div className="p-2 eu-t-caption text-stage-muted">
                 {get("pdf.thumbnailsLoading", "Chargement des pages…")}
               </div>
             ) : (
@@ -668,11 +668,11 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                     }
                     setCurrentPage(t.page);
                   }}
-                  className={`w-full mb-2 overflow-hidden rounded-sm border-2 bg-stage ${currentPage === t.page ? "border-accent" : "border-white/10 hover:border-white/25"}`}
+                  className={`w-full mb-2 overflow-hidden rounded-sm border-2 bg-stage ${currentPage === t.page ? "border-stage-accent" : "border-stage-line hover:border-stage-ink/30"}`}
                   title={`Page ${t.page}`}
                 >
                   <img src={t.dataUrl} className="w-full h-auto block" alt={`p${t.page}`} />
-                  <div className="text-center font-mono text-[10px] leading-none py-1 text-white/50 bg-stage-alt">
+                  <div className="text-center eu-t-caption leading-none py-1 text-stage-muted bg-stage-alt">
                     {t.page}
                   </div>
                 </button>
@@ -684,8 +684,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           {!legacyMode && !pdfLoaded && !error && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-stage/90">
               <div className="flex flex-col items-center gap-3">
-                <div className="w-5 h-5 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
-                <p className="text-white/60 text-[13px]">{get("pdf.loading", "Chargement du PDF…")}</p>
+                <div className="w-5 h-5 border-2 border-stage-line border-t-stage-ink/70 rounded-full animate-spin" />
+                <p className="text-stage-muted eu-t-small">{get("pdf.loading", "Chargement du PDF…")}</p>
               </div>
             </div>
           )}

@@ -997,7 +997,7 @@ export default function Whiteboard({
               }}
               onBlur={commitPendingText}
               onFocus={(e) => e.target.select()}
-              className="absolute bg-white text-black border-2 border-accent px-1.5 py-0.5 text-sm outline-hidden shadow-pop"
+              className="absolute bg-paper text-paper-ink border-2 border-accent px-1.5 py-0.5 text-sm outline-hidden shadow-pop"
               style={{
                 left: `${pendingText.normX * pageSize.w}px`,
                 top: `${pendingText.normY * pageSize.h}px`,

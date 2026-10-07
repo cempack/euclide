@@ -522,22 +522,18 @@ export default function Python() {
 
         {/* Output: a real terminal surface, dark in both themes. */}
         <div className="shrink-0 border-t border-line bg-stage text-stage-ink">
-          <div className="flex items-center justify-between gap-2 px-3 h-7 border-b border-white/10">
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/45">
-              {t.tools?.output || "Sortie"}
-            </span>
+          <div className="flex items-center justify-between gap-2 px-3 h-7 border-b border-stage-line">
+            <span className="eu-t-label text-stage-muted">{t.tools?.output || "Sortie"}</span>
             <div className="flex items-center gap-2">
               {result && (
-                <span
-                  className={`font-mono text-[10px] ${result.ok ? "text-ok-solid" : "text-danger-solid"}`}
-                >
+                <span className={`eu-t-caption ${result.ok ? "text-ok-solid" : "text-stage-danger"}`}>
                   {result.ok ? get("python.ok", "terminé") : get("python.failed", "erreur")}
                 </span>
               )}
               {result && (
                 <button
                   onClick={() => setResult(null)}
-                  className="font-mono text-[10px] text-white/45 hover:text-white/80"
+                  className="eu-t-caption text-stage-muted hover:text-stage-ink"
                 >
                   {t.tools?.clearOutput || "effacer"}
                 </button>
@@ -548,12 +544,12 @@ export default function Python() {
             {result ? (
               <>
                 {result.stdout || (
-                  <span className="text-white/40">{t.tools?.noOutput || "(aucune sortie)"}</span>
+                  <span className="text-stage-muted">{t.tools?.noOutput || "(aucune sortie)"}</span>
                 )}
-                {result.stderr && <span className="text-danger-solid">{`\n${result.stderr}`}</span>}
+                {result.stderr && <span className="text-stage-danger">{`\n${result.stderr}`}</span>}
               </>
             ) : (
-              <span className="text-white/40">
+              <span className="text-stage-muted">
                 {t.tools?.runHint ||
                   "Exécutez pour voir la sortie ici. Les scripts temporaires s'exécutent sans être enregistrés."}
               </span>
