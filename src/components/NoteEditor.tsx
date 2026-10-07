@@ -155,7 +155,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     const sent = { title: d.title, body: d.body || "", course_id: d.course_id ?? null };
     const saved = await api.saveNote({ id: d.id, ...sent });
     if (!saved?.id) {
-      throw new Error("save failed");
+      throw new Error("La note n'a pas été enregistrée.");
     }
     // Keep whatever was typed while the save was in flight: take back only the
     // fields the backend owns, and stay dirty if the draft moved on.

@@ -11,6 +11,7 @@ describe("errors", () => {
   it("reads strings, Error objects and falls back", () => {
     expect(errorMessage('"Pronote n\'est pas connecté."')).toBe("Pronote n'est pas connecté.");
     expect(errorMessage(new Error("boom"))).toBe("boom");
+    expect(errorMessage(new TypeError("x is undefined"), "Erreur")).toBe("Erreur");
     expect(errorMessage(undefined, "Erreur")).toBe("Erreur");
     expect(errorCode("x")).toBeNull();
   });

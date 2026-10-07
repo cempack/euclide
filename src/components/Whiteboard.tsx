@@ -586,7 +586,7 @@ export default function Whiteboard({
       oc.fillRect(0, 0, o.width, o.height);
       oc.drawImage(c, 0, 0);
       const blob = await new Promise<Blob | null>((resolve) => o.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("png");
+      if (!blob) throw new Error("L'image n'a pas pu être créée.");
       const title = tabs.list().find((t) => t.id === tabId)?.title ?? "Tableau";
       const exported = await api.createFileBytes(
         `${title.replace(/\.euboard$/i, "")}.png`,
