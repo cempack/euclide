@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
 import { api, type AppInfo, type FileItem, isTauri } from "./lib/api";
 import { get, fmt } from "./lib/i18n";
-import { isMac } from "./lib/shortcuts";
 import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
@@ -20,6 +19,7 @@ import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
 import { useExitGuard } from "./shell/exitGuard";
+import { useShortcut } from "./lib/keymap";
 import { TooltipLayer } from "./ui/Tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { q } from "./api/queries";
@@ -585,91 +585,47 @@ function Shell() {
     };
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      // Shortcuts that mean something while typing (Ctrl+B for bold, Ctrl+F,
-      // Ctrl+digit…) belong to the focused field, not to the app.
-      const el = e.target as HTMLElement | null;
-      const typing =
-        !!el &&
-        (el.isContentEditable ||
-          el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.tagName === "SELECT");
-      if (typing && mod && !e.shiftKey && /^[bndft1-9]$/i.test(e.key)) return;
-      // Save the active editor. The tab system already knows how: notes, the
-      // whiteboard and the Python editor each register a flush function, which
-      // is what the « unsaved changes » prompt uses when closing a tab.
-      if (mod && !e.shiftKey && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        const id = tabs.activeId();
-        if (!editors.isDirty(id)) return;
-        void editors
-          .flush(id)
-          .then(() => toast(get("messages.saved", "Enregistré"), "success"))
-          .catch(() => toast(get("messages.genericError", "Erreur"), "error"));
-      } else if (mod && e.shiftKey && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setCaptureOpen((c) => !c);
-      } else if (mod && e.shiftKey && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        toggleProjection();
-      } else if (mod && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPalette((p) => !p);
-      } else if (mod && e.key.toLowerCase() === "t") {
-        e.preventDefault();
-        if (tabs.active()?.kind !== "dashboard") {
-          tabs.open({ kind: "dashboard" });
-        }
-      } else if (mod && e.key.toLowerCase() === "w") {
-        e.preventDefault();
-        void requestClose(tabs.activeId());
-      } else if (mod && e.key.toLowerCase() === "d") {
-        e.preventDefault();
-        if (tabs.active()?.kind !== "dashboard") {
-          tabs.open({ kind: "dashboard" });
-        }
-      } else if (mod && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        tabs.open({ kind: "documents" });
-      } else if (mod && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        tabs.open({
-          kind: "whiteboard",
-          title: get("app.tabWhiteboard", "Tableau"),
-          params: { isNew: true },
-        });
-      } else if (mod && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        tabs.open({ kind: "note", title: get("common.newNote", "Nouvelle note"), params: { isNew: true } });
-      } else if (mod && e.key === ",") {
-        e.preventDefault();
-        tabs.open({ kind: "settings" });
-      } else if (mod && e.key === "/") {
-        e.preventDefault();
-        setHelp((h) => !h);
-      } else if (e.key === "Escape" && projection) {
-        // Escape is the way out of projection mode; overlays handle their own.
-        const dialogOpen = !!document.querySelector('[role="dialog"], [aria-modal="true"]');
-        if (!palette && !help && !captureOpen && !dialogOpen) {
-          e.preventDefault();
-          toggleProjection();
-        }
-      } else if (e.ctrlKey && (e.key === "Tab" || e.code === "Tab")) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.shiftKey) tabs.prev();
-        else tabs.next();
-      } else if (mod && /^[1-9]$/.test(e.key)) {
-        e.preventDefault();
-        tabs.focusIndex(Number(e.key) - 1);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [requestClose, toast, toggleProjection, projection, palette, help, captureOpen]);
+  // The app's shortcuts (lib/keymap.ts says which keys, and when they apply).
+  const openDashboard = () => {
+    if (tabs.active()?.kind !== "dashboard") tabs.open({ kind: "dashboard" });
+  };
+  useShortcut("palette", () => setPalette((p) => !p));
+  useShortcut("capture", () => setCaptureOpen((c) => !c));
+  useShortcut("help", () => setHelp((h) => !h));
+  useShortcut("projection", toggleProjection);
+  useShortcut("newTab", openDashboard);
+  useShortcut("dashboard", openDashboard);
+  useShortcut("closeTab", () => void requestClose(tabs.activeId()));
+  useShortcut("gotoTab", (digit) => tabs.focusIndex((digit ?? 1) - 1));
+  useShortcut("nextTab", tabs.next);
+  useShortcut("prevTab", tabs.prev);
+  useShortcut("documents", () => void tabs.open({ kind: "documents" }));
+  useShortcut("settings", () => void tabs.open({ kind: "settings" }));
+  useShortcut("newNote", () => {
+    tabs.open({ kind: "note", title: get("common.newNote", "Nouvelle note"), params: { isNew: true } });
+  });
+  useShortcut("whiteboard", () => {
+    tabs.open({ kind: "whiteboard", title: get("app.tabWhiteboard", "Tableau"), params: { isNew: true } });
+  });
+  // Save the active editor: notes, the whiteboard and the Python editor each
+  // register how (stores/editors.ts), as the unsaved-changes prompt uses.
+  useShortcut("save", () => {
+    const id = tabs.activeId();
+    if (!editors.isDirty(id)) return;
+    editors
+      .flush(id)
+      .then(() => toast(get("messages.saved", "Enregistré"), "success"))
+      .catch(() => toast(get("messages.genericError", "Erreur"), "error"));
+  });
+  // Escape is the way out of projection mode; open dialogs close first.
+  useShortcut(
+    "leaveProjection",
+    () => {
+      if (palette || help || captureOpen || document.querySelector("dialog[open]")) return false;
+      toggleProjection();
+    },
+    projection,
+  );
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-canvas eu-root">

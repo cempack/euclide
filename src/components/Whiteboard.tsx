@@ -16,7 +16,8 @@ import {
 } from "./icons";
 import { get } from "../lib/i18n";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
-import { MOD } from "../lib/shortcuts";
+import { keysOf } from "../lib/keymap";
+import { tip } from "../ui/Tooltip";
 
 const BASIC_COLORS = [
   "#000000",
@@ -961,7 +962,7 @@ export default function Whiteboard({
           <button
             onClick={save}
             className="eu-btn-primary eu-btn-sm eu-no-drag"
-            data-tip={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+            {...tip(get("common.save", "Enregistrer"), keysOf("save"))}
           >
             {get("common.save", "Enregistrer")}
             {dirty && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}

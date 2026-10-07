@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { api, invalidateCache, type PythonDemo, type PythonResult } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import { useToast, useConfirm } from "../components/ui";
-import { tabs } from "../stores/tabs";
+import { useActiveKind } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import CodeEditor from "../components/CodeEditor";
 import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
-import { MOD, isMac } from "../lib/shortcuts";
+import { keysOf, useShortcut } from "../lib/keymap";
+import { tip } from "../ui/Tooltip";
 import { CodeIcon, PlayIcon, PlusIcon, TrashIcon } from "../components/icons";
 
 const STARTER_CODE =
@@ -40,19 +41,9 @@ export default function Python() {
     return () => editors.setDirty("python", false);
   }, [openScript?.isDirty]);
 
-  // ⌘↵ / Ctrl+↵ runs the open script. Only while the Python tab is the active
-  // one, so it never fires from another pane (all panes stay mounted).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (!mod || e.key !== "Enter") return;
-      if (tabs.active()?.kind !== "python") return;
-      e.preventDefault();
-      void run();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  });
+  // Ctrl+↵ runs the open script, while the Python tab is the one shown
+  // (every pane stays mounted).
+  useShortcut("runPython", () => void run(), useActiveKind() === "python");
 
   const refresh = async (selectPath?: string): Promise<PythonDemo[]> => {
     const list = await api.listDemos().catch(() => [] as PythonDemo[]);
@@ -457,7 +448,7 @@ export default function Python() {
                 onClick={save}
                 disabled={!openScript.isDirty}
                 className="eu-btn-ghost eu-btn-sm"
-                data-tip={`${t.tools?.saveBtn || "Enregistrer"} (${MOD}S)`}
+                {...tip(t.tools?.saveBtn || "Enregistrer", keysOf("save"))}
               >
                 {t.tools?.saveBtn || "Enregistrer"}
               </button>
@@ -465,7 +456,7 @@ export default function Python() {
                 onClick={run}
                 disabled={running}
                 className="eu-btn-primary eu-btn-sm"
-                data-tip={`${t.tools?.execute || "Exécuter"} (${MOD}↵)`}
+                {...tip(t.tools?.execute || "Exécuter", keysOf("runPython"))}
               >
                 {running ? (
                   <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />

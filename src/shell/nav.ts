@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { get } from "../lib/i18n";
 import type { TabKind } from "../stores/tabs";
+import { keysOf } from "../lib/keymap";
 
 /**
  * One glyph per kind of screen, everywhere it appears (sidebar, tabs, palette,
@@ -45,15 +46,15 @@ export type NavItem = { kind: TabKind; label: string; keys?: string };
 
 /** The sidebar: what you work on, then what you work with. */
 export const NAV_WORK: NavItem[] = [
-  { kind: "dashboard", label: get("nav.dashboard", "Tableau de bord"), keys: "mod+D" },
+  { kind: "dashboard", label: get("nav.dashboard", "Tableau de bord"), keys: keysOf("dashboard") },
   { kind: "courses", label: get("nav.courses", "Cours") },
-  { kind: "documents", label: get("nav.documents", "Documents"), keys: "mod+F" },
+  { kind: "documents", label: get("nav.documents", "Documents"), keys: keysOf("documents") },
   { kind: "reminders", label: get("nav.reminders", "Rappels") },
 ];
 
 export const NAV_TOOLS: NavItem[] = [
-  { kind: "note", label: get("nav.notes", "Nouvelle note"), keys: "mod+N" },
-  { kind: "whiteboard", label: get("nav.whiteboard", "Tableau blanc"), keys: "mod+B" },
+  { kind: "note", label: get("nav.notes", "Nouvelle note"), keys: keysOf("newNote") },
+  { kind: "whiteboard", label: get("nav.whiteboard", "Tableau blanc"), keys: keysOf("whiteboard") },
   { kind: "python", label: get("nav.python", "Python") },
   { kind: "tools", label: get("nav.tools", "Outils") },
   { kind: "recap", label: get("nav.recap", "Bilan") },
