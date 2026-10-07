@@ -53,7 +53,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             // pdfLoaded will be set true by the 'euclide-pdf-loaded' postMessage from the iframe after successful open
           }
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setError("Impossible d'ouvrir ce document.");
         }
@@ -116,7 +116,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           api.getFileVersions(fileId).then(setVersions).catch(() => {});
           window.dispatchEvent(new CustomEvent("eu:library-changed"));
           toast(get("pdf.annotationsSaved", "Annotations enregistrées dans {name}").replace("{name}", fileName), "success");
-        } catch (e: any) {
+        } catch {
           toast("Erreur lors de l'enregistrement des annotations", "error");
         }
       }

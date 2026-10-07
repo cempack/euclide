@@ -326,7 +326,7 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
     } finally {
       closeRename();
     }
-  }, [renameTarget, renameValue, tabs, toast, closeRename]); // eslint-disable-line react-hooks/exhaustive-deps -- api/fmt/t/window are stable module imports + globals
+  }, [renameTarget, renameValue, tabs, toast, closeRename]);
 
   // Unified + sorted + filtered view (fixes previous note-first concat + enables search + groups)
   const filteredItems = useMemo((): DocItem[] => {

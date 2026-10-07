@@ -86,7 +86,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           });
           commitDirty(false);
         }
-      } catch (e) {
+      } catch {
         toast(get("notes.loadError", "Erreur de chargement des notes/cours"), "error");
       } finally {
         if (mounted) setLoading(false);
