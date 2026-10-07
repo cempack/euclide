@@ -12,8 +12,6 @@ import { TimerProvider, useTimerControls, useTimerSec, formatTimer, chime } from
 import { TabsProvider, useTabs, useDirtyMap, fitTabCount, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
 import { Segmented } from "./components/layout";
-import CommandPalette from "./components/CommandPalette";
-import ShortcutsHelp from "./components/ShortcutsHelp";
 import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
 import {
   BookIcon,
@@ -40,18 +38,59 @@ import {
   ClockIcon,
 } from "./components/icons";
 import Dashboard from "./screens/Dashboard";
-import Courses from "./screens/Courses";
-const CourseDetail = lazy(() => import("./screens/CourseDetail"));
-import Documents from "./screens/Documents";
-import Tools from "./screens/Tools";
-const Python = lazy(() => import("./screens/Python"));
-import Settings from "./screens/Settings";
-import Reminders from "./screens/Reminders";
-const Recap = lazy(() => import("./screens/Recap"));
-const ClassContent = lazy(() => import("./screens/ClassContent"));
-const Whiteboard = lazy(() => import("./components/Whiteboard"));
-const PdfViewer = lazy(() => import("./components/PdfViewer"));
-const NoteEditor = lazy(() => import("./components/NoteEditor"));
+
+// Only the dashboard ships in the startup bundle. Every other screen loads on
+// first use, and `prefetchScreens` warms them once the app is idle.
+const screenModules = {
+  courses: () => import("./screens/Courses"),
+  course: () => import("./screens/CourseDetail"),
+  documents: () => import("./screens/Documents"),
+  tools: () => import("./screens/Tools"),
+  python: () => import("./screens/Python"),
+  settings: () => import("./screens/Settings"),
+  reminders: () => import("./screens/Reminders"),
+  recap: () => import("./screens/Recap"),
+  classContent: () => import("./screens/ClassContent"),
+  whiteboard: () => import("./components/Whiteboard"),
+  pdf: () => import("./components/PdfViewer"),
+  note: () => import("./components/NoteEditor"),
+  palette: () => import("./components/CommandPalette"),
+  shortcuts: () => import("./components/ShortcutsHelp"),
+};
+const Courses = lazy(screenModules.courses);
+const CourseDetail = lazy(screenModules.course);
+const Documents = lazy(screenModules.documents);
+const Tools = lazy(screenModules.tools);
+const Python = lazy(screenModules.python);
+const Settings = lazy(screenModules.settings);
+const Reminders = lazy(screenModules.reminders);
+const Recap = lazy(screenModules.recap);
+const ClassContent = lazy(screenModules.classContent);
+const Whiteboard = lazy(screenModules.whiteboard);
+const PdfViewer = lazy(screenModules.pdf);
+const NoteEditor = lazy(screenModules.note);
+const CommandPalette = lazy(screenModules.palette);
+const ShortcutsHelp = lazy(screenModules.shortcuts);
+
+/** Load every screen in the background, one at a time, once the app is idle. */
+function prefetchScreens() {
+  const queue = Object.values(screenModules);
+  // Older WebKit has no requestIdleCallback.
+  const ric = (window as { requestIdleCallback?: Window["requestIdleCallback"] }).requestIdleCallback;
+  const idle = (cb: () => void) => (ric ? ric(cb, { timeout: 3000 }) : window.setTimeout(cb, 200));
+  const next = () => {
+    const load = queue.shift();
+    if (load) load().finally(() => idle(next));
+  };
+  idle(next);
+}
+
+/** True from the first time `flag` is true: overlays mount on first use, then stay. */
+function useLatch(flag: boolean): boolean {
+  const [latched, setLatched] = useState(flag);
+  if (flag && !latched) setLatched(true);
+  return latched || flag;
+}
 
 const TAB_ICONS: Partial<Record<TabKind, React.ReactNode>> = {
   dashboard: <HomeIcon className="w-4 h-4" />,
@@ -220,7 +259,7 @@ const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
   return (
     <aside className="eu-sidebar w-[232px] shrink-0 h-full flex flex-col gap-1 bg-canvas border-r border-line">
       <div className="flex items-center gap-2.5 px-1.5 pb-1">
-        <img src="/euclide-logo.png" alt="" className="w-7 h-7 rounded object-contain" />
+        <img src="/logo-64.png" alt="" width={28} height={28} className="w-7 h-7 rounded object-contain" />
         <div className="min-w-0 leading-tight">
           <div className="font-mono text-[12px] font-semibold tracking-[0.16em] text-ink">EUCLIDE</div>
           <div className="font-mono text-[9px] tracking-[0.12em] text-ink-faint uppercase truncate">
@@ -651,74 +690,58 @@ const TabPane = memo(function TabPane({
   tab: Tab;
   visible: boolean;
 }) {
+  return (
+    <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
+      <TabScreen info={info} tab={tab} visible={visible} />
+    </Suspense>
+  );
+});
+
+function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
   switch (tab.kind) {
     case "dashboard":
       return <Dashboard info={info} visible={visible} />;
     case "courses":
       return <Courses />;
     case "course":
-      return (
-        <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
-          <CourseDetail courseId={tab.params.courseId!} visible={visible} />
-        </Suspense>
-      );
+      return <CourseDetail courseId={tab.params.courseId!} visible={visible} />;
     case "class-content":
       return (
-        <Suspense fallback={<Loading label={get("classContent.loading", "Chargement…")} />}>
-          <ClassContent
-            courseId={tab.params.courseId!}
-            className={tab.params.className || ""}
-            matiere={tab.params.matiere || ""}
-          />
-        </Suspense>
+        <ClassContent
+          courseId={tab.params.courseId!}
+          className={tab.params.className || ""}
+          matiere={tab.params.matiere || ""}
+        />
       );
     case "documents":
       return <Documents filterHint={tab.params.filter} visible={visible} />;
     case "tools":
       return <Tools />;
     case "python":
-      return (
-        <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
-          <Python />
-        </Suspense>
-      );
+      return <Python />;
     case "settings":
       return <Settings info={info} />;
     case "reminders":
       return <Reminders />;
     case "recap":
-      return (
-        <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
-          <Recap />
-        </Suspense>
-      );
+      return <Recap />;
     case "whiteboard":
-      return (
-        <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
-          <Whiteboard tabId={tab.id} fileId={tab.params.fileId} visible={visible} />
-        </Suspense>
-      );
+      return <Whiteboard tabId={tab.id} fileId={tab.params.fileId} visible={visible} />;
     case "pdf":
-      return (
-        <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
-          <PdfViewer fileId={tab.params.fileId!} fileName={tab.params.fileName ?? tab.title} />
-        </Suspense>
-      );
+      return <PdfViewer fileId={tab.params.fileId!} fileName={tab.params.fileName ?? tab.title} />;
     case "note":
       return (
-        <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
-          <NoteEditor
-            tabId={tab.id}
-            noteId={tab.params.noteId}
-            isNew={!!tab.params.isNew}
-            initialCourseId={tab.params.courseId}
-          />
-        </Suspense>
+        <NoteEditor
+          tabId={tab.id}
+          noteId={tab.params.noteId}
+          isNew={!!tab.params.isNew}
+          initialCourseId={tab.params.courseId}
+        />
       );
     default:
       return null;
   }
-});
+}
 
 /**
  * The reading column for content screens: one place that owns the max width,
@@ -996,6 +1019,10 @@ function Shell() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
+  const paletteUsed = useLatch(palette);
+  const helpUsed = useLatch(help);
+
+  useEffect(prefetchScreens, []);
   const [dragging, setDragging] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
   const tabs = useTabs();
@@ -1333,9 +1360,17 @@ function Shell() {
 
       {projection && <TimerStage />}
 
-      <CommandPalette open={palette} onClose={closePalette} onHelp={handleHelp} />
+      {paletteUsed && (
+        <Suspense fallback={null}>
+          <CommandPalette open={palette} onClose={closePalette} onHelp={handleHelp} />
+        </Suspense>
+      )}
       <QuickCapture open={captureOpen} onClose={closeCapture} />
-      <ShortcutsHelp open={help} onClose={closeHelp} />
+      {helpUsed && (
+        <Suspense fallback={null}>
+          <ShortcutsHelp open={help} onClose={closeHelp} />
+        </Suspense>
+      )}
       <UpdateAvailablePopup update={availableUpdate} onDismiss={dismissUpdate} />
       {dragging && (
         <div className="fixed inset-0 z-80 grid place-items-center bg-accent/10 pointer-events-none">

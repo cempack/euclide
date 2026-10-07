@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import jsQR from "jsqr";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import {
@@ -381,7 +380,8 @@ function PronoteSection() {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
+        const { default: jsQR } = await import("jsqr");
         const canvas = document.createElement("canvas");
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
@@ -1117,7 +1117,13 @@ function AboutSection({ info }: { info: AppInfo | null }) {
     <Section title={get("about.title", "À propos")}>
       <Panel pad>
         <div className="flex items-center gap-3.5">
-          <img src="/euclide-logo.png" alt="" className="w-11 h-11 rounded object-contain" />
+          <img
+            src="/logo-128.png"
+            alt=""
+            width={44}
+            height={44}
+            className="w-11 h-11 rounded object-contain"
+          />
           <div className="min-w-0">
             <p className="eu-t-body font-medium text-ink">
               {t.appName} {info && <span className="text-ink-muted font-normal">v{info.version}</span>}
