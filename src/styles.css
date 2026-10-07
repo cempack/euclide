@@ -162,7 +162,6 @@
    only `.eu-row`, which is why switching used to look like a no-op. */
 :root,
 [data-density="comfortable"] {
-  --eu-density: 1;
   --eu-type-scale: 1;
   --eu-row-y: 10px;
   --eu-pad: 24px;
@@ -181,7 +180,6 @@
   --eu-stat-min: 11.5rem;
 }
 [data-density="compact"] {
-  --eu-density: 0.78;
   --eu-row-y: 5px;
   --eu-pad: 14px;
   --eu-page-gap: 14px;
@@ -537,19 +535,6 @@ input[type="range"],
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: rgb(var(--eu-accent));
-}
-
-/* Simple fade for list items / entrances - GPU friendly, no JS cost */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.animate-fade-in {
-  animation: fadeIn 0.16s ease-out forwards;
 }
 
 /* Respect the OS « reduce motion » setting. framer-motion is handled by

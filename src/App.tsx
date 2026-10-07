@@ -700,7 +700,7 @@ const TabPane = memo(function TabPane({
 function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
   switch (tab.kind) {
     case "dashboard":
-      return <Dashboard info={info} visible={visible} />;
+      return <Dashboard visible={visible} />;
     case "courses":
       return <Courses />;
     case "course":

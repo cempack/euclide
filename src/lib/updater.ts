@@ -41,7 +41,7 @@ export function updaterSupported(): boolean {
   return isTauri();
 }
 
-export async function isPortableWindowsUpdate(): Promise<boolean> {
+async function isPortableWindowsUpdate(): Promise<boolean> {
   if (portableWindows != null) return portableWindows;
   try {
     const info = await api.appInfo();

@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useTabs } from "../lib/tabs";
 import {
   api,
-  type AppInfo,
   type Course,
   type CourseClass,
   type FileItem,
@@ -72,13 +71,7 @@ const DASHBOARD_EVENTS = [
  * the mini activity recap — now lives in the window status bar and in Outils,
  * so it is reachable from every screen instead of only from this one.
  */
-export default function Dashboard({
-  info: _info,
-  visible = true,
-}: {
-  info?: AppInfo | null;
-  visible?: boolean;
-}) {
+export default function Dashboard({ visible = true }: { visible?: boolean }) {
   const tabs = useTabs();
   const toast = useToast();
   const confirm = useConfirm();

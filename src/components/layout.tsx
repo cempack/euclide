@@ -54,7 +54,7 @@ export function PageHeader({
 }
 
 /** Mono context line under a page title. Children separated by `<MetaDot/>`. */
-export function MetaLine({ children }: { children: ReactNode }) {
+function MetaLine({ children }: { children: ReactNode }) {
   return <div className="eu-t-label mt-2 flex items-center gap-2.5 flex-wrap leading-normal">{children}</div>;
 }
 

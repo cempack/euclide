@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTabs } from "../lib/tabs";
 import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
@@ -42,7 +42,6 @@ export default function ClassContent({
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const mountedRef = useRef(true);
 
   const subjectForPronote = (m: string) => {
     const lower = (m || "").toLowerCase();
@@ -136,11 +135,7 @@ export default function ClassContent({
   };
 
   useEffect(() => {
-    mountedRef.current = true;
     load();
-    return () => {
-      mountedRef.current = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, className, matiere]);
 
