@@ -1,7 +1,9 @@
 mod commands;
 mod db;
+mod error;
 mod keepawake;
 mod linux_env;
+mod models;
 mod paths;
 mod perf;
 mod portable_update;
@@ -38,7 +40,22 @@ pub fn run() {
             crate::portable_update::purge_update_leftovers(&exe_dir);
             #[cfg(windows)]
             crate::portable_update::schedule_leftover_cleanup(&exe_dir);
-            app.manage(db::Db(std::sync::Mutex::new(db::open())));
+            let db = match db::Db::open(&crate::paths::db_path()) {
+                Ok(db) => db,
+                Err(err) => {
+                    rfd::MessageDialog::new()
+                        .set_title("Euclide")
+                        .set_level(rfd::MessageLevel::Error)
+                        .set_description(format!(
+                            "Impossible d'ouvrir la base de données d'Euclide.\n\n{}",
+                            err.message()
+                        ))
+                        .show();
+                    std::process::exit(1);
+                }
+            };
+            db::seed_python_demos();
+            app.manage(db);
             app.manage(KeepAwake::default());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
 
@@ -48,7 +65,7 @@ pub fn run() {
             {
                 let db = app.state::<db::Db>();
                 let ka = app.state::<KeepAwake>();
-                let conn = db.0.lock().unwrap();
+                let conn = db.lock();
                 let val = crate::commands::get_setting_raw(&conn, "keep_awake");
                 let should_on = val.as_deref() != Some("0");
                 // Always ensure the preference is saved (defaults to on/"1" for first run).
@@ -99,93 +116,93 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_app_info,
-            commands::list_courses,
-            commands::create_course,
-            commands::update_course,
-            commands::delete_course,
-            commands::list_notes,
-            commands::all_notes,
-            commands::save_note,
-            commands::delete_note,
-            commands::rename_note,
-            commands::list_files,
-            commands::recent_files,
-            commands::import_files,
-            commands::import_paths,
-            commands::file_path,
-            commands::open_file,
-            commands::reveal_file,
-            commands::list_openers,
-            commands::delete_file,
-            commands::rename_file,
-            commands::global_search,
-            commands::reindex_documents,
-            commands::index_files,
-            commands::list_reminders,
-            commands::create_reminder,
-            commands::update_reminder,
-            commands::toggle_reminder,
-            commands::delete_reminder,
-            commands::list_sequences,
-            commands::list_sequence_items,
-            commands::create_sequence,
-            commands::rename_sequence,
-            commands::delete_sequence,
-            commands::move_sequence,
-            commands::create_sequence_item,
-            commands::update_sequence_item,
-            commands::delete_sequence_item,
-            commands::move_sequence_item,
-            commands::list_links,
-            commands::create_link,
-            commands::delete_link,
-            commands::open_url,
-            commands::list_schedule,
-            commands::get_today_classes,
-            commands::save_schedule_entry,
-            commands::delete_schedule_entry,
-            commands::save_board,
-            commands::read_board,
-            commands::export_board_png,
-            commands::save_annotations,
-            commands::read_annotations,
-            commands::save_export,
-            commands::update_file,
-            commands::get_file_versions,
-            commands::read_version_data,
-            commands::ensure_original_version,
-            commands::list_python_demos,
-            commands::create_python_script,
-            commands::save_python_script,
-            commands::delete_python_script,
-            commands::rename_python_script,
-            commands::import_python_script,
-            commands::run_python_demo,
-            commands::run_python_code,
-            commands::python_complete,
-            commands::choose_data_dir,
-            commands::reset_data_dir,
-            commands::backup_data_dir,
-            commands::set_keep_awake,
-            commands::keep_awake_status,
-            commands::get_setting,
-            commands::set_setting,
-            commands::log_event,
-            commands::get_recap,
-            commands::pronote_status,
-            commands::pronote_qr_login,
-            commands::pronote_password_login,
-            commands::pronote_sync,
-            commands::pronote_logout,
-            commands::pronote_contents,
-            commands::list_course_classes,
-            commands::attach_class_to_course,
-            commands::detach_course_class,
-            commands::set_course_class_progress,
-            commands::set_course_class_item,
-            commands::update_course_class_notes,
-            commands::pronote_classes,
+            commands::legacy::get_app_info,
+            commands::legacy::list_courses,
+            commands::legacy::create_course,
+            commands::legacy::update_course,
+            commands::legacy::delete_course,
+            commands::legacy::list_notes,
+            commands::legacy::all_notes,
+            commands::legacy::save_note,
+            commands::legacy::delete_note,
+            commands::legacy::rename_note,
+            commands::legacy::list_files,
+            commands::legacy::recent_files,
+            commands::legacy::import_files,
+            commands::legacy::import_paths,
+            commands::legacy::file_path,
+            commands::legacy::open_file,
+            commands::legacy::reveal_file,
+            commands::legacy::list_openers,
+            commands::legacy::delete_file,
+            commands::legacy::rename_file,
+            commands::legacy::global_search,
+            commands::legacy::reindex_documents,
+            commands::legacy::index_files,
+            commands::legacy::list_reminders,
+            commands::legacy::create_reminder,
+            commands::legacy::update_reminder,
+            commands::legacy::toggle_reminder,
+            commands::legacy::delete_reminder,
+            commands::legacy::list_sequences,
+            commands::legacy::list_sequence_items,
+            commands::legacy::create_sequence,
+            commands::legacy::rename_sequence,
+            commands::legacy::delete_sequence,
+            commands::legacy::move_sequence,
+            commands::legacy::create_sequence_item,
+            commands::legacy::update_sequence_item,
+            commands::legacy::delete_sequence_item,
+            commands::legacy::move_sequence_item,
+            commands::legacy::list_links,
+            commands::legacy::create_link,
+            commands::legacy::delete_link,
+            commands::legacy::open_url,
+            commands::legacy::list_schedule,
+            commands::legacy::get_today_classes,
+            commands::legacy::save_schedule_entry,
+            commands::legacy::delete_schedule_entry,
+            commands::legacy::save_board,
+            commands::legacy::read_board,
+            commands::legacy::export_board_png,
+            commands::legacy::save_annotations,
+            commands::legacy::read_annotations,
+            commands::legacy::save_export,
+            commands::legacy::update_file,
+            commands::legacy::get_file_versions,
+            commands::legacy::read_version_data,
+            commands::legacy::ensure_original_version,
+            commands::legacy::list_python_demos,
+            commands::legacy::create_python_script,
+            commands::legacy::save_python_script,
+            commands::legacy::delete_python_script,
+            commands::legacy::rename_python_script,
+            commands::legacy::import_python_script,
+            commands::legacy::run_python_demo,
+            commands::legacy::run_python_code,
+            commands::legacy::python_complete,
+            commands::legacy::choose_data_dir,
+            commands::legacy::reset_data_dir,
+            commands::legacy::backup_data_dir,
+            commands::legacy::set_keep_awake,
+            commands::legacy::keep_awake_status,
+            commands::legacy::get_setting,
+            commands::legacy::set_setting,
+            commands::legacy::log_event,
+            commands::legacy::get_recap,
+            commands::legacy::pronote_status,
+            commands::legacy::pronote_qr_login,
+            commands::legacy::pronote_password_login,
+            commands::legacy::pronote_sync,
+            commands::legacy::pronote_logout,
+            commands::legacy::pronote_contents,
+            commands::legacy::list_course_classes,
+            commands::legacy::attach_class_to_course,
+            commands::legacy::detach_course_class,
+            commands::legacy::set_course_class_progress,
+            commands::legacy::set_course_class_item,
+            commands::legacy::update_course_class_notes,
+            commands::legacy::pronote_classes,
             perf::log_perf,
             portable_update::apply_windows_portable_update,
             relaunch::relaunch_after_update,

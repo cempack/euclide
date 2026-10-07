@@ -10,214 +10,9 @@ use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
+pub use crate::models::*;
+
 type R<T> = Result<T, String>;
-
-// ---------------------------------------------------------------------------
-// Models
-// ---------------------------------------------------------------------------
-
-#[derive(Serialize)]
-pub struct AppInfo {
-    teacher_name: String,
-    author: String,
-    version: String,
-    data_dir: String,
-    windows_portable: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Course {
-    id: i64,
-    name: String,
-    emoji: String,
-    color: String,
-    description: String,
-    matiere: String, // "Mathématiques" | "NSI" | "Maths expertes" - used to map to Pronote subject for cahier de textes contents
-    created_at: String,
-}
-
-/// Attachment of a course to a Pronote class/group. Stores per-class progress (last document)
-/// and professor notes specific to how far that class has gone in the course.
-#[derive(Serialize, Deserialize)]
-pub struct CourseClass {
-    #[serde(default)]
-    id: i64,
-    course_id: i64,
-    class_name: String,
-    #[serde(default)]
-    last_file_id: Option<i64>,
-    #[serde(default)]
-    last_file_name: Option<String>,
-    #[serde(default)]
-    last_file_kind: Option<String>,
-    /// Step of a sequence this class has reached (see `sequence_items`).
-    #[serde(default)]
-    last_item_id: Option<i64>,
-    #[serde(default)]
-    last_item_title: Option<String>,
-    #[serde(default)]
-    last_sequence_title: Option<String>,
-    #[serde(default)]
-    progress_updated_at: String,
-    #[serde(default)]
-    notes: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Note {
-    #[serde(default)]
-    id: i64,
-    course_id: Option<i64>,
-    #[serde(default)]
-    title: String,
-    #[serde(default)]
-    body: String,
-    #[serde(default)]
-    updated_at: String,
-}
-
-#[derive(Serialize)]
-pub struct FileItem {
-    id: i64,
-    course_id: Option<i64>,
-    name: String,
-    rel_path: String,
-    kind: String,
-    size: i64,
-    added_at: String,
-}
-
-#[derive(Serialize)]
-pub struct Reminder {
-    id: i64,
-    title: String,
-    due_at: Option<String>,
-    done: bool,
-    created_at: String,
-    /// Course this reminder belongs to, if any.
-    course_id: Option<i64>,
-    /// "none" | "daily" | "weekly" | "monthly".
-    repeat_rule: String,
-}
-
-/// A chapter of a course's progression.
-#[derive(Serialize)]
-pub struct Sequence {
-    id: i64,
-    course_id: i64,
-    title: String,
-    position: i64,
-    created_at: String,
-}
-
-/// A step inside a sequence, optionally bound to a document of the locker.
-#[derive(Serialize)]
-pub struct SequenceItem {
-    id: i64,
-    sequence_id: i64,
-    title: String,
-    position: i64,
-    file_id: Option<i64>,
-    file_name: Option<String>,
-    file_kind: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct QuickLink {
-    id: i64,
-    label: String,
-    url: String,
-    icon: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ScheduleEntry {
-    #[serde(default)]
-    id: i64,
-    day_of_week: i64,
-    start_time: String,
-    end_time: String,
-    subject: String,
-    #[serde(default)]
-    room: String,
-    #[serde(default)]
-    course_id: Option<i64>,
-    #[serde(default = "default_source")]
-    source: String,
-}
-
-fn default_source() -> String {
-    "manual".into()
-}
-
-#[derive(Serialize)]
-pub struct PronoteStatus {
-    connected: bool,
-    account_name: Option<String>,
-    last_sync: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct PythonDemo {
-    name: String,
-    path: String,
-    code: String,
-}
-
-#[derive(Serialize)]
-pub struct SearchResult {
-    kind: String, // note | file | course
-    id: i64,
-    title: String,
-    subtitle: String,
-    snippet: String,
-    course_id: Option<i64>,
-    file_kind: String,
-}
-
-#[derive(Serialize)]
-pub struct PythonResult {
-    ok: bool,
-    stdout: String,
-    stderr: String,
-}
-
-#[derive(Serialize, Clone)]
-pub struct PythonCompletion {
-    name: String,
-    complete: Option<String>,
-    #[serde(rename = "type")]
-    type_: Option<String>,
-    signature: Option<String>,
-    doc: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct TopCourse {
-    name: String,
-    emoji: String,
-    count: i64,
-}
-
-#[derive(Serialize)]
-pub struct TopItem {
-    name: String,
-    count: i64,
-}
-
-#[derive(Serialize)]
-pub struct RecapData {
-    period_label: Option<String>,
-    files_opened: i64,
-    notes_written: i64,
-    demos_run: i64,
-    reminders_done: i64,
-    active_minutes: i64,
-    top_courses: Vec<TopCourse>,
-    top_documents: Vec<TopItem>,
-    top_tools: Vec<TopItem>,
-    time_by_area: Vec<TopItem>,
-}
 
 // ---------------------------------------------------------------------------
 // App info
@@ -240,7 +35,7 @@ pub fn get_app_info() -> AppInfo {
 
 #[tauri::command]
 pub fn list_courses(state: State<Db>) -> R<Vec<Course>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached("SELECT id, name, emoji, color, description, matiere, created_at FROM courses ORDER BY name")
         .map_err(e)?;
@@ -270,7 +65,7 @@ pub fn create_course(
     matiere: String, // "Mathématiques" | "NSI" | "Maths expertes"
 ) -> R<Course> {
     let id = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.execute(
             "INSERT INTO courses (name, emoji, color, description, matiere) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![name, emoji, color, description, matiere],
@@ -279,7 +74,7 @@ pub fn create_course(
         conn.last_insert_rowid()
     };
     let _ = fs::create_dir_all(crate::paths::courses_dir().join(id.to_string()));
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.query_row(
         "SELECT id, name, emoji, color, description, matiere, created_at FROM courses WHERE id = ?1",
         [id],
@@ -300,7 +95,7 @@ pub fn create_course(
 
 #[tauri::command]
 pub fn update_course(state: State<Db>, course: Course) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "UPDATE courses SET name=?1, emoji=?2, color=?3, description=?4, matiere=?5 WHERE id=?6",
         params![
@@ -319,7 +114,7 @@ pub fn update_course(state: State<Db>, course: Course) -> R<()> {
 #[tauri::command]
 pub fn delete_course(state: State<Db>, id: i64) -> R<()> {
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.execute("DELETE FROM courses WHERE id=?1", [id])
             .map_err(e)?;
     }
@@ -333,7 +128,7 @@ pub fn delete_course(state: State<Db>, id: i64) -> R<()> {
 
 #[tauri::command]
 pub fn list_course_classes(state: State<Db>, course_id: i64) -> R<Vec<CourseClass>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT cc.id, cc.course_id, cc.class_name, cc.last_file_id, \
@@ -373,7 +168,7 @@ pub fn attach_class_to_course(
     course_id: i64,
     class_name: String,
 ) -> R<CourseClass> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let class_name = class_name.trim().to_string();
     if class_name.is_empty() {
         return Err("Nom de classe vide".into());
@@ -415,7 +210,7 @@ pub fn attach_class_to_course(
 
 #[tauri::command]
 pub fn detach_course_class(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM course_classes WHERE id=?1", [id])
         .map_err(e)?;
     Ok(())
@@ -428,7 +223,7 @@ pub fn set_course_class_progress(
     class_name: String,
     file_id: Option<i64>,
 ) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "UPDATE course_classes \
          SET last_file_id = ?1, progress_updated_at = datetime('now') \
@@ -449,7 +244,7 @@ pub fn set_course_class_item(
     class_name: String,
     item_id: Option<i64>,
 ) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "UPDATE course_classes \
          SET last_item_id = ?1, progress_updated_at = datetime('now') \
@@ -467,7 +262,7 @@ pub fn update_course_class_notes(
     class_name: String,
     notes: String,
 ) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "UPDATE course_classes SET notes = ?1 WHERE course_id = ?2 AND class_name = ?3",
         params![notes, course_id, class_name],
@@ -482,7 +277,7 @@ pub fn update_course_class_notes(
 
 #[tauri::command]
 pub fn list_notes(state: State<Db>, course_id: Option<i64>) -> R<Vec<Note>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, course_id, title, body, updated_at FROM notes \
@@ -505,7 +300,7 @@ pub fn list_notes(state: State<Db>, course_id: Option<i64>) -> R<Vec<Note>> {
 
 #[tauri::command]
 pub fn all_notes(state: State<Db>) -> R<Vec<Note>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, course_id, title, body, updated_at FROM notes ORDER BY updated_at DESC",
@@ -527,7 +322,7 @@ pub fn all_notes(state: State<Db>) -> R<Vec<Note>> {
 
 #[tauri::command]
 pub fn save_note(state: State<Db>, note: Note) -> R<Note> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let id = if note.id > 0 {
         conn.execute(
             "UPDATE notes SET title=?1, body=?2, course_id=?3, updated_at=datetime('now') WHERE id=?4",
@@ -561,7 +356,7 @@ pub fn save_note(state: State<Db>, note: Note) -> R<Note> {
 
 #[tauri::command]
 pub fn delete_note(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM notes WHERE id=?1", [id])
         .map_err(e)?;
     Ok(())
@@ -573,7 +368,7 @@ pub fn rename_note(state: State<Db>, id: i64, new_title: String) -> R<Note> {
     if title.is_empty() {
         return Err("Le titre ne peut pas être vide.".into());
     }
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "UPDATE notes SET title=?1, updated_at=datetime('now') WHERE id=?2",
         params![title, id],
@@ -627,7 +422,7 @@ fn map_file(r: &rusqlite::Row) -> rusqlite::Result<FileItem> {
 
 #[tauri::command]
 pub fn list_files(state: State<Db>, course_id: Option<i64>) -> R<Vec<FileItem>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files \
@@ -640,7 +435,7 @@ pub fn list_files(state: State<Db>, course_id: Option<i64>) -> R<Vec<FileItem>> 
 
 #[tauri::command]
 pub fn recent_files(state: State<Db>, limit: i64) -> R<Vec<FileItem>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files \
@@ -757,7 +552,7 @@ fn register_file(state: &State<Db>, course_id: Option<i64>, dest: &PathBuf) -> R
     let rel = rel_path(dest);
     let size = fs::metadata(dest).map(|m| m.len() as i64).unwrap_or(0);
     let kind = kind_from_ext(&name);
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "INSERT INTO files (course_id, name, rel_path, kind, size) VALUES (?1,?2,?3,?4,?5)",
         params![course_id, name, rel, kind, size],
@@ -788,7 +583,7 @@ fn abs_path(rel: &str) -> PathBuf {
 
 #[tauri::command]
 pub fn file_path(state: State<Db>, id: i64) -> R<String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let rel: String = conn
         .query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
         .map_err(e)?;
@@ -836,7 +631,7 @@ pub fn list_openers(_state: State<Db>, _id: i64) -> R<Vec<Opener>> {
 
 #[tauri::command]
 pub fn delete_file(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let rel: Option<String> = conn
         .query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
         .optional()
@@ -882,7 +677,7 @@ pub async fn rename_file(
 
     // Load current metadata (outside long lock)
     let (old_rel, old_name, old_kind, _course_id): (String, String, String, Option<i64>) = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let rel: String = conn
             .query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
             .map_err(e)?;
@@ -902,7 +697,7 @@ pub async fn rename_file(
 
     if trimmed == old_name {
         // No change; return fresh record
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         return conn
             .query_row(
                 "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files WHERE id=?1",
@@ -951,7 +746,7 @@ pub async fn rename_file(
     let new_kind = kind_from_ext(&final_name);
 
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.execute(
             "UPDATE files SET name=?1, rel_path=?2, kind=?3 WHERE id=?4",
             params![final_name, new_rel, new_kind, id],
@@ -963,12 +758,12 @@ pub async fn rename_file(
     if new_kind == "pdf" {
         index_pdf(&app, &state, id, &final_name, &abs_new).await;
     } else if old_kind == "pdf" {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let _ = conn.execute("DELETE FROM doc_index WHERE file_id=?1", [id]);
     }
 
     // Return fresh record
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.query_row(
         "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files WHERE id=?1",
         [id],
@@ -985,7 +780,7 @@ pub fn global_search(state: State<Db>, query: String) -> R<Vec<SearchResult>> {
     if q.len() < 2 {
         return Ok(vec![]);
     }
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut scored: Vec<(f32, SearchResult)> = vec![];
 
     // Courses (fuzzy on name)
@@ -1262,7 +1057,7 @@ async fn index_pdf(app: &AppHandle, state: &State<'_, Db>, file_id: i64, name: &
     .ok()
     .and_then(|v: Value| v.get("text").and_then(|t| t.as_str().map(String::from)))
     .unwrap_or_default();
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let _ = conn.execute("DELETE FROM doc_index WHERE file_id=?1", [file_id]);
     let _ = conn.execute(
         "INSERT INTO doc_index (name, content, file_id) VALUES (?1, ?2, ?3)",
@@ -1273,7 +1068,7 @@ async fn index_pdf(app: &AppHandle, state: &State<'_, Db>, file_id: i64, name: &
 #[tauri::command]
 pub async fn reindex_documents(app: AppHandle, state: State<'_, Db>) -> R<i64> {
     let pdfs: Vec<(i64, String, String)> = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let mut stmt = conn
             .prepare_cached("SELECT id, name, rel_path FROM files WHERE kind='pdf'")
             .map_err(e)?;
@@ -1298,7 +1093,7 @@ pub async fn index_files(app: AppHandle, state: State<'_, Db>, ids: Vec<i64>) ->
     let sql =
         format!("SELECT id, name, rel_path FROM files WHERE kind='pdf' AND id IN ({placeholders})");
     let pdfs: Vec<(i64, String, String)> = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let mut stmt = conn.prepare(&sql).map_err(e)?;
         let rows = stmt
             .query_map(rusqlite::params_from_iter(ids.iter()), |r| {
@@ -1380,7 +1175,7 @@ fn next_occurrence(due_at: &str, rule: &str) -> Option<String> {
 
 #[tauri::command]
 pub fn list_reminders(state: State<Db>) -> R<Vec<Reminder>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let sql = format!(
         "SELECT {REMINDER_COLS} FROM reminders ORDER BY done, COALESCE(due_at, created_at)"
     );
@@ -1397,7 +1192,7 @@ pub fn create_reminder(
     course_id: Option<i64>,
     repeat_rule: Option<String>,
 ) -> R<Reminder> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let rule = normalize_repeat(repeat_rule);
     conn.execute(
         "INSERT INTO reminders (title, due_at, course_id, repeat_rule) VALUES (?1, ?2, ?3, ?4)",
@@ -1418,7 +1213,7 @@ pub fn update_reminder(
     course_id: Option<i64>,
     repeat_rule: Option<String>,
 ) -> R<Reminder> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let rule = normalize_repeat(repeat_rule);
     conn.execute(
         "UPDATE reminders SET title=?1, due_at=?2, course_id=?3, repeat_rule=?4 WHERE id=?5",
@@ -1436,7 +1231,7 @@ pub fn update_reminder(
 /// occurrence. That is what makes "chaque mardi" useful.
 #[tauri::command]
 pub fn toggle_reminder(state: State<Db>, id: i64, done: bool) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     if done {
         let row: Option<(Option<String>, String)> = conn
             .query_row(
@@ -1469,7 +1264,7 @@ pub fn toggle_reminder(state: State<Db>, id: i64, done: bool) -> R<()> {
 
 #[tauri::command]
 pub fn delete_reminder(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM reminders WHERE id=?1", [id])
         .map_err(e)?;
     Ok(())
@@ -1481,7 +1276,7 @@ pub fn delete_reminder(state: State<Db>, id: i64) -> R<()> {
 
 #[tauri::command]
 pub fn list_sequences(state: State<Db>, course_id: i64) -> R<Vec<Sequence>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, course_id, title, position, created_at FROM sequences \
@@ -1504,7 +1299,7 @@ pub fn list_sequences(state: State<Db>, course_id: i64) -> R<Vec<Sequence>> {
 
 #[tauri::command]
 pub fn list_sequence_items(state: State<Db>, course_id: i64) -> R<Vec<SequenceItem>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT si.id, si.sequence_id, si.title, si.position, si.file_id, f.name, f.kind \
@@ -1533,7 +1328,7 @@ pub fn list_sequence_items(state: State<Db>, course_id: i64) -> R<Vec<SequenceIt
 
 #[tauri::command]
 pub fn create_sequence(state: State<Db>, course_id: i64, title: String) -> R<Sequence> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err("Titre vide".into());
@@ -1569,7 +1364,7 @@ pub fn create_sequence(state: State<Db>, course_id: i64, title: String) -> R<Seq
 
 #[tauri::command]
 pub fn rename_sequence(state: State<Db>, id: i64, title: String) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err("Titre vide".into());
@@ -1584,7 +1379,7 @@ pub fn rename_sequence(state: State<Db>, id: i64, title: String) -> R<()> {
 
 #[tauri::command]
 pub fn delete_sequence(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM sequences WHERE id = ?1", [id])
         .map_err(e)?;
     Ok(())
@@ -1595,7 +1390,7 @@ pub fn delete_sequence(state: State<Db>, id: i64) -> R<()> {
 /// feature (all at 0) get a stable order.
 #[tauri::command]
 pub fn move_sequence(state: State<Db>, course_id: i64, id: i64, delta: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let ids: Vec<i64> = conn
         .prepare("SELECT id FROM sequences WHERE course_id = ?1 ORDER BY position, id")
         .map_err(e)?
@@ -1630,7 +1425,7 @@ pub fn create_sequence_item(
     title: String,
     file_id: Option<i64>,
 ) -> R<SequenceItem> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err("Titre vide".into());
@@ -1674,7 +1469,7 @@ pub fn update_sequence_item(
     title: String,
     file_id: Option<i64>,
 ) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err("Titre vide".into());
@@ -1689,7 +1484,7 @@ pub fn update_sequence_item(
 
 #[tauri::command]
 pub fn delete_sequence_item(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM sequence_items WHERE id = ?1", [id])
         .map_err(e)?;
     Ok(())
@@ -1697,7 +1492,7 @@ pub fn delete_sequence_item(state: State<Db>, id: i64) -> R<()> {
 
 #[tauri::command]
 pub fn move_sequence_item(state: State<Db>, sequence_id: i64, id: i64, delta: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let ids: Vec<i64> = conn
         .prepare("SELECT id FROM sequence_items WHERE sequence_id = ?1 ORDER BY position, id")
         .map_err(e)?
@@ -1731,7 +1526,7 @@ pub fn move_sequence_item(state: State<Db>, sequence_id: i64, id: i64, delta: i6
 
 #[tauri::command]
 pub fn list_links(state: State<Db>) -> R<Vec<QuickLink>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached("SELECT id, label, url, icon FROM links ORDER BY id")
         .map_err(e)?;
@@ -1750,7 +1545,7 @@ pub fn list_links(state: State<Db>) -> R<Vec<QuickLink>> {
 
 #[tauri::command]
 pub fn create_link(state: State<Db>, label: String, url: String, icon: String) -> R<QuickLink> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "INSERT INTO links (label, url, icon) VALUES (?1,?2,?3)",
         params![label, url, icon],
@@ -1767,7 +1562,7 @@ pub fn create_link(state: State<Db>, label: String, url: String, icon: String) -
 
 #[tauri::command]
 pub fn delete_link(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM links WHERE id=?1", [id])
         .map_err(e)?;
     Ok(())
@@ -1871,7 +1666,7 @@ fn map_schedule(r: &rusqlite::Row) -> rusqlite::Result<ScheduleEntry> {
 
 #[tauri::command]
 pub fn list_schedule(state: State<Db>) -> R<Vec<ScheduleEntry>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, day_of_week, start_time, end_time, subject, room, course_id, source \
@@ -1890,7 +1685,7 @@ pub fn get_today_classes(state: State<Db>) -> R<Vec<ScheduleEntry>> {
         .to_string()
         .parse::<i64>()
         .unwrap_or(1);
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let mut stmt = conn
         .prepare_cached(
             "SELECT id, day_of_week, start_time, end_time, subject, room, course_id, source \
@@ -1903,7 +1698,7 @@ pub fn get_today_classes(state: State<Db>) -> R<Vec<ScheduleEntry>> {
 
 #[tauri::command]
 pub fn save_schedule_entry(state: State<Db>, entry: ScheduleEntry) -> R<ScheduleEntry> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let id = if entry.id > 0 {
         conn.execute(
             "UPDATE schedule SET day_of_week=?1, start_time=?2, end_time=?3, subject=?4, room=?5, course_id=?6, source=?7 WHERE id=?8",
@@ -1926,7 +1721,7 @@ pub fn save_schedule_entry(state: State<Db>, entry: ScheduleEntry) -> R<Schedule
 
 #[tauri::command]
 pub fn delete_schedule_entry(state: State<Db>, id: i64) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute("DELETE FROM schedule WHERE id=?1", [id])
         .map_err(e)?;
     Ok(())
@@ -1953,7 +1748,7 @@ pub struct BoardSave {
 pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
     if let Some(id) = save.file_id {
         let (rel, current_name) = {
-            let conn = state.0.lock().unwrap();
+            let conn = state.lock();
             let rel: String = conn
                 .query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
                 .map_err(e)?;
@@ -1977,7 +1772,7 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
             let _ = fs::copy(&abs, &backup_path);
             let versions_key = format!("file_versions_{}", id);
             let mut versions: Vec<serde_json::Value> = {
-                let conn = state.0.lock().unwrap();
+                let conn = state.lock();
                 if let Some(vstr) = get_setting_raw(&conn, &versions_key) {
                     serde_json::from_str(&vstr).unwrap_or_default()
                 } else {
@@ -1991,7 +1786,7 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
                 "backup_name": backup_name
             }));
             {
-                let conn = state.0.lock().unwrap();
+                let conn = state.lock();
                 set_setting_raw(
                     &conn,
                     &versions_key,
@@ -2001,7 +1796,7 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
         }
         fs::write(&abs, save.json).map_err(e)?;
         let size = fs::metadata(&abs).map(|m| m.len() as i64).unwrap_or(0);
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.execute(
             "UPDATE files SET size=?1, added_at=datetime('now') WHERE id=?2",
             params![size, id],
@@ -2034,14 +1829,14 @@ pub fn save_board(state: State<Db>, save: BoardSave) -> R<FileItem> {
 /// marked up (pen, highlight, text) and reopened with the marks intact.
 #[tauri::command]
 pub fn save_annotations(state: State<Db>, file_id: i64, json: String) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     set_setting_raw(&conn, &format!("pdf_annot_{file_id}"), &json);
     Ok(())
 }
 
 #[tauri::command]
 pub fn read_annotations(state: State<Db>, file_id: i64) -> R<Option<String>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     Ok(get_setting_raw(&conn, &format!("pdf_annot_{file_id}")))
 }
 
@@ -2073,7 +1868,7 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         .decode(b64)
         .map_err(e)?;
     let (rel, current_name) = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let rel: String = conn
             .query_row("SELECT rel_path FROM files WHERE id=?1", [file_id], |r| {
                 r.get(0)
@@ -2102,7 +1897,7 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         // persist versions list (not registered as docs, hidden)
         let versions_key = format!("file_versions_{}", file_id);
         let mut versions: Vec<serde_json::Value> = {
-            let conn = state.0.lock().unwrap();
+            let conn = state.lock();
             if let Some(vstr) = get_setting_raw(&conn, &versions_key) {
                 serde_json::from_str(&vstr).unwrap_or_default()
             } else {
@@ -2116,7 +1911,7 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
             "backup_name": backup_name
         }));
         {
-            let conn = state.0.lock().unwrap();
+            let conn = state.lock();
             set_setting_raw(
                 &conn,
                 &versions_key,
@@ -2128,7 +1923,7 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
     fs::write(&abs, &bytes).map_err(e)?;
     let new_size = bytes.len() as i64;
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.execute(
             "UPDATE files SET size=?1, added_at=datetime('now') WHERE id=?2",
             params![new_size, file_id],
@@ -2136,7 +1931,7 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
         .map_err(e)?;
     }
     // return refreshed file item
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.query_row(
         "SELECT id, course_id, name, rel_path, kind, size, added_at FROM files WHERE id=?1",
         [file_id],
@@ -2147,7 +1942,7 @@ pub fn update_file(state: State<Db>, file_id: i64, data_url: String) -> R<FileIt
 
 #[tauri::command]
 pub fn get_file_versions(state: State<Db>, file_id: i64) -> R<Vec<serde_json::Value>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let new_key = format!("file_versions_{}", file_id);
     if let Some(vstr) = get_setting_raw(&conn, &new_key) {
         let v: Vec<serde_json::Value> = serde_json::from_str(&vstr).unwrap_or_default();
@@ -2188,7 +1983,7 @@ pub fn read_version_data(name: String) -> R<String> {
 #[tauri::command]
 pub fn read_board(state: State<Db>, id: i64) -> R<String> {
     let rel: String = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.query_row("SELECT rel_path FROM files WHERE id=?1", [id], |r| r.get(0))
             .map_err(e)?
     };
@@ -2202,7 +1997,7 @@ pub fn read_board(state: State<Db>, id: i64) -> R<String> {
 #[tauri::command]
 pub fn ensure_original_version(state: State<Db>, file_id: i64) -> R<()> {
     let (rel, current_name) = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let rel: String = conn
             .query_row("SELECT rel_path FROM files WHERE id=?1", [file_id], |r| {
                 r.get(0)
@@ -2221,7 +2016,7 @@ pub fn ensure_original_version(state: State<Db>, file_id: i64) -> R<()> {
     }
     let versions_key = format!("file_versions_{}", file_id);
     let mut versions: Vec<serde_json::Value> = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         if let Some(vstr) = get_setting_raw(&conn, &versions_key) {
             serde_json::from_str(&vstr).unwrap_or_default()
         } else {
@@ -2252,7 +2047,7 @@ pub fn ensure_original_version(state: State<Db>, file_id: i64) -> R<()> {
         "backup_name": backup_name
     }));
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         set_setting_raw(
             &conn,
             &versions_key,
@@ -2696,7 +2491,7 @@ pub async fn backup_data_dir(state: State<'_, Db>) -> R<String> {
         uuid::Uuid::new_v4().simple()
     ));
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         conn.execute("VACUUM INTO ?1", [snapshot.to_string_lossy().to_string()])
             .map_err(|err| format!("Instantané de la base : {err}"))?;
     }
@@ -2717,7 +2512,7 @@ pub async fn backup_data_dir(state: State<'_, Db>) -> R<String> {
 #[tauri::command]
 pub fn set_keep_awake(ka: State<KeepAwake>, db: State<Db>, on: bool) -> bool {
     crate::keepawake::set(&ka, on);
-    let conn = db.0.lock().unwrap();
+    let conn = db.lock();
     set_setting_raw(&conn, "keep_awake", if on { "1" } else { "0" });
     on
 }
@@ -2750,13 +2545,13 @@ pub(crate) fn set_setting_raw(conn: &rusqlite::Connection, key: &str, value: &st
 
 #[tauri::command]
 pub fn get_setting(state: State<Db>, key: String) -> R<Option<String>> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     Ok(get_setting_raw(&conn, &key))
 }
 
 #[tauri::command]
 pub fn set_setting(state: State<Db>, key: String, value: String) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     set_setting_raw(&conn, &key, &value);
     Ok(())
 }
@@ -2767,7 +2562,7 @@ pub fn set_setting(state: State<Db>, key: String, value: String) -> R<()> {
 
 #[tauri::command]
 pub fn log_event(state: State<Db>, kind: String, label: String, course_id: Option<i64>) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     conn.execute(
         "INSERT INTO usage_events (kind, label, course_id) VALUES (?1,?2,?3)",
         params![kind, label, course_id],
@@ -2908,7 +2703,7 @@ fn recap_from_conn(conn: &rusqlite::Connection, period: &str) -> RecapData {
 
 #[tauri::command]
 pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let _ = conn.execute(
         "DELETE FROM usage_events WHERE created_at < datetime('now', '-30 days')",
         [],
@@ -2922,7 +2717,7 @@ pub fn get_recap(state: State<Db>, period: String) -> R<RecapData> {
 
 #[tauri::command]
 pub fn pronote_status(state: State<Db>) -> R<PronoteStatus> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     let connected = get_setting_raw(&conn, "pronote_connected").as_deref() == Some("1");
     Ok(PronoteStatus {
         connected,
@@ -2940,7 +2735,7 @@ pub async fn pronote_qr_login(
 ) -> R<PronoteStatus> {
     // Stable UUID must never change between logins.
     let uuid = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         match get_setting_raw(&conn, "pronote_uuid") {
             Some(u) => u,
             None => {
@@ -2975,7 +2770,7 @@ pub async fn pronote_qr_login(
         .unwrap_or("")
         .to_string();
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         set_setting_raw(&conn, "pronote_connected", "1");
         set_setting_raw(&conn, "pronote_mode", "qr");
         set_setting_raw(&conn, "pronote_account", &account);
@@ -3025,7 +2820,7 @@ pub async fn pronote_password_login(
     // registration). A leftover client_identifier from another account
     // makes Pronote derive the wrong AES key.
     let (device_name, client_id) = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         let device_name = match get_setting_raw(&conn, "pronote_device_name") {
             Some(d) => d,
             None => {
@@ -3077,7 +2872,7 @@ pub async fn pronote_password_login(
         .unwrap_or("")
         .to_string();
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         set_setting_raw(&conn, "pronote_connected", "1");
         set_setting_raw(&conn, "pronote_mode", "password");
         set_setting_raw(&conn, "pronote_account", &account);
@@ -3106,7 +2901,7 @@ pub async fn pronote_password_login(
 #[tauri::command]
 pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
     let creds = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         json!({
             "mode": get_setting_raw(&conn, "pronote_mode").unwrap_or_else(|| "qr".into()),
             "url": get_setting_raw(&conn, "pronote_url"),
@@ -3130,7 +2925,7 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
         return Err(err.to_string());
     }
 
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     // The password token rotates on every login: persist the new one or future
     // logins will fail.
     for key in ["username", "password"] {
@@ -3188,7 +2983,7 @@ pub async fn pronote_sync(app: AppHandle, state: State<'_, Db>) -> R<i64> {
 
 #[tauri::command]
 pub fn pronote_logout(state: State<Db>) -> R<()> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     for key in [
         "pronote_connected",
         "pronote_mode",
@@ -3222,7 +3017,7 @@ pub async fn pronote_contents(
     from_date: Option<String>,
 ) -> R<serde_json::Value> {
     let creds = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         json!({
             "mode": get_setting_raw(&conn, "pronote_mode").unwrap_or_else(|| "qr".into()),
             "url": get_setting_raw(&conn, "pronote_url"),
@@ -3252,7 +3047,7 @@ pub async fn pronote_contents(
     }
 
     let mut res = res;
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     take_rotated_credentials(&conn, &mut res);
     Ok(res)
 }
@@ -3262,7 +3057,7 @@ pub async fn pronote_contents(
 #[tauri::command]
 pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_json::Value> {
     let creds = {
-        let conn = state.0.lock().unwrap();
+        let conn = state.lock();
         json!({
             "mode": get_setting_raw(&conn, "pronote_mode").unwrap_or_else(|| "qr".into()),
             "url": get_setting_raw(&conn, "pronote_url"),
@@ -3287,7 +3082,7 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
     }
 
     let mut res = res;
-    let conn = state.0.lock().unwrap();
+    let conn = state.lock();
     take_rotated_credentials(&conn, &mut res);
     Ok(res)
 }
