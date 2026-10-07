@@ -775,7 +775,7 @@ function ScheduleSection() {
                         <div
                           key={e.id}
                           className="group rounded border border-line bg-panel px-2 py-1.5 relative"
-                          title={`${e.subject}${e.room ? ` · ${e.room}` : ""}`}
+                          data-tip={`${e.subject}${e.room ? ` · ${e.room}` : ""}`}
                         >
                           <p className="eu-t-caption">
                             {e.start_time}–{e.end_time}
@@ -785,7 +785,7 @@ function ScheduleSection() {
                           {e.source === "pronote" ? (
                             <span
                               className="absolute top-1 right-1 eu-t-label"
-                              title={get("settings.fromPronote", "Depuis Pronote")}
+                              data-tip={get("settings.fromPronote", "Depuis Pronote")}
                             >
                               P
                             </span>
@@ -793,7 +793,7 @@ function ScheduleSection() {
                             <button
                               onClick={() => void remove(e.id)}
                               aria-label={`${get("common.delete", "Supprimer")} — ${e.subject}`}
-                              title={get("common.delete", "Supprimer")}
+                              data-tip={get("common.delete", "Supprimer")}
                               className="absolute top-0.5 right-0.5 w-6 h-6 grid place-items-center rounded-sm text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger-soft transition-opacity duration-fast"
                             >
                               <TrashIcon className="w-3 h-3" />

@@ -301,7 +301,7 @@ function LinksSection() {
                       );
                   }}
                   className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
-                  title={l.url}
+                  data-tip={l.url}
                 >
                   <Favicon url={l.url} className="w-5 h-5 text-[0.625rem]" remote={remoteIcons} />
                   <span className="eu-t-body text-ink truncate">{l.label}</span>
@@ -323,7 +323,7 @@ function LinksSection() {
                     refresh();
                   }}
                   aria-label={`${get("common.delete", "Supprimer")} — ${l.label}`}
-                  title={get("common.delete", "Supprimer")}
+                  data-tip={get("common.delete", "Supprimer")}
                   className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                 >
                   <TrashIcon className="w-3.5 h-3.5" />

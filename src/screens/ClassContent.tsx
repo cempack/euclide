@@ -300,7 +300,7 @@ export default function ClassContent({
                                   api.openUrl(d.url).catch(() => {});
                                 }}
                                 className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-ink focus:outline-hidden"
-                                title="Ouvrir dans le navigateur"
+                                data-tip="Ouvrir dans le navigateur"
                               >
                                 {d.name}
                               </button>
@@ -311,7 +311,7 @@ export default function ClassContent({
                               <button
                                 onClick={() => copyUrl(d.url)}
                                 className="eu-btn-quiet eu-btn-sm ml-1"
-                                title="Copier le lien direct Pronote"
+                                data-tip="Copier le lien direct Pronote"
                               >
                                 copier
                               </button>

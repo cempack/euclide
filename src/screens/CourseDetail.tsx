@@ -370,7 +370,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                 tabs.close(`course:${courseId}`);
               }}
               aria-label={get("common.delete", "Supprimer")}
-              title={fmt(get("courseDetail.deleteCourse", "Supprimer « {name} »"), { name: course.name })}
+              data-tip={fmt(get("courseDetail.deleteCourse", "Supprimer « {name} »"), { name: course.name })}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
             >
               <TrashIcon className="w-4 h-4" />
@@ -648,7 +648,8 @@ function FilesPane({
           <button
             onClick={() => openFile(f)}
             className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
-            title={f.name}
+            data-tip={f.name}
+            aria-label={f.name}
           >
             <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
             <span className="eu-t-body text-ink truncate">{f.name}</span>
@@ -677,7 +678,7 @@ function FilesPane({
               }
             }}
             aria-label={`${get("common.delete", "Supprimer")} — ${f.name}`}
-            title={get("common.delete", "Supprimer")}
+            data-tip={get("common.delete", "Supprimer")}
             className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
           >
             <TrashIcon className="w-3.5 h-3.5" />
@@ -859,7 +860,7 @@ function SequencePane({
                       onClick={() => void api.moveSequence(courseId, seq.id, -1).then(reload)}
                       disabled={seqIndex === 0}
                       aria-label={get("sequences.moveUp", "Monter")}
-                      title={get("sequences.moveUp", "Monter")}
+                      data-tip={get("sequences.moveUp", "Monter")}
                       className="eu-btn-quiet eu-btn-icon eu-btn-sm"
                     >
                       <ChevronDownIcon className="w-3.5 h-3.5 rotate-180" />
@@ -868,7 +869,7 @@ function SequencePane({
                       onClick={() => void api.moveSequence(courseId, seq.id, 1).then(reload)}
                       disabled={seqIndex === sequences.length - 1}
                       aria-label={get("sequences.moveDown", "Descendre")}
-                      title={get("sequences.moveDown", "Descendre")}
+                      data-tip={get("sequences.moveDown", "Descendre")}
                       className="eu-btn-quiet eu-btn-icon eu-btn-sm"
                     >
                       <ChevronDownIcon className="w-3.5 h-3.5" />
@@ -889,7 +890,7 @@ function SequencePane({
                         await reload();
                       }}
                       aria-label={`${get("common.delete", "Supprimer")} — ${seq.title}`}
-                      title={get("common.delete", "Supprimer")}
+                      data-tip={get("common.delete", "Supprimer")}
                       className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                     >
                       <TrashIcon className="w-3.5 h-3.5" />
@@ -909,7 +910,8 @@ function SequencePane({
                             <button
                               onClick={() => openItemFile(item)}
                               className="eu-chip hover:text-ink shrink-0 max-w-[22ch]"
-                              title={item.file_name || ""}
+                              data-tip={item.file_name || ""}
+                              aria-label={item.file_name || ""}
                             >
                               <FileKindIcon kind={item.file_kind || "file"} className="w-3 h-3" />
                               <span className="truncate">{item.file_name}</span>
@@ -930,7 +932,7 @@ function SequencePane({
                                 }}
                                 className="eu-select eu-field-sm w-[104px]"
                                 aria-label={get("sequences.markClass", "Marquer une classe ici")}
-                                title={get("sequences.markClass", "Marquer une classe ici")}
+                                data-tip={get("sequences.markClass", "Marquer une classe ici")}
                               >
                                 <option value="">{get("sequences.markClassShort", "Classe ici…")}</option>
                                 {courseClasses.map((cc) => (
@@ -962,7 +964,7 @@ function SequencePane({
                                 await reload();
                               }}
                               aria-label={`${get("common.delete", "Supprimer")} — ${item.title}`}
-                              title={get("common.delete", "Supprimer")}
+                              data-tip={get("common.delete", "Supprimer")}
                               className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                             >
                               <TrashIcon className="w-3.5 h-3.5" />
@@ -1112,7 +1114,7 @@ function ClassCard({
         <button
           onClick={() => onDetach(cc)}
           aria-label={fmt(get("courseDetail.detach", "Détacher {name}"), { name: cc.class_name })}
-          title={get("courseDetail.detachTitle", "Détacher cette classe")}
+          data-tip={get("courseDetail.detachTitle", "Détacher cette classe")}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger shrink-0"
         >
           <TrashIcon className="w-3.5 h-3.5" />
@@ -1182,7 +1184,7 @@ function ClassCard({
             });
           }}
           className="eu-btn-ghost eu-btn-sm w-full"
-          title={get("courseDetail.showPronoteContentsTitle", "Cahier de textes et documents Pronote")}
+          data-tip={get("courseDetail.showPronoteContentsTitle", "Cahier de textes et documents Pronote")}
         >
           <BookIcon className="w-3.5 h-3.5" />
           {t.courseDetail?.showPronoteContents || "Contenu Pronote"}

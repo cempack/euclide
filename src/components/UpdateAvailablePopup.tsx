@@ -102,7 +102,8 @@ export function UpdateAvailablePopup({
               type="button"
               onClick={dismiss}
               disabled={busy}
-              title={get("updater.popupDismiss", "Fermer")}
+              data-tip={get("updater.popupDismiss", "Fermer")}
+              aria-label={get("updater.popupDismiss", "Fermer")}
               className="shrink-0 eu-btn-quiet eu-btn-icon eu-btn-sm"
             >
               <XIcon className="w-3.5 h-3.5" />

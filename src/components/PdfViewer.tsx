@@ -360,7 +360,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             <div
               className="w-3.5 h-3.5 rounded border border-line"
               style={{ background: legacyColor }}
-              title={`Couleur active : ${legacyColor}`}
+              data-tip={`Couleur active : ${legacyColor}`}
             />
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -505,7 +505,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             aria-pressed={currentEditorMode === 0}
             className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
-            title={get("pdf.selectTitle", "Sélection : visualiser sans annoter")}
+            data-tip={get("pdf.selectTitle", "Sélection : visualiser sans annoter")}
           >
             {get("pdf.select", "Sélection")}
           </button>
@@ -514,7 +514,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             aria-pressed={currentEditorMode === 15}
             className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
-            title={get("pdf.penTitle", "Stylo : dessin à main levée")}
+            data-tip={get("pdf.penTitle", "Stylo : dessin à main levée")}
+            aria-label={get("pdf.penTitle", "Stylo : dessin à main levée")}
           >
             <PenIcon className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{get("pdf.pen", "Stylo")}</span>
@@ -525,7 +526,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             aria-label={get("pdf.pages", "Pages")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
-            title={get("pdf.pagesTitle", "Vignettes des pages")}
+            data-tip={get("pdf.pagesTitle", "Vignettes des pages")}
           >
             <GridIcon className="w-4 h-4" />
           </button>
@@ -534,7 +535,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             aria-label={get("pdf.deleteAnnotation", "Supprimer l'annotation")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
             disabled={!canControlEditor}
-            title={get("pdf.deleteAnnotationTitle", "Supprimer l'annotation sélectionnée (Suppr)")}
+            data-tip={get("pdf.deleteAnnotationTitle", "Supprimer l'annotation sélectionnée (Suppr)")}
           >
             <TrashIcon className="w-4 h-4" />
           </button>
@@ -554,7 +555,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               }`}
               style={{ background: c }}
               disabled={!canControlEditor}
-              title={c}
+              data-tip={c}
             />
           ))}
         </ToolGroup>
@@ -646,7 +647,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             onClick={triggerViewerSave}
             className="eu-btn-primary eu-btn-sm"
             disabled={!canControlEditor}
-            title={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+            data-tip={`${get("common.save", "Enregistrer")} (${MOD}S)`}
           >
             {get("common.save", "Enregistrer")}
           </button>
@@ -672,7 +673,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                     setCurrentPage(t.page);
                   }}
                   className={`w-full mb-2 overflow-hidden rounded-sm border-2 bg-stage ${currentPage === t.page ? "border-stage-accent" : "border-stage-line hover:border-stage-ink/30"}`}
-                  title={`Page ${t.page}`}
+                  data-tip={`Page ${t.page}`}
+                  aria-label={`Page ${t.page}`}
                 >
                   <img src={t.dataUrl} className="w-full h-auto block" alt={`p${t.page}`} />
                   <div className="text-center eu-t-caption leading-none py-1 text-stage-muted bg-stage-alt">

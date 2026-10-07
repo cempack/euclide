@@ -52,7 +52,7 @@ const CourseCard = memo(function CourseCard({
           onEdit(c);
         }}
         aria-label={fmt(get("courses.editCourse", "Modifier {name}"), { name: c.name })}
-        title={get("courses.editCourse", "Modifier le cours")}
+        data-tip={get("courses.editCourse", "Modifier le cours")}
         className="absolute top-2 right-2 eu-btn-quiet eu-btn-icon eu-btn-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-fast"
       >
         <PenIcon className="w-3.5 h-3.5" />
@@ -168,7 +168,7 @@ function CourseForm({
               key={key}
               type="button"
               onClick={() => setIconKey(key)}
-              title={label}
+              data-tip={label}
               aria-label={label}
               aria-pressed={iconKey === key}
               className={`w-8 h-8 grid place-items-center rounded border transition-colors duration-fast ${

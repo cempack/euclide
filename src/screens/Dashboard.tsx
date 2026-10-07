@@ -460,7 +460,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                         );
                     }}
                     className="eu-btn-ghost eu-btn-sm"
-                    title={l.url}
+                    data-tip={l.url}
                   >
                     <Favicon url={l.url} className="w-4 h-4 text-[0.5625rem]" remote={remoteIcons} />
                     <span className="truncate max-w-[18ch]">{l.label}</span>
@@ -505,7 +505,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                       <button
                         onClick={() => toggle(r)}
                         aria-label={`${get("reminders.markDone", "Marquer fait")} — ${r.title}`}
-                        title={get("reminders.markDone", "Marquer fait")}
+                        data-tip={get("reminders.markDone", "Marquer fait")}
                         className="w-4 h-4 shrink-0 rounded-sm border border-line-strong hover:border-ok hover:bg-ok-soft transition-colors duration-fast"
                       />
                       <span className="eu-t-body text-ink truncate flex-1">{r.title}</span>
@@ -513,7 +513,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                         <span
                           className="w-2 h-2 rounded-sm shrink-0"
                           style={{ background: courseVisual(course.color, resolved === "dark").fg }}
-                          title={course.name}
+                          data-tip={course.name}
                         />
                       )}
                       {due.text && (
@@ -532,7 +532,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                       <button
                         onClick={(e) => deleteReminder(r.id, e)}
                         aria-label={`${get("common.delete", "Supprimer")} — ${r.title}`}
-                        title={get("common.delete", "Supprimer")}
+                        data-tip={get("common.delete", "Supprimer")}
                         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                       >
                         <TrashIcon className="w-3.5 h-3.5" />
@@ -574,7 +574,8 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     key={f.id}
                     onClick={() => openFile(f)}
                     className="eu-row-hover w-full text-left"
-                    title={f.name}
+                    data-tip={f.name}
+                    aria-label={f.name}
                   >
                     <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
                     <span className="eu-t-body text-ink truncate flex-1">{f.name}</span>

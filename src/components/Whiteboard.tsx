@@ -732,7 +732,7 @@ export default function Whiteboard({
                 }}
                 aria-pressed={tool === t}
                 aria-label={label}
-                title={label}
+                data-tip={label}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle eu-no-drag"
               >
                 <Icon className="w-4 h-4" />
@@ -760,7 +760,8 @@ export default function Whiteboard({
           ))}
           <span
             className={`relative w-5 h-5 rounded-full border overflow-hidden cursor-pointer eu-no-drag ${!colorPresets.includes(color) && tool !== "eraser" ? "border-ink" : "border-line"}`}
-            title={get("whiteboard.customColor", "Couleur personnalisée")}
+            data-tip={get("whiteboard.customColor", "Couleur personnalisée")}
+            aria-label={get("whiteboard.customColor", "Couleur personnalisée")}
           >
             <input
               type="color"
@@ -787,7 +788,7 @@ export default function Whiteboard({
               onClick={() => setSize(s)}
               aria-pressed={size === s}
               aria-label={`${s} px`}
-              title={`${s} px`}
+              data-tip={`${s} px`}
               className={`w-6 h-6 grid place-items-center rounded border eu-no-drag transition-colors duration-fast ${size === s ? "border-ink bg-panel-alt" : "border-line hover:bg-panel-alt"}`}
             >
               <span
@@ -806,7 +807,7 @@ export default function Whiteboard({
           role="switch"
           aria-checked={opacity < 1}
           aria-label={get("whiteboard.opacity", "Semi-transparent")}
-          title={get("whiteboard.opacity", "Semi-transparent")}
+          data-tip={get("whiteboard.opacity", "Semi-transparent")}
           className="eu-btn-quiet eu-btn-sm eu-btn-toggle eu-no-drag"
         >
           {get("whiteboard.opacityShort", "Opacité")}
@@ -826,7 +827,7 @@ export default function Whiteboard({
           <button
             onClick={resetZoom}
             className="eu-btn-quiet eu-btn-sm eu-no-drag font-mono tabular-nums w-12"
-            title={get("whiteboard.zoomReset", "Réinitialiser le zoom")}
+            data-tip={get("whiteboard.zoomReset", "Réinitialiser le zoom")}
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -847,7 +848,7 @@ export default function Whiteboard({
             onClick={undo}
             disabled={itemCount === 0}
             aria-label={get("whiteboard.undo", "Annuler")}
-            title={get("whiteboard.undo", "Annuler")}
+            data-tip={get("whiteboard.undo", "Annuler")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
           >
             <UndoIcon className="w-3.5 h-3.5" />
@@ -856,7 +857,7 @@ export default function Whiteboard({
             onClick={clear}
             disabled={itemCount === 0}
             aria-label={get("whiteboard.clear", "Tout effacer")}
-            title={get("whiteboard.clear", "Tout effacer")}
+            data-tip={get("whiteboard.clear", "Tout effacer")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
           >
             <TrashIcon className="w-3.5 h-3.5" />
@@ -947,14 +948,14 @@ export default function Whiteboard({
             onClick={exportPng}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag"
             aria-label={get("whiteboard.exportPng", "Exporter en PNG")}
-            title={get("whiteboard.exportPng", "Exporter en PNG")}
+            data-tip={get("whiteboard.exportPng", "Exporter en PNG")}
           >
             <DownloadIcon className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={save}
             className="eu-btn-primary eu-btn-sm eu-no-drag"
-            title={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+            data-tip={`${get("common.save", "Enregistrer")} (${MOD}S)`}
           >
             {get("common.save", "Enregistrer")}
             {dirty && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
