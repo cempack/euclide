@@ -1532,6 +1532,146 @@ input[type="radio"] {
   background: #000;
 }
 
+/* An empty note offers its templates (features/notes/Templates.tsx). */
+.eu-template-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-panel-alt);
+}
+.eu-template-strip > .eu-t-label {
+  margin-right: 0.375rem;
+}
+
+/* A note as it prints (features/notes/PrintSheet.tsx). Laid out off screen
+   while it gets ready, so its fonts and formulas load; alone on the page in
+   print. Sizes in pt and mm: paper, not pixels. The page margins match
+   MARGINS_MM in src-tauri/src/print/mod.rs. */
+.eu-print {
+  position: fixed;
+  top: 0;
+  left: -400mm;
+  width: 178mm;
+  visibility: hidden;
+  pointer-events: none;
+  background: #fff;
+  color: var(--color-paper-ink);
+  font-family: var(--font-sans);
+}
+.eu-print-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8mm;
+  padding-bottom: 2mm;
+  margin-bottom: 7mm;
+  border-bottom: 0.5pt solid rgb(17 18 19 / 0.35);
+  font-family: var(--font-mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(17 18 19 / 0.62);
+}
+.eu-print-namebox {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 0.9fr 0.8fr;
+  margin-bottom: 8mm;
+  border: 0.75pt solid rgb(17 18 19);
+  border-radius: 1.5mm;
+  font-size: 8.5pt;
+  color: rgb(17 18 19 / 0.7);
+}
+.eu-print-namebox > span {
+  height: 14mm;
+  padding: 1.5mm 2.2mm;
+}
+.eu-print-namebox > span + span {
+  border-left: 0.75pt solid rgb(17 18 19);
+}
+.eu-print-mark {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.eu-print-mark b {
+  align-self: flex-end;
+  font-size: 11pt;
+  font-weight: 500;
+  color: rgb(17 18 19);
+}
+.eu-print-title {
+  margin: 0 0 5mm;
+  font-size: 19pt;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.eu-print .eu-prose {
+  font-size: 11pt;
+  line-height: 1.5;
+  color: rgb(17 18 19);
+}
+.eu-print .eu-prose > h1:first-child {
+  margin-top: 0;
+  margin-bottom: 5mm;
+  font-size: 19pt;
+  line-height: 1.2;
+}
+.eu-print .eu-prose h2 {
+  font-size: 13.5pt;
+}
+.eu-print .eu-prose h3 {
+  font-size: 11.5pt;
+}
+.eu-print .eu-prose :is(h1, h2, h3) {
+  break-after: avoid;
+}
+.eu-print .eu-prose :is(pre, table, blockquote, img, li, .katex-display) {
+  break-inside: avoid;
+}
+.eu-print .eu-prose :is(code, pre, th) {
+  background: rgb(17 18 19 / 0.04);
+}
+.eu-print .eu-prose a {
+  color: inherit;
+}
+.eu-print .eu-prose a[href^="http"]::after {
+  content: " (" attr(href) ")";
+  font-size: 0.85em;
+  color: rgb(17 18 19 / 0.6);
+  word-break: break-all;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm 16mm 18mm;
+
+    @bottom-right {
+      content: counter(page) " / " counter(pages);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 7.5pt;
+      color: rgb(17 18 19 / 0.55);
+    }
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body > :not(.eu-print) {
+    display: none !important;
+  }
+  .eu-print {
+    position: static;
+    width: auto;
+    visibility: visible;
+  }
+}
+
 /* The classroom scene (features/classroom): the time and the countdown for
    the projector, on the dark stage so a beamer does not glare. */
 .eu-scene {

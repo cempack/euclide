@@ -1,12 +1,17 @@
 import { lazy, Suspense, useEffect, useRef, useState, useCallback } from "react";
-import { Presentation } from "lucide-react";
+import { flushSync } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ClipboardCheck, FileDown, Presentation, Printer } from "lucide-react";
 import { Icon } from "../ui/Icon";
+import { MenuButton } from "../ui/Menu";
+import { q } from "../api/queries";
+import { openFile } from "../lib/files";
 import { useActiveId } from "../stores/tabs";
 import { tabs } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
-import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
+import { TrashIcon, CodeIcon, LinkIcon } from "./icons";
 import { tr } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { useSetting } from "../api/hooks";
@@ -17,6 +22,9 @@ import { relativeTime } from "../lib/format";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { Markdown } from "../features/notes/Markdown";
+import { PrintSheet, printDialog, sheetReady, type PrintJob } from "../features/notes/PrintSheet";
+import { TemplateMenu, TemplateStrip } from "../features/notes/Templates";
+import { fillTemplate, type NoteTemplate } from "../features/notes/templates";
 
 interface NoteEditorProps {
   tabId: string;
@@ -36,7 +44,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [draft, setDraft] = useState<Partial<Note> & { id?: number }>({
-    title: "Nouvelle note",
+    title: tr("notes.newTitle"),
     body: "",
     course_id: initialCourseId ?? null,
   });
@@ -64,7 +72,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const view: NoteView = savedView === "edit" || savedView === "preview" ? savedView : "split";
   const [linkPopupOpen, setLinkPopupOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
-  useShortcut("present", () => setPresenting(true), useActiveId() === tabId);
+  const active = useActiveId() === tabId;
+  useShortcut("present", () => setPresenting(true), active);
+  const [printJob, setPrintJob] = useState<PrintJob | null>(null);
   const [linkTextInput, setLinkTextInput] = useState("");
   const [linkUrlInput, setLinkUrlInput] = useState("https://");
   const [linkSelection, setLinkSelection] = useState<{ start: number; end: number } | null>(null);
@@ -92,7 +102,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         } else if (isNew) {
           // new note, preselect if initial
           commitDraft({
-            title: "Nouvelle note",
+            title: tr("notes.newTitle"),
             body: "",
             course_id: initialCourseId ?? null,
           });
@@ -329,7 +339,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
   const onTitleChange = (title: string) => {
     markDirty({ title });
-    tabs.rename(tabId, title || "Nouvelle note");
+    tabs.rename(tabId, title || tr("notes.newTitle"));
   };
   const onCourseChange = (courseId: number | null) => markDirty({ course_id: courseId });
 
@@ -362,37 +372,92 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     }
   };
 
-  const exportPdf = async () => {
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const title = draft.title || "Note";
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(title, 48, 56);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    const body = (draft.body || "")
-      .replace(/\$\$[\s\S]*?\$\$/g, "[formule]")
-      .replace(/\$[^$]+\$/g, "[formule]");
-    const lines = doc.splitTextToSize(body || " ", 500);
-    doc.text(lines, 48, 84);
-    try {
-      const f = await api.createFileBytes(`${title}.pdf`, doc.output("arraybuffer"), {
-        courseId: draft.course_id ?? null,
+  const classes = useQuery({
+    ...q.courseClasses(draft.course_id ?? 0),
+    enabled: draft.course_id != null,
+  }).data;
+
+  /** The note's course, its classes and today: for templates and the printed header. */
+  const context = () => ({
+    cours: courses.find((c) => c.id === draft.course_id)?.name ?? "",
+    classe: (classes ?? []).map((c) => c.class_name).join(", "),
+    date: new Date().toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }),
+  });
+
+  /**
+   * Starts the note from a template (asking first if it has text). An
+   * untitled note takes the template's title; the first « … » is selected,
+   * ready to type over.
+   */
+  const applyTemplate = async (t: NoteTemplate) => {
+    const current = draftRef.current;
+    if ((current.body || "").trim()) {
+      const ok = await confirm.ask({
+        title: tr("templates.replaceTitle"),
+        message: tr("templates.replaceMessage", { name: t.name }),
+        confirmLabel: tr("templates.replace"),
+        danger: true,
       });
-      if (!f?.id) {
-        doc.save(`${title}.pdf`);
-        toast(tr("notes.exported").replace("{name}", `${title}.pdf`), "success");
+      if (!ok) return;
+    }
+    const filled = fillTemplate(t, context());
+    const untitled = !current.title?.trim() || current.title === tr("notes.newTitle");
+    markDirty({ body: filled.body, ...(untitled ? { title: filled.title } : {}) });
+    if (untitled) tabs.rename(tabId, filled.title);
+    window.setTimeout(() => {
+      const ta = textareaRef.current;
+      const at = filled.body.indexOf("…");
+      if (!ta) return;
+      ta.focus();
+      if (at >= 0) ta.setSelectionRange(at, at + 1);
+    }, 0);
+  };
+
+  /**
+   * « pdf » and « evaluation » write a PDF into the library (with the
+   * note's course), « paper » opens the print dialog. Where the webview
+   * cannot write the PDF itself, the dialog takes over.
+   */
+  const print = async (kind: "pdf" | "evaluation" | "paper") => {
+    if (printJob) return;
+    const title = draft.title?.trim() || tr("notes.newTitle");
+    const { cours, classe, date } = context();
+    const job: PrintJob = {
+      title,
+      body: draft.body || "",
+      context: [cours, classe].filter(Boolean).join(" · "),
+      date,
+      nameBox: kind === "evaluation",
+    };
+    flushSync(() => setPrintJob(job));
+    try {
+      await sheetReady();
+      if (kind === "paper" || !isTauri()) {
+        await printDialog();
         return;
       }
-      toast(tr("notes.exported").replace("{name}", f.name), "success");
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
-    } catch (err) {
-      reportError("note.exportPdf", err);
-      doc.save(`${title}.pdf`);
-      toast(tr("notes.exported").replace("{name}", `${title}.pdf`), "success");
+      try {
+        const file = await api.printToPdf(title, draft.course_id ?? null);
+        api.logEvent("note_export", file.name, draft.course_id ?? null);
+        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        toast(tr("print.saved", { name: file.name }), "success", {
+          action: { label: tr("print.open"), run: () => openFile(file) },
+        });
+      } catch (err) {
+        reportError("note.printToPdf", err);
+        toast(tr("print.fallback"), "info");
+        await printDialog();
+      }
+    } finally {
+      setPrintJob(null);
     }
   };
+  useShortcut("print", () => void print("paper"), active);
 
   if (loading) {
     return <Loading label={tr("notes.loading")} />;
@@ -438,9 +503,29 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <Icon icon={Presentation} size={14} />
             <span className="hidden @3xl:inline">{tr("slides.present")}</span>
           </button>
-          <button onClick={exportPdf} className="eu-btn-quiet eu-btn-sm" data-tip={tr("notes.exportPdf")}>
-            <DownloadIcon className="w-3.5 h-3.5" /> PDF
-          </button>
+          <MenuButton
+            label={tr("print.menu")}
+            className="eu-btn-quiet eu-btn-sm"
+            items={[
+              { label: tr("print.pdf"), icon: FileDown, onSelect: () => void print("pdf") },
+              {
+                label: tr("print.evaluation"),
+                icon: ClipboardCheck,
+                onSelect: () => void print("evaluation"),
+              },
+              "separator",
+              {
+                label: tr("print.paper"),
+                icon: Printer,
+                keys: keysOf("print"),
+                onSelect: () => void print("paper"),
+              },
+            ]}
+          >
+            <Icon icon={FileDown} size={14} />
+            <span className="hidden @3xl:inline">PDF</span>
+            <Icon icon={ChevronDown} size={14} />
+          </MenuButton>
           {draft.id && (
             <button
               onClick={doDelete}
@@ -517,6 +602,10 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               </button>
             </ToolGroup>
           )}
+          <TemplateMenu
+            note={{ title: draft.title || "", body: draft.body || "" }}
+            onPick={(t) => void applyTemplate(t)}
+          />
           <ToolSpacer />
           <span className="eu-t-caption truncate @max-4xl:hidden">{tr("notes.markdownHint")}</span>
           <Segmented
@@ -567,6 +656,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           </div>
         )}
       </div>
+
+      {!(draft.body || "").trim() && <TemplateStrip onPick={(t) => void applyTemplate(t)} />}
 
       {/* Source | preview */}
       <div className="flex-1 min-h-0 flex flex-col @3xl:flex-row overflow-hidden">
@@ -621,6 +712,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           </div>
         )}
       </div>
+
+      {printJob && <PrintSheet job={printJob} />}
 
       {presenting && (
         <Suspense fallback={null}>

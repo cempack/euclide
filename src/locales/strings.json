@@ -44,7 +44,8 @@
     "active": "Activé",
     "enable": "Activer",
     "more": "Plus d'outils",
-    "searchEllipsis": "Rechercher…"
+    "searchEllipsis": "Rechercher…",
+    "undo": "Annuler"
   },
   "dashboard": {
     "noClassesToday": "Aucun cours aujourd'hui.",
@@ -378,7 +379,7 @@
     "titlePlaceholder": "Titre de la note",
     "source": "Source Markdown",
     "preview": "Aperçu",
-    "previewEmpty": "L'aperçu apparaîtra ici...",
+    "previewEmpty": "L'aperçu apparaîtra ici…",
     "general": "Général",
     "addLink": "Ajouter un lien",
     "linkText": "Texte du lien",
@@ -391,8 +392,6 @@
     "loadError": "Erreur de chargement",
     "saveError": "Erreur lors de l'enregistrement",
     "deleteConfirm": "Supprimer cette note ?",
-    "exportPdf": "Exporter en PDF",
-    "exported": "Exporté : {name}",
     "courseTitle": "Affecter à un cours",
     "format": "Mise en forme",
     "bold": "Gras",
@@ -523,7 +522,8 @@
     "groupPalette": "Dans la palette",
     "navigateList": "Parcourir les résultats",
     "checkPython": "Vérifier le script Python",
-    "present": "Présenter la note"
+    "present": "Présenter la note",
+    "print": "Imprimer la note"
   },
   "confirm": {
     "unsavedTitle": "Modifications non enregistrées",
@@ -740,5 +740,33 @@
     "close": "Fermer",
     "keys": "Espace : pause · R : recommencer · + / − : une minute · 1…9 : minutes · Échap : fermer",
     "fullscreen": "Plein écran"
+  },
+  "print": {
+    "menu": "Exporter ou imprimer",
+    "pdf": "Exporter en PDF",
+    "evaluation": "PDF d'évaluation (nom, prénom, note)",
+    "paper": "Imprimer…",
+    "name": "Nom",
+    "firstName": "Prénom",
+    "class": "Classe",
+    "mark": "Note",
+    "saved": "PDF enregistré : {name}",
+    "open": "Ouvrir",
+    "fallback": "Export direct impossible ici : choisissez « Enregistrer au format PDF » dans la fenêtre d'impression."
+  },
+  "templates": {
+    "start": "Partir d'un modèle",
+    "menu": "Modèles",
+    "saveAs": "Enregistrer comme modèle…",
+    "saveTitle": "Enregistrer comme modèle",
+    "name": "Nom du modèle",
+    "hint": "Dans le texte, {placeholders} seront remplacés à chaque nouvelle note ; « … » marque où écrire.",
+    "nameTaken": "Ce nom est celui d'un modèle d'Euclide : choisissez-en un autre.",
+    "saved": "Modèle « {name} » enregistré",
+    "delete": "Supprimer « {name} »",
+    "deleted": "Modèle « {name} » supprimé",
+    "replaceTitle": "Remplacer le texte de la note ?",
+    "replaceMessage": "Le modèle « {name} » prendra la place du texte actuel.",
+    "replace": "Remplacer"
   }
 }
