@@ -17,7 +17,8 @@ export function errorCode(err: unknown): string | null {
 export function errorMessage(err: unknown, fallback = "Une erreur est survenue."): string {
   let msg = "";
   if (typeof err === "string") msg = err;
-  else if (err instanceof Error) msg = err.message;
+  // A TypeError and the like is a bug, in English: the teacher gets the fallback.
+  else if (err instanceof Error) msg = err.name === "Error" ? err.message : "";
   else if (err && typeof err === "object" && "message" in err) {
     const m = (err as { message: unknown }).message;
     if (typeof m === "string") msg = m;

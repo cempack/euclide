@@ -146,7 +146,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     if (!pdfSrc || !ifr?.contentWindow) return;
     try {
       const res = await fetch(pdfSrc);
-      if (!res.ok) throw new Error("fetch pdf failed");
+      if (!res.ok) throw new Error("Le document n'a pas pu être lu.");
       const buffer = await res.arrayBuffer();
       ifr.contentWindow.postMessage({ type: "euclide-open", buffer }, "*", [buffer]);
     } catch (e) {
@@ -312,7 +312,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     const base = fileName.replace(/\.[^.]+$/, "");
     try {
       const blob = await new Promise<Blob | null>((resolve) => merged.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("png");
+      if (!blob) throw new Error("L'image n'a pas pu être créée.");
       const f = await api.createFileBytes(`${base} (annoté).png`, await blob.arrayBuffer());
       if (!f?.id) {
         toast(get("messages.genericError", "Erreur"), "error");

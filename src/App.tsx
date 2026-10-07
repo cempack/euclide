@@ -251,7 +251,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
         if (saved?.id) tabs.open({ kind: "note", title: payload, params: { noteId: saved.id } });
       } else {
         const created = await api.createReminder(payload, null);
-        if (!created?.id) throw new Error("no id");
+        if (!created?.id) throw new Error("Le rappel n'a pas été enregistré.");
         window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
         toast(get("capture.reminderSaved", "Rappel ajouté"), "success");
         onClose();

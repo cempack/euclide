@@ -84,10 +84,10 @@ function normalizeExternalUrl(url: string): string {
 /** Open a quick link in the system browser. Throws if nothing could launch. */
 async function openExternalUrl(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
-  if (!href) throw new Error("empty url");
+  if (!href) throw new Error("Adresse vide.");
   if (!isTauri()) {
     const opened = window.open(href, "_blank", "noopener,noreferrer");
-    if (!opened) throw new Error("popup blocked");
+    if (!opened) throw new Error("L'ouverture du lien a été bloquée.");
     return;
   }
   await invoke<void>("open_url", { url: href });
