@@ -769,6 +769,11 @@ function handle(cmd: string, args: Args): unknown {
       return notes.filter((n) => n.course_id === num(args, "courseId"));
     case "all_notes":
       return notes.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    case "get_note": {
+      const note = notes.find((n) => n.id === Number(args?.id));
+      if (!note) throw { code: "not_found", message: "Note introuvable." };
+      return note;
+    }
     case "save_note": {
       const input = (args?.note ?? {}) as Partial<Note>;
       const existing = input.id ? notes.find((n) => n.id === input.id) : undefined;

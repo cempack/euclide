@@ -111,8 +111,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             if (mounted) setLoading(false);
             return;
           }
-          const all = (await api.allNotes()) ?? [];
-          const found = all.find((n) => n.id === noteId);
+          const found = await api.getNote(noteId);
           if (found && mounted) {
             commitDraft(found);
             setPreviewBody(found.body || "");

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, invalidateCache, type PythonDemo, type PythonResult } from "../lib/api";
+import { api, type PythonDemo, type PythonResult } from "../lib/api";
 import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
@@ -151,7 +151,6 @@ export default function Python() {
     }
     const d = await api.importScript();
     if (d) {
-      invalidateCache("listDemos");
       setOpenScript({
         name: d.name,
         code: d.code,
@@ -191,7 +190,6 @@ export default function Python() {
           isDirty: false,
         });
 
-        invalidateCache("listDemos");
         // Still refresh in background to fully reconcile list + ensure selection (in case of races or external changes).
         refresh(created.path).catch(logged("python.refresh"));
 
@@ -257,7 +255,6 @@ export default function Python() {
       });
       if (!ok) return;
       await api.deleteScript(openScript.path);
-      invalidateCache("listDemos");
     }
     setOpenScript(null);
     setResult(null);
@@ -302,7 +299,6 @@ export default function Python() {
           toast("Impossible de renommer le script", "error");
           return;
         }
-        invalidateCache("listDemos");
         // Optimistically update demos list (path may be new)
         setDemos((prev) => {
           const filtered = prev.filter((d) => d.path !== openScript.path);
