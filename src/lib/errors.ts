@@ -25,5 +25,18 @@ export function errorMessage(err: unknown, fallback = "Une erreur est survenue."
   }
   // Older commands sometimes returned a JSON-quoted string.
   msg = msg.trim().replace(/^"+|"+$/g, "");
-  return msg || fallback;
+  return frenchSpaces(msg) || fallback;
+}
+
+/**
+ * French typography for messages written elsewhere (Rust, Python): a
+ * no-break space before « : ; ! ? » and inside guillemets, so the sign
+ * never starts a line. strings.json is written that way already. Not the
+ * narrow one: in IBM Plex it is so thin that « Prêt ? » reads « Prêt? ».
+ */
+export function frenchSpaces(text: string): string {
+  return text
+    .replace(/ ([:;!?])(?=\s|$|[»)\]…*_.,])/g, "\u00a0$1")
+    .replace(/« /g, "«\u00a0")
+    .replace(/ »/g, "\u00a0»");
 }
