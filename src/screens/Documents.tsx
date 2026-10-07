@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import { api, type Course, type FileItem, type Note } from "../lib/api";
 import { tabs } from "../stores/tabs";
+import { openFile } from "../lib/files";
 import { t, fmt, get } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
@@ -233,20 +234,12 @@ export default function Documents({
     }
   };
 
-  const openFile = (f: FileItem) => {
-    api.logEvent("file_open", f.name, f.course_id);
-    if (f.kind === "board") tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
-    else if (f.kind === "pdf" || f.kind === "image")
-      tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
-    else api.openFile(f.id);
-  };
-
   const openNote = (n: Note) => {
     tabs.open({ kind: "note", title: n.title || "Note", params: { noteId: n.id } });
   };
 
   // Stable callbacks (Memo* are now hoisted at top of module)
-  const handleOpenFile = useCallback((f: FileItem) => openFile(f), [openFile]);
+  const handleOpenFile = useCallback((f: FileItem) => openFile({ ...f, courseId: f.course_id }), []);
   const handleOpenNote = useCallback((n: Note) => openNote(n), [openNote]);
 
   const startRenameFile = useCallback((f: FileItem) => {
@@ -272,10 +265,7 @@ export default function Documents({
       if (!ok) return;
       try {
         await api.deleteFile(f.id);
-        tabs
-          .list()
-          .filter((t) => t.params.fileId === f.id)
-          .forEach((t) => tabs.close(t.id));
+        tabs.closeFile(f.id);
         toast(get("documents.toastDeleted", "Supprimé"), "success");
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       } catch (err: any) {

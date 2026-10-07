@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { tabs } from "../stores/tabs";
+import { openFile } from "../lib/files";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import {
@@ -540,14 +541,6 @@ function FilesPane({
   const toast = useToast();
   const confirmDlg = useConfirm();
 
-  const openFile = (f: FileItem) => {
-    api.logEvent("file_open", f.name, f.course_id);
-    if (f.kind === "board") tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
-    else if (f.kind === "pdf" || f.kind === "image")
-      tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
-    else api.openFile(f.id);
-  };
-
   if (files.length === 0) {
     return (
       <EmptyState
@@ -572,7 +565,7 @@ function FilesPane({
       {files.map((f) => (
         <div key={f.id} className="eu-row-hover group">
           <button
-            onClick={() => openFile(f)}
+            onClick={() => openFile({ ...f, courseId: f.course_id })}
             className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
             data-tip={f.name}
             aria-label={f.name}
@@ -596,10 +589,7 @@ function FilesPane({
               if (!ok) return;
               try {
                 await api.deleteFile(f.id);
-                tabs
-                  .list()
-                  .filter((tab) => tab.params.fileId === f.id)
-                  .forEach((tab) => tabs.close(tab.id));
+                tabs.closeFile(f.id);
                 window.dispatchEvent(new CustomEvent("eu:library-changed"));
                 onChanged();
               } catch (err: any) {
@@ -715,14 +705,7 @@ function SequencePane({
   const openItemFile = (item: SequenceItem) => {
     if (item.file_id == null) return;
     const name = item.file_name || get("common.document", "Document");
-    api.logEvent("file_open", name, courseId);
-    if (item.file_kind === "board") {
-      tabs.open({ kind: "whiteboard", title: name, params: { fileId: item.file_id } });
-    } else if (item.file_kind === "pdf" || item.file_kind === "image") {
-      tabs.open({ kind: "pdf", title: name, params: { fileId: item.file_id, fileName: name } });
-    } else {
-      api.openFile(item.file_id);
-    }
+    openFile({ id: item.file_id, name, kind: item.file_kind || "file", courseId });
   };
 
   return (
@@ -1012,16 +995,8 @@ function ClassCard({
 
   const reopen = () => {
     if (!cc.last_file_id) return;
-    api.logEvent("progress_reopen", cc.last_file_name || "", courseId);
-    const kind = cc.last_file_kind || "file";
     const name = cc.last_file_name || "Document";
-    if (kind === "board") {
-      tabs.open({ kind: "whiteboard", title: name, params: { fileId: cc.last_file_id } });
-    } else if (kind === "pdf" || kind === "image") {
-      tabs.open({ kind: "pdf", title: name, params: { fileId: cc.last_file_id, fileName: name } });
-    } else {
-      api.openFile(cc.last_file_id);
-    }
+    openFile({ id: cc.last_file_id, name, kind: cc.last_file_kind || "file", courseId }, "progress_reopen");
   };
 
   return (
