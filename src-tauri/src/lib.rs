@@ -49,6 +49,12 @@ pub fn run() {
             crate::portable_update::purge_update_leftovers(&exe_dir);
             #[cfg(windows)]
             crate::portable_update::schedule_leftover_cleanup(&exe_dir);
+            // A restore chosen in Settings is applied before the database opens.
+            match jobs::backup::apply_pending_restore() {
+                Ok(Some(name)) => perf::append(&[format!("backup.restored={name}")]),
+                Ok(None) => {}
+                Err(e) => eprintln!("[backup] restore: {}", e.message()),
+            }
             let db = match db::Db::open(&crate::paths::db_path()) {
                 Ok(db) => db,
                 Err(err) => {
@@ -68,6 +74,8 @@ pub fn run() {
             app.manage(db);
             app.manage(KeepAwake::default());
             app.manage(jobs::indexer::Indexer::default());
+            app.manage(jobs::backup::Health::default());
+            jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
 
@@ -202,9 +210,14 @@ pub fn run() {
             commands::python::run_python_demo,
             commands::python::run_python_code,
             commands::python::python_complete,
-            commands::legacy::choose_data_dir,
-            commands::legacy::reset_data_dir,
-            commands::legacy::backup_data_dir,
+            commands::storage::choose_data_dir,
+            commands::storage::reset_data_dir,
+            commands::storage::backup_data_dir,
+            commands::storage::get_backup_status,
+            commands::storage::backup_now,
+            commands::storage::choose_backup_folder,
+            commands::storage::clear_backup_folder,
+            commands::storage::restore_snapshot,
             commands::settings::set_keep_awake,
             commands::settings::keep_awake_status,
             commands::settings::get_setting,

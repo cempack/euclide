@@ -255,9 +255,9 @@ pub fn list_openers() -> Vec<Opener> {
     ]
 }
 
-/// Delete a document, its versions and annotations. The row goes first (in
-/// a transaction): files left on disk by an interruption are harmless,
-/// rows pointing at nothing are not.
+/// Delete a document, its versions and annotations; the document itself goes
+/// to the trash for 30 days. The row goes first (in a transaction): files left
+/// on disk by an interruption are harmless, rows pointing at nothing are not.
 #[tauri::command]
 pub async fn delete_file(db: State<'_, Db>, id: i64) -> AppResult<()> {
     db.write(move |conn| {
@@ -281,10 +281,14 @@ pub async fn delete_file(db: State<'_, Db>, id: i64) -> AppResult<()> {
         )?;
         tx.execute("DELETE FROM doc_index WHERE file_id=?1", [id])?;
         tx.commit()?;
-        for rel in versions.iter().chain(rel.iter()) {
+        for rel in &versions {
             if let Ok(path) = abs_path(rel) {
                 let _ = fs::remove_file(path);
             }
+        }
+        // The document itself waits 30 days in Euclide-Sauvegardes/corbeille/.
+        if let Some(path) = rel.and_then(|r| abs_path(&r).ok()) {
+            crate::jobs::backup::trash(&path);
         }
         Ok(())
     })
