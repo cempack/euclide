@@ -4,7 +4,9 @@ import { Highlight } from "./Highlight";
 
 describe("Highlight", () => {
   it("marks the words the search found, and only them", () => {
-    const { container } = render(<Highlight text={"la fonction \u0002carrée\u0003 est \u0002paire\u0003…"} />);
+    const { container } = render(
+      <Highlight text={"la fonction \u0002carrée\u0003 est \u0002paire\u0003…"} />,
+    );
     expect([...container.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["carrée", "paire"]);
     expect(container.textContent).toBe("la fonction carrée est paire…");
   });
