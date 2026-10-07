@@ -1,8 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 static DATA_DIR_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// The data folder once startup has settled it (see `freeze_data_dir`).
+static FROZEN_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 #[cfg(test)]
 pub(crate) static TEST_ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -199,9 +202,25 @@ fn ensure_subdirs(dir: &Path) {
 /// Default (no config): a folder named `Euclide-Data` next to the application (classic USB-key behavior).
 /// User can override via Settings → choose any folder; the pointer is stored in euclide-data.json next to the app.
 pub fn data_dir() -> PathBuf {
+    if let Some(dir) = FROZEN_DATA_DIR.get() {
+        return dir.clone();
+    }
     let dir = intended_data_dir();
     ensure_subdirs(&dir);
     dir
+}
+
+/// Settle the data folder for the rest of the process, once startup has
+/// checked it is writable. Every later `data_dir()` is a plain clone instead
+/// of re-reading euclide-data.json and creating four folders on each call.
+pub fn freeze_data_dir() -> PathBuf {
+    FROZEN_DATA_DIR
+        .get_or_init(|| {
+            let dir = intended_data_dir();
+            ensure_subdirs(&dir);
+            dir
+        })
+        .clone()
 }
 
 /// Make sure Euclide-Data can actually be written. If the folder next to the app is
