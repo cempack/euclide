@@ -7,6 +7,9 @@ import { MetaDot, PageHeader, Panel } from "../components/layout";
 import { tr, trn } from "../lib/i18n";
 import { logged } from "../lib/report";
 import { BookIcon, DocIcon, RefreshIcon } from "../components/icons";
+import { Copy } from "lucide-react";
+import { Icon } from "../ui/Icon";
+import { matiereMatches } from "../features/classroom/lesson";
 
 interface ContentItem {
   date?: string;
@@ -24,6 +27,52 @@ interface ContentItem {
 }
 
 const NO_CONTENTS: ContentItem[] = [];
+
+/** The Monday of a date's week, at midnight. */
+function mondayOf(d: Date): Date {
+  const m = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+  return m;
+}
+
+/**
+ * Lessons by week, most recent first: « Cette semaine », « Semaine
+ * dernière », then « Semaine du lundi 22 septembre ».
+ */
+function byWeek(items: ContentItem[]): { key: string; label: string; items: ContentItem[] }[] {
+  const thisWeek = mondayOf(new Date()).getTime();
+  const DAY = 86_400_000;
+  const weeks = new Map<number, ContentItem[]>();
+  for (const c of items) {
+    const [y, m, d] = (c.date ?? "").slice(0, 10).split("-").map(Number);
+    const at = y ? mondayOf(new Date(y, m - 1, d)).getTime() : 0;
+    weeks.set(at, [...(weeks.get(at) ?? []), c]);
+  }
+  return [...weeks.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([at, list]) => {
+      const days = Math.round((at - thisWeek) / DAY);
+      const label = !at
+        ? tr("classContent.weekUnknown")
+        : days === 0
+          ? tr("classContent.weekThis")
+          : days === -7
+            ? tr("classContent.weekLast")
+            : days === 7
+              ? tr("classContent.weekNext")
+              : tr("classContent.weekOf", {
+                  date: new Date(at).toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  }),
+                });
+      const sorted = list
+        .slice()
+        .sort((a, b) => `${b.date}${b.start_time}`.localeCompare(`${a.date}${a.start_time}`));
+      return { key: String(at), label, items: sorted };
+    });
+}
 
 export default function ClassContent({
   courseId,
@@ -58,10 +107,9 @@ export default function ClassContent({
   const isRefreshing = contentsQ.isFetching && !contentsQ.isPending;
   const lastRefresh = contentsQ.dataUpdatedAt ? new Date(contentsQ.dataUpdatedAt) : null;
   const error = noMatiere
-    ? "Aucune matière définie pour ce cours. Modifiez le cours pour choisir Mathématiques, NSI ou Maths expertes."
+    ? tr("classContent.noMatiere")
     : contentsQ.error
-      ? contentsQ.error.message ||
-        "Impossible de récupérer le contenu Pronote. Vérifiez la connexion Pronote (prof)."
+      ? contentsQ.error.message || tr("classContent.loadError")
       : null;
 
   const copyUrl = (url?: string) => {
@@ -73,7 +121,7 @@ export default function ClassContent({
       })
       .catch(() => {
         // No clipboard access: show the link instead.
-        toast(tr("classContent.linkFallback").replace("{url}", url), "success");
+        toast(tr("classContent.linkFallback", { url }), "success");
       });
   };
 
@@ -97,7 +145,7 @@ export default function ClassContent({
         }}
         backLabel={course?.name || tr("classContent.back")}
         icon={<BookIcon className="w-5 h-5" />}
-        title={tr("classContent.title").replace("{class}", className)}
+        title={tr("classContent.title", { class: className })}
         meta={
           <>
             <span>{effectiveMatiere || tr("common.none")}</span>
@@ -156,9 +204,7 @@ export default function ClassContent({
           <EmptyState
             icon={<BookIcon className="w-4 h-4" />}
             title={tr("classContent.noContent")}
-            hint={tr("classContent.noContentHint")
-              .replace("{class}", className)
-              .replace("{matiere}", effectiveMatiere)}
+            hint={tr("classContent.noContentHint", { class: className, matiere: effectiveMatiere })}
             action={
               <button onClick={refreshContents} className="eu-btn-ghost eu-btn-sm">
                 <RefreshIcon className="w-3.5 h-3.5" />
@@ -168,78 +214,76 @@ export default function ClassContent({
           />
         </Panel>
       ) : (
-        <div className={`space-y-4 ${loading || isRefreshing ? "opacity-60" : ""}`}>
-          {contents.map((c, idx) => (
-            <div key={idx} className="eu-panel p-[14px]">
-              <div className="flex items-start gap-3.5">
-                {/* Date rail: the spine of a cahier de textes. */}
-                <div className="w-[92px] shrink-0 eu-panel-alt rounded px-2 py-1.5">
-                  <p className="eu-t-caption text-ink">{c.date_label || c.date?.slice(0, 10)}</p>
-                  <p className="eu-t-caption mt-0.5">
-                    {c.start_time}–{c.end_time}
-                  </p>
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-2">
-                  {/* Title + category — more prominent */}
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <BookIcon className="w-4 h-4 text-ink-muted shrink-0" />
-                    <span className="eu-t-title text-ink">{c.title || "(sans titre)"}</span>
-                    {c.category && <span className="eu-chip">{c.category}</span>}
-                    {c.subject && c.subject !== effectiveMatiere && (
-                      <span className="eu-t-caption text-ink-muted">({c.subject})</span>
-                    )}
-                  </div>
-
-                  {/* Description — the actual lesson content */}
-                  {c.description && <p className="eu-t-body text-ink">{c.description}</p>}
-
-                  {/* Meta */}
-                  {c.groups && <div className="eu-t-small text-ink-muted">Groupes : {c.groups}</div>}
-
-                  {/* Documents — now a distinctive attachment block */}
-                  {c.documents && c.documents.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-line">
-                      <div className="eu-t-label mb-1.5">Documents joints ({c.documents.length})</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {c.documents.map((d, di) => (
-                          <div
-                            key={di}
-                            className="flex items-center gap-1.5 eu-t-small bg-panel-alt border border-line rounded px-2 py-1 max-w-full"
-                          >
-                            <DocIcon className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-                            {d.url ? (
-                              <button
-                                onClick={() => {
-                                  if (!d.url) return;
-                                  api.openUrl(d.url).catch(logged("classContent.openUrl"));
-                                }}
-                                className="truncate font-medium max-w-[220px] text-left hover:underline hover:text-ink focus:outline-hidden"
-                                data-tip="Ouvrir dans le navigateur"
-                              >
-                                {d.name}
-                              </button>
-                            ) : (
-                              <span className="truncate font-medium max-w-[220px]">{d.name}</span>
-                            )}
-                            {d.url && (
-                              <button
-                                onClick={() => copyUrl(d.url)}
-                                className="eu-btn-quiet eu-btn-sm ml-1"
-                                data-tip="Copier le lien direct Pronote"
-                              >
-                                copier
-                              </button>
-                            )}
-                            <span className="eu-t-caption ml-1">{d.type === 1 ? "fichier" : "lien"}</span>
-                          </div>
-                        ))}
-                      </div>
+        <div className={`flex flex-col gap-5 ${loading || isRefreshing ? "opacity-60" : ""}`}>
+          {byWeek(contents).map((week) => (
+            <section key={week.key} aria-label={week.label}>
+              <h2 className="eu-t-label mb-2">{week.label}</h2>
+              <div className="eu-panel eu-divide selectable">
+                {week.items.map((c, idx) => (
+                  <article key={`${c.lesson_id ?? idx}-${c.date}`} className="eu-lesson">
+                    {/* The date rail: the spine of a cahier de textes. */}
+                    <div className="eu-lesson-date">
+                      <p className="eu-t-small text-ink font-medium first-letter:uppercase">
+                        {c.date_label || c.date?.slice(0, 10)}
+                      </p>
+                      <p className="eu-t-caption mt-0.5">
+                        {c.start_time}–{c.end_time}
+                      </p>
                     </div>
-                  )}
-                </div>
+                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="eu-t-title text-ink">{c.title || tr("classContent.untitled")}</span>
+                        {c.category && <span className="eu-chip">{c.category}</span>}
+                        {c.subject && !matiereMatches(effectiveMatiere, c.subject) && (
+                          <span className="eu-t-caption">{c.subject}</span>
+                        )}
+                      </div>
+                      {c.description && (
+                        <p className="eu-t-body text-ink whitespace-pre-line">{c.description}</p>
+                      )}
+                      {c.groups && (
+                        <p className="eu-t-meta">{tr("classContent.groups", { groups: c.groups })}</p>
+                      )}
+                      {c.documents && c.documents.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {c.documents.map((d, di) => (
+                            <span key={di} className="eu-resource">
+                              {d.url ? (
+                                <button
+                                  type="button"
+                                  className="eu-resource-open"
+                                  onClick={() => api.openUrl(d.url!).catch(logged("classContent.openUrl"))}
+                                  data-tip={tr("classContent.openInBrowser")}
+                                >
+                                  <DocIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" />
+                                  <span className="truncate">{d.name}</span>
+                                </button>
+                              ) : (
+                                <span className="eu-resource-open">
+                                  <DocIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" />
+                                  <span className="truncate">{d.name}</span>
+                                </span>
+                              )}
+                              {d.url && (
+                                <button
+                                  type="button"
+                                  className="eu-resource-copy"
+                                  onClick={() => copyUrl(d.url)}
+                                  aria-label={tr("classContent.copyLink", { name: d.name })}
+                                  data-tip={tr("classContent.copyLinkTip")}
+                                >
+                                  <Icon icon={Copy} size={14} />
+                                </button>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                ))}
               </div>
-            </div>
+            </section>
           ))}
         </div>
       )}
