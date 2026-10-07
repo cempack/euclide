@@ -1,366 +1,125 @@
 import type { SVGProps } from "react";
+import {
+  Archive,
+  ArrowRight,
+  BookOpen,
+  Bell,
+  Calendar,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  CircleCheck,
+  CircleHelp,
+  Clock,
+  CodeXml,
+  Coffee,
+  Download,
+  Eraser,
+  File,
+  FileText,
+  Folder,
+  Globe,
+  Image,
+  Layers,
+  LayoutGrid,
+  Link,
+  Moon,
+  NotebookPen,
+  Pause,
+  PenLine,
+  Pin,
+  Play,
+  Plus,
+  Projector,
+  QrCode,
+  RectangleHorizontal,
+  RefreshCw,
+  Repeat,
+  ScrollText,
+  Search,
+  Settings,
+  Slash,
+  Sparkles,
+  Sun,
+  Trash2,
+  Type,
+  Undo2,
+  Wrench,
+  X,
+  House,
+  type LucideIcon,
+  type LucideProps,
+} from "lucide-react";
+import { ICON_STROKE } from "../ui/Icon";
 
+/**
+ * The names screens already import, now drawn by lucide at Euclide's stroke
+ * weight (see ui/Icon.tsx). Sizes come from the caller's className.
+ */
 type IconProps = SVGProps<SVGSVGElement>;
 
-const base = (props: IconProps) => ({
-  width: 20,
-  height: 20,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.8,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  ...props,
-});
+function glyph(Glyph: LucideIcon) {
+  return function GlyphIcon(props: IconProps) {
+    return (
+      <Glyph size={20} strokeWidth={ICON_STROKE} aria-hidden focusable={false} {...(props as LucideProps)} />
+    );
+  };
+}
 
-export const HomeIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M3 10.5 12 4l9 6.5" />
-    <path d="M5 9.5V20h14V9.5" />
-    <path d="M9.5 20v-5h5v5" />
-  </svg>
-);
-
-export const BookIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z" />
-    <path d="M18 19H6a2 2 0 0 0-2 2" />
-    <path d="M8 7h8M8 11h8M8 15h8" />
-  </svg>
-);
-
-export const DocIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M14 3v5h5" />
-    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <path d="M8.5 13h7M8.5 17h7" />
-  </svg>
-);
-
-export const ToolIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.8-.4-.4-2.8z" />
-  </svg>
-);
-
-export const SparkleIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M12 4.5c.5 2.6 1.4 3.5 4 4-2.6.5-3.5 1.4-4 4-.5-2.6-1.4-3.5-4-4 2.6-.5 3.5-1.4 4-4Z" />
-    <path d="M18.5 14.5c.28 1.3.7 1.72 2 2-1.3.28-1.72.7-2 2-.28-1.3-.7-1.72-2-2 1.3-.28 1.72-.7 2-2Z" />
-  </svg>
-);
-
-export const GearIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 6 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H2a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H22a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-  </svg>
-);
-
-export const PlusIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);
-
-export const SearchIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="11" cy="11" r="7" />
-    <path d="m20 20-3.2-3.2" />
-  </svg>
-);
-
-export const BellIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-  </svg>
-);
-
-export const ClockIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7v5l3 2" />
-  </svg>
-);
-
-export const PenIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-  </svg>
-);
-
-export const CodeIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 6l-3 12" />
-  </svg>
-);
-
-export const NoteIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M5 3h9l5 5v13a0 0 0 0 1 0 0H5a0 0 0 0 1 0 0V3z" />
-    <path d="M14 3v5h5M8 13h8M8 17h5" />
-  </svg>
-);
-
-export const PlayIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M6 4.5 19 12 6 19.5z" />
-  </svg>
-);
-
-export const LinkIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M9.5 14.5 14.5 9.5" />
-    <path d="M8 12 6 14a3.5 3.5 0 0 0 5 5l2-2" />
-    <path d="M16 12l2-2a3.5 3.5 0 0 0-5-5l-2 2" />
-  </svg>
-);
-
-export const CoffeeIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" />
-    <path d="M17 9h2a2.5 2.5 0 0 1 0 5h-2" />
-    <path d="M7 2.5c0 1-1 1.5-1 3M11 2.5c0 1-1 1.5-1 3" />
-  </svg>
-);
-
-export const TrashIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M4 7h16M10 7V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
-  </svg>
-);
-
-export const FileIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M14 3v5h5" />
-    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-  </svg>
-);
-
-export const RefreshIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M3 2v6h6" />
-    <path d="M21 12A9 9 0 0 0 6 5.3L3 8" />
-    <path d="M21 22v-6h-6" />
-    <path d="M3 12a9 9 0 0 0 15 6.7l3-2.7" />
-  </svg>
-);
-
-export const CheckIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="m5 13 4 4L19 7" />
-  </svg>
-);
-
-export const QrIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="3" y="3" width="7" height="7" rx="1" />
-    <rect x="14" y="3" width="7" height="7" rx="1" />
-    <rect x="3" y="14" width="7" height="7" rx="1" />
-    <path d="M14 14h3v3M21 14v7h-7M17.5 17.5h.01" />
-  </svg>
-);
-
-export const MoonIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" />
-  </svg>
-);
-
-export const SunIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </svg>
-);
-
-export const ArrowRightIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M5 12h14M13 6l6 6-6 6" />
-  </svg>
-);
-
-export const XIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M6 6l12 12M18 6 6 18" />
-  </svg>
-);
-
-export const HelpIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M9.2 9.3a2.8 2.8 0 0 1 5.4 1c0 1.9-2.8 2.5-2.8 2.5" />
-    <path d="M12 17h.01" />
-  </svg>
-);
-
-export const DownloadIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M12 4v11M8 11l4 4 4-4" />
-    <path d="M5 19h14" />
-  </svg>
-);
-
-export const UndoIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M9 7 4 12l5 5" />
-    <path d="M4 12h11a5 5 0 0 1 0 10h-3" />
-  </svg>
-);
-
-export const GlobeIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="M2 12h20" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10" />
-  </svg>
-);
-
-export const ImageIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <path d="M21 15l-5-5L5 21" />
-  </svg>
-);
-
-export const CalendarIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <path d="M16 2v4M8 2v4M3 10h18" />
-  </svg>
-);
-
-export const CheckCircleIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="m9 12 2 2 4-4" />
-  </svg>
-);
-
-export const FolderIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-  </svg>
-);
-
-export const GridIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="3" y="3" width="7" height="7" rx="1" />
-    <rect x="14" y="3" width="7" height="7" rx="1" />
-    <rect x="3" y="14" width="7" height="7" rx="1" />
-    <rect x="14" y="14" width="7" height="7" rx="1" />
-  </svg>
-);
-
-export const DescriptionIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M14 3v5h5" />
-    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-  </svg>
-);
-
-// Whiteboard tool icons (simple, recognizable, consistent stroke style, no emojis)
-export const EraserIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="4" y="9" width="12" height="8" rx="1" />
-    <path d="M16 9 L20 5" />
-  </svg>
-);
-
-export const LineIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M5 19 L19 5" />
-  </svg>
-);
-
-export const RectIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="5" y="6" width="14" height="12" rx="2" />
-  </svg>
-);
-
-export const EllipseIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <ellipse cx="12" cy="12" rx="8" ry="5.5" />
-  </svg>
-);
-
-export const TextIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M7 7 h10" />
-    <path d="M12 7 v10" />
-  </svg>
-);
-
-// Chrome / appearance icons
-export const ProjectorIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="2.5" y="7.5" width="19" height="9" rx="1.5" />
-    <circle cx="9" cy="12" r="2.5" />
-    <path d="M16 11h2M6 16.5v2M18 16.5v2" />
-  </svg>
-);
-
-export const PinIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M12 15v6" />
-    <path d="M8.5 4h7l-1 6 3 2v1H6.5v-1l3-2z" />
-  </svg>
-);
-
-export const PauseIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M9.5 6v12M14.5 6v12" />
-  </svg>
-);
-
-export const ChevronRightIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="m9.5 6 6 6-6 6" />
-  </svg>
-);
-
-export const ChevronDownIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="m6 9.5 6 6 6-6" />
-  </svg>
-);
-
-export const ArchiveIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <rect x="3.5" y="5" width="17" height="4" rx="1" />
-    <path d="M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
-    <path d="M10 13h4" />
-  </svg>
-);
-
-export const RepeatIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="M4 12a6 6 0 0 1 6-6h9" />
-    <path d="m16 3 3 3-3 3" />
-    <path d="M20 12a6 6 0 0 1-6 6H5" />
-    <path d="m8 21-3-3 3-3" />
-  </svg>
-);
-
-export const LayersIcon = (p: IconProps) => (
-  <svg {...base(p)}>
-    <path d="m12 3 8 4.5-8 4.5-8-4.5z" />
-    <path d="m4 12.5 8 4.5 8-4.5" />
-    <path d="m4 16.5 8 4.5 8-4.5" />
-  </svg>
-);
+export const HomeIcon = glyph(House);
+export const BookIcon = glyph(BookOpen);
+export const DocIcon = glyph(FileText);
+export const ToolIcon = glyph(Wrench);
+export const SparkleIcon = glyph(Sparkles);
+export const GearIcon = glyph(Settings);
+export const PlusIcon = glyph(Plus);
+export const SearchIcon = glyph(Search);
+export const BellIcon = glyph(Bell);
+export const ClockIcon = glyph(Clock);
+export const PenIcon = glyph(PenLine);
+export const CodeIcon = glyph(CodeXml);
+export const NoteIcon = glyph(NotebookPen);
+export const PlayIcon = glyph(Play);
+export const LinkIcon = glyph(Link);
+export const CoffeeIcon = glyph(Coffee);
+export const TrashIcon = glyph(Trash2);
+export const FileIcon = glyph(File);
+export const RefreshIcon = glyph(RefreshCw);
+export const CheckIcon = glyph(Check);
+export const QrIcon = glyph(QrCode);
+export const MoonIcon = glyph(Moon);
+export const SunIcon = glyph(Sun);
+export const ArrowRightIcon = glyph(ArrowRight);
+export const XIcon = glyph(X);
+export const HelpIcon = glyph(CircleHelp);
+export const DownloadIcon = glyph(Download);
+export const UndoIcon = glyph(Undo2);
+export const GlobeIcon = glyph(Globe);
+export const ImageIcon = glyph(Image);
+export const CalendarIcon = glyph(Calendar);
+export const CheckCircleIcon = glyph(CircleCheck);
+export const FolderIcon = glyph(Folder);
+export const GridIcon = glyph(LayoutGrid);
+export const DescriptionIcon = glyph(ScrollText);
+export const EraserIcon = glyph(Eraser);
+export const LineIcon = glyph(Slash);
+export const RectIcon = glyph(RectangleHorizontal);
+export const EllipseIcon = glyph(Circle);
+export const TextIcon = glyph(Type);
+export const ProjectorIcon = glyph(Projector);
+export const PinIcon = glyph(Pin);
+export const PauseIcon = glyph(Pause);
+export const ChevronRightIcon = glyph(ChevronRight);
+export const ChevronDownIcon = glyph(ChevronDown);
+export const ArchiveIcon = glyph(Archive);
+export const RepeatIcon = glyph(Repeat);
+export const LayersIcon = glyph(Layers);
 
 // Mapper for file kind icons in lists (Documents, Dashboard recents, etc.)
-// Uses existing custom icons for consistency; no emojis, no material.
 export function FileKindIcon({ kind, className = "w-5 h-5" }: { kind: string; className?: string }) {
-  const cn = className;
-  if (kind === "image") return <ImageIcon className={cn} />;
-  if (kind === "board" || kind === "whiteboard") return <PenIcon className={cn} />;
+  if (kind === "image") return <ImageIcon className={className} />;
+  if (kind === "board" || kind === "whiteboard") return <PenIcon className={className} />;
   // pdf, doc, sheet, slides, generic file, etc.
-  return <DocIcon className={cn} />;
+  return <DocIcon className={className} />;
 }
