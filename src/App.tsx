@@ -622,7 +622,7 @@ const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }
             className="absolute inset-0 flex flex-col min-h-0"
             style={{ display: visible ? "flex" : "none" }}
             aria-hidden={!visible}
-            {...(!visible ? ({ inert: "" } as Record<string, string>) : {})}
+            inert={!visible}
           >
             {FULL_BLEED.includes(tab.kind) ? (
               // Tool screens own their whole surface; wrapping them in the

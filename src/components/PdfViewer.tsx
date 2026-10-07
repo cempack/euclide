@@ -411,9 +411,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           style={{ zoom: legacyZoom }}
         >
           <div className="relative mx-auto shadow-pop bg-white inline-block rounded">
-            <canvas ref={(el) => (legacyPageCanvas.current = el)} className="block" />
+            <canvas ref={legacyPageCanvas} className="block" />
             <canvas
-              ref={(el) => (legacyOverlay.current = el)}
+              ref={legacyOverlay}
               onPointerDown={legacyDown}
               onPointerMove={legacyMove}
               onPointerUp={legacyUp}
