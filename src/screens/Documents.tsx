@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import { api, type Course, type FileItem, type Note } from "../lib/api";
 import { tabs } from "../stores/tabs";
+import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
 import { t, fmt, get } from "../lib/i18n";
-import { errorMessage } from "../lib/errors";
-import { reportError } from "../lib/report";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel } from "../components/layout";
@@ -188,6 +187,8 @@ export default function Documents({
   visible?: boolean;
 }) {
   const toast = useToast();
+  const { pick: pickFiles } = useImportFiles();
+  const importDocs = () => void pickFiles();
   const confirm = useConfirm();
   const live = { subscribed: visible };
   const docs = useQuery({ ...q.files(null), ...live }).data ?? NO_FILES;
@@ -213,26 +214,6 @@ export default function Documents({
   }, [filterHint]);
 
   const courseName = useCallback((id: number | null) => courses.find((c) => c.id === id)?.name, [courses]);
-
-  const importDocs = async () => {
-    try {
-      toast(get("messages.importing", "Import…"), "info");
-      const added = (await api.importFiles(null)) ?? [];
-      if (added.length) {
-        added.forEach((f) => api.logEvent("file_import", f.name, null));
-        toast(
-          fmt(t.documents?.toastImported || "{count} document(s) importé(s)", { count: added.length }),
-          "success",
-        );
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
-      } else {
-        toast(get("messages.importError", "Import impossible (sélection annulée ?)"), "error");
-      }
-    } catch (err) {
-      reportError("documents.import", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
-    }
-  };
 
   const openNote = (n: Note) => {
     tabs.open({ kind: "note", title: n.title || "Note", params: { noteId: n.id } });

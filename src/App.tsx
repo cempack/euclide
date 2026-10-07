@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
-import { api, type AppInfo, type FileItem, isTauri } from "./lib/api";
+import { api, type AppInfo, isTauri } from "./lib/api";
 import { get, fmt } from "./lib/i18n";
 import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
@@ -21,6 +21,7 @@ import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
 import { useExitGuard } from "./shell/exitGuard";
+import { useImportFiles } from "./shell/useImportFiles";
 import { useShortcut } from "./lib/keymap";
 import { TooltipLayer } from "./ui/Tooltip";
 import { useQueryClient } from "@tanstack/react-query";
@@ -84,13 +85,6 @@ function useLatch(flag: boolean): boolean {
 
 /** Screens that manage their own full-bleed chrome instead of the text column. */
 const FULL_BLEED: TabKind[] = ["python", "whiteboard", "pdf", "note"];
-
-async function afterImport(added: FileItem[], toast: (m: string, t?: "info" | "success" | "error") => void) {
-  if (!added.length) return;
-  added.forEach((f) => api.logEvent("file_import", f.name, null));
-  window.dispatchEvent(new CustomEvent("eu:library-changed"));
-  toast(get("messages.imported", "{count} importé(s)").replace("{count}", String(added.length)), "success");
-}
 
 const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }) {
   const list = useTabList();
@@ -333,6 +327,7 @@ function Shell() {
   const confirm = useConfirm();
 
   useExitGuard(confirm, toast);
+  const { drop: importDropped } = useImportFiles();
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const { projection, toggleProjection } = useAppearance();
@@ -519,14 +514,7 @@ function Shell() {
             setDragging(false);
             const paths = p.paths ?? [];
             if (!paths.length) return;
-            try {
-              toast(get("messages.importing", "Import…"), "info");
-              const added = await api.importPaths(paths, null);
-              await afterImport(added, toast);
-            } catch (err) {
-              reportError("app.dropImport", err);
-              toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
-            }
+            await importDropped(paths);
           } else {
             setDragging(false);
           }
@@ -541,7 +529,7 @@ function Shell() {
       active = false;
       unlisten?.();
     };
-  }, [toast]);
+  }, [importDropped]);
 
   useEffect(() => {
     if (!isTauri()) return;
