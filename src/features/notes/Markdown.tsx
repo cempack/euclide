@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import { displayMath } from "./math";
 
 // Built once: new plugin arrays or components on each render made
 // react-markdown parse the note and re-render all its formulas on every
@@ -30,7 +31,7 @@ export const Markdown = memo(function Markdown({
   return (
     <div className={`eu-prose ${className}`}>
       <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={COMPONENTS}>
-        {body}
+        {displayMath(body)}
       </ReactMarkdown>
     </div>
   );
