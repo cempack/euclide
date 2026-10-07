@@ -42,7 +42,7 @@ const ReminderRow = memo(function ReminderRow({
         aria-label={`${
           isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")
         } — ${r.title}`}
-        title={
+        data-tip={
           isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")
         }
         className={`shrink-0 w-5 h-5 grid place-items-center rounded-sm border transition-colors duration-fast ${
@@ -92,7 +92,7 @@ const ReminderRow = memo(function ReminderRow({
       <button
         onClick={() => onDelete(r.id)}
         aria-label={`${get("common.delete", "Supprimer")} — ${r.title}`}
-        title={get("common.delete", "Supprimer")}
+        data-tip={get("common.delete", "Supprimer")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
       >
         <TrashIcon className="w-3.5 h-3.5" />

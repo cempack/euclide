@@ -350,14 +350,14 @@ export default function Python() {
               onClick={create}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
               aria-label={get("python.newScript", "Nouveau script")}
-              title={get("python.newScriptTitle", "Nouveau script temporaire (non enregistré)")}
+              data-tip={get("python.newScriptTitle", "Nouveau script temporaire (non enregistré)")}
             >
               <PlusIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={importScript}
               className="eu-btn-quiet eu-btn-sm"
-              title={get("python.importTitle", "Importer un fichier .py")}
+              data-tip={get("python.importTitle", "Importer un fichier .py")}
             >
               {t.tools?.importerBtn || "Importer"}
             </button>
@@ -369,7 +369,8 @@ export default function Python() {
           {openScript && !openScript.path && (
             <div
               className="flex items-center gap-2 px-2 h-7 rounded bg-panel-alt text-ink eu-no-drag"
-              title={get("python.tempScript", "Script temporaire (non enregistré)")}
+              data-tip={get("python.tempScript", "Script temporaire (non enregistré)")}
+              aria-label={get("python.tempScript", "Script temporaire (non enregistré)")}
             >
               <CodeIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" />
               <span className="eu-t-meta text-ink truncate flex-1">{openScript.name}</span>
@@ -434,7 +435,7 @@ export default function Python() {
               ) : (
                 <button
                   onClick={startRename}
-                  title={get("python.renameTitle", "Cliquer pour renommer")}
+                  data-tip={get("python.renameTitle", "Cliquer pour renommer")}
                   className="font-mono text-small text-ink truncate px-1 -mx-1 rounded hover:bg-panel-alt"
                 >
                   {openScript.name}
@@ -443,7 +444,7 @@ export default function Python() {
               {openScript.isDirty && (
                 <span
                   className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0"
-                  title={get("app.unsaved", "Non enregistré")}
+                  data-tip={get("app.unsaved", "Non enregistré")}
                 />
               )}
               {!openScript.path && (
@@ -456,7 +457,7 @@ export default function Python() {
                 onClick={save}
                 disabled={!openScript.isDirty}
                 className="eu-btn-ghost eu-btn-sm"
-                title={`${t.tools?.saveBtn || "Enregistrer"} (${MOD}S)`}
+                data-tip={`${t.tools?.saveBtn || "Enregistrer"} (${MOD}S)`}
               >
                 {t.tools?.saveBtn || "Enregistrer"}
               </button>
@@ -464,7 +465,7 @@ export default function Python() {
                 onClick={run}
                 disabled={running}
                 className="eu-btn-primary eu-btn-sm"
-                title={`${t.tools?.execute || "Exécuter"} (${MOD}↵)`}
+                data-tip={`${t.tools?.execute || "Exécuter"} (${MOD}↵)`}
               >
                 {running ? (
                   <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -477,7 +478,7 @@ export default function Python() {
                 onClick={deleteCurrent}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                 aria-label={get("common.delete", "Supprimer")}
-                title={get("common.delete", "Supprimer")}
+                data-tip={get("common.delete", "Supprimer")}
               >
                 <TrashIcon className="w-3.5 h-3.5" />
               </button>

@@ -74,7 +74,12 @@ type RowProps = {
 function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowProps) {
   return (
     <div className="eu-row-hover group">
-      <button onClick={onOpen} className="flex items-center gap-2.5 flex-1 min-w-0 text-left" title={title}>
+      <button
+        onClick={onOpen}
+        className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+        data-tip={title}
+        aria-label={title}
+      >
         <span className="shrink-0" style={accent ? { color: accent } : undefined}>
           {icon}
         </span>
@@ -84,7 +89,7 @@ function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowPr
       <button
         onClick={onRename}
         aria-label={`${get("common.rename", "Renommer")} — ${title}`}
-        title={get("common.rename", "Renommer")}
+        data-tip={get("common.rename", "Renommer")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm"
       >
         <PenIcon className="w-3.5 h-3.5" />
@@ -92,7 +97,7 @@ function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowPr
       <button
         onClick={onDelete}
         aria-label={`${get("common.delete", "Supprimer")} — ${title}`}
-        title={get("common.delete", "Supprimer")}
+        data-tip={get("common.delete", "Supprimer")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
       >
         <TrashIcon className="w-3.5 h-3.5" />

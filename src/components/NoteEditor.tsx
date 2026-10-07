@@ -401,7 +401,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         {dirty && (
           <span
             className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0"
-            title={get("app.unsaved", "Non enregistré")}
+            data-tip={get("app.unsaved", "Non enregistré")}
           />
         )}
         <ToolSep />
@@ -409,7 +409,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           className="eu-select eu-field-sm w-[140px]"
           value={draft.course_id ?? ""}
           onChange={(e) => onCourseChange(e.target.value ? Number(e.target.value) : null)}
-          title={get("notes.courseTitle", "Affecter à un cours")}
+          data-tip={get("notes.courseTitle", "Affecter à un cours")}
           aria-label={get("notes.courseTitle", "Affecter à un cours")}
         >
           <option value="">{get("notes.general", "Général")}</option>
@@ -423,7 +423,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           <button
             onClick={exportPdf}
             className="eu-btn-quiet eu-btn-sm"
-            title={get("notes.exportPdf", "Exporter en PDF")}
+            data-tip={get("notes.exportPdf", "Exporter en PDF")}
           >
             <DownloadIcon className="w-3.5 h-3.5" /> PDF
           </button>
@@ -432,7 +432,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               onClick={doDelete}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
               aria-label={get("common.delete", "Supprimer")}
-              title={get("common.delete", "Supprimer")}
+              data-tip={get("common.delete", "Supprimer")}
             >
               <TrashIcon className="w-3.5 h-3.5" />
             </button>
@@ -441,7 +441,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             onClick={doSave}
             disabled={!dirty}
             className="eu-btn-primary eu-btn-sm"
-            title={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+            data-tip={`${get("common.save", "Enregistrer")} (${MOD}S)`}
           >
             {get("common.save", "Enregistrer")}
           </button>
@@ -455,7 +455,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <button
               onClick={insertBold}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              title={get("notes.bold", "Gras")}
+              data-tip={get("notes.bold", "Gras")}
               aria-label={get("notes.bold", "Gras")}
             >
               <span className="font-bold text-body">B</span>
@@ -463,7 +463,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <button
               onClick={insertItalic}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              title={get("notes.italic", "Italique")}
+              data-tip={get("notes.italic", "Italique")}
               aria-label={get("notes.italic", "Italique")}
             >
               <span className="italic text-body">I</span>
@@ -471,7 +471,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <button
               onClick={insertTitle}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              title={get("notes.heading", "Titre")}
+              data-tip={get("notes.heading", "Titre")}
               aria-label={get("notes.heading", "Titre")}
             >
               <span className="font-semibold text-body">H</span>
@@ -479,7 +479,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <button
               onClick={insertList}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              title={get("notes.list", "Liste")}
+              data-tip={get("notes.list", "Liste")}
               aria-label={get("notes.list", "Liste")}
             >
               <span className="text-body">•</span>
@@ -487,7 +487,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <button
               onClick={insertCode}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              title={get("notes.code", "Code")}
+              data-tip={get("notes.code", "Code")}
               aria-label={get("notes.code", "Code")}
             >
               <CodeIcon className="w-4 h-4" />
@@ -495,7 +495,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             <button
               onClick={openLinkPopup}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              title={get("notes.link", "Lien")}
+              data-tip={get("notes.link", "Lien")}
               aria-label={get("notes.link", "Lien")}
             >
               <LinkIcon className="w-4 h-4" />

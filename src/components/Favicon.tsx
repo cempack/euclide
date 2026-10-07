@@ -44,7 +44,7 @@ export function Favicon({
   return (
     <span
       aria-hidden
-      title={badge.host}
+      data-tip={badge.host}
       className={`${className} shrink-0 grid place-items-center rounded-sm font-mono font-semibold leading-none`}
       style={{ background: badge.bg, color: badge.fg, fontSize: "0.6em" }}
     >

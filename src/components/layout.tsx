@@ -179,7 +179,7 @@ export function Segmented<T extends string | number>({
           type="button"
           role="tab"
           aria-selected={value === o.value}
-          title={o.title}
+          data-tip={o.title}
           onClick={() => onChange(o.value)}
         >
           {o.label}
@@ -232,7 +232,7 @@ export function StatTile({
     <button
       type="button"
       onClick={onClick}
-      title={title}
+      data-tip={title}
       className={`${base} hover:bg-panel-alt transition-colors duration-fast`}
     >
       {inner}
