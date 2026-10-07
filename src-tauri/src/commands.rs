@@ -773,15 +773,17 @@ fn register_file(state: &State<Db>, course_id: Option<i64>, dest: &PathBuf) -> R
 }
 
 /// Path relative to the Euclide-Data folder, stored so the USB stays portable.
+/// Always written with `/`: a key filled on Windows must open on Linux/macOS.
 fn rel_path(abs: &PathBuf) -> String {
     let base = crate::paths::data_dir();
     abs.strip_prefix(&base)
-        .map(|p| p.to_string_lossy().to_string())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
         .unwrap_or_else(|_| abs.to_string_lossy().to_string())
 }
 
+/// Older builds stored Windows separators; `/` works on every OS, `\\` only on Windows.
 fn abs_path(rel: &str) -> PathBuf {
-    crate::paths::data_dir().join(rel)
+    crate::paths::data_dir().join(rel.replace('\\', "/"))
 }
 
 #[tauri::command]
@@ -794,9 +796,11 @@ pub fn file_path(state: State<Db>, id: i64) -> R<String> {
 }
 
 #[tauri::command]
-pub fn open_file(app: AppHandle, state: State<Db>, id: i64, with_app: Option<String>) -> R<()> {
+pub fn open_file(app: AppHandle, state: State<Db>, id: i64) -> R<()> {
     let path = file_path(state, id)?;
-    app.opener().open_path(path, with_app).map_err(e)?;
+    // Always the system's default application: the webview never picks which
+    // program gets launched.
+    app.opener().open_path(path, None::<&str>).map_err(e)?;
     Ok(())
 }
 
@@ -817,11 +821,6 @@ pub struct Opener {
 #[tauri::command]
 pub fn list_openers(_state: State<Db>, _id: i64) -> R<Vec<Opener>> {
     Ok(vec![
-        Opener {
-            name: "Navigateur par défaut".to_string(),
-            app: None,
-            is_reveal: false,
-        },
         Opener {
             name: "Application par défaut".to_string(),
             app: None,
@@ -877,6 +876,9 @@ pub async fn rename_file(
     if trimmed.is_empty() {
         return Err("Le nom ne peut pas être vide.".into());
     }
+    // A rename stays in the same folder: a separator would move the file.
+    plain_file_name(&trimmed)
+        .map_err(|_| "Le nom ne peut pas contenir « / », « \\ » ni « : ».".to_string())?;
 
     // Load current metadata (outside long lock)
     let (old_rel, old_name, old_kind, _course_id): (String, String, String, Option<i64>) = {
@@ -2178,8 +2180,9 @@ pub fn get_file_versions(state: State<Db>, file_id: i64) -> R<Vec<serde_json::Va
 
 #[tauri::command]
 pub fn read_version_data(name: String) -> R<String> {
+    let name = plain_file_name(&name)?;
     let vdir = crate::paths::documents_dir().join(".versions");
-    let p = vdir.join(&name);
+    let p = vdir.join(name);
     if !p.exists() {
         return Err("version introuvable".to_string());
     }
@@ -2323,6 +2326,40 @@ pub fn list_python_demos() -> R<Vec<PythonDemo>> {
     Ok(demos)
 }
 
+/// A bare file name chosen by the backend (version backups, …): no folders,
+/// no `..`, nothing absolute.
+fn plain_file_name(name: &str) -> R<&str> {
+    let ok = !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains(['/', '\\', ':'])
+        && std::path::Path::new(name).file_name() == Some(std::ffi::OsStr::new(name));
+    if ok {
+        Ok(name)
+    } else {
+        Err("Nom de fichier invalide.".into())
+    }
+}
+
+/// The webview only sends back script paths it got from `list_python_demos`.
+/// Anything that is not a `.py` file directly inside `python/` is refused:
+/// `Path::starts_with` compares components without resolving `..`, so the
+/// parent folder is canonicalised and compared instead.
+fn script_in_python_dir(path: &str) -> R<PathBuf> {
+    let dir = crate::paths::python_dir();
+    let p = PathBuf::from(path);
+    let invalid = || "Chemin de script invalide.".to_string();
+    let file_name = p.file_name().ok_or_else(invalid)?.to_owned();
+    if p.extension().map(|x| x != "py").unwrap_or(true) {
+        return Err(invalid());
+    }
+    let parent = p.parent().ok_or_else(invalid)?;
+    match (fs::canonicalize(parent), fs::canonicalize(&dir)) {
+        (Ok(a), Ok(b)) if a == b => Ok(dir.join(file_name)),
+        _ => Err(invalid()),
+    }
+}
+
 fn slugify(name: &str) -> String {
     let s: String = name
         .trim()
@@ -2356,23 +2393,14 @@ pub fn create_python_script(name: String, code: String) -> R<PythonDemo> {
 
 #[tauri::command]
 pub fn save_python_script(path: String, code: String) -> R<()> {
-    // keep edits inside the python scripts directory
-    let dir = crate::paths::python_dir();
-    let p = PathBuf::from(&path);
-    if !p.starts_with(&dir) {
-        return Err("Chemin de script invalide.".into());
-    }
+    let p = script_in_python_dir(&path)?;
     fs::write(&p, code).map_err(e)?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn delete_python_script(path: String) -> R<()> {
-    let dir = crate::paths::python_dir();
-    let p = PathBuf::from(&path);
-    if !p.starts_with(&dir) {
-        return Err("Chemin de script invalide.".into());
-    }
+    let p = script_in_python_dir(&path)?;
     fs::remove_file(&p).map_err(e)?;
     Ok(())
 }
@@ -2380,9 +2408,9 @@ pub fn delete_python_script(path: String) -> R<()> {
 #[tauri::command]
 pub fn rename_python_script(path: String, new_name: String) -> R<PythonDemo> {
     let dir = crate::paths::python_dir();
-    let p = PathBuf::from(&path);
-    if !p.starts_with(&dir) || !p.exists() {
-        return Err("Chemin de script invalide ou introuvable.".into());
+    let p = script_in_python_dir(&path)?;
+    if !p.exists() {
+        return Err("Script introuvable.".into());
     }
     let stem = p
         .file_stem()
@@ -2454,7 +2482,13 @@ pub async fn import_python_script(app: AppHandle) -> R<Option<PythonDemo>> {
 
 #[tauri::command]
 pub async fn run_python_demo(app: AppHandle, path: String) -> R<PythonResult> {
-    let v = crate::sidecar::call(&app, "run_demo", &json!({ "path": path })).await?;
+    let path = script_in_python_dir(&path)?;
+    let v = crate::sidecar::call(
+        &app,
+        "run_demo",
+        &json!({ "path": path.to_string_lossy().to_string() }),
+    )
+    .await?;
     Ok(PythonResult {
         ok: v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
         stdout: v
@@ -2566,19 +2600,29 @@ pub async fn choose_data_dir(app: AppHandle) -> R<Option<String>> {
     let Ok(p) = picked.into_path() else {
         return Ok(None);
     };
-    crate::paths::save_configured_data_dir(&p);
+    if !crate::paths::dir_is_writable(&p) {
+        return Err("Ce dossier n'est pas accessible en écriture.".into());
+    }
+    crate::paths::write_data_dir_pointer(&p)
+        .map_err(|err| format!("Impossible d'enregistrer le dossier choisi : {err}"))?;
     Ok(Some(p.to_string_lossy().to_string()))
 }
 
 #[tauri::command]
 pub fn reset_data_dir() -> R<()> {
-    crate::paths::clear_configured_data_dir();
-    Ok(())
+    crate::paths::remove_data_dir_pointer()
+        .map_err(|err| format!("Impossible de réinitialiser le dossier : {err}"))
 }
 
 /// Zip `src` into `../Euclide-Sauvegardes/euclide-YYYYMMDD-HHMM.zip`.
-fn write_data_dir_backup(src: &std::path::Path) -> Result<std::path::PathBuf, String> {
-    use std::io::{Read, Write};
+///
+/// `db_snapshot` is a consistent copy of the live database (see
+/// `backup_data_dir`); it is stored as `euclide.db` in place of the live file,
+/// whose latest changes may still sit in the WAL.
+fn write_data_dir_backup(
+    src: &std::path::Path,
+    db_snapshot: &std::path::Path,
+) -> Result<std::path::PathBuf, String> {
     use zip::write::SimpleFileOptions;
 
     if !src.is_dir() {
@@ -2595,13 +2639,26 @@ fn write_data_dir_backup(src: &std::path::Path) -> Result<std::path::PathBuf, St
     let dest = out_dir.join(format!("euclide-{stamp}.zip"));
 
     let file = fs::File::create(&dest).map_err(|err| format!("Écriture archive : {err}"))?;
-    let mut zw = zip::ZipWriter::new(file);
+    let mut zw = zip::ZipWriter::new(std::io::BufWriter::new(file));
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
+    let mut add = |name: &str, path: &std::path::Path| -> Result<(), String> {
+        // Files are streamed: a large PDF never has to fit in memory.
+        let Ok(f) = fs::File::open(path) else {
+            return Ok(());
+        };
+        zw.start_file(name, opts)
+            .map_err(|err| format!("Archive : {err}"))?;
+        std::io::copy(&mut std::io::BufReader::new(f), &mut zw)
+            .map_err(|err| format!("Archive : {err}"))?;
+        Ok(())
+    };
+
+    add("euclide.db", db_snapshot)?;
+
     // Iterative walk: no recursion limits, and we can skip our own output
-    // folder plus SQLite's transient WAL files.
+    // folder plus the live database files (replaced by the snapshot above).
     let mut stack = vec![src.to_path_buf()];
-    let mut buf = Vec::new();
     while let Some(dir) = stack.pop() {
         let entries = match fs::read_dir(&dir) {
             Ok(entries) => entries,
@@ -2620,22 +2677,10 @@ fn write_data_dir_backup(src: &std::path::Path) -> Result<std::path::PathBuf, St
                 stack.push(path);
                 continue;
             }
-            // The -wal/-shm siblings are meaningless without a live
-            // connection; the .db itself is checkpointed on close.
-            if name.ends_with("-wal") || name.ends_with("-shm") {
+            if name == "euclide.db" || name.ends_with("-wal") || name.ends_with("-shm") {
                 continue;
             }
-            let Ok(mut f) = fs::File::open(&path) else {
-                continue;
-            };
-            buf.clear();
-            if f.read_to_end(&mut buf).is_err() {
-                continue;
-            }
-            zw.start_file(name, opts)
-                .map_err(|err| format!("Archive : {err}"))?;
-            zw.write_all(&buf)
-                .map_err(|err| format!("Archive : {err}"))?;
+            add(&name, &path)?;
         }
     }
     zw.finish().map_err(|err| format!("Archive : {err}"))?;
@@ -2648,12 +2693,27 @@ fn write_data_dir_backup(src: &std::path::Path) -> Result<std::path::PathBuf, St
 /// documents, the whiteboards and the Python scripts all sit in one folder, so
 /// one archive is a complete backup. Returns the path of the archive.
 #[tauri::command]
-pub async fn backup_data_dir() -> R<String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        write_data_dir_backup(&crate::paths::data_dir()).map(|p| p.to_string_lossy().to_string())
+pub async fn backup_data_dir(state: State<'_, Db>) -> R<String> {
+    let src = crate::paths::data_dir();
+    // `VACUUM INTO` writes a consistent copy that includes what is still in the
+    // WAL. It is quick (the database is small) and only holds the lock briefly.
+    let snapshot = std::env::temp_dir().join(format!(
+        "euclide-backup-{}.db",
+        uuid::Uuid::new_v4().simple()
+    ));
+    {
+        let conn = state.0.lock().unwrap();
+        conn.execute("VACUUM INTO ?1", [snapshot.to_string_lossy().to_string()])
+            .map_err(|err| format!("Instantané de la base : {err}"))?;
+    }
+    let snap = snapshot.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        write_data_dir_backup(&src, &snap).map(|p| p.to_string_lossy().to_string())
     })
     .await
-    .map_err(|err| format!("Sauvegarde interrompue : {err}"))?
+    .map_err(|err| format!("Sauvegarde interrompue : {err}"));
+    let _ = fs::remove_file(&snapshot);
+    result?
 }
 
 // ---------------------------------------------------------------------------
@@ -3205,20 +3265,9 @@ pub async fn pronote_contents(
         return Err(err.to_string());
     }
 
-    // Persist rotated token (QR) for future calls, like sync does.
+    let mut res = res;
     let conn = state.0.lock().unwrap();
-    for key in ["username", "password"] {
-        if let Some(v) = res.get(key).and_then(|x| x.as_str()) {
-            set_setting_raw(&conn, &format!("pronote_{key}"), v);
-        }
-    }
-    // Persist client_identifier if returned (PIN device registration)
-    if let Some(cid) = res.get("client_identifier").and_then(|x| x.as_str()) {
-        if !cid.is_empty() {
-            set_setting_raw(&conn, "pronote_client_identifier", cid);
-        }
-    }
-
+    take_rotated_credentials(&conn, &mut res);
     Ok(res)
 }
 
@@ -3251,21 +3300,31 @@ pub async fn pronote_classes(app: AppHandle, state: State<'_, Db>) -> R<serde_js
         return Err(err.to_string());
     }
 
-    // Persist rotated token
+    let mut res = res;
     let conn = state.0.lock().unwrap();
-    for key in ["username", "password"] {
-        if let Some(v) = res.get(key).and_then(|x| x.as_str()) {
-            set_setting_raw(&conn, &format!("pronote_{key}"), v);
-        }
-    }
-    // Persist client_identifier if returned (PIN device registration)
-    if let Some(cid) = res.get("client_identifier").and_then(|x| x.as_str()) {
-        if !cid.is_empty() {
-            set_setting_raw(&conn, "pronote_client_identifier", cid);
-        }
-    }
-
+    take_rotated_credentials(&conn, &mut res);
     Ok(res)
+}
+
+/// Pronote rotates its login token on every session: save the new one (and the
+/// PIN device id) for the next call, and strip them from the response so
+/// credentials never reach the webview.
+fn take_rotated_credentials(conn: &rusqlite::Connection, res: &mut serde_json::Value) {
+    let Some(obj) = res.as_object_mut() else {
+        return;
+    };
+    for key in ["username", "password"] {
+        if let Some(v) = obj.remove(key) {
+            if let Some(v) = v.as_str() {
+                set_setting_raw(conn, &format!("pronote_{key}"), v);
+            }
+        }
+    }
+    if let Some(cid) = obj.remove("client_identifier") {
+        if let Some(cid) = cid.as_str().filter(|c| !c.is_empty()) {
+            set_setting_raw(conn, "pronote_client_identifier", cid);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3580,19 +3639,21 @@ mod classroom_flow_tests {
     }
 
     #[test]
-    fn backup_zip_includes_db_and_docs_skips_wal() {
+    fn backup_zip_uses_db_snapshot_and_skips_live_db_files() {
         let tmp = std::env::temp_dir().join(format!("euclide-backup-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         let src = tmp.join("Euclide-Data");
         fs::create_dir_all(src.join("documents")).unwrap();
-        fs::write(src.join("euclide.db"), b"db-bytes").unwrap();
+        fs::write(src.join("euclide.db"), b"live-db-bytes").unwrap();
         fs::write(src.join("euclide.db-wal"), b"wal").unwrap();
         fs::write(src.join("euclide.db-shm"), b"shm").unwrap();
         fs::write(src.join("documents/note.txt"), b"hello").unwrap();
         fs::create_dir_all(src.join("Euclide-Sauvegardes")).unwrap();
         fs::write(src.join("Euclide-Sauvegardes/old.zip"), b"old").unwrap();
+        let snapshot = tmp.join("snapshot.db");
+        fs::write(&snapshot, b"db-bytes").unwrap();
 
-        let dest = write_data_dir_backup(&src).unwrap();
+        let dest = write_data_dir_backup(&src, &snapshot).unwrap();
         assert!(dest.exists());
         assert!(dest
             .to_string_lossy()
@@ -3604,7 +3665,7 @@ mod classroom_flow_tests {
             names.push(archive.by_index(i).unwrap().name().to_string());
         }
         names.sort();
-        assert!(names.iter().any(|n| n == "euclide.db"));
+        assert_eq!(names.iter().filter(|n| *n == "euclide.db").count(), 1);
         assert!(names.iter().any(|n| n == "documents/note.txt"));
         assert!(!names
             .iter()
@@ -3729,5 +3790,55 @@ mod pronote_login_tests {
             reuse_pronote_client_id(None, None, "https://x/pronote/professeur.html", "a", cid),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod hardening_tests {
+    use super::{plain_file_name, take_rotated_credentials};
+    use rusqlite::Connection;
+    use serde_json::json;
+
+    #[test]
+    fn plain_file_names_only() {
+        for ok in ["cours.pdf", "Théorème de Pythagore.pdf", "a..b.txt", ".hidden"] {
+            assert!(plain_file_name(ok).is_ok(), "{ok} should be accepted");
+        }
+        for bad in [
+            "",
+            ".",
+            "..",
+            "../x.pdf",
+            "a/b.pdf",
+            "a\\b.pdf",
+            "/etc/passwd",
+            "C:\\Windows\\x.dll",
+            "C:x",
+        ] {
+            assert!(plain_file_name(bad).is_err(), "{bad} should be refused");
+        }
+    }
+
+    #[test]
+    fn rotated_credentials_are_saved_and_stripped() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);")
+            .unwrap();
+        let mut res = json!({
+            "ok": true,
+            "contents": [],
+            "username": "u2",
+            "password": "token-2",
+            "client_identifier": "cid",
+        });
+        take_rotated_credentials(&conn, &mut res);
+        assert_eq!(res, json!({ "ok": true, "contents": [] }));
+        let get = |k: &str| -> String {
+            conn.query_row("SELECT value FROM settings WHERE key=?1", [k], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(get("pronote_username"), "u2");
+        assert_eq!(get("pronote_password"), "token-2");
+        assert_eq!(get("pronote_client_identifier"), "cid");
     }
 }

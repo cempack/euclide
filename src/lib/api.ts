@@ -509,7 +509,7 @@ export const api = {
   importFiles: (courseId: number | null) => invoke<FileItem[]>("import_files", { courseId }),
   importPaths: (paths: string[], courseId: number | null) =>
     invoke<FileItem[]>("import_paths", { paths, courseId }),
-  openFile: (id: number, withApp?: string) => invoke<void>("open_file", { id, with_app: withApp }),
+  openFile: (id: number) => invoke<void>("open_file", { id }),
   revealFile: (id: number) => invoke<void>("reveal_file", { id }),
   listOpeners: (id: number) => invoke<Opener[]>("list_openers", { id }),
   filePath: (id: number) => invoke<string>("file_path", { id }),
@@ -701,6 +701,6 @@ export async function openWith(fileId: number, opt: Opener) {
   if (opt.is_reveal) {
     await api.revealFile(fileId);
   } else {
-    await api.openFile(fileId, opt.app);
+    await api.openFile(fileId);
   }
 }
