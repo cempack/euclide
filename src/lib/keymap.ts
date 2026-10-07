@@ -83,6 +83,12 @@ export const KEYMAP = {
     group: "actions",
     inFields: true,
   },
+  present: {
+    keys: "F5",
+    label: tr("shortcuts.present"),
+    group: "actions",
+    inFields: true,
+  },
   projection: {
     keys: "mod+shift+P",
     label: tr("appearance.projection"),

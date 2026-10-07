@@ -586,6 +586,9 @@ function Shell() {
   useShortcut("palette", () => setPalette((p) => !p));
   useShortcut("capture", () => setCaptureOpen((c) => !c));
   useShortcut("help", () => setHelp((h) => !h));
+  // F5 presents a note (NoteEditor binds it); anywhere else it does nothing,
+  // rather than reload the window and lose what is not saved.
+  useShortcut("present", () => {});
   useShortcut("projection", toggleProjection);
   useShortcut("newTab", openDashboard);
   useShortcut("dashboard", openDashboard);

@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Ce que la fenêtre d'Euclide peut demander à Tauri : les commandes d'Euclide, le thème de la fenêtre et les mises à jour.",
+  "description": "Ce que la fenêtre d'Euclide peut demander à Tauri : les commandes d'Euclide, le thème de la fenêtre, le plein écran (diapositives) et les mises à jour.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-set-theme", "updater:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-theme",
+    "core:window:allow-set-fullscreen",
+    "updater:default"
+  ]
 }

@@ -1342,7 +1342,8 @@ input[type="radio"] {
    UI type roles are too tight for reading.
    --------------------------------------------------------------------------- */
 .eu-prose {
-  font-size: 14px;
+  /* rem: notes grow with projection mode like the rest of the app. */
+  font-size: var(--text-body);
   line-height: 1.65;
   color: rgb(var(--eu-ink));
 }
@@ -1437,4 +1438,92 @@ input[type="radio"] {
 }
 .eu-prose strong {
   font-weight: 600;
+}
+
+/* Notes presented as slides (features/notes/Slides.tsx): paper in every
+   theme, the text sized per slide to fill the screen. */
+.eu-slides {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--color-paper);
+  color: var(--color-paper-ink);
+  overflow: hidden;
+}
+.eu-slides::backdrop {
+  background: var(--color-paper);
+}
+.eu-slides:focus-visible {
+  outline: none;
+}
+.eu-slide {
+  position: absolute;
+  inset: 7vh 8vw 9vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+.eu-slide-body {
+  width: 100%;
+  max-height: 100%;
+}
+.eu-slide-body .eu-prose {
+  font-size: inherit;
+  line-height: 1.4;
+  color: var(--color-paper-ink);
+}
+.eu-slide-body .eu-prose > :first-child {
+  margin-top: 0;
+}
+.eu-slide-body .eu-prose code,
+.eu-slide-body .eu-prose pre {
+  background: rgb(17 18 19 / 0.05);
+  border-color: rgb(17 18 19 / 0.12);
+}
+.eu-slide-body .eu-prose pre code {
+  background: none;
+  border: 0;
+}
+.eu-slide-title {
+  align-items: center;
+  text-align: center;
+}
+.eu-slide-title .eu-prose h1 {
+  font-size: 2.1em;
+  margin: 0;
+}
+.eu-slide-title .eu-prose h1 + * {
+  margin-top: 0.6em;
+  color: rgb(17 18 19 / 0.6);
+}
+.eu-slides-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgb(var(--eu-accent));
+  transition: width 180ms var(--ease-out);
+}
+.eu-slides-chip {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: rgb(17 18 19 / 0.45);
+  transition: opacity 300ms;
+}
+.eu-slides-blank {
+  position: absolute;
+  inset: 0;
+}
+.eu-slides-blank-black {
+  background: #000;
 }
