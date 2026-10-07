@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { api, type QuickLink } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
@@ -15,6 +17,8 @@ import {
   TrashIcon,
 } from "../components/icons";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
+
+const NO_LINKS: QuickLink[] = [];
 
 export default function Tools() {
   return (
@@ -215,37 +219,14 @@ function TimerSection() {
 function LinksSection() {
   const toast = useToast();
   const confirmDlg = useConfirm();
-  const [links, setLinks] = useState<QuickLink[]>([]);
+  const queryClient = useQueryClient();
+  const links = useQuery(q.links()).data ?? NO_LINKS;
+  const remoteIcons = remoteFaviconsEnabled(useQuery(q.setting("remote_favicons")).data ?? null);
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
-  const [remoteIcons, setRemoteIcons] = useState(true);
 
-  const refresh = () =>
-    api
-      .listLinks()
-      .then(setLinks)
-      .catch(() => {});
-  useEffect(() => {
-    refresh();
-    const readIcons = () => {
-      api
-        .getSetting("remote_favicons")
-        .then((v) => setRemoteIcons(remoteFaviconsEnabled(v)))
-        .catch(() => {});
-    };
-    readIcons();
-    const onChange = () => {
-      refresh();
-      readIcons();
-    };
-    window.addEventListener("eu:quicklinks-changed", onChange);
-    window.addEventListener("eu:settings-changed", onChange);
-    return () => {
-      window.removeEventListener("eu:quicklinks-changed", onChange);
-      window.removeEventListener("eu:settings-changed", onChange);
-    };
-  }, []);
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: q.links().queryKey });
 
   const add = async () => {
     if (!label.trim() || !url.trim()) return;
