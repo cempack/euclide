@@ -8,6 +8,7 @@
 @theme {
   /* Only Euclide's tokens: Tailwind's default palette must not leak in. */
   --color-*: initial;
+  --color-chrome: rgb(var(--eu-chrome));
   --color-canvas: rgb(var(--eu-canvas));
   --color-panel: rgb(var(--eu-panel));
   --color-panel-alt: rgb(var(--eu-panel-alt));
@@ -139,6 +140,7 @@
 [data-theme="light"] {
   color-scheme: light;
 
+  --eu-chrome: 243 241 238; /* sidebar, tab strip, status bar   */
   --eu-canvas: 250 249 248; /* application background            */
   --eu-panel: 255 255 255; /* cards, panels, popovers          */
   --eu-panel-alt: 247 246 245; /* panel headers, zebra, wells      */
@@ -186,6 +188,7 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
+  --eu-chrome: 14 14 14;
   --eu-canvas: 19 19 19;
   --eu-panel: 25 25 25;
   --eu-panel-alt: 32 32 32;
@@ -342,28 +345,6 @@
   }
 }
 
-/* Hide scrollbar on the tab strip for a clean tab bar (still fully scrollable). */
-.eu-topbar {
-  height: var(--eu-topbar-h);
-}
-.eu-topbar .overflow-x-auto::-webkit-scrollbar {
-  display: none;
-}
-.eu-topbar .overflow-x-auto {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.eu-sidebar {
-  padding: var(--eu-sidebar-p);
-}
-.eu-sidebar-rail {
-  width: 3rem;
-  padding: var(--eu-sidebar-p) 0;
-}
-.eu-nav-item {
-  height: var(--eu-nav-h);
-}
 .eu-page {
   display: flex;
   flex-direction: column;
@@ -645,6 +626,218 @@
      composites it incorrectly. A plain scrim reads better in both themes. */
   .eu-scrim {
     @apply absolute inset-0 bg-scrim;
+  }
+
+  /* -------------------------------------------------------------------------
+     Shell. Chrome (sidebar, tab strip, status bar) sits a step below the
+     page; the sidebar header is as tall as the tab strip, so one hairline
+     runs under both.
+     ------------------------------------------------------------------------- */
+  .eu-sidebar {
+    @apply w-58 shrink-0 h-full flex flex-col bg-chrome border-r border-line;
+  }
+  .eu-sidebar-head {
+    @apply flex items-center gap-2.5 px-4 shrink-0;
+    height: var(--eu-topbar-h);
+    box-shadow: inset 0 -1px 0 var(--color-line);
+  }
+  .eu-wordmark {
+    @apply font-mono text-[0.75rem] leading-none font-semibold tracking-[0.18em] text-ink mb-1;
+  }
+  /* A compact strip only has room for the name. */
+  [data-density="compact"] .eu-sidebar-head .eu-t-caption {
+    display: none;
+  }
+  [data-density="compact"] .eu-wordmark {
+    @apply mb-0;
+  }
+  .eu-sidebar-body {
+    @apply flex-1 min-h-0 overflow-y-auto flex flex-col;
+    padding: var(--eu-sidebar-p);
+    padding-top: calc(var(--eu-sidebar-p) + 0.5rem);
+  }
+  .eu-sidebar-foot {
+    @apply flex items-center gap-2 border-t border-line shrink-0;
+    padding: 0.5rem var(--eu-sidebar-p) 0.5rem calc(var(--eu-sidebar-p) + 0.25rem);
+  }
+  .eu-avatar {
+    @apply w-7 h-7 shrink-0 grid place-items-center rounded-full bg-ink text-panel font-mono text-caption font-semibold;
+  }
+  .eu-rail {
+    @apply w-12 shrink-0 h-full flex flex-col items-center bg-chrome border-r border-line;
+    padding: var(--eu-sidebar-p) 0;
+  }
+
+  .eu-nav-item {
+    @apply flex items-center gap-2.5 px-2.5 rounded-md border border-transparent text-left text-body text-ink-muted
+      transition-colors duration-fast hover:bg-hover hover:text-ink active:bg-pressed;
+    height: var(--eu-control);
+  }
+  .eu-nav-icon {
+    @apply shrink-0 opacity-80;
+  }
+  .eu-nav-keys {
+    @apply ml-auto font-mono text-caption text-ink-faint whitespace-nowrap opacity-0 transition-opacity duration-fast;
+  }
+  .eu-nav-item:hover .eu-nav-keys,
+  .eu-nav-item:focus-visible .eu-nav-keys,
+  .eu-nav-item[aria-current="page"] .eu-nav-keys {
+    @apply opacity-100;
+  }
+  /* The current screen: raised paper, its glyph in the accent colour. */
+  .eu-nav-item[aria-current="page"],
+  .eu-current-raised[aria-current="page"],
+  .eu-current-raised[aria-pressed="true"] {
+    @apply bg-panel border-line text-ink shadow-raised hover:bg-panel;
+  }
+  .eu-nav-item[aria-current="page"] {
+    @apply font-medium;
+  }
+  .eu-nav-item[aria-current="page"] .eu-nav-icon {
+    @apply opacity-100 text-accent;
+  }
+
+  /* Tabs share the strip evenly between 7.5 and 12.5 rem; a pinned tab is
+     its icon. The active tab is the page's own colour and opens into it:
+     the strip's hairline is an inset shadow the tab paints over. */
+  .eu-tabstrip {
+    @apply shrink-0 flex items-stretch bg-chrome;
+    height: var(--eu-topbar-h);
+    box-shadow: inset 0 -1px 0 var(--color-line);
+  }
+  .eu-tabs {
+    @apply flex flex-1 items-stretch min-w-0 overflow-x-auto;
+    scrollbar-width: none;
+  }
+  .eu-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .eu-tab {
+    @apply relative flex items-center min-w-30 max-w-50 grow-0 shrink basis-50 border-x border-transparent
+      text-ink-muted transition-colors duration-fast;
+  }
+  .eu-tab + .eu-tab:not([data-active]):not(:has(+ [data-active]))::after,
+  .eu-tab:first-child:not([data-active])::after {
+    content: "";
+    @apply absolute right-[-1px] top-2.5 bottom-2.5 w-px bg-line;
+  }
+  .eu-tab:hover {
+    @apply bg-hover text-ink;
+  }
+  .eu-tab[data-active] {
+    @apply bg-canvas border-line text-ink z-1;
+  }
+  .eu-tab[data-active]:hover {
+    @apply bg-canvas;
+  }
+  .eu-tab[data-pinned] {
+    @apply min-w-0 basis-auto shrink-0 grow-0;
+  }
+  .eu-tab[data-drop] {
+    @apply bg-accent-soft;
+  }
+  .eu-tab[data-dragging] {
+    @apply opacity-45;
+  }
+  .eu-tab-main {
+    @apply flex flex-1 min-w-0 items-center gap-2 h-full pl-3 pr-1 text-small select-none;
+  }
+  .eu-tab[data-pinned] .eu-tab-main {
+    @apply px-3 gap-1;
+  }
+  .eu-tab[data-active] .eu-tab-main {
+    @apply font-medium;
+  }
+  .eu-tab-title {
+    @apply truncate;
+  }
+  .eu-tab-pin {
+    @apply text-ink-faint;
+  }
+  .eu-tab-dirty {
+    @apply w-1.5 h-1.5 shrink-0 rounded-full bg-warn-solid;
+  }
+  /* Reserved even when hidden, so titles never move under the pointer. */
+  .eu-tab-close {
+    @apply shrink-0 w-6 h-6 mr-1.5 grid place-items-center rounded-sm text-ink-faint opacity-0
+      transition-[opacity,background-color,color] duration-fast hover:bg-danger-soft hover:text-danger
+      focus-visible:opacity-100;
+  }
+  .eu-tab:hover .eu-tab-close,
+  .eu-tab[data-active] .eu-tab-close {
+    @apply opacity-100;
+  }
+  .eu-tab-new {
+    @apply self-center ml-1.5;
+  }
+  .eu-tabstrip-extras {
+    @apply flex items-center gap-1.5 shrink-0 pl-2 pr-2.5;
+  }
+  .eu-search-button {
+    @apply flex items-center gap-2 pl-2.5 pr-1.5 rounded-md border border-line bg-panel text-ink-muted
+      transition-colors duration-fast hover:text-ink;
+    height: var(--eu-control-sm);
+  }
+  .eu-search-button:hover {
+    background-image: linear-gradient(var(--color-hover), var(--color-hover));
+  }
+  .eu-search-label {
+    @apply text-small pr-6 hidden sm:inline;
+  }
+
+  .eu-statusbar {
+    @apply shrink-0 h-6 flex items-stretch bg-chrome border-t border-line font-mono text-caption text-ink-faint
+      select-none;
+  }
+  .eu-status-item {
+    @apply flex items-center gap-1.5 px-2.5 border-r border-line whitespace-nowrap;
+  }
+  .eu-status-end {
+    @apply border-r-0 border-l;
+  }
+  .eu-status-button {
+    @apply transition-colors duration-fast hover:bg-hover hover:text-ink;
+  }
+  .eu-dot {
+    @apply w-1.5 h-1.5 rounded-full shrink-0;
+  }
+
+  .eu-timer {
+    @apply flex items-stretch rounded-md border border-line bg-panel overflow-hidden text-ink;
+    height: var(--eu-control-sm);
+  }
+  .eu-timer > button {
+    @apply flex items-center gap-1.5 px-2 font-mono text-small transition-colors duration-fast hover:bg-hover;
+  }
+  .eu-timer > button + button {
+    @apply border-l border-line px-1.5 text-ink-muted hover:text-ink;
+  }
+  .eu-timer-done {
+    @apply border-danger bg-danger-soft text-danger;
+  }
+
+  /* Tooltip (ui/Tooltip.tsx): a small ink label, keys as faint keycaps. */
+  .eu-tooltip {
+    @apply fixed m-0 p-0 border-0 left-0 top-0 flex items-center gap-2 max-w-72 px-2 py-1 rounded bg-ink text-panel
+      text-small font-medium shadow-pop pointer-events-none z-tooltip;
+    inset: auto;
+    left: 0;
+    top: 0;
+    transition: opacity 120ms var(--ease-out);
+  }
+  .eu-tooltip[data-open="false"] {
+    display: none;
+  }
+  @starting-style {
+    .eu-tooltip[data-open="true"] {
+      opacity: 0;
+    }
+  }
+  .eu-tooltip-keys {
+    @apply inline-flex gap-0.5;
+  }
+  .eu-tooltip-keys > kbd {
+    @apply px-1 py-0.5 rounded-sm bg-panel/15 font-mono text-[0.625rem] leading-none text-panel/80;
   }
 }
 
