@@ -1,5 +1,5 @@
 import { Modal } from "./ui";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { keymapGroups } from "../lib/keymap";
 import { Kbd } from "../ui/Kbd";
 
@@ -8,29 +8,29 @@ type Row = { label: string } & ({ keys: string } | { gesture: string[] });
 /** What the keymap cannot say: the mouse on tabs, and the palette's prefixes. */
 const EXTRA: { group: string; items: Row[] }[] = [
   {
-    group: get("shortcuts.groupTabs", "Barre d'onglets"),
+    group: tr("shortcuts.groupTabs"),
     items: [
       {
-        gesture: [get("shortcuts.doubleClick", "Double-clic")],
-        label: get("shortcuts.pinTab", "Épingler l'onglet"),
+        gesture: [tr("shortcuts.doubleClick")],
+        label: tr("shortcuts.pinTab"),
       },
       {
-        gesture: [get("shortcuts.drag", "Glisser")],
-        label: get("shortcuts.reorderTab", "Réordonner les onglets"),
+        gesture: [tr("shortcuts.drag")],
+        label: tr("shortcuts.reorderTab"),
       },
       {
-        gesture: [get("shortcuts.middleClick", "Clic milieu")],
-        label: get("shortcuts.closeTab", "Fermer l'onglet"),
+        gesture: [tr("shortcuts.middleClick")],
+        label: tr("shortcuts.closeTab"),
       },
     ],
   },
   {
-    group: get("shortcuts.groupPalette", "Dans la palette"),
+    group: tr("shortcuts.groupPalette"),
     items: [
-      { gesture: [">"], label: get("palette.prefixCommands", "Commandes") },
-      { gesture: ["@"], label: get("palette.prefixCourses", "Cours") },
-      { gesture: ["#"], label: get("palette.prefixDocs", "Documents") },
-      { gesture: ["↑", "↓"], label: get("shortcuts.navigateList", "Parcourir les résultats") },
+      { gesture: [">"], label: tr("palette.prefixCommands") },
+      { gesture: ["@"], label: tr("palette.prefixCourses") },
+      { gesture: ["#"], label: tr("palette.prefixDocs") },
+      { gesture: ["↑", "↓"], label: tr("shortcuts.navigateList") },
     ],
   },
 ];
@@ -38,7 +38,7 @@ const EXTRA: { group: string; items: Row[] }[] = [
 export default function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
   const groups: { group: string; items: Row[] }[] = [...keymapGroups(), ...EXTRA];
   return (
-    <Modal open={open} onClose={onClose} title={get("app.shortcutsTitle", "Raccourcis")} width="max-w-2xl">
+    <Modal open={open} onClose={onClose} title={tr("app.shortcutsTitle")} width="max-w-2xl">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
         {groups.map((group) => (
           <div key={group.group}>

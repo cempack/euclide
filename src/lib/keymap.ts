@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { get } from "./i18n";
+import { tr } from "./i18n";
 import { isMac } from "./shortcuts";
 
 /**
@@ -24,75 +24,75 @@ type KeySpec = {
 export const KEYMAP = {
   palette: {
     keys: "mod+K",
-    label: get("shortcuts.palette", "Palette de recherche"),
+    label: tr("shortcuts.palette"),
     group: "navigation",
     inFields: true,
     overDialogs: true,
   },
-  newTab: { keys: "mod+T", label: get("app.newTab", "Nouvel onglet"), group: "navigation" },
+  newTab: { keys: "mod+T", label: tr("app.newTab"), group: "navigation" },
   closeTab: {
     keys: "mod+W",
-    label: get("shortcuts.closeTab", "Fermer l'onglet"),
+    label: tr("shortcuts.closeTab"),
     group: "navigation",
     inFields: true,
   },
   gotoTab: {
     keys: "mod+digit",
     shown: "mod+1…9",
-    label: get("shortcuts.gotoTab", "Aller à l'onglet"),
+    label: tr("shortcuts.gotoTab"),
     group: "navigation",
   },
   nextTab: {
     keys: "ctrl+Tab",
-    label: get("shortcuts.nextTab", "Onglet suivant"),
+    label: tr("shortcuts.nextTab"),
     group: "navigation",
     inFields: true,
   },
   prevTab: {
     keys: "ctrl+shift+Tab",
-    label: get("shortcuts.prevTab", "Onglet précédent"),
+    label: tr("shortcuts.prevTab"),
     group: "navigation",
     inFields: true,
   },
-  dashboard: { keys: "mod+D", label: get("nav.dashboard", "Tableau de bord"), group: "navigation" },
-  documents: { keys: "mod+F", label: get("nav.documents", "Documents"), group: "navigation" },
+  dashboard: { keys: "mod+D", label: tr("nav.dashboard"), group: "navigation" },
+  documents: { keys: "mod+F", label: tr("nav.documents"), group: "navigation" },
   save: {
     keys: "mod+S",
-    label: get("shortcuts.save", "Enregistrer (note, tableau, script)"),
+    label: tr("shortcuts.save"),
     group: "actions",
     inFields: true,
   },
-  newNote: { keys: "mod+N", label: get("common.newNote", "Nouvelle note"), group: "actions" },
-  whiteboard: { keys: "mod+B", label: get("nav.whiteboard", "Tableau blanc"), group: "actions" },
+  newNote: { keys: "mod+N", label: tr("common.newNote"), group: "actions" },
+  whiteboard: { keys: "mod+B", label: tr("nav.whiteboard"), group: "actions" },
   capture: {
     keys: "mod+shift+K",
-    label: get("capture.title", "Capture rapide"),
+    label: tr("capture.title"),
     group: "actions",
     inFields: true,
     overDialogs: true,
   },
   runPython: {
     keys: "mod+enter",
-    label: get("shortcuts.runPython", "Exécuter le script Python"),
+    label: tr("shortcuts.runPython"),
     group: "actions",
     inFields: true,
   },
   projection: {
     keys: "mod+shift+P",
-    label: get("appearance.projection", "Mode projection"),
+    label: tr("appearance.projection"),
     group: "actions",
     inFields: true,
   },
   leaveProjection: {
     keys: "esc",
-    label: get("appearance.leaveProjection", "Quitter la projection"),
+    label: tr("appearance.leaveProjection"),
     group: "actions",
     inFields: true,
   },
-  settings: { keys: "mod+,", label: get("nav.settings", "Réglages"), group: "actions", inFields: true },
+  settings: { keys: "mod+,", label: tr("nav.settings"), group: "actions", inFields: true },
   help: {
     keys: "mod+/",
-    label: get("app.shortcutsTitle", "Raccourcis"),
+    label: tr("app.shortcutsTitle"),
     group: "actions",
     inFields: true,
     overDialogs: true,
@@ -216,7 +216,7 @@ export function keymapGroups(): { group: string; items: { keys: string; label: s
   const of = (group: KeySpec["group"]) =>
     specs.filter((s) => s.group === group).map((s) => ({ keys: s.shown ?? s.keys, label: s.label }));
   return [
-    { group: get("shortcuts.groupNavigation", "Navigation"), items: of("navigation") },
-    { group: get("shortcuts.groupActions", "Actions"), items: of("actions") },
+    { group: tr("shortcuts.groupNavigation"), items: of("navigation") },
+    { group: tr("shortcuts.groupActions"), items: of("actions") },
   ];
 }

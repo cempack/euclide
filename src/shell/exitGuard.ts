@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { api, isTauri } from "../lib/api";
-import { fmt, get } from "../lib/i18n";
+import { fmt, tr } from "../lib/i18n";
 import { editors } from "../stores/editors";
 import { saveTabSession, tabs } from "../stores/tabs";
 import { logged } from "../lib/report";
@@ -36,13 +36,8 @@ async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
   if (!left.length) return true;
   const names = left.map((id) => tabs.list().find((t) => t.id === id)?.title ?? id).join(", ");
   const choice = await confirm.dirty({
-    title: get("confirm.quitTitle", "Quitter Euclide ?"),
-    message: fmt(
-      left.length === 1
-        ? get("confirm.quitMessageOne", "Cet onglet a des modifications non enregistrées : {names}.")
-        : get("confirm.quitMessage", "Ces onglets ont des modifications non enregistrées : {names}."),
-      { names },
-    ),
+    title: tr("confirm.quitTitle"),
+    message: fmt(left.length === 1 ? tr("confirm.quitMessageOne") : tr("confirm.quitMessage"), { names }),
   });
   if (choice === "cancel") return false;
   if (choice === "discard") return true;
@@ -50,7 +45,7 @@ async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
   const results = await Promise.allSettled(left.map(editors.flush));
   await committed();
   if (results.some((r) => r.status === "rejected") || dirtyIds().length) {
-    toast(get("confirm.quitFailed", "Enregistrement impossible : Euclide reste ouvert."), "error");
+    toast(tr("confirm.quitFailed"), "error");
     return false;
   }
   return true;

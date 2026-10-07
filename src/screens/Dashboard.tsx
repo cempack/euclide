@@ -4,7 +4,7 @@ import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
 import { api, type Course, type CourseClass, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
-import { t, get, fmt } from "../lib/i18n";
+import { tr, trList } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import {
@@ -118,24 +118,23 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       await api.toggleReminder(r.id, markingDone);
       if (markingDone) {
         api.logEvent("reminder_done", r.title, r.course_id);
-        const cheers: string[] =
-          t.dashboard?.cheers && t.dashboard.cheers.length ? t.dashboard.cheers : ["Bien joué !"];
+        const cheers = trList("dashboard.cheers");
         toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
       }
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
     } catch (err) {
       reportError("dashboard.toggleReminder", err);
       setDone(!markingDone);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
   const deleteReminder = async (id: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
     const ok = await confirm.ask({
-      title: t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?",
-      message: t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?",
-      confirmLabel: get("common.delete", "Supprimer"),
+      title: tr("dashboard.confirmDeleteReminder"),
+      message: tr("dashboard.confirmDeleteReminder"),
+      confirmLabel: tr("common.delete"),
       danger: true,
     });
     if (!ok) return;
@@ -144,7 +143,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
     } catch (err) {
       reportError("dashboard.deleteReminder", err);
-      toast(errorMessage(err, t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression"), "error");
+      toast(errorMessage(err, tr("dashboard.errorDeleteReminder")), "error");
     }
   };
 
@@ -230,18 +229,16 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             <MetaDot />
             <span>
               {classes.length === 0
-                ? get("dashboard.metaNoClass", "aucun cours")
-                : fmt(get("dashboard.metaClasses", "{count} cours"), { count: classes.length })}
+                ? tr("dashboard.metaNoClass")
+                : tr("dashboard.metaClasses", { count: classes.length })}
             </span>
             <MetaDot />
-            <span>{fmt(get("dashboard.metaReminders", "{count} rappels"), { count: pending.length })}</span>
+            <span>{tr("dashboard.metaReminders", { count: pending.length })}</span>
             {pronoteStatus && (
               <>
                 <MetaDot />
                 <span className={pronoteStatus.connected ? "text-ok" : ""}>
-                  {pronoteStatus.connected
-                    ? get("status.pronoteOn", "pronote connecté")
-                    : get("status.pronoteOff", "pronote hors ligne")}
+                  {pronoteStatus.connected ? tr("status.pronoteOn") : tr("status.pronoteOff")}
                 </span>
               </>
             )}
@@ -254,30 +251,30 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
               onClick={() =>
                 tabs.open({
                   kind: "note",
-                  title: t.common?.newNote || "Nouvelle note",
+                  title: tr("common.newNote"),
                   params: { isNew: true },
                 })
               }
             >
               <NoteIcon className="w-3.5 h-3.5" />
-              {get("dashboard.newNote", "Note")}
+              {tr("dashboard.newNote")}
             </button>
             <button
               className="eu-btn-ghost eu-btn-sm"
               onClick={() =>
                 tabs.open({
                   kind: "whiteboard",
-                  title: get("app.tabWhiteboard", "Tableau"),
+                  title: tr("app.tabWhiteboard"),
                   params: { isNew: true },
                 })
               }
             >
               <PenIcon className="w-3.5 h-3.5" />
-              {get("dashboard.newBoard", "Tableau")}
+              {tr("dashboard.newBoard")}
             </button>
             <button className="eu-btn-primary eu-btn-sm" onClick={importDocs}>
               <PlusIcon className="w-3.5 h-3.5" />
-              {t.common?.importFiles || "Importer"}
+              {tr("common.importFiles")}
             </button>
           </>
         }
@@ -296,7 +293,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           onOpenBoard={() =>
             tabs.open({
               kind: "whiteboard",
-              title: get("app.tabWhiteboard", "Tableau"),
+              title: tr("app.tabWhiteboard"),
               params: { isNew: true, courseId: focusCourse?.id },
             })
           }
@@ -306,11 +303,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
       <div className="grid grid-cols-1 @3xl:grid-cols-[1.3fr_1fr] gap-4 items-start">
         <div className="flex flex-col gap-4 min-w-0">
           <Panel
-            title={get("dashboard.todayTitle", "Aujourd'hui")}
+            title={tr("dashboard.todayTitle")}
             icon={<CalendarIcon className="w-3.5 h-3.5" />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
-                {get("dashboard.schedule", "Emploi du temps")}
+                {tr("dashboard.schedule")}
                 <ChevronRightIcon className="w-3 h-3" />
               </button>
             }
@@ -318,14 +315,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             {classes.length === 0 ? (
               <EmptyState
                 icon={<CalendarIcon className="w-4 h-4" />}
-                title={get("dashboard.noClassTitle", "Aucun cours aujourd'hui")}
-                hint={
-                  t.dashboard?.noClassesToday ||
-                  "Profitez du calme — ou ajoutez vos cours dans l'emploi du temps."
-                }
+                title={tr("dashboard.noClassTitle")}
+                hint={tr("dashboard.noClassesToday")}
                 action={
                   <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
-                    {get("dashboard.schedule", "Emploi du temps")}
+                    {tr("dashboard.schedule")}
                   </button>
                 }
               />
@@ -345,25 +339,22 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           </Panel>
 
           <Panel
-            title={get("dashboard.quickLinks", "Liens rapides")}
+            title={tr("dashboard.quickLinks")}
             icon={<LinkIcon className="w-3.5 h-3.5" />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
-                {get("common.manage", "Gérer")}
+                {tr("common.manage")}
                 <ChevronRightIcon className="w-3 h-3" />
               </button>
             }
           >
             {links.length === 0 ? (
               <EmptyState
-                title={get("dashboard.noLinksTitle", "Aucun lien rapide")}
-                hint={get(
-                  "dashboard.noLinksHint",
-                  "Ajoutez depuis Outils les adresses que vous ouvrez tous les jours.",
-                )}
+                title={tr("dashboard.noLinksTitle")}
+                hint={tr("dashboard.noLinksHint")}
                 action={
                   <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
-                    {get("common.add", "Ajouter")}
+                    {tr("common.add")}
                   </button>
                 }
               />
@@ -376,10 +367,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     onClick={() => {
                       void api.openUrl(l.url).catch((err) => {
                         reportError("dashboard.openUrl", err);
-                        toast(
-                          errorMessage(err, get("messages.openUrlError", "Impossible d'ouvrir le lien")),
-                          "error",
-                        );
+                        toast(errorMessage(err, tr("messages.openUrlError")), "error");
                       });
                     }}
                     className="eu-btn-ghost eu-btn-sm"
@@ -396,13 +384,13 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
         <div className="flex flex-col gap-4 min-w-0">
           <Panel
-            title={t.nav?.reminders || "Rappels"}
+            title={tr("nav.reminders")}
             icon={<BellIcon className="w-3.5 h-3.5" />}
             action={
               <button
                 className="eu-btn-quiet eu-btn-sm"
                 onClick={() => tabs.open({ kind: "reminders" })}
-                aria-label={get("common.add", "Ajouter")}
+                aria-label={tr("common.add")}
               >
                 <PlusIcon className="w-3.5 h-3.5" />
               </button>
@@ -410,11 +398,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           >
             {pending.length === 0 ? (
               <EmptyState
-                title={get("dashboard.noRemindersTitle", "Rien à retenir")}
-                hint={t.dashboard?.noReminders || "Aucun rappel en attente."}
+                title={tr("dashboard.noRemindersTitle")}
+                hint={tr("dashboard.noReminders")}
                 action={
                   <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "reminders" })}>
-                    {t.common?.newReminder || "Nouveau rappel"}
+                    {tr("common.newReminder")}
                   </button>
                 }
               />
@@ -427,8 +415,8 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     <div key={r.id} className="eu-row-hover group">
                       <button
                         onClick={() => toggle(r)}
-                        aria-label={`${get("reminders.markDone", "Marquer fait")} — ${r.title}`}
-                        data-tip={get("reminders.markDone", "Marquer fait")}
+                        aria-label={`${tr("reminders.markDone")} — ${r.title}`}
+                        data-tip={tr("reminders.markDone")}
                         className="w-4 h-4 shrink-0 rounded-sm border border-line-strong hover:border-ok hover:bg-ok-soft transition-colors duration-fast"
                       />
                       <span className="eu-t-body text-ink truncate flex-1">{r.title}</span>
@@ -454,8 +442,8 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                       )}
                       <button
                         onClick={(e) => deleteReminder(r.id, e)}
-                        aria-label={`${get("common.delete", "Supprimer")} — ${r.title}`}
-                        data-tip={get("common.delete", "Supprimer")}
+                        aria-label={`${tr("common.delete")} — ${r.title}`}
+                        data-tip={tr("common.delete")}
                         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                       >
                         <TrashIcon className="w-3.5 h-3.5" />
@@ -468,25 +456,22 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           </Panel>
 
           <Panel
-            title={get("dashboard.resumeTitle", "Reprendre")}
+            title={tr("dashboard.resumeTitle")}
             icon={<ClockIcon className="w-3.5 h-3.5" />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "documents" })}>
-                {t.nav?.documents || "Documents"}
+                {tr("nav.documents")}
                 <ChevronRightIcon className="w-3 h-3" />
               </button>
             }
           >
             {recentFiles.length === 0 ? (
               <EmptyState
-                title={get("dashboard.noRecentTitle", "Rien d'ouvert récemment")}
-                hint={get(
-                  "dashboard.noRecentHint",
-                  "Importez des PDF, des images ou créez un tableau : ils apparaîtront ici.",
-                )}
+                title={tr("dashboard.noRecentTitle")}
+                hint={tr("dashboard.noRecentHint")}
                 action={
                   <button className="eu-btn-ghost eu-btn-sm" onClick={importDocs}>
-                    {t.common?.importFiles || "Importer"}
+                    {tr("common.importFiles")}
                   </button>
                 }
               />
@@ -515,19 +500,19 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         <StatTile
           icon={<BookIcon className="w-4 h-4" />}
           value={courses.length}
-          label={t.nav?.courses || "Cours"}
+          label={tr("nav.courses")}
           onClick={() => tabs.open({ kind: "courses" })}
         />
         <StatTile
           icon={<DescriptionIcon className="w-4 h-4" />}
           value={docCount}
-          label={t.nav?.documents || "Documents"}
+          label={tr("nav.documents")}
           onClick={() => tabs.open({ kind: "documents" })}
         />
         <StatTile
           icon={<NoteIcon className="w-4 h-4" />}
           value={noteCount}
-          label={get("nav.notes", "Notes")}
+          label={tr("nav.notes")}
           onClick={() => tabs.open({ kind: "documents", params: { filter: "note" } })}
         />
         <StatTile
@@ -539,9 +524,9 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
               {String((recap?.active_minutes ?? 0) % 60).padStart(2, "0")}
             </span>
           }
-          label={get("dashboard.activeToday", "Aujourd'hui")}
-          hint={`${get("nav.recap", "Bilan")} →`}
-          onClick={() => tabs.open({ kind: "recap", title: get("nav.recap", "Bilan") })}
+          label={tr("dashboard.activeToday")}
+          hint={`${tr("nav.recap")} →`}
+          onClick={() => tabs.open({ kind: "recap", title: tr("nav.recap") })}
         />
       </StatStrip>
     </>
@@ -582,7 +567,7 @@ function NowCard({
     courseClass?.last_file_id != null
       ? {
           id: courseClass.last_file_id,
-          name: courseClass.last_file_name || get("common.document", "Document"),
+          name: courseClass.last_file_name || tr("common.document"),
           kind: courseClass.last_file_kind || "file",
           course_id: course?.id ?? null,
         }
@@ -595,22 +580,18 @@ function NowCard({
       <div className="flex-1 min-w-0 p-[18px]">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="eu-t-label">
-            {state === "current"
-              ? get("dashboard.nowLabel", "En cours")
-              : get("dashboard.nextLabel", "Prochain cours")}
+            {state === "current" ? tr("dashboard.nowLabel") : tr("dashboard.nextLabel")}
           </span>
           <span className={state === "current" ? "eu-chip-warn" : "eu-chip"}>
             {entry.start_time}–{entry.end_time}
           </span>
           {state === "current" && remaining != null && (
             <span className="eu-t-caption text-warn">
-              {fmt(get("status.remaining", "reste {time}"), { time: humanMinutes(remaining) })}
+              {tr("status.remaining", { time: humanMinutes(remaining) })}
             </span>
           )}
           {state === "next" && until != null && (
-            <span className="eu-t-caption">
-              {fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(until) })}
-            </span>
+            <span className="eu-t-caption">{tr("status.inTime", { time: humanMinutes(until) })}</span>
           )}
         </div>
 
@@ -638,26 +619,24 @@ function NowCard({
             <button className="eu-btn-primary eu-btn-sm" onClick={() => onResume(resumeFile)}>
               <PlayIcon className="w-3.5 h-3.5" />
               <span className="truncate max-w-[26ch]">
-                {fmt(get("dashboard.resumeFile", "Reprendre · {name}"), { name: resumeFile.name })}
+                {tr("dashboard.resumeFile", { name: resumeFile.name })}
               </span>
             </button>
           ) : (
             course && (
               <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenContent}>
                 <LayersIcon className="w-3.5 h-3.5" />
-                {get("dashboard.setProgress", "Définir la progression")}
+                {tr("dashboard.setProgress")}
               </button>
             )
           )}
           <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenContent}>
             <BookIcon className="w-3.5 h-3.5" />
-            {course
-              ? get("dashboard.openContent", "Cahier de textes")
-              : get("dashboard.linkCourse", "Associer un cours")}
+            {course ? tr("dashboard.openContent") : tr("dashboard.linkCourse")}
           </button>
           <button className="eu-btn-ghost eu-btn-sm" onClick={onOpenBoard}>
             <PenIcon className="w-3.5 h-3.5" />
-            {get("nav.whiteboard", "Tableau blanc")}
+            {tr("nav.whiteboard")}
           </button>
           {courseClass?.last_item_title && (
             <span className="eu-t-meta ml-auto truncate max-w-[34ch]">
@@ -712,11 +691,11 @@ function ScheduleRow({
       {entry.room && <span className="eu-chip shrink-0 hidden @xl:inline-flex">{entry.room}</span>}
       <span className="eu-t-caption shrink-0 w-[78px] text-right">
         {isCurrent
-          ? get("dashboard.inProgress", "en cours")
+          ? tr("dashboard.inProgress")
           : status === "past"
-            ? get("dashboard.past", "passé")
+            ? tr("dashboard.past")
             : mins != null
-              ? fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(mins) })
+              ? tr("status.inTime", { time: humanMinutes(mins) })
               : ""}
       </span>
     </button>

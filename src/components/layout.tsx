@@ -11,7 +11,7 @@ import {
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Ellipsis } from "lucide-react";
 import { ArrowRightIcon } from "./icons";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 
 /**
  * Layout primitives.
@@ -197,7 +197,7 @@ function MorePopover({ children }: { children: ReactNode }) {
   const popRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const id = useId();
-  const label = get("common.more", "Plus d'outils");
+  const label = tr("common.more");
 
   // The button is the popover's invoker (popoverTarget), so the browser
   // toggles it, light dismiss included; we only place it when it opens.

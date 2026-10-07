@@ -30,7 +30,7 @@ import {
   Ruler,
   X,
 } from "lucide-react";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { Dialog, EXIT_MS } from "../ui/Dialog";
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             {view.mode === "ask" ? (
               <div className="flex justify-end gap-2">
                 <button className="eu-btn-ghost" onClick={() => answer(false)}>
-                  {view.opts.cancelLabel || get("confirm.cancel", "Annuler")}
+                  {view.opts.cancelLabel || tr("confirm.cancel")}
                 </button>
                 <button
                   className={view.opts.danger ? "eu-btn-danger" : "eu-btn-primary"}
@@ -228,19 +228,19 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   data-autofocus={view.opts.danger ? undefined : true}
                   onClick={() => answer(true)}
                 >
-                  {view.opts.confirmLabel || get("confirm.ok", "Confirmer")}
+                  {view.opts.confirmLabel || tr("confirm.ok")}
                 </button>
               </div>
             ) : (
               <div className="flex justify-end gap-2 flex-wrap">
                 <button className="eu-btn-ghost" onClick={() => answer("cancel")}>
-                  {get("confirm.cancel", "Annuler")}
+                  {tr("confirm.cancel")}
                 </button>
                 <button className="eu-btn-ghost" onClick={() => answer("discard")}>
-                  {get("confirm.discard", "Ne pas enregistrer")}
+                  {tr("confirm.discard")}
                 </button>
                 <button className="eu-btn-primary" data-autofocus onClick={() => answer("save")}>
-                  {get("confirm.save", "Enregistrer")}
+                  {tr("confirm.save")}
                 </button>
               </div>
             )}
@@ -329,7 +329,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 className="eu-toast-close"
-                aria-label={get("common.close", "Fermer")}
+                aria-label={tr("common.close")}
                 onClick={() => dismiss(toast.id)}
               >
                 <X size={14} strokeWidth={1.75} aria-hidden />

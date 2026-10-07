@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { XIcon } from "./icons";
 import { useConfirm, useToast } from "./ui";
-import { fmt, get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import {
   dismissAvailableUpdate,
   installErrorMessage,
@@ -47,15 +47,9 @@ export function UpdateAvailablePopup({
     // In-app dialog rather than the native window.confirm(), which looked
     // foreign inside the Tauri window.
     const ok = await confirmDlg.ask({
-      title: get("updater.install", "Installer"),
-      message: fmt(
-        get(
-          "updater.confirmInstall",
-          "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le.",
-        ),
-        { version: update.version },
-      ),
-      confirmLabel: get("updater.install", "Installer"),
+      title: tr("updater.install"),
+      message: tr("updater.confirmInstall", { version: update.version }),
+      confirmLabel: tr("updater.install"),
     });
     if (!ok) return;
     setBusy(true);
@@ -70,12 +64,10 @@ export function UpdateAvailablePopup({
       dismissAvailableUpdate(update.version);
       setBusy(false);
       setDone(true);
-      toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
+      toast(tr("updater.installed"), "success");
     } catch (err) {
       setBusy(false);
-      setError(
-        installErrorMessage(err) || get("updater.installFailed", "Impossible d'installer la mise à jour."),
-      );
+      setError(installErrorMessage(err) || tr("updater.installFailed"));
     }
   };
 
@@ -89,21 +81,15 @@ export function UpdateAvailablePopup({
         >
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="eu-t-section text-ink">
-                {fmt(get("updater.popupTitle", "Mise à jour {version}"), { version: update.version })}
-              </p>
-              <p className="eu-t-meta mt-1">
-                {done
-                  ? get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le.")
-                  : get("updater.popupBody", "Une nouvelle version est disponible.")}
-              </p>
+              <p className="eu-t-section text-ink">{tr("updater.popupTitle", { version: update.version })}</p>
+              <p className="eu-t-meta mt-1">{done ? tr("updater.installed") : tr("updater.popupBody")}</p>
             </div>
             <button
               type="button"
               onClick={dismiss}
               disabled={busy}
-              data-tip={get("updater.popupDismiss", "Fermer")}
-              aria-label={get("updater.popupDismiss", "Fermer")}
+              data-tip={tr("updater.popupDismiss")}
+              aria-label={tr("updater.popupDismiss")}
               className="shrink-0 eu-btn-quiet eu-btn-icon eu-btn-sm"
             >
               <XIcon className="w-3.5 h-3.5" />
@@ -121,7 +107,7 @@ export function UpdateAvailablePopup({
           <div className="flex justify-end gap-2 mt-3 flex-wrap">
             {!busy && (
               <button type="button" onClick={dismiss} className="eu-btn-quiet eu-btn-sm shrink-0">
-                {done ? get("updater.popupDismiss", "Fermer") : get("updater.popupLater", "Plus tard")}
+                {done ? tr("updater.popupDismiss") : tr("updater.popupLater")}
               </button>
             )}
             {!done && (
@@ -132,10 +118,10 @@ export function UpdateAvailablePopup({
                 className="eu-btn-primary eu-btn-sm whitespace-nowrap tabular-nums shrink-0"
               >
                 {busy
-                  ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
+                  ? tr("updater.installing", {
                       percent: percent ?? 0,
                     })
-                  : get("updater.popupInstall", "Installer")}
+                  : tr("updater.popupInstall")}
               </button>
             )}
           </div>

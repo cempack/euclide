@@ -1,5 +1,5 @@
 import { Clock, Pause, Play, X } from "lucide-react";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { formatTimer, timer, useTimerRunning, useTimerSec } from "../stores/timer";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
@@ -14,9 +14,9 @@ export function TimerSlot() {
 function TimerControl({ sec }: { sec: number }) {
   const running = useTimerRunning();
   const done = sec <= 0;
-  const toggleLabel = running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre");
-  const addLabel = get("timer.addMinute", "+1 minute");
-  const stopLabel = get("timer.stop", "Arrêter le minuteur");
+  const toggleLabel = running ? tr("timer.pause") : tr("timer.resume");
+  const addLabel = tr("timer.addMinute");
+  const stopLabel = tr("timer.stop");
   return (
     <div className={`eu-timer ${done ? "eu-timer-done" : ""}`}>
       <button type="button" onClick={timer.toggle} aria-label={toggleLabel} {...tip(toggleLabel)}>
@@ -64,13 +64,13 @@ export function TimerStage() {
         <div className="flex flex-col gap-1.5">
           <button type="button" onClick={timer.toggle} className="eu-btn-ghost eu-btn-sm">
             <Icon icon={running ? Pause : Play} size={14} />
-            {running ? get("timer.pause", "Pause") : get("timer.resume", "Reprendre")}
+            {running ? tr("timer.pause") : tr("timer.resume")}
           </button>
           <button type="button" onClick={() => timer.add(1)} className="eu-btn-ghost eu-btn-sm">
             +1 min
           </button>
           <button type="button" onClick={timer.stop} className="eu-btn-quiet eu-btn-sm">
-            {get("timer.stop", "Arrêter")}
+            {tr("timer.stop")}
           </button>
         </div>
       </div>

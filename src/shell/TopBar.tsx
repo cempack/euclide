@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { ChevronDown, CircleHelp, Pin, PinOff, Plus, Search, X } from "lucide-react";
 import { courseVisual } from "../lib/color";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { fitTabCount, tabs, useActiveId, useMaxTabs, useTabList, type Tab } from "../stores/tabs";
 import { useDirtyMap } from "../stores/editors";
 import { useAppearance } from "../lib/theme";
@@ -110,25 +110,25 @@ export const TopBar = memo(function TopBar({
       .map((t) => t.id);
     return [
       {
-        label: tab.pinned ? get("app.unpinTab", "Détacher l'onglet") : get("app.pinTab", "Épingler l'onglet"),
+        label: tab.pinned ? tr("app.unpinTab") : tr("app.pinTab"),
         icon: tab.pinned ? PinOff : Pin,
         onSelect: () => tabs.togglePin(tab.id),
       },
       "separator",
       {
-        label: get("common.close", "Fermer"),
+        label: tr("common.close"),
         icon: X,
         keys: tab.id === activeId ? keysOf("closeTab") : undefined,
         disabled: list.length < 2,
         onSelect: () => void onCloseTab(tab.id),
       },
       {
-        label: get("app.closeOthers", "Fermer les autres onglets"),
+        label: tr("app.closeOthers"),
         disabled: others.length === 0,
         onSelect: () => void closeMany(others),
       },
       {
-        label: get("app.closeRight", "Fermer les onglets à droite"),
+        label: tr("app.closeRight"),
         disabled: right.length === 0,
         onSelect: () => void closeMany(right),
       },
@@ -153,18 +153,13 @@ export const TopBar = memo(function TopBar({
   }, [courses]);
 
   const atLimit = maxTabs > 0 && list.length >= maxTabs;
-  const closeLabel = get("common.close", "Fermer");
-  const newTabLabel = get("app.newTab", "Nouvel onglet");
-  const helpLabel = get("app.shortcutsTitle", "Raccourcis");
+  const closeLabel = tr("common.close");
+  const newTabLabel = tr("app.newTab");
+  const helpLabel = tr("app.shortcutsTitle");
 
   return (
     <div ref={barRef} className="eu-tabstrip">
-      <div
-        ref={stripRef}
-        role="tablist"
-        aria-label={get("app.openTabs", "Onglets ouverts")}
-        className="eu-tabs"
-      >
+      <div ref={stripRef} role="tablist" aria-label={tr("app.openTabs")} className="eu-tabs">
         {list.map((tab, index) => {
           const active = tab.id === activeId;
           const dirty = !!dirtyMap[tab.id];
@@ -244,13 +239,13 @@ export const TopBar = memo(function TopBar({
                   }
                 }}
                 onDoubleClick={() => tabs.togglePin(tab.id)}
-                {...tip(pinned ? `${tab.title} · ${get("app.pinned", "Épinglé")}` : tab.title)}
+                {...tip(pinned ? `${tab.title} · ${tr("app.pinned")}` : tab.title)}
                 className="eu-tab-main"
               >
                 <TabIcon tab={tab} courseIcons={courseIcons} />
                 {!pinned && <span className="eu-tab-title">{tab.title}</span>}
                 {pinned && !dirty && <Icon icon={Pin} size={14} className="eu-tab-pin" />}
-                {dirty && <span className="eu-tab-dirty" aria-label={get("app.unsaved", "Non enregistré")} />}
+                {dirty && <span className="eu-tab-dirty" aria-label={tr("app.unsaved")} />}
               </button>
               {!pinned && list.length > 1 && (
                 <button
@@ -275,9 +270,7 @@ export const TopBar = memo(function TopBar({
             }}
             aria-label={newTabLabel}
             {...(atLimit
-              ? tip(
-                  `${newTabLabel} · ${get("app.tabLimitHint", "la limite est atteinte : le plus ancien sera fermé")}`,
-                )
+              ? tip(`${newTabLabel} · ${tr("app.tabLimitHint")}`)
               : tip(newTabLabel, keysOf("newTab")))}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
           >
@@ -288,7 +281,7 @@ export const TopBar = memo(function TopBar({
       {overflowing && (
         <div className="self-center shrink-0 pl-1">
           <MenuButton
-            label={get("app.allTabs", "Tous les onglets")}
+            label={tr("app.allTabs")}
             placement="bottom-end"
             items={list.map((t) => ({
               label: t.title,
@@ -312,7 +305,7 @@ export const TopBar = memo(function TopBar({
         <TimerSlot />
         <button type="button" onClick={onSearch} className="eu-search-button">
           <Icon icon={Search} size={14} />
-          <span className="eu-search-label">{get("common.searchEllipsis", "Rechercher…")}</span>
+          <span className="eu-search-label">{tr("common.searchEllipsis")}</span>
           <Kbd keys={keysOf("palette")} />
         </button>
         <button

@@ -4,7 +4,7 @@ import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
-import { get, fmt } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { useSetting } from "../api/hooks";
 import { isMac } from "../lib/shortcuts";
@@ -129,7 +129,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         }
       } catch (err) {
         reportError("note.load", err);
-        toast(errorMessage(err, get("notes.loadError", "Erreur de chargement des notes/cours")), "error");
+        toast(errorMessage(err, tr("notes.loadError")), "error");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -211,7 +211,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     const t = setTimeout(() => {
       persist().catch((err) => {
         reportError("note.autosave", err);
-        toast(errorMessage(err, get("notes.saveError", "Erreur lors de l'enregistrement")), "error");
+        toast(errorMessage(err, tr("notes.saveError")), "error");
       });
     }, 800);
     return () => clearTimeout(t);
@@ -365,29 +365,29 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const doDelete = async () => {
     if (!draft.id) return;
     const ok = await confirm.ask({
-      title: get("notes.deleteConfirm", "Supprimer cette note ?"),
-      message: get("notes.deleteConfirm", "Supprimer cette note ?"),
-      confirmLabel: get("common.delete", "Supprimer"),
+      title: tr("notes.deleteConfirm"),
+      message: tr("notes.deleteConfirm"),
+      confirmLabel: tr("common.delete"),
       danger: true,
     });
     if (!ok) return;
     await api.deleteNote(draft.id);
-    toast(get("notes.deleted", "Note supprimée"), "success");
+    toast(tr("notes.deleted"), "success");
     window.dispatchEvent(new CustomEvent("eu:library-changed"));
     tabs.close(tabId, { discard: true });
   };
 
   const doSave = async () => {
     if (!draft.title?.trim()) {
-      toast(get("notes.titleRequired", "Le titre est requis"), "error");
+      toast(tr("notes.titleRequired"), "error");
       return;
     }
     try {
       await persist();
-      toast(get("notes.saved", "Note enregistrée"), "success");
+      toast(tr("notes.saved"), "success");
     } catch (err) {
       reportError("note.save", err);
-      toast(errorMessage(err, get("notes.saveError", "Erreur lors de l'enregistrement")), "error");
+      toast(errorMessage(err, tr("notes.saveError")), "error");
     }
   };
 
@@ -411,20 +411,20 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       });
       if (!f?.id) {
         doc.save(`${title}.pdf`);
-        toast(get("notes.exported", "Exporté : {name}").replace("{name}", `${title}.pdf`), "success");
+        toast(tr("notes.exported").replace("{name}", `${title}.pdf`), "success");
         return;
       }
-      toast(get("notes.exported", "Exporté : {name}").replace("{name}", f.name), "success");
+      toast(tr("notes.exported").replace("{name}", f.name), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
     } catch (err) {
       reportError("note.exportPdf", err);
       doc.save(`${title}.pdf`);
-      toast(get("notes.exported", "Exporté : {name}").replace("{name}", `${title}.pdf`), "success");
+      toast(tr("notes.exported").replace("{name}", `${title}.pdf`), "success");
     }
   };
 
   if (loading) {
-    return <Loading label={get("notes.loading", "Chargement…")} />;
+    return <Loading label={tr("notes.loading")} />;
   }
 
   const selectedCourse = courses.find((c) => c.id === draft.course_id);
@@ -436,25 +436,22 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         <input
           className="flex-1 min-w-0 bg-transparent border-none eu-t-title text-ink px-1 -mx-1 py-1 rounded outline-hidden placeholder:text-ink-faint"
           value={draft.title || ""}
-          placeholder={get("notes.titlePlaceholder", "Titre de la note")}
+          placeholder={tr("notes.titlePlaceholder")}
           onChange={(e) => onTitleChange(e.target.value)}
-          aria-label={get("notes.titlePlaceholder", "Titre de la note")}
+          aria-label={tr("notes.titlePlaceholder")}
         />
         {dirty && (
-          <span
-            className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0"
-            data-tip={get("app.unsaved", "Non enregistré")}
-          />
+          <span className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0" data-tip={tr("app.unsaved")} />
         )}
         <ToolSep />
         <select
           className="eu-select eu-field-sm w-[140px]"
           value={draft.course_id ?? ""}
           onChange={(e) => onCourseChange(e.target.value ? Number(e.target.value) : null)}
-          data-tip={get("notes.courseTitle", "Affecter à un cours")}
-          aria-label={get("notes.courseTitle", "Affecter à un cours")}
+          data-tip={tr("notes.courseTitle")}
+          aria-label={tr("notes.courseTitle")}
         >
-          <option value="">{get("notes.general", "Général")}</option>
+          <option value="">{tr("notes.general")}</option>
           {courses.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -462,19 +459,15 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           ))}
         </select>
         <ToolGroup>
-          <button
-            onClick={exportPdf}
-            className="eu-btn-quiet eu-btn-sm"
-            data-tip={get("notes.exportPdf", "Exporter en PDF")}
-          >
+          <button onClick={exportPdf} className="eu-btn-quiet eu-btn-sm" data-tip={tr("notes.exportPdf")}>
             <DownloadIcon className="w-3.5 h-3.5" /> PDF
           </button>
           {draft.id && (
             <button
               onClick={doDelete}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
-              aria-label={get("common.delete", "Supprimer")}
-              data-tip={get("common.delete", "Supprimer")}
+              aria-label={tr("common.delete")}
+              data-tip={tr("common.delete")}
             >
               <TrashIcon className="w-3.5 h-3.5" />
             </button>
@@ -483,9 +476,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             onClick={doSave}
             disabled={!dirty}
             className="eu-btn-primary eu-btn-sm"
-            {...tip(get("common.save", "Enregistrer"), keysOf("save"))}
+            {...tip(tr("common.save"), keysOf("save"))}
           >
-            {get("common.save", "Enregistrer")}
+            {tr("common.save")}
           </button>
         </ToolGroup>
       </Toolbar>
@@ -494,104 +487,102 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       <div className="relative shrink-0">
         <Toolbar className="h-8 py-0 gap-0.5">
           {view !== "preview" && (
-            <ToolGroup className="gap-0" label={get("notes.format", "Mise en forme")}>
+            <ToolGroup className="gap-0" label={tr("notes.format")}>
               <button
                 onClick={insertBold}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-                data-tip={get("notes.bold", "Gras")}
-                aria-label={get("notes.bold", "Gras")}
+                data-tip={tr("notes.bold")}
+                aria-label={tr("notes.bold")}
               >
                 <span className="font-bold text-body">B</span>
               </button>
               <button
                 onClick={insertItalic}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-                data-tip={get("notes.italic", "Italique")}
-                aria-label={get("notes.italic", "Italique")}
+                data-tip={tr("notes.italic")}
+                aria-label={tr("notes.italic")}
               >
                 <span className="italic text-body">I</span>
               </button>
               <button
                 onClick={insertTitle}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-                data-tip={get("notes.heading", "Titre")}
-                aria-label={get("notes.heading", "Titre")}
+                data-tip={tr("notes.heading")}
+                aria-label={tr("notes.heading")}
               >
                 <span className="font-semibold text-body">H</span>
               </button>
               <button
                 onClick={insertList}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-                data-tip={get("notes.list", "Liste")}
-                aria-label={get("notes.list", "Liste")}
+                data-tip={tr("notes.list")}
+                aria-label={tr("notes.list")}
               >
                 <span className="text-body">•</span>
               </button>
               <button
                 onClick={insertCode}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-                data-tip={get("notes.code", "Code")}
-                aria-label={get("notes.code", "Code")}
+                data-tip={tr("notes.code")}
+                aria-label={tr("notes.code")}
               >
                 <CodeIcon className="w-4 h-4" />
               </button>
               <button
                 onClick={openLinkPopup}
                 className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-                data-tip={get("notes.link", "Lien")}
-                aria-label={get("notes.link", "Lien")}
+                data-tip={tr("notes.link")}
+                aria-label={tr("notes.link")}
               >
                 <LinkIcon className="w-4 h-4" />
               </button>
             </ToolGroup>
           )}
           <ToolSpacer />
-          <span className="eu-t-caption truncate @max-4xl:hidden">
-            {get("notes.markdownHint", "Markdown · formules LaTeX entre $…$")}
-          </span>
+          <span className="eu-t-caption truncate @max-4xl:hidden">{tr("notes.markdownHint")}</span>
           <Segmented
             value={view}
             onChange={setView}
-            label={get("notes.viewMode", "Affichage")}
+            label={tr("notes.viewMode")}
             className="h-(--eu-control-sm) shrink-0 ml-2"
             options={[
-              { value: "edit", label: get("notes.viewEdit", "Édition") },
-              { value: "split", label: get("notes.viewSplit", "Partagé") },
-              { value: "preview", label: get("notes.viewPreview", "Aperçu") },
+              { value: "edit", label: tr("notes.viewEdit") },
+              { value: "split", label: tr("notes.viewSplit") },
+              { value: "preview", label: tr("notes.viewPreview") },
             ]}
           />
         </Toolbar>
 
         {linkPopupOpen && (
           <div className="absolute top-full left-2 mt-1 z-30 w-[300px] eu-panel shadow-pop p-3">
-            <p className="eu-t-label mb-2">{get("notes.addLink", "Ajouter un lien")}</p>
+            <p className="eu-t-label mb-2">{tr("notes.addLink")}</p>
             <div className="flex flex-col gap-2">
               <input
                 className="eu-input"
-                placeholder={get("notes.linkText", "Texte affiché")}
+                placeholder={tr("notes.linkText")}
                 value={linkTextInput}
                 onChange={(e) => setLinkTextInput(e.target.value)}
                 autoFocus
-                aria-label={get("notes.linkText", "Texte affiché")}
+                aria-label={tr("notes.linkText")}
               />
               <input
                 className="eu-input"
-                placeholder={get("notes.linkUrl", "https://…")}
+                placeholder={tr("notes.linkUrl")}
                 value={linkUrlInput}
                 onChange={(e) => setLinkUrlInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") insertLinkFromPopup();
                   if (e.key === "Escape") closeLinkPopup();
                 }}
-                aria-label={get("notes.linkUrl", "Adresse")}
+                aria-label={tr("notes.linkUrl")}
               />
             </div>
             <div className="flex gap-2 mt-3 justify-end">
               <button onClick={closeLinkPopup} className="eu-btn-quiet eu-btn-sm">
-                {get("common.cancel", "Annuler")}
+                {tr("common.cancel")}
               </button>
               <button onClick={insertLinkFromPopup} className="eu-btn-primary eu-btn-sm">
-                {get("notes.insert", "Insérer")}
+                {tr("notes.insert")}
               </button>
             </div>
           </div>
@@ -607,9 +598,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
             }`}
           >
             {view === "split" && (
-              <p className="eu-t-label px-3 py-1.5 border-b border-line">
-                {get("notes.source", "Source Markdown")}
-              </p>
+              <p className="eu-t-label px-3 py-1.5 border-b border-line">{tr("notes.source")}</p>
             )}
             <textarea
               ref={textareaRef}
@@ -627,10 +616,10 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
                   insertItalic();
                 }
               }}
-              placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
+              placeholder={tr("notes.bodyPlaceholder")}
               className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-code resize-none outline-hidden selectable"
               style={{ whiteSpace: "pre-wrap" }}
-              aria-label={get("notes.source", "Source Markdown")}
+              aria-label={tr("notes.source")}
             />
           </div>
         )}
@@ -638,15 +627,13 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
         {view !== "edit" && (
           <div className="flex-1 flex flex-col min-w-0 min-h-0">
             {view === "split" && (
-              <p className="eu-t-label px-3 py-1.5 border-b border-line">{get("notes.preview", "Aperçu")}</p>
+              <p className="eu-t-label px-3 py-1.5 border-b border-line">{tr("notes.preview")}</p>
             )}
             <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
               {previewBody ? (
                 <MarkdownPreview body={previewBody} centered={view === "preview"} />
               ) : (
-                <p className="eu-t-body text-ink-faint italic">
-                  {get("notes.previewEmpty", "L'aperçu apparaîtra ici pendant que vous écrivez.")}
-                </p>
+                <p className="eu-t-body text-ink-faint italic">{tr("notes.previewEmpty")}</p>
               )}
             </div>
           </div>
@@ -657,13 +644,13 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       <div className="shrink-0 flex items-center gap-2 px-3 h-6 border-t border-line bg-panel-alt">
         <span className="eu-t-caption">
           {draft.updated_at
-            ? fmt(get("notes.savedAt", "enregistré {when}"), { when: relativeTime(draft.updated_at) })
-            : get("notes.neverSaved", "jamais enregistré")}
+            ? tr("notes.savedAt", { when: relativeTime(draft.updated_at) })
+            : tr("notes.neverSaved")}
         </span>
         {selectedCourse ? (
           <span className="eu-chip">{selectedCourse.name}</span>
         ) : (
-          <span className="eu-chip">{get("notes.general", "Général")}</span>
+          <span className="eu-chip">{tr("notes.general")}</span>
         )}
       </div>
     </div>
