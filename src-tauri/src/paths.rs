@@ -135,19 +135,27 @@ fn load_configured_data_dir() -> Option<PathBuf> {
     Some(p)
 }
 
+/// Startup picker: the database is not open yet, so this process switches to
+/// the chosen folder right away and the pointer remembers it for next time.
 pub fn save_configured_data_dir(dir: &Path) {
     set_data_dir_override(dir.to_path_buf());
-    let cfg = serde_json::json!({ "dataDir": dir.to_string_lossy() });
-    if let Ok(s) = serde_json::to_string_pretty(&cfg) {
-        let _ = fs::write(data_root_config_path(), s);
-    }
+    let _ = write_data_dir_pointer(dir);
 }
 
-pub fn clear_configured_data_dir() {
-    if let Ok(mut guard) = DATA_DIR_OVERRIDE.lock() {
-        *guard = None;
+/// Settings: only write the pointer. The running process keeps its folder
+/// (the database is open there); the new one is used after a restart.
+pub fn write_data_dir_pointer(dir: &Path) -> std::io::Result<()> {
+    let cfg = serde_json::json!({ "dataDir": dir.to_string_lossy() });
+    let s = serde_json::to_string_pretty(&cfg).map_err(std::io::Error::other)?;
+    fs::write(data_root_config_path(), s)
+}
+
+/// Settings: go back to the default folder at the next launch.
+pub fn remove_data_dir_pointer() -> std::io::Result<()> {
+    match fs::remove_file(data_root_config_path()) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        other => other,
     }
-    let _ = fs::remove_file(data_root_config_path());
 }
 
 fn set_data_dir_override(dir: PathBuf) {
