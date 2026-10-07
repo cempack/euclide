@@ -4,7 +4,8 @@ import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
 import { TrashIcon, CodeIcon, LinkIcon, DownloadIcon } from "./icons";
 import { get, fmt } from "../lib/i18n";
-import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
+import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
+import { useSetting } from "../api/hooks";
 import { MOD, isMac } from "../lib/shortcuts";
 import { relativeTime } from "../lib/format";
 import ReactMarkdown from "react-markdown";
@@ -22,6 +23,8 @@ interface NoteEditorProps {
 // Built once: new plugin arrays or components on each render made
 // react-markdown parse the note and re-render all its formulas on every
 // keystroke, even while the preview text itself had not changed.
+type NoteView = "edit" | "split" | "preview";
+
 const REMARK_PLUGINS = [remarkMath];
 const REHYPE_PLUGINS = [rehypeKatex];
 const MARKDOWN_COMPONENTS = {
@@ -31,9 +34,15 @@ const MARKDOWN_COMPONENTS = {
 };
 
 /** The rendered note; renders again only when its text changes. */
-const MarkdownPreview = memo(function MarkdownPreview({ body }: { body: string }) {
+const MarkdownPreview = memo(function MarkdownPreview({
+  body,
+  centered,
+}: {
+  body: string;
+  centered: boolean;
+}) {
   return (
-    <div className="eu-prose max-w-[68ch]">
+    <div className={`eu-prose max-w-[68ch] ${centered ? "mx-auto" : ""}`}>
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
@@ -76,6 +85,9 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   }, []);
 
   // Link popup state
+  // Source, preview or both side by side (stacked when the pane is narrow).
+  const [savedView, setView] = useSetting("note_view");
+  const view: NoteView = savedView === "edit" || savedView === "preview" ? savedView : "split";
   const [linkPopupOpen, setLinkPopupOpen] = useState(false);
   const [linkTextInput, setLinkTextInput] = useState("");
   const [linkUrlInput, setLinkUrlInput] = useState("https://");
@@ -477,60 +489,73 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       {/* Markdown toolbar */}
       <div className="relative shrink-0">
         <Toolbar className="h-8 py-0 gap-0.5">
-          <ToolGroup className="gap-0" label={get("notes.format", "Mise en forme")}>
-            <button
-              onClick={insertBold}
-              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              data-tip={get("notes.bold", "Gras")}
-              aria-label={get("notes.bold", "Gras")}
-            >
-              <span className="font-bold text-body">B</span>
-            </button>
-            <button
-              onClick={insertItalic}
-              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              data-tip={get("notes.italic", "Italique")}
-              aria-label={get("notes.italic", "Italique")}
-            >
-              <span className="italic text-body">I</span>
-            </button>
-            <button
-              onClick={insertTitle}
-              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              data-tip={get("notes.heading", "Titre")}
-              aria-label={get("notes.heading", "Titre")}
-            >
-              <span className="font-semibold text-body">H</span>
-            </button>
-            <button
-              onClick={insertList}
-              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              data-tip={get("notes.list", "Liste")}
-              aria-label={get("notes.list", "Liste")}
-            >
-              <span className="text-body">•</span>
-            </button>
-            <button
-              onClick={insertCode}
-              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              data-tip={get("notes.code", "Code")}
-              aria-label={get("notes.code", "Code")}
-            >
-              <CodeIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={openLinkPopup}
-              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-              data-tip={get("notes.link", "Lien")}
-              aria-label={get("notes.link", "Lien")}
-            >
-              <LinkIcon className="w-4 h-4" />
-            </button>
-          </ToolGroup>
+          {view !== "preview" && (
+            <ToolGroup className="gap-0" label={get("notes.format", "Mise en forme")}>
+              <button
+                onClick={insertBold}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={get("notes.bold", "Gras")}
+                aria-label={get("notes.bold", "Gras")}
+              >
+                <span className="font-bold text-body">B</span>
+              </button>
+              <button
+                onClick={insertItalic}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={get("notes.italic", "Italique")}
+                aria-label={get("notes.italic", "Italique")}
+              >
+                <span className="italic text-body">I</span>
+              </button>
+              <button
+                onClick={insertTitle}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={get("notes.heading", "Titre")}
+                aria-label={get("notes.heading", "Titre")}
+              >
+                <span className="font-semibold text-body">H</span>
+              </button>
+              <button
+                onClick={insertList}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={get("notes.list", "Liste")}
+                aria-label={get("notes.list", "Liste")}
+              >
+                <span className="text-body">•</span>
+              </button>
+              <button
+                onClick={insertCode}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={get("notes.code", "Code")}
+                aria-label={get("notes.code", "Code")}
+              >
+                <CodeIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={openLinkPopup}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={get("notes.link", "Lien")}
+                aria-label={get("notes.link", "Lien")}
+              >
+                <LinkIcon className="w-4 h-4" />
+              </button>
+            </ToolGroup>
+          )}
           <ToolSpacer />
-          <span className="eu-t-caption">
+          <span className="eu-t-caption truncate @max-4xl:hidden">
             {get("notes.markdownHint", "Markdown · formules LaTeX entre $…$")}
           </span>
+          <Segmented
+            value={view}
+            onChange={setView}
+            label={get("notes.viewMode", "Affichage")}
+            className="h-(--eu-control-sm) shrink-0 ml-2"
+            options={[
+              { value: "edit", label: get("notes.viewEdit", "Édition") },
+              { value: "split", label: get("notes.viewSplit", "Partagé") },
+              { value: "preview", label: get("notes.viewPreview", "Aperçu") },
+            ]}
+          />
         </Toolbar>
 
         {linkPopupOpen && (
@@ -570,46 +595,58 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       </div>
 
       {/* Source | preview */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        <div className="flex-1 flex flex-col min-w-0 border-r border-line">
-          <p className="eu-t-label px-3 py-1.5 border-b border-line">
-            {get("notes.source", "Source Markdown")}
-          </p>
-          <textarea
-            ref={textareaRef}
-            value={draft.body || ""}
-            onChange={(e) => markDirty({ body: e.target.value })}
-            onKeyDown={(e) => {
-              const mod = isMac ? e.metaKey : e.ctrlKey;
-              if (!mod || e.shiftKey || e.altKey) return;
-              const k = e.key.toLowerCase();
-              if (k === "b") {
-                e.preventDefault();
-                insertBold();
-              } else if (k === "i") {
-                e.preventDefault();
-                insertItalic();
-              }
-            }}
-            placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
-            className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-code resize-none outline-hidden selectable"
-            style={{ whiteSpace: "pre-wrap" }}
-            aria-label={get("notes.source", "Source Markdown")}
-          />
-        </div>
-
-        <div className="flex-1 flex flex-col min-w-0">
-          <p className="eu-t-label px-3 py-1.5 border-b border-line">{get("notes.preview", "Aperçu")}</p>
-          <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
-            {previewBody ? (
-              <MarkdownPreview body={previewBody} />
-            ) : (
-              <p className="eu-t-body text-ink-faint italic">
-                {get("notes.previewEmpty", "L'aperçu apparaîtra ici pendant que vous écrivez.")}
+      <div className="flex-1 min-h-0 flex flex-col @3xl:flex-row overflow-hidden">
+        {view !== "preview" && (
+          <div
+            className={`flex-1 flex flex-col min-w-0 min-h-0 ${
+              view === "split" ? "border-b border-line @3xl:border-b-0 @3xl:border-r" : ""
+            }`}
+          >
+            {view === "split" && (
+              <p className="eu-t-label px-3 py-1.5 border-b border-line">
+                {get("notes.source", "Source Markdown")}
               </p>
             )}
+            <textarea
+              ref={textareaRef}
+              value={draft.body || ""}
+              onChange={(e) => markDirty({ body: e.target.value })}
+              onKeyDown={(e) => {
+                const mod = isMac ? e.metaKey : e.ctrlKey;
+                if (!mod || e.shiftKey || e.altKey) return;
+                const k = e.key.toLowerCase();
+                if (k === "b") {
+                  e.preventDefault();
+                  insertBold();
+                } else if (k === "i") {
+                  e.preventDefault();
+                  insertItalic();
+                }
+              }}
+              placeholder={get("notes.bodyPlaceholder", "Écrivez ici…")}
+              className="flex-1 min-h-0 bg-canvas text-ink p-3 font-mono text-code resize-none outline-hidden selectable"
+              style={{ whiteSpace: "pre-wrap" }}
+              aria-label={get("notes.source", "Source Markdown")}
+            />
           </div>
-        </div>
+        )}
+
+        {view !== "edit" && (
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
+            {view === "split" && (
+              <p className="eu-t-label px-3 py-1.5 border-b border-line">{get("notes.preview", "Aperçu")}</p>
+            )}
+            <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
+              {previewBody ? (
+                <MarkdownPreview body={previewBody} centered={view === "preview"} />
+              ) : (
+                <p className="eu-t-body text-ink-faint italic">
+                  {get("notes.previewEmpty", "L'aperçu apparaîtra ici pendant que vous écrivez.")}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Status */}

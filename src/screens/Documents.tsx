@@ -89,7 +89,7 @@ function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowPr
         </span>
         <span className="eu-t-body text-ink truncate">{title}</span>
       </button>
-      <span className="eu-t-caption shrink-0 hidden sm:block">{meta}</span>
+      <span className="eu-t-caption shrink-0 hidden @xl:block">{meta}</span>
       <button
         onClick={onRename}
         aria-label={`${get("common.rename", "Renommer")} — ${title}`}
@@ -477,7 +477,7 @@ export default function Documents({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+        <div className="flex items-center flex-wrap gap-1.5">
           <button onClick={() => setFilter({ kind: "all" })} {...chipProps(filter.kind === "all")}>
             {get("documents.filterAll", "Tout")}
           </button>

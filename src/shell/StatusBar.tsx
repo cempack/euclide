@@ -102,7 +102,7 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
       >
         <span className="truncate">{info?.data_dir}</span>
       </span>
-      <span className="eu-status-item eu-status-end">{themeLabel}</span>
+      <span className="eu-status-item eu-status-end hidden md:flex">{themeLabel}</span>
       <span className="eu-status-item eu-status-end">v{info?.version ?? "…"}</span>
     </footer>
   );

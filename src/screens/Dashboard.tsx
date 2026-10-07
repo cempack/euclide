@@ -325,7 +325,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-4 items-start">
+      <div className="grid grid-cols-1 @3xl:grid-cols-[1.3fr_1fr] gap-4 items-start">
         <div className="flex flex-col gap-4 min-w-0">
           <Panel
             title={get("dashboard.todayTitle", "Aujourd'hui")}
@@ -729,7 +729,7 @@ function ScheduleRow({
         {entry.start_time}–{entry.end_time}
       </span>
       <span className="eu-t-body text-ink font-medium truncate flex-1">{entry.subject}</span>
-      {entry.room && <span className="eu-chip shrink-0 hidden sm:inline-flex">{entry.room}</span>}
+      {entry.room && <span className="eu-chip shrink-0 hidden @xl:inline-flex">{entry.room}</span>}
       <span className="eu-t-caption shrink-0 w-[78px] text-right">
         {isCurrent
           ? get("dashboard.inProgress", "en cours")

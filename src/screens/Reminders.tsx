@@ -328,7 +328,7 @@ export default function Reminders() {
         </div>
 
         {showDetails && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-4 pt-4 border-t border-line">
+          <div className="grid grid-cols-1 @2xl:grid-cols-3 gap-3.5 mt-4 pt-4 border-t border-line">
             <Field label={t.dashboard?.dueQuickLabel || "Échéance"}>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 <button type="button" onClick={() => setQuickDue(0)} className="eu-btn-ghost eu-btn-sm">

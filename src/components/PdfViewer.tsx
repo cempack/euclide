@@ -518,7 +518,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             aria-label={get("pdf.penTitle", "Stylo : dessin à main levée")}
           >
             <PenIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{get("pdf.pen", "Stylo")}</span>
+            <span className="hidden @2xl:inline">{get("pdf.pen", "Stylo")}</span>
           </button>
           <button
             onClick={togglePagesSidebar}

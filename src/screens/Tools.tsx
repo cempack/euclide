@@ -189,7 +189,7 @@ function TimerSection() {
               </button>
             ))}
           </div>
-          <span className="w-px h-7 bg-line hidden sm:block" />
+          <span className="w-px h-7 bg-line hidden @lg:block" />
           <Field label={get("tools.timerCustom", "Durée libre")} className="w-auto">
             <div className="flex items-center gap-1.5">
               <input
@@ -286,7 +286,7 @@ function LinksSection() {
                 >
                   <Favicon url={l.url} className="w-5 h-5 text-[0.625rem]" remote={remoteIcons} />
                   <span className="eu-t-body text-ink truncate">{l.label}</span>
-                  <span className="eu-t-meta truncate hidden sm:inline">{l.url}</span>
+                  <span className="eu-t-meta truncate hidden @xl:inline">{l.url}</span>
                 </button>
                 <button
                   onClick={async () => {
