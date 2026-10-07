@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useTabs } from "../lib/tabs";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import {
   api,
-  type Course,
   type CourseClass,
   type FileItem,
   type Note,
@@ -29,8 +30,9 @@ import {
 
 // TTL cache for pronoteClasses (avoids sidecar + login on every open)
 // on every single course tab open; the list changes rarely).
-const pronoteClassesCache = { data: null as any[] | null, ts: 0 };
-const PRONOTE_CACHE_TTL = 5 * 60 * 1000;
+const NO_NOTES: Note[] = [];
+const NO_FILES: FileItem[] = [];
+const NO_CLASSES: CourseClass[] = [];
 
 function isMainClass(name: string): boolean {
   if (!name) return false;
@@ -68,123 +70,46 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   const toast = useToast();
   const confirmDlg = useConfirm();
 
-  const [course, setCourse] = useState<Course | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [courseClasses, setCourseClasses] = useState<CourseClass[]>([]);
+  const queryClient = useQueryClient();
+  const live = { subscribed: visible };
+  const coursesQ = useQuery({ ...q.courses(), ...live });
+  const notesQ = useQuery({ ...q.courseNotes(courseId), ...live });
+  const filesQ = useQuery({ ...q.files(courseId), ...live });
+  const classesQ = useQuery({ ...q.courseClasses(courseId), ...live });
+  const course = coursesQ.data?.find((c) => c.id === courseId) ?? null;
+  const notes = notesQ.data ?? NO_NOTES;
+  const files = filesQ.data ?? NO_FILES;
+  const courseClasses = classesQ.data ?? NO_CLASSES;
+  const loading = coursesQ.isPending || notesQ.isPending || filesQ.isPending || classesQ.isPending;
   const [newClassName, setNewClassName] = useState("");
-  // Pronote for class dropdown + subject
-  const [pronoteClasses, setPronoteClasses] = useState<any[]>([]);
+  // Pronote for class dropdown + subject (only while connected).
+  const pronoteConnected = !!useQuery(q.pronoteStatus()).data?.connected;
+  const pronoteClassesQ = useQuery({ ...q.pronoteClasses(), enabled: pronoteConnected && visible });
+  const pronoteClasses = useMemo(
+    () => (pronoteConnected ? sanitizePronoteClasses(pronoteClassesQ.data ?? []) : []),
+    [pronoteConnected, pronoteClassesQ.data],
+  );
   const [selectedPronoteClass, setSelectedPronoteClass] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Attach existing global documents to this course's casier (avoids direct uploads from course page which had refresh issues)
   const [showAttach, setShowAttach] = useState(false);
   const [attachDocs, setAttachDocs] = useState<FileItem[]>([]);
   const [attachSelected, setAttachSelected] = useState<number[]>([]);
-  const staleLib = useRef(false);
 
   const { resolved } = useAppearance();
 
-  const refreshNotes = useCallback(
-    () =>
-      api
-        .listNotes(courseId)
-        .then((n) => setNotes(Array.isArray(n) ? n : []))
-        .catch(() => {}),
-    [courseId],
-  );
   const refreshFiles = useCallback(
-    () =>
-      api
-        .listFiles(courseId)
-        .then((f) => setFiles(Array.isArray(f) ? f : []))
-        .catch(() => {}),
-    [courseId],
+    () => queryClient.invalidateQueries({ queryKey: q.files(courseId).queryKey }),
+    [queryClient, courseId],
   );
   const refreshClasses = useCallback(
-    () =>
-      api
-        .listCourseClasses(courseId)
-        .then((c) => setCourseClasses(Array.isArray(c) ? c : []))
-        .catch(() => {}),
-    [courseId],
+    () => queryClient.invalidateQueries({ queryKey: q.courseClasses(courseId).queryKey }),
+    [queryClient, courseId],
   );
   const refreshAll = useCallback(() => {
-    refreshFiles();
-    refreshClasses();
+    void refreshFiles();
+    void refreshClasses();
   }, [refreshFiles, refreshClasses]);
-
-  useEffect(() => {
-    setLoading(true);
-    const pCourse = api.listCourses().then((cs) => {
-      setCourse(cs.find((c) => c.id === courseId) ?? null);
-    });
-    const pNotes = refreshNotes();
-    const pFiles = refreshFiles();
-    const pClasses = refreshClasses();
-    Promise.all([pCourse, pNotes, pFiles, pClasses]).finally(() => setLoading(false));
-
-    // Pronote attach dropdown (cached)
-    api
-      .pronoteStatus()
-      .then((s) => {
-        const connected = !!s.connected;
-        if (!connected) {
-          pronoteClassesCache.data = null;
-          pronoteClassesCache.ts = 0;
-          setPronoteClasses([]);
-          return;
-        }
-        const now = Date.now();
-        if (pronoteClassesCache.data && now - pronoteClassesCache.ts < PRONOTE_CACHE_TTL) {
-          let list = pronoteClassesCache.data;
-          if (Array.isArray(list)) {
-            list = sanitizePronoteClasses(list);
-            pronoteClassesCache.data = list;
-            setPronoteClasses(list);
-          } else {
-            setPronoteClasses([]);
-          }
-          return;
-        }
-        api
-          .pronoteClasses()
-          .then((r: any) => {
-            if (r?.ok && Array.isArray(r.classes)) {
-              const cleaned = sanitizePronoteClasses(r.classes);
-              pronoteClassesCache.data = cleaned;
-              pronoteClassesCache.ts = Date.now();
-              setPronoteClasses(cleaned);
-            }
-          })
-          .catch(() => {});
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId]);
-
-  // Keep notes (and files) in sync when edited/deleted from the standalone editor or Documents
-  useEffect(() => {
-    const onLibChange = () => {
-      if (!visible) {
-        staleLib.current = true;
-        return;
-      }
-      refreshNotes();
-      refreshFiles();
-    };
-    window.addEventListener("eu:library-changed", onLibChange);
-    return () => window.removeEventListener("eu:library-changed", onLibChange);
-  }, [visible, refreshNotes, refreshFiles]);
-
-  useEffect(() => {
-    if (visible && staleLib.current) {
-      staleLib.current = false;
-      refreshNotes();
-      refreshFiles();
-    }
-  }, [visible, refreshNotes, refreshFiles]);
 
   // Sanitized + not-yet-attached Pronote classes for the dropdown (prevents weird/non-class entries and dups).
   // We aggressively drop subgroup names containing "." (e.g. 4ITAGR.1, 3ESPGR.2, 5ALLGR.1, 4AP.1)
@@ -238,8 +163,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   const updateMatiere = async (newMatiere: string) => {
     if (!course) return;
     await api.updateCourse({ ...course, matiere: newMatiere });
-    const cs = await api.listCourses();
-    setCourse(cs.find((c) => c.id === courseId) ?? null);
+    window.dispatchEvent(new CustomEvent("eu:course-changed"));
     toast(`Matière mise à jour : ${newMatiere || "(aucune)"}`, "success");
   };
 
