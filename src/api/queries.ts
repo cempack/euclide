@@ -24,6 +24,18 @@ export const q = {
       queryKey: ["courses", courseId, "classes"],
       queryFn: () => api.listCourseClasses(courseId),
     }),
+  /** A course's progression: its sequences (chapters) and their steps. */
+  progression: (courseId: number) =>
+    queryOptions({
+      queryKey: ["courses", courseId, "progression"],
+      queryFn: async () => {
+        const [sequences, items] = await Promise.all([
+          api.listSequences(courseId),
+          api.listSequenceItems(courseId),
+        ]);
+        return { sequences, items };
+      },
+    }),
   /** A course's files, or with null the library (the files of no course). */
   files: (courseId: number | null) =>
     queryOptions({

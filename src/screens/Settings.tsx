@@ -876,15 +876,21 @@ function AboutSection({ info }: { info: AppInfo | null }) {
   const confirmDlg = useConfirm();
   const [status, setStatus] = useState<
     "idle" | "checking" | "upToDate" | "publishing" | "available" | "installing" | "installed" | "error"
-  >("idle");
+  >(() => (isTauri() && updaterSupported() ? "checking" : "idle"));
   const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
   const [error, setError] = useState("");
   const [percent, setPercent] = useState<number | null>(null);
 
-  const runCheck = async (quiet: boolean) => {
+  const runCheck = (quiet: boolean) => {
     if (!updaterSupported()) return;
     setStatus("checking");
     setError("");
+    void check(quiet);
+  };
+
+  /** The answer to a check; the screen opens already « checking ». */
+  const check = async (quiet: boolean) => {
+    if (!updaterSupported()) return;
     try {
       const next = await checkForAppUpdate(!quiet);
       if (next) {
@@ -914,7 +920,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
 
   useEffect(() => {
     if (!isTauri()) return;
-    void runCheck(true);
+    void check(true);
     const onAvailable = (e: Event) => {
       const detail = (e as CustomEvent<AppUpdateInfo>).detail;
       if (!detail?.version) return;

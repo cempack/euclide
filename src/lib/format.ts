@@ -218,3 +218,14 @@ export function getFaviconUrl(url: string): string | null {
     return null;
   }
 }
+
+/** A word of encouragement when a reminder is done, never the same twice in a row. */
+let lastCheer = -1;
+export function cheer(): string {
+  const pool = trList("dashboard.cheers");
+  if (!pool.length) return "";
+  let i = Math.floor(Math.random() * pool.length);
+  if (i === lastCheer && pool.length > 1) i = (i + 1) % pool.length;
+  lastCheer = i;
+  return pool[i];
+}

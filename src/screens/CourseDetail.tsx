@@ -68,6 +68,9 @@ function sanitizePronoteClasses(raw: any[]): any[] {
   return out;
 }
 
+const NO_SEQUENCES: Sequence[] = [];
+const NO_ITEMS: SequenceItem[] = [];
+
 export default function CourseDetail({ courseId, visible = true }: { courseId: number; visible?: boolean }) {
   const toast = useToast();
   const confirmDlg = useConfirm();
@@ -600,35 +603,21 @@ function SequencePane({
   const toast = useToast();
   const confirmDlg = useConfirm();
 
-  const [sequences, setSequences] = useState<Sequence[]>([]);
-  const [items, setItems] = useState<SequenceItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const progression = useQuery(q.progression(courseId));
+  const sequences = progression.data?.sequences ?? NO_SEQUENCES;
+  const items = progression.data?.items ?? NO_ITEMS;
+  const loading = progression.isPending;
+  useEffect(() => {
+    if (progression.error) reportError("course.sequences", progression.error);
+  }, [progression.error]);
   const [newSequence, setNewSequence] = useState("");
   const [addingTo, setAddingTo] = useState<number | null>(null);
   const [newItem, setNewItem] = useState("");
   const [newItemFile, setNewItemFile] = useState<number | "">("");
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
-  const load = useCallback(async () => {
-    try {
-      const [s, i] = await Promise.all([api.listSequences(courseId), api.listSequenceItems(courseId)]);
-      setSequences(Array.isArray(s) ? s : []);
-      setItems(Array.isArray(i) ? i : []);
-    } catch (err) {
-      reportError("course.sequences", err);
-      setSequences([]);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [courseId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   const reload = async () => {
-    await load();
+    await progression.refetch();
     onRefresh();
   };
 
@@ -936,10 +925,12 @@ function ClassCard({
 }) {
   const [notesDraft, setNotesDraft] = useState(cc.notes);
   const [savingNotes, setSavingNotes] = useState(false);
-
-  useEffect(() => {
+  // Saved notes changed underneath (another tab, a refetch): show them.
+  const [notesFor, setNotesFor] = useState(cc.notes);
+  if (notesFor !== cc.notes) {
+    setNotesFor(cc.notes);
     setNotesDraft(cc.notes);
-  }, [cc.notes]);
+  }
 
   const saveNotes = async () => {
     if (notesDraft === cc.notes) return;

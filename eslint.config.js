@@ -30,7 +30,25 @@ export default tseslint.config(
       "no-empty": ["warn", { allowEmptyCatch: false }],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-      // React Compiler rules: warnings until the state refactor, then errors.
+      // React Compiler rules: code that breaks them is not compiled (and
+      // usually re-renders more than it should).
+      "react-hooks/set-state-in-effect": "error",
+      "react-hooks/immutability": "error",
+      "react-hooks/refs": "error",
+      "react-hooks/purity": "error",
+      "react-hooks/preserve-manual-memoization": "error",
+    },
+  },
+  {
+    // Rewritten in later milestones (PDF viewer M6, Python M5, whiteboard M7):
+    // warnings until then.
+    files: [
+      "src/components/PdfViewer.tsx",
+      "src/components/Whiteboard.tsx",
+      "src/components/CodeEditor.tsx",
+      "src/screens/Python.tsx",
+    ],
+    rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/immutability": "warn",
       "react-hooks/refs": "warn",

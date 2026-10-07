@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
-import { tr, trList } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
@@ -10,7 +10,7 @@ import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layo
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { BellIcon, CheckIcon, RepeatIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
-import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
+import { formatDueLabel, localYmd, localYmdToIso, cheer } from "../lib/format";
 
 const NO_REMINDERS: Reminder[] = [];
 const NO_COURSES: Course[] = [];
@@ -174,8 +174,7 @@ export default function Reminders() {
         await api.toggleReminder(r.id, markingDone);
         if (markingDone) {
           api.logEvent("reminder_done", r.title, r.course_id);
-          const cheers = trList("dashboard.cheers");
-          toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
+          toast(cheer(), "success");
         }
         window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
         if (!optimistic) refresh({ silent: true });
