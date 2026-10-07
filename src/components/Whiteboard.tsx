@@ -781,7 +781,7 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Stroke width */}
-        <ToolGroup label={get("whiteboard.sizes", "Épaisseurs")}>
+        <ToolGroup collapse label={get("whiteboard.sizes", "Épaisseurs")}>
           {SIZES.slice(0, 5).map((s) => (
             <button
               key={s}
@@ -802,21 +802,23 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Opacity */}
-        <button
-          onClick={() => setOpacity(opacity === 1 ? 0.35 : 1)}
-          role="switch"
-          aria-checked={opacity < 1}
-          aria-label={get("whiteboard.opacity", "Semi-transparent")}
-          data-tip={get("whiteboard.opacity", "Semi-transparent")}
-          className="eu-btn-quiet eu-btn-sm eu-btn-toggle eu-no-drag"
-        >
-          {get("whiteboard.opacityShort", "Opacité")}
-        </button>
+        <ToolGroup collapse>
+          <button
+            onClick={() => setOpacity(opacity === 1 ? 0.35 : 1)}
+            role="switch"
+            aria-checked={opacity < 1}
+            aria-label={get("whiteboard.opacity", "Semi-transparent")}
+            data-tip={get("whiteboard.opacity", "Semi-transparent")}
+            className="eu-btn-quiet eu-btn-sm eu-btn-toggle eu-no-drag"
+          >
+            {get("whiteboard.opacityShort", "Opacité")}
+          </button>
+        </ToolGroup>
 
         <ToolSep />
 
         {/* Zoom */}
-        <ToolGroup label={get("whiteboard.zoom", "Zoom")}>
+        <ToolGroup collapse label={get("whiteboard.zoom", "Zoom")}>
           <button
             onClick={zoomOut}
             aria-label={get("whiteboard.zoomOut", "Réduire")}
@@ -843,7 +845,7 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* History */}
-        <ToolGroup label={get("whiteboard.history", "Historique")}>
+        <ToolGroup collapse label={get("whiteboard.history", "Historique")}>
           <button
             onClick={undo}
             disabled={itemCount === 0}
@@ -867,65 +869,67 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Versions: load an earlier snapshot, then Enregistrer to promote it. */}
-        <select
-          className="eu-select eu-field-sm w-[130px] eu-no-drag"
-          value=""
-          aria-label={get("pdf.versions", "Versions")}
-          onChange={async (e) => {
-            const versionId = Number(e.target.value);
-            if (!versionId) return;
-            try {
-              const res = await fetch(versionUrl(versionId));
-              if (!res.ok) throw new Error(await res.text());
-              const txt = await res.text();
-              const d = JSON.parse(txt) as BoardDoc;
-              if (pendingText || pendingTextRef.current) {
-                editingTextOriginal.current = null;
-                setPendingText(null);
-                pendingTextRef.current = null;
-              }
-              strokes.current = d.strokes ?? [];
-              shapes.current = d.shapes ?? [];
-              texts.current = d.texts ?? [];
-              history.current = [];
-              setItemCount(strokes.current.length + shapes.current.length + texts.current.length);
-              const rr = wrapRef.current?.getBoundingClientRect();
-              if (rr && rr.width > 0) updateCanvasSize(rr.width, rr.height, zoomRef.current);
-              redraw();
-              setDirty(true);
-              toast(
-                get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"),
-                "success",
-              );
-            } catch {
-              toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
-            }
-          }}
-        >
-          <option value="" disabled>
-            {get("pdf.versions", "Versions")} ({versions.length})
-          </option>
-          {versions.length === 0 ? (
-            <option value="" disabled>
-              {get("pdf.noVersionsYet", "Aucune version")}
-            </option>
-          ) : (
-            versions
-              .slice()
-              .reverse()
-              .map((v) => {
-                const label =
-                  v.timestamp === "original"
-                    ? get("pdf.original", "Original")
-                    : `v${v.version} ${v.timestamp}`;
-                return (
-                  <option key={v.id} value={v.id}>
-                    {label}
-                  </option>
+        <ToolGroup collapse label={get("pdf.versions", "Versions")}>
+          <select
+            className="eu-select eu-field-sm w-[130px] eu-no-drag"
+            value=""
+            aria-label={get("pdf.versions", "Versions")}
+            onChange={async (e) => {
+              const versionId = Number(e.target.value);
+              if (!versionId) return;
+              try {
+                const res = await fetch(versionUrl(versionId));
+                if (!res.ok) throw new Error(await res.text());
+                const txt = await res.text();
+                const d = JSON.parse(txt) as BoardDoc;
+                if (pendingText || pendingTextRef.current) {
+                  editingTextOriginal.current = null;
+                  setPendingText(null);
+                  pendingTextRef.current = null;
+                }
+                strokes.current = d.strokes ?? [];
+                shapes.current = d.shapes ?? [];
+                texts.current = d.texts ?? [];
+                history.current = [];
+                setItemCount(strokes.current.length + shapes.current.length + texts.current.length);
+                const rr = wrapRef.current?.getBoundingClientRect();
+                if (rr && rr.width > 0) updateCanvasSize(rr.width, rr.height, zoomRef.current);
+                redraw();
+                setDirty(true);
+                toast(
+                  get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"),
+                  "success",
                 );
-              })
-          )}
-        </select>
+              } catch {
+                toast(get("pdf.versionLoadError", "Erreur chargement de la version"), "error");
+              }
+            }}
+          >
+            <option value="" disabled>
+              {get("pdf.versions", "Versions")} ({versions.length})
+            </option>
+            {versions.length === 0 ? (
+              <option value="" disabled>
+                {get("pdf.noVersionsYet", "Aucune version")}
+              </option>
+            ) : (
+              versions
+                .slice()
+                .reverse()
+                .map((v) => {
+                  const label =
+                    v.timestamp === "original"
+                      ? get("pdf.original", "Original")
+                      : `v${v.version} ${v.timestamp}`;
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {label}
+                    </option>
+                  );
+                })
+            )}
+          </select>
+        </ToolGroup>
 
         <ToolSpacer />
 

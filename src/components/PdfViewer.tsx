@@ -562,7 +562,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
         <ToolSep />
 
-        <ToolGroup label={get("whiteboard.zoom", "Zoom")}>
+        <ToolGroup collapse label={get("whiteboard.zoom", "Zoom")}>
           <button
             onClick={() => doZoom(-1)}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
@@ -579,9 +579,9 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           </button>
         </ToolGroup>
 
+        {!legacyMode && <ToolSep />}
         {!legacyMode && (
-          <>
-            <ToolSep />
+          <ToolGroup collapse label={get("pdf.versions", "Versions")}>
             <select
               className="eu-select eu-field-sm w-[130px]"
               aria-label={get("pdf.versions", "Versions")}
@@ -632,7 +632,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                   })
               )}
             </select>
-          </>
+          </ToolGroup>
         )}
 
         <ToolSpacer />

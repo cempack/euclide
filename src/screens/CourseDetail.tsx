@@ -332,7 +332,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
             {course.description && (
               <>
                 <MetaDot />
-                <span className="eu-t-small normal-case tracking-normal">{course.description}</span>
+                <span>{course.description}</span>
               </>
             )}
           </>

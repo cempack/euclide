@@ -949,6 +949,47 @@
     }
   }
 
+  /* Menus (ui/Menu.tsx): paper in the top layer; the item under the
+     keyboard or the pointer is an ink tint. */
+  .eu-menu {
+    @apply fixed m-0 min-w-48 max-w-80 p-1 rounded-md border border-line bg-panel text-ink shadow-pop z-dropdown;
+    inset: auto;
+    left: 0;
+    top: 0;
+    animation: eu-rise 120ms var(--ease-out) both;
+  }
+  .eu-menu:not(:popover-open) {
+    display: none;
+  }
+  .eu-menu-item {
+    @apply w-full flex items-center gap-2.5 px-2.5 rounded text-left text-body text-ink outline-none;
+    height: var(--eu-control);
+  }
+  .eu-menu-item:hover,
+  .eu-menu-item:focus {
+    @apply bg-pressed;
+  }
+  .eu-menu-item svg {
+    @apply text-ink-muted;
+  }
+  .eu-menu-item[data-danger],
+  .eu-menu-item[data-danger] svg {
+    @apply text-danger;
+  }
+  .eu-menu-item[aria-disabled="true"] {
+    @apply opacity-45 cursor-default bg-transparent;
+  }
+  .eu-menu-sep {
+    @apply my-1 mx-1 h-px bg-line;
+  }
+  /* Toolbar groups that did not fit, stacked in the « … » popover. */
+  .eu-toolbar-more {
+    @apply flex flex-col items-start gap-1.5 p-2 min-w-0;
+  }
+  .eu-toolbar-slot {
+    @apply flex items-center shrink-0;
+  }
+
   /* Tooltip (ui/Tooltip.tsx): a small ink label, keys as faint keycaps. */
   .eu-tooltip {
     @apply fixed m-0 p-0 border-0 left-0 top-0 flex items-center gap-2 max-w-72 px-2 py-1 rounded bg-ink text-panel
