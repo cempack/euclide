@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type Course } from "../lib/api";
+import { api, versionUrl, type Course, type FileVersion } from "../lib/api";
 import { useTabs } from "../lib/tabs";
 import { useToast, useConfirm } from "./ui";
 import {
@@ -124,7 +124,7 @@ export default function Whiteboard({
   );
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<any>(null);
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<FileVersion[]>([]);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -278,14 +278,11 @@ export default function Whiteboard({
         .catch(() => {});
   }, [fileId]);
 
-  // load + ensure original version snapshot for this board (so default counts as version, like PDF)
+  // Version history. The first save keeps the original, so nothing is copied on open.
   useEffect(() => {
     const fid = currentFileId ?? fileId;
     if (fid) {
       (async () => {
-        try {
-          await api.ensureOriginalVersion(fid);
-        } catch {}
         try {
           const v = await api.getFileVersions(fid);
           setVersions(v);
@@ -561,14 +558,9 @@ export default function Whiteboard({
       toast(get("whiteboard.saved", "Enregistré"), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
       api
-        .ensureOriginalVersion(f.id)
-        .catch(() => {})
-        .then(() => {
-          api
-            .getFileVersions(f.id)
-            .then(setVersions)
-            .catch(() => {});
-        });
+        .getFileVersions(f.id)
+        .then(setVersions)
+        .catch(() => {});
     } catch {
       toast(get("messages.genericError", "Erreur"), "error");
     }
@@ -585,10 +577,15 @@ export default function Whiteboard({
       oc.fillStyle = "#fff";
       oc.fillRect(0, 0, o.width, o.height);
       oc.drawImage(c, 0, 0);
-      const exported = await api.exportBoardPng(
-        courseId,
-        tabs.tabs.find((t) => t.id === tabId)?.title ?? "Tableau",
-        o.toDataURL("image/png"),
+      const blob = await new Promise<Blob | null>((resolve) => o.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("png");
+      const title = tabs.tabs.find((t) => t.id === tabId)?.title ?? "Tableau";
+      const exported = await api.createFileBytes(
+        `${title.replace(/\.euboard$/i, "")}.png`,
+        await blob.arrayBuffer(),
+        {
+          courseId,
+        },
       );
       if (!exported?.id) {
         toast(get("messages.genericError", "Erreur"), "error");
@@ -874,11 +871,11 @@ export default function Whiteboard({
           value=""
           aria-label={get("pdf.versions", "Versions")}
           onChange={async (e) => {
-            const name = e.target.value;
-            if (!name) return;
+            const versionId = Number(e.target.value);
+            if (!versionId) return;
             try {
-              const dataUrl = await api.readVersionData(name);
-              const res = await fetch(dataUrl);
+              const res = await fetch(versionUrl(versionId));
+              if (!res.ok) throw new Error(await res.text());
               const txt = await res.text();
               const d = JSON.parse(txt) as BoardDoc;
               if (pendingText || pendingTextRef.current) {
@@ -915,13 +912,13 @@ export default function Whiteboard({
             versions
               .slice()
               .reverse()
-              .map((v: any, i: number) => {
-                const isOrig =
-                  v.timestamp === "original" ||
-                  (typeof v.backup_name === "string" && v.backup_name.includes("original"));
-                const label = isOrig ? get("pdf.original", "Original") : `v${v.version} ${v.timestamp}`;
+              .map((v) => {
+                const label =
+                  v.timestamp === "original"
+                    ? get("pdf.original", "Original")
+                    : `v${v.version} ${v.timestamp}`;
                 return (
-                  <option key={i} value={v.backup_name}>
+                  <option key={v.id} value={v.id}>
                     {label}
                   </option>
                 );

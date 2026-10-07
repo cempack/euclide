@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { api } from "../lib/api";
+import { api, fileUrl, versionUrl, type FileVersion } from "../lib/api";
 import { useToast } from "./ui";
 import { DownloadIcon, PenIcon, TrashIcon, GridIcon } from "./icons";
 import { OpenWithButton } from "./OpenWithButton";
@@ -34,15 +33,13 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   const legacyDrawing = useRef(false);
   const legacyCurrent = useRef<any>(null);
 
-  // Load file url (convertFileSrc gives asset:// or http that works for pdf.js fetch + iframe)
+  // The document is served by id over eufile:// (no absolute path in the webview).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setError(null);
       try {
-        const abs = await api.filePath(fileId);
-        if (!abs) throw new Error("no path");
-        const src = convertFileSrc(abs);
+        const src = fileUrl(fileId);
         if (!cancelled) {
           if (legacyMode) {
             // image path
@@ -104,16 +101,8 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
       if (d.type === "euclide-pdf-saved" && d.buffer) {
         try {
-          const buffer: ArrayBuffer = d.buffer;
-          const blob = new Blob([buffer], { type: "application/pdf" });
-          const dataUrl: string = await new Promise((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(r.result as string);
-            r.onerror = reject;
-            r.readAsDataURL(blob);
-          });
-          // save back to the CURRENT document (in-place update, with internal versioning backup)
-          await api.updateFile(fileId, dataUrl);
+          // Save back into the same document; the previous content becomes a version.
+          await api.writeFileBytes(fileId, d.buffer as ArrayBuffer);
           // refresh versions list
           api
             .getFileVersions(fileId)
@@ -139,7 +128,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   const pdfLoadedRef = useRef(false);
   pdfLoadedRef.current = pdfLoaded;
   const [currentEditorMode, setCurrentEditorMode] = useState<number>(0); // 0=select (NONE), 15=Ink (Stylo)
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<FileVersion[]>([]);
   const [currentColor, setCurrentColor] = useState("#000000");
   const [showPages, setShowPages] = useState(false);
   const [thumbnails, setThumbnails] = useState<{ page: number; dataUrl: string }[]>([]);
@@ -238,15 +227,10 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [legacyMode, pdfSrc]);
 
-  // load simple file versions history (for PDF mode) - fetch early so UI is visible.
-  // Also ensure the pristine "default file" is snapshotted as a version the first time
-  // this document is opened in the editor, so user can always revert to the original bytes.
+  // Version history. The first save keeps the original, so nothing is copied on open.
   useEffect(() => {
     if (!legacyMode && fileId) {
       (async () => {
-        try {
-          await api.ensureOriginalVersion(fileId);
-        } catch {}
         try {
           const v = await api.getFileVersions(fileId);
           setVersions(v);
@@ -319,10 +303,11 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     m.fillRect(0, 0, merged.width, merged.height);
     m.drawImage(cv, 0, 0);
     if (ov) m.drawImage(ov, 0, 0);
-    const dataUrl = merged.toDataURL("image/png");
     const base = fileName.replace(/\.[^.]+$/, "");
     try {
-      const f = await api.saveExport(`${base} (annoté).png`, dataUrl);
+      const blob = await new Promise<Blob | null>((resolve) => merged.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("png");
+      const f = await api.createFileBytes(`${base} (annoté).png`, await blob.arrayBuffer());
       if (!f?.id) {
         toast(get("messages.genericError", "Erreur"), "error");
         return;
@@ -597,11 +582,11 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
               className="eu-select h-7 w-[130px] text-[11.5px]"
               aria-label={get("pdf.versions", "Versions")}
               onChange={async (e) => {
-                const name = e.target.value;
-                if (!name) return;
+                const versionId = Number(e.target.value);
+                if (!versionId) return;
                 try {
-                  const dataUrl = await api.readVersionData(name);
-                  const res = await fetch(dataUrl);
+                  const res = await fetch(versionUrl(versionId));
+                  if (!res.ok) throw new Error(await res.text());
                   const buffer = await res.arrayBuffer();
                   const ifr = iframeRef.current;
                   if (ifr?.contentWindow) {
@@ -630,15 +615,13 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                 versions
                   .slice()
                   .reverse()
-                  .map((v: any, i: number) => {
-                    const isOriginal =
-                      v.timestamp === "original" ||
-                      (typeof v.backup_name === "string" && v.backup_name.includes("__original"));
-                    const label = isOriginal
-                      ? get("pdf.original", "Original")
-                      : `v${v.version} ${v.timestamp}`;
+                  .map((v) => {
+                    const label =
+                      v.timestamp === "original"
+                        ? get("pdf.original", "Original")
+                        : `v${v.version} ${v.timestamp}`;
                     return (
-                      <option key={i} value={v.backup_name}>
+                      <option key={v.id} value={v.id}>
                         {label}
                       </option>
                     );

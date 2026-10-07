@@ -86,6 +86,13 @@ impl From<String> for AppError {
     }
 }
 
+// …and still use `?` on the new helpers while they are converted.
+impl From<AppError> for String {
+    fn from(e: AppError) -> Self {
+        e.message()
+    }
+}
+
 impl From<&str> for AppError {
     fn from(msg: &str) -> Self {
         Self::User(msg.to_string())

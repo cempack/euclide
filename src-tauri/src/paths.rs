@@ -324,6 +324,35 @@ pub fn python_dir() -> PathBuf {
     data_dir().join("python")
 }
 
+/// Tests that touch files run against a fresh data folder of their own.
+/// Holds the environment lock until dropped.
+#[cfg(test)]
+pub(crate) fn temp_data_dir(name: &str) -> TempDataDir {
+    let guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!("euclide-test-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    set_data_dir_override(dir.clone());
+    ensure_subdirs(&dir);
+    TempDataDir { dir, _guard: guard }
+}
+
+#[cfg(test)]
+pub(crate) struct TempDataDir {
+    dir: PathBuf,
+    _guard: std::sync::MutexGuard<'static, ()>,
+}
+
+#[cfg(test)]
+impl Drop for TempDataDir {
+    fn drop(&mut self) {
+        if let Ok(mut g) = DATA_DIR_OVERRIDE.lock() {
+            *g = None;
+        }
+        let _ = fs::remove_dir_all(&self.dir);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -263,19 +263,9 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
 
   const doAttachDocs = async () => {
     if (attachSelected.length === 0) return;
-    const paths: string[] = [];
-    for (const id of attachSelected) {
-      try {
-        const p = await api.filePath(id);
-        paths.push(p);
-      } catch {}
-    }
-    if (paths.length === 0) {
-      setShowAttach(false);
-      return;
-    }
     try {
-      const added = await api.importPaths(paths, courseId);
+      // Copied on the Rust side: the webview never handles the documents' paths.
+      const added = await api.attachFilesToCourse(courseId, attachSelected);
       if (added.length) {
         added.forEach((f) => api.logEvent("file_import", f.name, courseId));
         toast(

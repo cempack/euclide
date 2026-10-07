@@ -783,6 +783,39 @@ function handle(cmd: string, args: Args): unknown {
         .slice(0, num(args, "limit") ?? 8);
     case "global_search":
       return search(str(args, "query"));
+    case "create_file_bytes": {
+      const headers = (args?.headers ?? {}) as Record<string, string>;
+      const name = decodeURIComponent(headers["x-eu-name"] ?? "export");
+      const course = headers["x-eu-course-id"] ? Number(headers["x-eu-course-id"]) : null;
+      const f: FileItem = {
+        id: newId(),
+        course_id: course,
+        name,
+        rel_path: `documents/${name}`,
+        kind: name.endsWith(".pdf") ? "pdf" : name.endsWith(".png") ? "image" : "file",
+        size: Number(args?.size ?? 0),
+        added_at: sqlUtc(new Date()),
+      };
+      files.push(f);
+      return f;
+    }
+    case "write_file_bytes": {
+      const headers = (args?.headers ?? {}) as Record<string, string>;
+      const f = files.find((x) => x.id === Number(headers["x-eu-file-id"]));
+      if (f) Object.assign(f, { size: Number(args?.size ?? f.size), added_at: sqlUtc(new Date()) });
+      return f ?? null;
+    }
+    case "attach_files_to_course": {
+      const course = num(args, "courseId");
+      const ids = (args?.fileIds as number[]) ?? [];
+      return files
+        .filter((f) => ids.includes(f.id))
+        .map((f) => {
+          const copy = { ...f, id: newId(), course_id: course, added_at: sqlUtc(new Date()) };
+          files.push(copy);
+          return copy;
+        });
+    }
     case "file_path":
       return "";
     case "list_openers":
