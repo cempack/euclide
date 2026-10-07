@@ -38,12 +38,21 @@ export function get(path: string, fallback: any = ""): any {
 }
 
 type Strings = typeof strings;
+/** A message whose wording follows a number: « 1 étape », « 3 étapes ». */
+type PluralForms = { one: string; other: string };
 type Leaves<T, P extends string = ""> = {
   [K in keyof T & string]: T[K] extends string
     ? `${P}${K}`
-    : T[K] extends readonly unknown[]
+    : T[K] extends readonly unknown[] | PluralForms
       ? never
       : Leaves<T[K], `${P}${K}.`>;
+}[keyof T & string];
+type Plurals<T, P extends string = ""> = {
+  [K in keyof T & string]: T[K] extends PluralForms
+    ? `${P}${K}`
+    : T[K] extends string | readonly unknown[]
+      ? never
+      : Plurals<T[K], `${P}${K}.`>;
 }[keyof T & string];
 type Lists<T, P extends string = ""> = {
   [K in keyof T & string]: T[K] extends readonly string[]
@@ -56,6 +65,8 @@ type Lists<T, P extends string = ""> = {
 /** Every message in strings.json, by its dotted path: a typo fails the typecheck. */
 export type StringKey = Leaves<Strings>;
 export type StringListKey = Lists<Strings>;
+/** Every message with singular and plural forms. */
+export type PluralKey = Plurals<Strings>;
 
 function lookup(path: string): unknown {
   let cur: unknown = strings;
@@ -68,6 +79,20 @@ export function tr(key: StringKey, vars?: Record<string, string | number>): stri
   const text = lookup(key);
   const s = typeof text === "string" ? text : key;
   return vars ? fmt(s, vars) : s;
+}
+
+const PLURAL = new Intl.PluralRules("fr-FR");
+const NUMBER = new Intl.NumberFormat("fr-FR");
+
+/**
+ * A message for `count` things, in the right form: French puts 0 and 1 in
+ * the singular (« 0 étape », « 1 étape », « 2 étapes »). {count} is written
+ * the French way (« 1 200 »).
+ */
+export function trn(key: PluralKey, count: number, vars?: Record<string, string | number>): string {
+  const forms = lookup(key) as Partial<Record<Intl.LDMLPluralRule, string>> | undefined;
+  const text = forms?.[PLURAL.select(count)] ?? forms?.other ?? key;
+  return fmt(text, { count: NUMBER.format(count), ...vars });
 }
 
 /** A list of messages (greetings, day names…). */

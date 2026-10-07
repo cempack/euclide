@@ -4,7 +4,7 @@ import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
 import { api, type Reminder, type ScheduleEntry } from "../lib/api";
 import { appReady } from "../lib/perf";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import {
@@ -256,7 +256,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                 : tr("dashboard.metaClasses", { count: classes.length })}
             </span>
             <MetaDot />
-            <span>{tr("dashboard.metaReminders", { count: pending.length })}</span>
+            <span>{trn("dashboard.metaReminders", pending.length)}</span>
             {pronoteStatus && (
               <>
                 <MetaDot />

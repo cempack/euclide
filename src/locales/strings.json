@@ -67,7 +67,10 @@
     "addReminderBtn": "Ajouter",
     "metaNoClass": "aucun cours",
     "metaClasses": "{count} cours",
-    "metaReminders": "{count} rappels",
+    "metaReminders": {
+      "one": "{count} rappel",
+      "other": "{count} rappels"
+    },
     "newNote": "Note",
     "newBoard": "Tableau",
     "todayTitle": "Aujourd'hui",
@@ -122,7 +125,10 @@
     "output": "SORTIE",
     "clearOutput": "effacer",
     "runHint": "Exécutez le script ({keys}) : ce qu'il affiche apparaît ici.",
-    "scriptsCount": "{count} script{plural}",
+    "scriptsCount": {
+      "one": "{count} script",
+      "other": "{count} scripts"
+    },
     "emptyEditorHint": "Créez un script temporaire (+) ou sélectionnez. Enregistrer pour le conserver.",
     "noScriptSelected": "Aucun script ouvert",
     "linkNamePlaceholder": "Nom",
@@ -170,12 +176,21 @@
     "nothingHere": "Rien ici",
     "nothingHint": "Importez des fichiers ou créez des notes.",
     "noteFallbackTitle": "Note",
-    "toastImported": "{count} importé(s)",
+    "toastImported": {
+      "one": "{count} document importé",
+      "other": "{count} documents importés"
+    },
     "toastRenamed": "Renommé \"{name}\"",
     "toastDeleted": "Supprimé",
     "noteKind": "Note",
-    "metaFiles": "{count} fichiers",
-    "metaNotes": "{count} notes",
+    "metaFiles": {
+      "one": "{count} fichier",
+      "other": "{count} fichiers"
+    },
+    "metaNotes": {
+      "one": "{count} note",
+      "other": "{count} notes"
+    },
     "filterAll": "Tout",
     "noResult": "Aucun résultat",
     "noResultHint": "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents.",
@@ -241,10 +256,22 @@
     "confirmDetach": "Détacher \"{name}\" ?",
     "attachDocsTitle": "Attacher des documents",
     "attachDocsHint": "Sélectionnez des fichiers de la bibliothèque Documents pour les copier dans le casier de ce cours.",
-    "importedFilesToast": "{count} importé(s)",
-    "metaClasses": "{count} classes",
-    "metaFiles": "{count} documents",
-    "metaNotes": "{count} notes",
+    "importedFilesToast": {
+      "one": "{count} document attaché",
+      "other": "{count} documents attachés"
+    },
+    "metaClasses": {
+      "one": "{count} classe",
+      "other": "{count} classes"
+    },
+    "metaFiles": {
+      "one": "{count} document",
+      "other": "{count} documents"
+    },
+    "metaNotes": {
+      "one": "{count} note",
+      "other": "{count} notes"
+    },
     "confirmDeleteCourseBody": "Le casier, les notes et les séquences de ce cours seront supprimés.",
     "deleteCourse": "Supprimer « {name} »",
     "lockerTitle": "Casier du cours",
@@ -257,7 +284,13 @@
     "contentTab": "Contenu {name}",
     "showPronoteContentsTitle": "Cahier de textes et documents Pronote",
     "sections": "Parties du cours",
-    "lockerShort": "Casier"
+    "lockerShort": "Casier",
+    "attachDocsCount": {
+      "one": "Attacher {count} document",
+      "other": "Attacher {count} documents"
+    },
+    "attachDocsNone": "Attacher des documents",
+    "libraryEmpty": "Aucun document dans la bibliothèque."
   },
   "settings": {
     "pronoteTitle": "Pronote",
@@ -358,12 +391,21 @@
       "remindersDone": "rappels",
       "activeMinutes": "min"
     },
-    "highlightFiles": "{count} fichier(s) ouvert(s).",
-    "highlightNotes": "{count} note(s).",
+    "highlightFiles": {
+      "one": "{count} fichier ouvert.",
+      "other": "{count} fichiers ouverts."
+    },
+    "highlightNotes": {
+      "one": "{count} note écrite.",
+      "other": "{count} notes écrites."
+    },
     "highlightTopCourse": "Cours actif : {name}.",
     "highlightTopDoc": "Doc consulté : {name}.",
     "highlightTopTool": "Outil : {name}.",
-    "highlightReminders": "{count} rappel(s) fait(s).",
+    "highlightReminders": {
+      "one": "{count} rappel fait.",
+      "other": "{count} rappels faits."
+    },
     "highlightEmpty": "Rien pour cette période.",
     "todayLabel": "aujourd'hui",
     "weekLabel": "cette semaine",
@@ -372,8 +414,14 @@
     "week": "Semaine",
     "month": "Mois",
     "noDataTitle": "Pas encore de données",
-    "opens": "{count} ouverture(s)",
-    "uses": "{count} utilisation(s)",
+    "opens": {
+      "one": "{count} ouverture",
+      "other": "{count} ouvertures"
+    },
+    "uses": {
+      "one": "{count} utilisation",
+      "other": "{count} utilisations"
+    },
     "highlights": "À retenir"
   },
   "notes": {
@@ -496,7 +544,10 @@
     "noContentHint": "Aucun contenu de cours trouvé pour {class} / {matiere}.",
     "linkCopied": "Lien copié dans le presse-papiers",
     "linkFallback": "Lien : {url}",
-    "metaEntries": "{count} séances",
+    "metaEntries": {
+      "one": "{count} séance",
+      "other": "{count} séances"
+    },
     "metaRefreshed": "actualisé à {time}",
     "errorTitle": "Contenu indisponible",
     "loadingFor": "Chargement du contenu Pronote pour {class}…"
@@ -632,7 +683,10 @@
     "add": "Ajouter",
     "emptyTitle": "Aucune séquence",
     "emptyHint": "Découpez le cours en séquences (chapitres) puis en étapes : activité, cours, exercices, évaluation. Chaque classe peut ensuite être positionnée sur une étape.",
-    "stepCount": "{count} étapes",
+    "stepCount": {
+      "one": "{count} étape",
+      "other": "{count} étapes"
+    },
     "moveUp": "Monter",
     "moveDown": "Descendre",
     "deleteTitle": "Supprimer la séquence",
@@ -675,14 +729,20 @@
     "repeatMonthly": "Chaque mois",
     "markTodo": "Marquer à faire",
     "clearDoneTitle": "Effacer les terminés",
-    "clearDoneMessage": "Supprimer les {count} rappels terminés ?",
+    "clearDoneMessage": {
+      "one": "Supprimer le rappel terminé ?",
+      "other": "Supprimer les {count} rappels terminés ?"
+    },
     "groupOver": "En retard",
     "groupSoon": "Aujourd'hui et demain",
     "groupLater": "À venir",
     "groupNoDate": "Sans échéance",
     "groupDone": "Terminés",
     "metaPending": "{count} à faire",
-    "metaDone": "{count} terminés",
+    "metaDone": {
+      "one": "{count} terminé",
+      "other": "{count} terminés"
+    },
     "clearDone": "Effacer les terminés",
     "hideDetails": "Moins",
     "showDetails": "Détails",

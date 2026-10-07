@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleStop, ListChecks } from "lucide-react";
 import { api, isTauri, type PythonDemo } from "../lib/api";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { useToast, useConfirm } from "../components/ui";
@@ -440,12 +440,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
         </div>
 
         <div className="px-2.5 py-2 border-t border-line">
-          <p className="eu-t-caption">
-            {tr("tools.scriptsCount", {
-              count: demos.length,
-              plural: demos.length === 1 ? "" : "s",
-            })}
-          </p>
+          <p className="eu-t-caption">{trn("tools.scriptsCount", demos.length)}</p>
         </div>
       </aside>
 

@@ -4,7 +4,7 @@ import { tabs } from "../stores/tabs";
 import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel } from "../components/layout";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { logged } from "../lib/report";
 import { BookIcon, DocIcon, RefreshIcon } from "../components/icons";
 
@@ -104,7 +104,7 @@ export default function ClassContent({
             {contents.length > 0 && (
               <>
                 <MetaDot />
-                <span>{tr("classContent.metaEntries", { count: contents.length })}</span>
+                <span>{trn("classContent.metaEntries", contents.length)}</span>
               </>
             )}
             {lastRefresh && (

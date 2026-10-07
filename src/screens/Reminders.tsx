@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
@@ -215,9 +215,7 @@ export default function Reminders() {
     if (done.length === 0) return;
     const ok = await confirm.ask({
       title: tr("reminders.clearDoneTitle"),
-      message: tr("reminders.clearDoneMessage", {
-        count: done.length,
-      }),
+      message: trn("reminders.clearDoneMessage", done.length),
       confirmLabel: tr("common.delete"),
       danger: true,
     });
@@ -286,7 +284,7 @@ export default function Reminders() {
           <>
             <span>{tr("reminders.metaPending", { count: pendingCount })}</span>
             <MetaDot />
-            <span>{tr("reminders.metaDone", { count: doneCount })}</span>
+            <span>{trn("reminders.metaDone", doneCount)}</span>
           </>
         }
         actions={

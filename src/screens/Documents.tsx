@@ -5,7 +5,7 @@ import { api, thumbUrl, type Course, type FileItem, type Note, type SearchResult
 import { tabs } from "../stores/tabs";
 import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
@@ -517,9 +517,9 @@ export default function Documents({
         title={tr("nav.documents")}
         meta={
           <>
-            <span>{tr("documents.metaFiles", { count: docs.length })}</span>
+            <span>{trn("documents.metaFiles", docs.length)}</span>
             <MetaDot />
-            <span>{tr("documents.metaNotes", { count: notes.length })}</span>
+            <span>{trn("documents.metaNotes", notes.length)}</span>
             {totalSize > 0 && (
               <>
                 <MetaDot />
