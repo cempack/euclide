@@ -172,13 +172,6 @@ pub struct SearchResult {
     pub file_kind: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct PythonResult {
-    pub ok: bool,
-    pub stdout: String,
-    pub stderr: String,
-}
-
 #[derive(Debug, Serialize, Clone)]
 pub struct PythonCompletion {
     pub name: String,

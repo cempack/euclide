@@ -1,171 +1,12 @@
-#!/usr/bin/env python3
-"""Euclide sidecar.
+"""Pronote through pronotepy: QR-code and password login, schedule sync,
+lesson contents and the class list.
 
-Owns the fragile/heavy work that is awkward in Rust:
-  - Pronote (pronotepy) QR-code and token login + schedule sync
-  - PDF text extraction for the document search index
-  - Running small Python teaching demos
-  - Jedi-based autocomplete for the code editor
-
-Protocol (persistent "warm" mode, default for built apps):
-  The sidecar is kept alive as a long-running process.
-  Send JSON lines on stdin: {"command": "pronote_sync", "payload": {...}}
-  Receive exactly one JSON response line on stdout per command (with trailing \n).
-
-Legacy one-shot (for manual/debug): `euclide_sidecar <command> <json-payload>`
-  (still supported).
-
-This makes calls snappy: Python runtime + heavy imports (pronotepy, jedi, pypdf)
-are loaded once at startup and stay warm. No repeated process spawn/extract even
-on low-end machines.
-
-Bundled for distribution with PyInstaller --onedir --noconsole into `euclide-sidecar/`
-folder (fast, no console window).
+Every handler takes the request payload (credentials plus parameters) and
+returns a plain dict; the server wraps it in the protocol envelope.
 """
 
-import io
 import json
-import sys
-import contextlib
 
-
-def reply(obj):
-    sys.stdout.write(json.dumps(obj))
-    sys.stdout.flush()
-
-
-# ---------------------------------------------------------------------------
-# Python demos
-# ---------------------------------------------------------------------------
-
-def run_demo(payload):
-    path = payload.get("path")
-    if not path:
-        return {"ok": False, "stdout": "", "stderr": "Chemin manquant."}
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            source = fh.read()
-    except OSError as exc:
-        return {"ok": False, "stdout": "", "stderr": f"Lecture impossible : {exc}"}
-
-    out, err = io.StringIO(), io.StringIO()
-    sandbox = {"__name__": "__main__", "__file__": path}
-    # stdin is the protocol pipe: a script calling input() must not read (and
-    # block on) it. An empty stdin makes input() fail fast with EOFError.
-    real_stdin = sys.stdin
-    sys.stdin = io.StringIO("")
-    try:
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            exec(compile(source, path, "exec"), sandbox)  # noqa: S102 - trusted local script
-        return {"ok": True, "stdout": out.getvalue(), "stderr": err.getvalue()}
-    except SystemExit as exc:
-        # exit(), quit() and sys.exit() end the script, not the sidecar.
-        code = exc.code
-        if code is None or code == 0:
-            return {"ok": True, "stdout": out.getvalue(), "stderr": err.getvalue()}
-        message = code if isinstance(code, str) else f"Le script s'est arrêté (code {code})."
-        return {"ok": False, "stdout": out.getvalue(), "stderr": err.getvalue() + f"{message}\n"}
-    except EOFError:
-        import traceback
-
-        return {
-            "ok": False,
-            "stdout": out.getvalue(),
-            "stderr": err.getvalue()
-            + traceback.format_exc()
-            + "\ninput() n'est pas encore disponible ici : remplacez la saisie par une valeur.\n",
-        }
-    except Exception:  # noqa: BLE001 - surface any demo error to the UI
-        import traceback
-
-        return {
-            "ok": False,
-            "stdout": out.getvalue(),
-            "stderr": err.getvalue() + traceback.format_exc(),
-        }
-    finally:
-        sys.stdin = real_stdin
-
-
-# ---------------------------------------------------------------------------
-# Intelligent Python autocomplete via Jedi (used by the CodeEditor in the UI).
-# This gives real context-aware suggestions: stdlib, locals, attributes, signatures,
-# docstrings, etc. Requires `jedi` in the sidecar environment (see requirements.txt).
-# Lines/columns are 1-based (Jedi convention).
-# ---------------------------------------------------------------------------
-
-def python_complete(payload):
-    code = payload.get("code") or ""
-    try:
-        line = int(payload.get("line") or 1)
-        column = int(payload.get("column") or 1)
-    except Exception:
-        line, column = 1, 1
-    path = payload.get("path") or "<script>.py"
-
-    try:
-        import jedi  # type: ignore
-
-        script = jedi.Script(code=code, path=path)
-        comps = script.complete(line=line, column=column)
-        out = []
-        for c in comps[:25]:  # keep popup snappy
-            item = {
-                "name": c.name,
-                "complete": getattr(c, "complete", None),
-                "type": getattr(c, "type", None),
-                "doc": "",
-            }
-            # docstring (truncated for UI)
-            try:
-                ds = c.docstring()
-                if ds:
-                    item["doc"] = ds[:400]
-            except Exception:
-                pass
-            # signature for callables
-            try:
-                sigs = c.get_signatures()
-                if sigs:
-                    item["signature"] = sigs[0].to_string()
-            except Exception:
-                pass
-            out.append(item)
-        return {"ok": True, "completions": out}
-    except ImportError:
-        # Jedi not installed in this sidecar env — graceful fallback (local keywords still work in UI)
-        return {"ok": False, "error": "jedi_not_installed", "completions": []}
-    except Exception as exc:  # noqa: BLE001
-        # e.g. parse error in the snippet; don't crash the sidecar
-        return {"ok": False, "error": str(exc), "completions": []}
-
-
-# ---------------------------------------------------------------------------
-# PDF extraction
-# ---------------------------------------------------------------------------
-
-def extract_pdf(payload):
-    path = payload.get("path")
-    if not path:
-        return {"text": ""}
-    try:
-        from pypdf import PdfReader
-
-        reader = PdfReader(path)
-        chunks = []
-        for page in reader.pages[:60]:  # cap so huge PDFs stay snappy
-            try:
-                chunks.append(page.extract_text() or "")
-            except Exception:  # noqa: BLE001
-                continue
-        return {"text": "\n".join(chunks)}
-    except Exception as exc:  # noqa: BLE001
-        return {"text": "", "error": str(exc)}
-
-
-# ---------------------------------------------------------------------------
-# Pronote
-# ---------------------------------------------------------------------------
 
 def _account_name(client):
     info = getattr(client, "info", None)
@@ -293,10 +134,7 @@ def _password_login_kwargs(pin, device_name, client_id):
 
 def _is_login_crypto_error(exc):
     text = str(exc).lower()
-    return any(
-        needle in text
-        for needle in ("decrypt", "un pad", "unpad", "bad username", "bad password")
-    )
+    return any(needle in text for needle in ("decrypt", "un pad", "unpad", "bad username", "bad password"))
 
 
 def _login_error_payload(exc, *, offered_pin):
@@ -365,9 +203,7 @@ def _get_client(payload):
 
     client = None
     if mode == "password":
-        client = _open_password_client(
-            pronotepy, url, username, password, pin, device_name, client_id
-        )
+        client = _open_password_client(pronotepy, url, username, password, pin, device_name, client_id)
     else:
         try:
             login_args = [url, username, password, uuid]
@@ -453,9 +289,7 @@ def pronote_password_login(payload):
         return {"ok": False, "error": "URL, identifiant et mot de passe requis."}
 
     try:
-        client = _open_password_client(
-            pronotepy, url, username, password, pin, device_name, client_id
-        )
+        client = _open_password_client(pronotepy, url, username, password, pin, device_name, client_id)
     except Exception as exc:  # noqa: BLE001
         return _login_error_payload(exc, offered_pin=bool(pin))
 
@@ -513,12 +347,13 @@ def pronote_sync(payload):
 def _french_date_label(date_str: str) -> str:
     """Turn '01/05/2025 09:00:00' into 'Vendredi 01 mai' style label."""
     import datetime as dt
+
     jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
     mois = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
     try:
         core = (date_str or "").split()[0]
         d = dt.datetime.strptime(core, "%d/%m/%Y").date()
-        return f"{jours[d.weekday()]} {d.day:02d} {mois[d.month-1]}"
+        return f"{jours[d.weekday()]} {d.day:02d} {mois[d.month - 1]}"
     except Exception:  # noqa: BLE001
         return date_str or ""
 
@@ -581,12 +416,7 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
             data["estCours"] = True
             data["avecCoursAnnules"] = True
         resp = client.post("PageCahierDeTexte", 89, data)
-        lst = (
-            resp.get("dataSec", {})
-            .get("data", {})
-            .get("ListeCahierDeTextes", {})
-            .get("V", [])
-        )
+        lst = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", [])
     except Exception:  # noqa: BLE001
         lst = None
 
@@ -602,12 +432,7 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
                     data["estCours"] = True
                     data["avecCoursAnnules"] = True
                 resp = client.post("PageCahierDeTexte", 89, data)
-                sub_lst = (
-                    resp.get("dataSec", {})
-                    .get("data", {})
-                    .get("ListeCahierDeTextes", {})
-                    .get("V", [])
-                )
+                sub_lst = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", [])
                 if sub_lst:
                     lst.extend(sub_lst)
             except Exception:  # noqa: BLE001
@@ -620,16 +445,10 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
         c = conts[0]
         mat = (e.get("Matiere") or {}).get("V") or {}
         subject = mat.get("L") or ""
-        groups = [
-            (g or {}).get("L", "")
-            for g in ((e.get("listeGroupes") or {}).get("V") or [])
-        ]
-        profs = [
-            (p or {}).get("L", "")
-            for p in ((e.get("listeProfesseurs") or {}).get("V") or [])
-        ]
+        groups = [(g or {}).get("L", "") for g in ((e.get("listeGroupes") or {}).get("V") or [])]
+        profs = [(p or {}).get("L", "") for p in ((e.get("listeProfesseurs") or {}).get("V") or [])]
         title = c.get("L") or ""
-        raw_desc = ((c.get("descriptif") or {}).get("V") or "")
+        raw_desc = (c.get("descriptif") or {}).get("V") or ""
         # basic html strip for readability (keeps the text content)
         desc = unescape(re.sub(r"<[^>]+>", " ", raw_desc)).strip()
         desc = re.sub(r"\s+", " ", desc).strip()
@@ -665,29 +484,35 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
                 try:
                     if Attachment:
                         att = Attachment(client, pj)
-                        documents.append({
-                            "name": att.name,
-                            "id": att.id,
-                            "type": att.type,  # 0 = link, 1 = file
-                            "url": att.url,
-                            "estUnLienInterne": pj.get("estUnLienInterne", False),
-                        })
+                        documents.append(
+                            {
+                                "name": att.name,
+                                "id": att.id,
+                                "type": att.type,  # 0 = link, 1 = file
+                                "url": att.url,
+                                "estUnLienInterne": pj.get("estUnLienInterne", False),
+                            }
+                        )
                     else:
-                        documents.append({
+                        documents.append(
+                            {
+                                "name": pj.get("L", ""),
+                                "id": pj.get("N", ""),
+                                "type": pj.get("G", 1),
+                                "url": "",
+                                "estUnLienInterne": pj.get("estUnLienInterne", False),
+                            }
+                        )
+                except Exception:  # noqa: BLE001
+                    documents.append(
+                        {
                             "name": pj.get("L", ""),
                             "id": pj.get("N", ""),
                             "type": pj.get("G", 1),
                             "url": "",
                             "estUnLienInterne": pj.get("estUnLienInterne", False),
-                        })
-                except Exception:  # noqa: BLE001
-                    documents.append({
-                        "name": pj.get("L", ""),
-                        "id": pj.get("N", ""),
-                        "type": pj.get("G", 1),
-                        "url": "",
-                        "estUnLienInterne": pj.get("estUnLienInterne", False),
-                    })
+                        }
+                    )
         except Exception:  # noqa: BLE001
             pass
 
@@ -785,12 +610,14 @@ def _contents_via_lessons(client, days_back: int = 365, class_name: str | None =
                                     documents = []
                                     try:
                                         for f in getattr(cont, "files", []) or []:
-                                            documents.append({
-                                                "name": getattr(f, "name", ""),
-                                                "id": getattr(f, "id", ""),
-                                                "type": getattr(f, "type", 0),
-                                                "url": getattr(f, "url", ""),
-                                            })
+                                            documents.append(
+                                                {
+                                                    "name": getattr(f, "name", ""),
+                                                    "id": getattr(f, "id", ""),
+                                                    "type": getattr(f, "type", 0),
+                                                    "url": getattr(f, "url", ""),
+                                                }
+                                            )
                                     except Exception:  # noqa: BLE001
                                         pass
 
@@ -836,12 +663,14 @@ def _contents_via_lessons(client, days_back: int = 365, class_name: str | None =
                     documents = []
                     try:
                         for f in getattr(cont, "files", []) or []:
-                            documents.append({
-                                "name": getattr(f, "name", ""),
-                                "id": getattr(f, "id", ""),
-                                "type": getattr(f, "type", 0),
-                                "url": getattr(f, "url", ""),
-                            })
+                            documents.append(
+                                {
+                                    "name": getattr(f, "name", ""),
+                                    "id": getattr(f, "id", ""),
+                                    "type": getattr(f, "type", 0),
+                                    "url": getattr(f, "url", ""),
+                                }
+                            )
                     except Exception:  # noqa: BLE001
                         pass
 
@@ -909,10 +738,7 @@ def pronote_contents(payload):
     # Resolve class filter to a proper Pronote classe object when possible.
     # This is key for teacher accounts that can see multiple classes.
     classes_raw = (
-        client.parametres_utilisateur.get("dataSec", {})
-        .get("data", {})
-        .get("listeClasses", {})
-        .get("V", [])
+        client.parametres_utilisateur.get("dataSec", {}).get("data", {}).get("listeClasses", {}).get("V", [])
     )
     class_map = {}
     for c in classes_raw:
@@ -979,6 +805,7 @@ def pronote_contents(payload):
 
     # Build matieres summary (name + count) for a left sidebar, like Pronote's UI
     from collections import Counter
+
     counts = Counter(c.get("subject", "") for c in filtered if c.get("subject"))
     matieres = [
         {"name": name, "count": cnt}
@@ -1021,26 +848,21 @@ def pronote_classes(payload):
             return {"ok": False, "error": f"Session Pronote expiree ou erreur : {exc}"}
 
     classes_raw = (
-        client.parametres_utilisateur.get("dataSec", {})
-        .get("data", {})
-        .get("listeClasses", {})
-        .get("V", [])
+        client.parametres_utilisateur.get("dataSec", {}).get("data", {}).get("listeClasses", {}).get("V", [])
     )
     classes = []
     for c in classes_raw:
         name = (c.get("L") or "").strip()
         # Filter out subgroups, options, or admin codes.
         # Main classes have no space, dot, parenthesis, or comma, and length <= 6.
-        if (
-            name
-            and len(name) <= 6
-            and not any(char in name for char in [" ", ".", "(", ")", ","])
-        ):
-            classes.append({
-                "name": name,
-                "N": c.get("N"),
-                "G": c.get("G", 1),
-            })
+        if name and len(name) <= 6 and not any(char in name for char in [" ", ".", "(", ")", ","]):
+            classes.append(
+                {
+                    "name": name,
+                    "N": c.get("N"),
+                    "G": c.get("G", 1),
+                }
+            )
 
     cid = getattr(client, "client_identifier", None) or ""
     return {
@@ -1051,97 +873,3 @@ def pronote_classes(payload):
         "password": client.password,
         "client_identifier": cid,
     }
-
-
-# ---------------------------------------------------------------------------
-
-COMMANDS = {
-    "run_demo": run_demo,
-    "extract_pdf": extract_pdf,
-    "python_complete": python_complete,
-    "pronote_login": pronote_login,
-    "pronote_password_login": pronote_password_login,
-    "pronote_sync": pronote_sync,
-    "pronote_contents": pronote_contents,
-    "pronote_classes": pronote_classes,
-}
-
-
-def preload_heavy_modules():
-    """Pre-import heavy deps at sidecar startup so first real call is fast.
-    This is key for "keep warm" + snappy on low-end systems.
-    """
-    for name in ("pronotepy", "jedi", "pypdf"):
-        try:
-            __import__(name)
-        except Exception:
-            pass  # will fail later in the handler with clear error
-
-
-def server_mode():
-    """Interactive server: read JSON command lines from stdin, write one response line per command.
-    Keeps the Python process alive ("warm") for the lifetime of the app.
-    """
-    preload_heavy_modules()
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-            command = data.get("command") or data.get("cmd", "")
-            payload = data.get("payload", data.get("data", {}))
-            handler = COMMANDS.get(command)
-            if handler is None:
-                resp = {"ok": False, "error": f"Commande inconnue : {command}"}
-            else:
-                resp = handler(payload)
-            sys.stdout.write(json.dumps(resp) + "\n")
-            sys.stdout.flush()
-        except (Exception, SystemExit) as exc:  # noqa: BLE001 - one bad request must not kill the server
-            sys.stdout.write(json.dumps({"ok": False, "error": f"Erreur sidecar : {exc}"}) + "\n")
-            sys.stdout.flush()
-    # EOF or parent died -> graceful exit
-
-
-def use_utf8_stdio():
-    """Rust writes UTF-8. On Windows, Python would decode the pipes with the
-    ANSI code page, mangling accented paths, names and passwords."""
-    for stream in (sys.stdin, sys.stdout, sys.stderr):
-        if stream is None:
-            continue
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError):
-            pass
-
-
-def main():
-    use_utf8_stdio()
-    # New persistent warm mode (preferred, used by built app):
-    #   sidecar is started once, communicates over stdio JSON lines.
-    # Legacy one-shot (for direct terminal use or during transition):
-    #   sidecar <command> <json-payload-as-string>
-    if len(sys.argv) >= 3:
-        # legacy one-shot
-        command = sys.argv[1]
-        raw = sys.argv[2]
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
-            payload = {}
-
-        handler = COMMANDS.get(command)
-        if handler is None:
-            reply({"ok": False, "error": f"Commande inconnue : {command}"})
-            return
-        try:
-            reply(handler(payload))
-        except Exception as exc:  # noqa: BLE001
-            reply({"ok": False, "error": f"Erreur sidecar : {exc}"})
-    else:
-        server_mode()
-
-
-if __name__ == "__main__":
-    main()

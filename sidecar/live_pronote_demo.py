@@ -8,41 +8,16 @@ Tests:
 - Eleve view
 
 Run:
-  sidecar/.venv/bin/python sidecar/test_3d_contents.py
+  sidecar/.venv/bin/python sidecar/live_pronote_demo.py
 """
 
 import sys
 from pathlib import Path
 
+
 def main():
-    here = Path(__file__).parent
-    candidates = [
-        here / "euclide_sidecar.py",
-        here.parent / "src-tauri" / "resources" / "euclide_sidecar.py",
-        here / ".." / "src-tauri" / "resources" / "euclide_sidecar.py",
-        Path("/Users/elliotmoreau/Desktop/Euclide/src-tauri/resources/euclide_sidecar.py"),
-    ]
-    sidecar_path = None
-    for c in candidates:
-        p = c.resolve() if hasattr(c, "resolve") else c
-        if p.exists():
-            sidecar_path = p
-            break
-    if not sidecar_path:
-        print("euclide_sidecar.py not found. Tried:", [str(c) for c in candidates])
-        sys.exit(1)
-    print(f"Loading sidecar from: {sidecar_path}")
-
-    # Load the live functions (they are defined at top level before the if __name__)
-    ns = {}
-    with open(sidecar_path, "r", encoding="utf-8") as f:
-        code = f.read()
-    exec(compile(code, str(sidecar_path), "exec"), ns)
-
-    pronote_contents = ns.get("pronote_contents")
-    if not pronote_contents:
-        print("Could not load pronote_contents from sidecar")
-        sys.exit(1)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from euclide_sidecar.pronote import pronote_contents
 
     print("=== LIVE TEST: pronote_contents with class=3D on PROFESSEUR demo ===")
     payload = {
@@ -66,7 +41,15 @@ def main():
     if contents:
         print("First few contents (newest):")
         for c in contents[:4]:
-            print(" ", c.get("date_label"), c.get("start_time"), "-", c.get("subject"), ":", (c.get("title") or "")[:55])
+            print(
+                " ",
+                c.get("date_label"),
+                c.get("start_time"),
+                "-",
+                c.get("subject"),
+                ":",
+                (c.get("title") or "")[:55],
+            )
             if c.get("description"):
                 print("    desc:", (c.get("description") or "")[:70])
         # Look for the specific title mentioned in user report
@@ -79,9 +62,9 @@ def main():
         print("  -> No contents returned for 3D on prof demo.")
 
     # === DETAILED "WHAT ARE THE CONTENTS" ===
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("WHAT ARE THE CONTENTS (detailed samples for 3D prof view)")
-    print("="*60)
+    print("=" * 60)
     print("TOTAL CONTENTS:", len(contents))
     print("TOTAL MATIERES:", len(res.get("matieres", [])))
     print("\nMATIERES (top with counts):")
@@ -90,7 +73,7 @@ def main():
 
     print("\n--- DETAILED ITEM SAMPLES (first 4) ---")
     for i, c in enumerate(contents[:4]):
-        print("\n[Content #{}]".format(i+1))
+        print("\n[Content #{}]".format(i + 1))
         print("  date:", c.get("date"))
         print("  date_label:", c.get("date_label"), " times:", c.get("start_time"), "-", c.get("end_time"))
         print("  subject:", c.get("subject"))
@@ -100,13 +83,15 @@ def main():
         print("  groups:", repr(c.get("groups")))
         print("  lesson_id:", c.get("lesson_id"))
         desc = c.get("description") or ""
-        print("  description ({} chars): {}".format(len(desc), desc[:180] + ("..." if len(desc) > 180 else "")))
+        print(
+            "  description ({} chars): {}".format(len(desc), desc[:180] + ("..." if len(desc) > 180 else ""))
+        )
 
     print("\n--- ITEMS WITH ACTUAL DESCRIPTIONS (sample of 3) ---")
     with_desc = [c for c in contents if (c.get("description") or "").strip()]
     print("Count with non-empty description:", len(with_desc), "/", len(contents))
     for i, c in enumerate(with_desc[:3]):
-        print("\n  [With desc #{}] {} | {}".format(i+1, c.get("date_label"), c.get("subject")))
+        print("\n  [With desc #{}] {} | {}".format(i + 1, c.get("date_label"), c.get("subject")))
         print("    title:", c.get("title"))
         print("    desc[:220]:", (c.get("description") or "")[:220])
 
@@ -138,15 +123,32 @@ def main():
         first = contents[0]
         keys = sorted(first.keys())
         print("Keys present:", keys)
-        required = ["date", "date_label", "start_time", "end_time", "subject", "title", "description", "category", "groups", "teachers", "lesson_id", "documents"]
+        required = [
+            "date",
+            "date_label",
+            "start_time",
+            "end_time",
+            "subject",
+            "title",
+            "description",
+            "category",
+            "groups",
+            "teachers",
+            "lesson_id",
+            "documents",
+        ]
         missing = [k for k in required if k not in first]
-        print("Required keys all present:", len(missing) == 0, "(missing: {})".format(missing) if missing else "")
+        print(
+            "Required keys all present:",
+            len(missing) == 0,
+            "(missing: {})".format(missing) if missing else "",
+        )
         print("Has 'end' raw field too:", "end" in first)
         print("Has 'documents' (attachments) field:", "documents" in first)
 
-    print("="*60)
+    print("=" * 60)
     print("END WHAT ARE THE CONTENTS")
-    print("="*60)
+    print("=" * 60)
 
     print("\n=== Test optional subject filter (GREC) + class=3D on PROF ===")
     payload_subj = {
@@ -167,16 +169,28 @@ def main():
         for c in subj_contents[:3]:
             print("   ", c.get("title")[:80])
         # verify filter actually reduced + scoped
-        print("  (reduced from total {} to {}; all subjects match GREC: {})".format(
-            len(contents), len(subj_contents),
-            all("GREC" in (c.get("subject") or "").upper() for c in subj_contents[:5])
-        ))
+        print(
+            "  (reduced from total {} to {}; all subjects match GREC: {})".format(
+                len(contents),
+                len(subj_contents),
+                all("GREC" in (c.get("subject") or "").upper() for c in subj_contents[:5]),
+            )
+        )
 
         print("\n  --- Detailed GREC samples (with descriptions) ---")
         with_desc_grec = [c for c in subj_contents if (c.get("description") or "").strip()]
         print("  GREC items with descriptions:", len(with_desc_grec), "/", len(subj_contents))
         for i, c in enumerate(with_desc_grec[:3]):
-            print("\n    [GREC #" + str(i+1) + "] " + c.get("date_label") + " " + c.get("start_time") + "-" + c.get("end_time"))
+            print(
+                "\n    [GREC #"
+                + str(i + 1)
+                + "] "
+                + c.get("date_label")
+                + " "
+                + c.get("start_time")
+                + "-"
+                + c.get("end_time")
+            )
             print("      title:", c.get("title"))
             print("      category:", c.get("category"), "teachers:", repr(c.get("teachers")))
             print("      groups:", repr(c.get("groups")))
@@ -185,7 +199,14 @@ def main():
             if docs:
                 print("      documents:", len(docs))
                 for d in docs[:2]:
-                    print("        -", d.get("name"), "type=", d.get("type"), "url[:80]=", (d.get("url") or "")[:80])
+                    print(
+                        "        -",
+                        d.get("name"),
+                        "type=",
+                        d.get("type"),
+                        "url[:80]=",
+                        (d.get("url") or "")[:80],
+                    )
 
         # Also check any GREC items that have documents even without description (common for "Cahier de textes")
         with_docs = [c for c in subj_contents if c.get("documents")]
@@ -195,11 +216,28 @@ def main():
             print("    ex docs:", [d.get("name") for d in ex.get("documents", [])])
 
         # Check for key GREC topics that exist in the demo data (e.g. A2 writing, cahier examples)
-        a2 = [c for c in subj_contents if "A2" in (c.get("title") or "") or "message simple" in (c.get("title") or "").lower()]
-        cahier = [c for c in subj_contents if "cahier de textes" in (c.get("title") or "").lower() or "cahier de textes" in (c.get("description") or "").lower()]
+        a2 = [
+            c
+            for c in subj_contents
+            if "A2" in (c.get("title") or "") or "message simple" in (c.get("title") or "").lower()
+        ]
+        cahier = [
+            c
+            for c in subj_contents
+            if "cahier de textes" in (c.get("title") or "").lower()
+            or "cahier de textes" in (c.get("description") or "").lower()
+        ]
         print("\n  Key topic checks:")
-        print("    Items on 'Niveau A2' / 'message simple':", len(a2), "(example title: " + (a2[0].get("title")[:60] if a2 else "none") + ")")
-        print("    Items on 'Cahier de textes':", len(cahier), "(example title: " + (cahier[0].get("title")[:60] if cahier else "none") + ")")
+        print(
+            "    Items on 'Niveau A2' / 'message simple':",
+            len(a2),
+            "(example title: " + (a2[0].get("title")[:60] if a2 else "none") + ")",
+        )
+        print(
+            "    Items on 'Cahier de textes':",
+            len(cahier),
+            "(example title: " + (cahier[0].get("title")[:60] if cahier else "none") + ")",
+        )
 
     print("\n=== LIVE TEST: ELEVE demo (no class filter, student's own class contents) ===")
     # For eleve accounts, there is no listeClasses and contents are implicitly for the
@@ -219,7 +257,9 @@ def main():
     print("matieres sample:", [m["name"] for m in res_e.get("matieres", [])[:5]])
     if e_contents:
         ex = e_contents[0]
-        print("  first eleve item:", ex.get("date_label"), ex.get("subject"), ":", (ex.get("title") or "")[:50])
+        print(
+            "  first eleve item:", ex.get("date_label"), ex.get("subject"), ":", (ex.get("title") or "")[:50]
+        )
         # show one with desc if any
         e_with = next((c for c in e_contents if c.get("description")), None)
         if e_with:
@@ -229,18 +269,40 @@ def main():
     # Final verification summary
     prof_ok = res.get("ok") and len(contents) > 50
     inter_ok = len([c for c in contents if "interculturelles" in (c.get("title") or "").lower()]) > 0
-    subj_ok = len(subj_contents) > 0 and len(subj_contents) < len(contents) and all("GREC" in (c.get("subject") or "").upper() for c in subj_contents[:5] if subj_contents)
+    subj_ok = (
+        len(subj_contents) > 0
+        and len(subj_contents) < len(contents)
+        and all("GREC" in (c.get("subject") or "").upper() for c in subj_contents[:5] if subj_contents)
+    )
     eleve_ok = res_e.get("ok") and len(e_contents) > 10
-    docs_ok = len([c for c in contents if c.get("documents")]) > 0 or len([c for c in subj_contents if c.get("documents")]) > 0
+    docs_ok = (
+        len([c for c in contents if c.get("documents")]) > 0
+        or len([c for c in subj_contents if c.get("documents")]) > 0
+    )
     print("\n=== VERIFICATION SUMMARY ===")
-    print("Prof 3D returned substantial contents:", "PASS" if prof_ok else "FAIL", "(count={})".format(len(contents)))
+    print(
+        "Prof 3D returned substantial contents:",
+        "PASS" if prof_ok else "FAIL",
+        "(count={})".format(len(contents)),
+    )
     print("Known title 'Courants et influences interculturelles' present:", "PASS" if inter_ok else "FAIL")
     print("Subject filter works (GREC reduces + scopes correctly):", "PASS" if subj_ok else "FAIL")
     print("Eleve returns real own-class contents:", "PASS" if eleve_ok else "FAIL")
-    print("Attached documents (ListePieceJointe) are retrieved (e.g. 'Test Doc CDT.txt' with URL):", "PASS" if docs_ok else "FAIL")
+    print(
+        "Attached documents (ListePieceJointe) are retrieved (e.g. 'Test Doc CDT.txt' with URL):",
+        "PASS" if docs_ok else "FAIL",
+    )
     all_pass = prof_ok and inter_ok and subj_ok and eleve_ok and docs_ok
-    print("\nOVERALL:", "ALL CHECKS PASSED - real lesson contents + attached documents are found for 3D in prof view." if all_pass else "SOME CHECKS FAILED")
-    print("Test complete. Used updated pronote_contents with 'ressource'=class scoping for professeur accounts.")
+    print(
+        "\nOVERALL:",
+        "ALL CHECKS PASSED - real lesson contents + attached documents are found for 3D in prof view."
+        if all_pass
+        else "SOME CHECKS FAILED",
+    )
+    print(
+        "Test complete. Used updated pronote_contents with 'ressource'=class scoping for professeur accounts."
+    )
+
 
 if __name__ == "__main__":
     main()

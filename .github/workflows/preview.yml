@@ -67,7 +67,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: sidecar/dist/euclide-sidecar
-          key: sidecar-${{ matrix.platform }}-py3.12-${{ hashFiles('sidecar/requirements.txt', 'src-tauri/resources/euclide_sidecar.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
+          key: sidecar-${{ matrix.platform }}-py3.12-${{ hashFiles('sidecar/requirements.txt', 'sidecar/euclide_sidecar/**', 'sidecar/run_sidecar.py', 'sidecar/build.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
 
       - name: build sidecar (Linux)
         if: runner.os == 'Linux' && steps.sidecar-cache.outputs.cache-hit != 'true'
@@ -79,6 +79,14 @@ jobs:
         if: runner.os == 'Windows' && steps.sidecar-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: .\sidecar\build_sidecar.ps1
+
+      # What freezing can break (Jedi's data, accents, input(), the shims…).
+      - name: smoke-test the frozen sidecar
+        shell: bash
+        run: |
+          bin=sidecar/dist/euclide-sidecar/euclide-sidecar
+          if [ "${{ runner.os }}" = "Windows" ]; then bin="$bin.exe"; fi
+          python sidecar/smoke_frozen.py "$bin"
 
       - name: copy sidecar into tauri resources
         shell: bash

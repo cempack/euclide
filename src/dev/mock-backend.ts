@@ -945,9 +945,14 @@ function handle(cmd: string, args: Args): unknown {
     // Python
     case "list_python_demos":
       return pythonDemos.slice();
-    case "run_python_code":
-    case "run_python_demo":
-      return { ok: true, stdout: "[27, 82, 41, 124, 62, 31, 94, 47, 142, 71]\n", stderr: "" };
+    case "python_run":
+      return mockRun(args);
+    case "python_input":
+      mockAnswer?.(String(args?.text ?? ""));
+      return null;
+    case "python_stop":
+    case "python_prewarm":
+      return null;
     case "python_complete":
       return [];
 
@@ -963,4 +968,64 @@ function handle(cmd: string, args: Args): unknown {
       if (/^(list_|get_)/.test(cmd)) return [];
       return null;
   }
+}
+
+/**
+ * Browser mode cannot run Python: a run prints the string literals of the
+ * script's print() calls and asks its input() prompts, enough to show the
+ * console at work.
+ */
+let mockAnswer: ((text: string) => void) | null = null;
+let mockRunId = 0;
+
+function mockRun(args?: Record<string, unknown>): number {
+  type Ev = import("../lib/api").RunEvent;
+  const send = args?.onEvent as (events: Ev[]) => void;
+  const code = String(args?.code ?? "");
+  const id = ++mockRunId;
+  void (async () => {
+    for (const line of code.split("\n")) {
+      const asked = /input\(\s*["'](.*?)["']/.exec(line);
+      if (asked) {
+        send([{ t: "input", prompt: asked[1] }]);
+        await new Promise<string>((resolve) => (mockAnswer = resolve));
+        mockAnswer = null;
+        continue;
+      }
+      const printed = /^\s*print\(\s*["'](.*?)["']/.exec(line);
+      if (printed) send([{ t: "out", s: `${printed[1]}\n` }]);
+    }
+    if (code.includes("turtle")) send([{ t: "turtle", ops: mockSquare() }]);
+    send([{ t: "done", ok: true, code: 0 }]);
+  })();
+  return id;
+}
+
+/** What `turtle` would send for a filled square, a circle and a label. */
+function mockSquare() {
+  type Op = import("../lib/api").TurtleOp;
+  const ops: Op[] = [{ op: "turtle", id: 1, x: 0, y: 0, heading: 0, visible: true }];
+  let [x, y, heading] = [-80, -80, 0];
+  ops.push({ op: "move", id: 1, to: [x, y], speed: 6 });
+  const points: [number, number][] = [[x, y]];
+  for (let i = 0; i < 4; i++) {
+    const rad = (heading * Math.PI) / 180;
+    const to: [number, number] = [x + 160 * Math.cos(rad), y + 160 * Math.sin(rad)];
+    ops.push({ op: "line", id: 1, from: [x, y], to, color: "#0f4fa8", width: 3, speed: 6 });
+    [x, y] = to;
+    points.push(to);
+    heading += 90;
+    ops.push({ op: "heading", id: 1, heading });
+  }
+  ops.push({ op: "fill", id: 1, points, color: "rgb(234,240,251)" });
+  ops.push({ op: "dot", at: [0, 0], size: 20, color: "#a4262c" });
+  ops.push({
+    op: "text",
+    at: [-80, 100],
+    text: "Carré",
+    align: "left",
+    font: ["Arial", 16, "bold"],
+    color: "#111213",
+  });
+  return ops;
 }
