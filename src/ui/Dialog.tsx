@@ -66,6 +66,12 @@ export function Dialog({
         e.preventDefault();
         onCloseRef.current();
       }}
+      onKeyDown={(e) => {
+        // Enter in a field often closes the dialog (« Ajouter »): focus goes
+        // back to the button that opened it, and the same key press must not
+        // click that button again.
+        if (e.key === "Enter" && e.target instanceof HTMLInputElement) e.preventDefault();
+      }}
       onMouseDown={(e) => {
         // A press on the backdrop lands on the <dialog> itself, outside its box.
         if (e.target !== e.currentTarget) return;
