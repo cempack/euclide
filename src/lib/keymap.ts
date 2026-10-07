@@ -83,6 +83,12 @@ export const KEYMAP = {
     group: "actions",
     inFields: true,
   },
+  scene: {
+    keys: "mod+shift+H",
+    label: tr("scene.open"),
+    group: "actions",
+    inFields: true,
+  },
   present: {
     keys: "F5",
     label: tr("shortcuts.present"),

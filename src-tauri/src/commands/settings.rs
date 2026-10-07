@@ -23,6 +23,7 @@ pub(crate) const UI_SETTINGS: &[&str] = &[
     "python_timeout",
     "python_output_height",
     "documents_view",
+    "keep_awake_mode",
 ];
 
 fn ui_key(key: &str) -> AppResult<&str> {
@@ -76,9 +77,35 @@ pub async fn set_keep_awake(
     db: State<'_, Db>,
     on: bool,
 ) -> AppResult<bool> {
+    // A toggle by hand (palette, Outils) is a choice: on or off, not « during classes ».
     crate::keepawake::set(&ka, on);
-    db.write(move |conn| put(conn, "keep_awake", if on { "1" } else { "0" }))
+    let mode = if on { "on" } else { "off" };
+    db.write(move |conn| put(conn, "keep_awake_mode", mode))
         .await?;
+    Ok(on)
+}
+
+/// « auto » (during classes), « on » or « off »; applied at once.
+#[tauri::command]
+pub async fn set_keep_awake_mode(
+    ka: State<'_, KeepAwake>,
+    db: State<'_, Db>,
+    mode: String,
+) -> AppResult<bool> {
+    let mode = crate::keepawake::Mode::parse(Some(&mode));
+    let on = db
+        .write(move |conn| {
+            put(conn, "keep_awake_mode", mode.as_str())?;
+            Ok(match mode {
+                crate::keepawake::Mode::On => true,
+                crate::keepawake::Mode::Off => false,
+                crate::keepawake::Mode::Auto => {
+                    crate::keepawake::in_class(conn, chrono::Local::now().naive_local())
+                }
+            })
+        })
+        .await?;
+    crate::keepawake::set(&ka, on);
     Ok(on)
 }
 

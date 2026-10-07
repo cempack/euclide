@@ -1,7 +1,8 @@
 import { memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
-import { PanelLeftClose, PanelLeftOpen, Projector, Settings } from "lucide-react";
+import { AlarmClock, PanelLeftClose, PanelLeftOpen, Projector, Settings } from "lucide-react";
+import { scene } from "../stores/scene";
 import { useSetting } from "../api/hooks";
 import type { AppInfo } from "../lib/api";
 import { tr } from "../lib/i18n";
@@ -47,8 +48,9 @@ const NavButton = memo(function NavButton({
 export const ProjectionRail = memo(function ProjectionRail() {
   const { toggleProjection } = useAppearance();
   const label = tr("appearance.leaveProjection");
+  const sceneLabel = tr("scene.open");
   return (
-    <aside className="eu-rail">
+    <aside className="eu-rail gap-1">
       <button
         type="button"
         onClick={toggleProjection}
@@ -59,6 +61,16 @@ export const ProjectionRail = memo(function ProjectionRail() {
         className="eu-btn-ghost eu-btn-icon"
       >
         <Icon icon={Projector} />
+      </button>
+      <button
+        type="button"
+        onClick={scene.open}
+        aria-label={sceneLabel}
+        {...tip(sceneLabel, keysOf("scene"))}
+        data-tip-place="right"
+        className="eu-btn-quiet eu-btn-icon"
+      >
+        <Icon icon={AlarmClock} />
       </button>
     </aside>
   );

@@ -6,6 +6,7 @@ import { api, type FileItem, type QuickLink, type SearchResult } from "../lib/ap
 import { tabs } from "../stores/tabs";
 import { openFile } from "../lib/files";
 import { timer } from "../stores/timer";
+import { scene } from "../stores/scene";
 import { get, tr } from "../lib/i18n";
 import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
 import { useAppearance } from "../lib/theme";
@@ -13,6 +14,8 @@ import { useToast } from "./ui";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { Highlight } from "../ui/Highlight";
+import { Kbd } from "../ui/Kbd";
+import { keysOf } from "../lib/keymap";
 
 import {
   BellIcon,
@@ -47,6 +50,8 @@ interface Action {
   snippet?: string;
   group: string;
   icon: React.ReactNode;
+  /** Its keyboard shortcut (lib/keymap.ts), shown on the right. */
+  keys?: string;
   run: () => void;
 }
 
@@ -210,6 +215,7 @@ function CommandPalette({
         hint: tr("palette.new"),
         aliases: cmdAliases("note"),
         icon: <NoteIcon className="w-4 h-4" />,
+        keys: keysOf("newNote"),
         run: go("note", tr("common.newNote"), { isNew: true }),
       },
       {
@@ -226,6 +232,7 @@ function CommandPalette({
         label: tr("nav.settings"),
         aliases: cmdAliases("settings"),
         icon: <GearIcon className="w-4 h-4" />,
+        keys: keysOf("settings"),
         run: go("settings"),
       },
       {
@@ -280,12 +287,26 @@ function CommandPalette({
         label: tr("capture.title"),
         aliases: cmdAliases("capture"),
         icon: <PlusIcon className="w-4 h-4" />,
+        keys: keysOf("capture"),
         run: () => {
           onClose();
           window.dispatchEvent(new CustomEvent("eu:capture-open"));
         },
       },
     ];
+
+    actions.push({
+      id: "scene",
+      group: G,
+      label: tr("scene.open"),
+      aliases: [...cmdAliases("timer"), "horloge", "plein écran", "projecteur"],
+      icon: <ClockIcon className="w-4 h-4" />,
+      keys: keysOf("scene"),
+      run: () => {
+        scene.open();
+        onClose();
+      },
+    });
 
     for (const minutes of [5, 10, 15, 30]) {
       actions.push({
@@ -498,7 +519,11 @@ function CommandPalette({
                     <span className="eu-t-body block truncate">{a.label}</span>
                     {a.snippet && <Highlight text={a.snippet} className="block eu-t-meta truncate" />}
                   </span>
-                  {a.hint && <span className="eu-t-caption shrink-0 mt-0.5">{a.hint}</span>}
+                  {a.keys ? (
+                    <Kbd keys={a.keys} className="shrink-0 mt-0.5" />
+                  ) : (
+                    a.hint && <span className="eu-t-caption shrink-0 mt-0.5">{a.hint}</span>
+                  )}
                 </button>
               </div>
             );

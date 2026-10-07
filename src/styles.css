@@ -1527,3 +1527,146 @@ input[type="radio"] {
 .eu-slides-blank-black {
   background: #000;
 }
+
+/* The classroom scene (features/classroom): the time and the countdown for
+   the projector, on the dark stage so a beamer does not glare. */
+.eu-scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--color-stage);
+  color: var(--color-stage-ink);
+  overflow: hidden;
+}
+.eu-scene::backdrop {
+  background: var(--color-stage);
+}
+.eu-scene:focus-visible {
+  outline: none;
+}
+.eu-scene-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2rem;
+  padding: 3vh 5vw 0;
+  font-size: max(1rem, 3.2vh);
+  color: var(--color-stage-muted);
+}
+.eu-scene-banner {
+  font-weight: 600;
+  color: var(--color-stage-ink);
+}
+.eu-scene-clock-small {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.eu-scene-center {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.eu-scene-clock {
+  font-family: var(--font-mono);
+  font-size: min(30vh, 24vw);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.eu-scene-timer {
+  position: relative;
+  height: min(66vh, 80vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+.eu-scene-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.eu-scene-ring-track {
+  fill: none;
+  stroke: var(--color-stage-line);
+  stroke-width: 3;
+}
+.eu-scene-ring-bar {
+  fill: none;
+  stroke: var(--color-stage-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+.eu-scene-ring-done {
+  stroke: var(--color-stage-danger);
+}
+.eu-scene-digits {
+  font-family: var(--font-mono);
+  font-size: min(15vh, 18vw);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.eu-scene-timer-done .eu-scene-digits {
+  color: var(--color-stage-danger);
+  animation: eu-pulse 1.2s ease-in-out infinite;
+}
+.eu-scene-paused {
+  position: absolute;
+  bottom: 24%;
+  font-size: max(0.9rem, 2.4vh);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-stage-muted);
+}
+.eu-scene-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2vh;
+  padding: 1vh 4vw 3vh;
+  transition: opacity 300ms;
+}
+.eu-scene-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  padding: 0 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-stage-line);
+  color: var(--color-stage-ink);
+  font-size: 1rem;
+  transition: background-color 120ms;
+}
+.eu-scene-btn:hover {
+  background: var(--color-stage-hover);
+}
+.eu-scene-keys {
+  font-size: 0.8rem;
+  color: var(--color-stage-muted);
+}
+.eu-scene-close {
+  position: absolute;
+  top: 2.2vh;
+  right: 1.6vw;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 6px;
+  color: var(--color-stage-muted);
+}
+.eu-scene-close:hover {
+  background: var(--color-stage-hover);
+  color: var(--color-stage-ink);
+}

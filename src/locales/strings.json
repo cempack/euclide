@@ -96,7 +96,7 @@
     "En forme {name} ?"
   ],
   "tools": {
-    "keepAwake": "Veille écran",
+    "keepAwake": "Écran toujours allumé",
     "keepAwakeOn": "Écran allumé",
     "keepAwakeOff": "Veille normale",
     "timerTitle": "Minuteur de classe",
@@ -139,7 +139,13 @@
     "confirmDeleteLink": "Supprimer le lien « {name} » ?",
     "linkName": "Nom",
     "linkUrl": "Adresse",
-    "toastLinkAdded": "Lien ajouté"
+    "toastLinkAdded": "Lien ajouté",
+    "keepAwakeAuto": "Pendant les cours",
+    "keepAwakeAutoHint": "D'après l'emploi du temps : de 5 minutes avant le cours à 5 minutes après.",
+    "keepAwakeAlways": "Toujours",
+    "keepAwakeNever": "Jamais",
+    "keepAwakeNowOn": "En ce moment : l'écran ne se mettra pas en veille.",
+    "keepAwakeNowOff": "En ce moment : veille normale."
   },
   "courses": {
     "subtitle": "Classes, séquences et casiers.",
@@ -722,5 +728,17 @@
     "empty": "Cette note est vide.",
     "present": "Présenter",
     "presentTitle": "Présenter la note en diapositives (--- sépare les diapositives)"
+  },
+  "scene": {
+    "open": "Horloge et minuteur en grand",
+    "label": "Minuteur et horloge",
+    "next": "Ensuite",
+    "paused": "en pause",
+    "minus": "Une minute de moins",
+    "plus": "Une minute de plus",
+    "restart": "Recommencer",
+    "close": "Fermer",
+    "keys": "Espace : pause · R : recommencer · + / − : une minute · 1…9 : minutes · Échap : fermer",
+    "fullscreen": "Plein écran"
   }
 }
