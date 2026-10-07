@@ -18,5 +18,6 @@ pub mod schedule;
 pub mod search;
 pub mod sequences;
 pub mod settings;
+pub mod storage;
 
 pub(crate) use settings::{get_setting_raw, set_setting_raw};

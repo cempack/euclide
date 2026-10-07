@@ -2,150 +2,11 @@ use super::settings::{get_setting_raw, set_setting_raw};
 use crate::db::Db;
 use rusqlite::params;
 use serde_json::json;
-use std::fs;
 use tauri::{AppHandle, State};
-use tauri_plugin_dialog::DialogExt;
 
 pub use crate::models::*;
 
 type R<T> = Result<T, String>;
-
-// ---------------------------------------------------------------------------
-// Data folder / portable storage root selection
-// (chosen folder becomes the root that directly contains euclide.db + courses/ + documents/ + ...)
-// The pointer (euclide-data.json) lives next to the executable for USB portability.
-// Changing requires restart because DB + caches are opened at launch against the root.
-// ---------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn choose_data_dir(app: AppHandle) -> R<Option<String>> {
-    // Non-blocking folder picker (same pattern as import_files / import_python_script)
-    let (tx, rx) = std::sync::mpsc::channel();
-    app.dialog().file().pick_folder(move |folder| {
-        let _ = tx.send(folder);
-    });
-    let picked = rx.recv().ok().flatten();
-    let Some(picked) = picked else {
-        return Ok(None);
-    };
-    let Ok(p) = picked.into_path() else {
-        return Ok(None);
-    };
-    if !crate::paths::dir_is_writable(&p) {
-        return Err("Ce dossier n'est pas accessible en écriture.".into());
-    }
-    crate::paths::write_data_dir_pointer(&p)
-        .map_err(|err| format!("Impossible d'enregistrer le dossier choisi : {err}"))?;
-    Ok(Some(p.to_string_lossy().to_string()))
-}
-
-#[tauri::command]
-pub fn reset_data_dir() -> R<()> {
-    crate::paths::remove_data_dir_pointer()
-        .map_err(|err| format!("Impossible de réinitialiser le dossier : {err}"))
-}
-
-/// Zip `src` into `../Euclide-Sauvegardes/euclide-YYYYMMDD-HHMM.zip`.
-///
-/// `db_snapshot` is a consistent copy of the live database (see
-/// `backup_data_dir`); it is stored as `euclide.db` in place of the live file,
-/// whose latest changes may still sit in the WAL.
-fn write_data_dir_backup(
-    src: &std::path::Path,
-    db_snapshot: &std::path::Path,
-) -> Result<std::path::PathBuf, String> {
-    use zip::write::SimpleFileOptions;
-
-    if !src.is_dir() {
-        return Err("Dossier de données introuvable".to_string());
-    }
-    let parent = src
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| src.to_path_buf());
-    let out_dir = parent.join("Euclide-Sauvegardes");
-    fs::create_dir_all(&out_dir).map_err(|err| format!("Dossier de sauvegarde : {err}"))?;
-
-    let stamp = chrono::Local::now().format("%Y%m%d-%H%M").to_string();
-    let dest = out_dir.join(format!("euclide-{stamp}.zip"));
-
-    let file = fs::File::create(&dest).map_err(|err| format!("Écriture archive : {err}"))?;
-    let mut zw = zip::ZipWriter::new(std::io::BufWriter::new(file));
-    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-
-    let mut add = |name: &str, path: &std::path::Path| -> Result<(), String> {
-        // Files are streamed: a large PDF never has to fit in memory.
-        let Ok(f) = fs::File::open(path) else {
-            return Ok(());
-        };
-        zw.start_file(name, opts)
-            .map_err(|err| format!("Archive : {err}"))?;
-        std::io::copy(&mut std::io::BufReader::new(f), &mut zw)
-            .map_err(|err| format!("Archive : {err}"))?;
-        Ok(())
-    };
-
-    add("euclide.db", db_snapshot)?;
-
-    // Iterative walk: no recursion limits, and we can skip our own output
-    // folder plus the live database files (replaced by the snapshot above).
-    let mut stack = vec![src.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        let entries = match fs::read_dir(&dir) {
-            Ok(entries) => entries,
-            Err(_) => continue,
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let Ok(rel) = path.strip_prefix(src) else {
-                continue;
-            };
-            let name = rel.to_string_lossy().replace('\\', "/");
-            if name.is_empty() || name.starts_with("Euclide-Sauvegardes") {
-                continue;
-            }
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            if name == "euclide.db" || name.ends_with("-wal") || name.ends_with("-shm") {
-                continue;
-            }
-            add(&name, &path)?;
-        }
-    }
-    zw.finish().map_err(|err| format!("Archive : {err}"))?;
-    Ok(dest)
-}
-
-/// Zip the whole data folder next to itself, in `Euclide-Sauvegardes/`.
-///
-/// A USB key that lives in a pocket has no other safety net: the database, the
-/// documents, the whiteboards and the Python scripts all sit in one folder, so
-/// one archive is a complete backup. Returns the path of the archive.
-#[tauri::command]
-pub async fn backup_data_dir(state: State<'_, Db>) -> R<String> {
-    let src = crate::paths::data_dir();
-    // `VACUUM INTO` writes a consistent copy that includes what is still in the
-    // WAL. It is quick (the database is small) and only holds the lock briefly.
-    let snapshot = std::env::temp_dir().join(format!(
-        "euclide-backup-{}.db",
-        uuid::Uuid::new_v4().simple()
-    ));
-    {
-        let conn = state.lock();
-        conn.execute("VACUUM INTO ?1", [snapshot.to_string_lossy().to_string()])
-            .map_err(|err| format!("Instantané de la base : {err}"))?;
-    }
-    let snap = snapshot.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        write_data_dir_backup(&src, &snap).map(|p| p.to_string_lossy().to_string())
-    })
-    .await
-    .map_err(|err| format!("Sauvegarde interrompue : {err}"));
-    let _ = fs::remove_file(&snapshot);
-    result?
-}
 
 // ---------------------------------------------------------------------------
 // Pronote
@@ -552,10 +413,7 @@ fn e<T: std::fmt::Display>(err: T) -> String {
 
 #[cfg(test)]
 mod classroom_flow_tests {
-    use super::write_data_dir_backup;
     use rusqlite::{params, Connection};
-    use std::fs;
-    use std::io::Read;
 
     fn mem() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -706,55 +564,6 @@ mod classroom_flow_tests {
             )
             .unwrap();
         assert_eq!(file_name, "cours.pdf");
-    }
-
-    #[test]
-    fn backup_zip_uses_db_snapshot_and_skips_live_db_files() {
-        let tmp = std::env::temp_dir().join(format!("euclide-backup-test-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&tmp);
-        let src = tmp.join("Euclide-Data");
-        fs::create_dir_all(src.join("documents")).unwrap();
-        fs::write(src.join("euclide.db"), b"live-db-bytes").unwrap();
-        fs::write(src.join("euclide.db-wal"), b"wal").unwrap();
-        fs::write(src.join("euclide.db-shm"), b"shm").unwrap();
-        fs::write(src.join("documents/note.txt"), b"hello").unwrap();
-        fs::create_dir_all(src.join("Euclide-Sauvegardes")).unwrap();
-        fs::write(src.join("Euclide-Sauvegardes/old.zip"), b"old").unwrap();
-        let snapshot = tmp.join("snapshot.db");
-        fs::write(&snapshot, b"db-bytes").unwrap();
-
-        let dest = write_data_dir_backup(&src, &snapshot).unwrap();
-        assert!(dest.exists());
-        // Compare path components, not a string: Windows uses another separator.
-        assert_eq!(
-            dest.parent().and_then(|p| p.file_name()).unwrap(),
-            "Euclide-Sauvegardes"
-        );
-        assert!(dest
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .starts_with("euclide-"));
-
-        let mut archive = zip::ZipArchive::new(fs::File::open(&dest).unwrap()).unwrap();
-        let mut names = Vec::new();
-        for i in 0..archive.len() {
-            names.push(archive.by_index(i).unwrap().name().to_string());
-        }
-        names.sort();
-        assert_eq!(names.iter().filter(|n| *n == "euclide.db").count(), 1);
-        assert!(names.iter().any(|n| n == "documents/note.txt"));
-        assert!(!names
-            .iter()
-            .any(|n| n.ends_with("-wal") || n.ends_with("-shm")));
-        assert!(!names.iter().any(|n| n.contains("Euclide-Sauvegardes")));
-
-        let mut db = archive.by_name("euclide.db").unwrap();
-        let mut buf = String::new();
-        db.read_to_string(&mut buf).unwrap();
-        assert_eq!(buf, "db-bytes");
-
-        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]

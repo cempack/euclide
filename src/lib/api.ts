@@ -376,6 +376,12 @@ export const api = {
   chooseDataDir: () => invoke<string | null>("choose_data_dir"),
   resetDataDir: () => invoke<void>("reset_data_dir"),
   backupDataDir: () => invoke<string>("backup_data_dir"),
+  getBackupStatus: () => invoke<BackupStatus>("get_backup_status"),
+  backupNow: () => invoke<BackupStatus>("backup_now"),
+  chooseBackupFolder: () => invoke<string | null>("choose_backup_folder"),
+  clearBackupFolder: () => invoke<void>("clear_backup_folder"),
+  /** Applied at the next launch, before the database opens. */
+  restoreSnapshot: (name: string) => invoke<void>("restore_snapshot", { name }),
 
   // Courses
   listCourses: () => {
@@ -721,6 +727,18 @@ export const api = {
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
   setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
 };
+
+/** Automatic backups (Euclide-Sauvegardes/ and the optional external mirror). */
+export interface BackupStatus {
+  snapshots: Array<{ name: string; day: string; size: number }>;
+  folder: string;
+  external_dir: string | null;
+  external_reachable: boolean;
+  last_mirror: string | null;
+  /** "ok", the integrity problem found at startup, or null before the check ran. */
+  integrity: string | null;
+  restore_pending: boolean;
+}
 
 /** A saved version of a document, served at `versionUrl(id)`. */
 export interface FileVersion {
