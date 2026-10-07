@@ -6,7 +6,7 @@ import { api, type QuickLink, type SearchResult } from "../lib/api";
 import { tabs } from "../stores/tabs";
 import { openFile } from "../lib/files";
 import { timer } from "../stores/timer";
-import { get, fmt, t } from "../lib/i18n";
+import { get, tr } from "../lib/i18n";
 import { aliasesOf, rankPaletteItems } from "../lib/palette-search";
 import { useAppearance } from "../lib/theme";
 import { useToast } from "./ui";
@@ -53,10 +53,10 @@ interface Action {
  * Typing nothing shows the commands, which is the old behaviour.
  */
 const PREFIXES = [
-  { key: ">", label: get("palette.prefixCommands", "commandes") },
-  { key: "@", label: get("palette.prefixCourses", "cours") },
-  { key: "#", label: get("palette.prefixDocs", "documents") },
-  { key: "!", label: get("palette.prefixReminders", "rappels") },
+  { key: ">", label: tr("palette.prefixCommands") },
+  { key: "@", label: tr("palette.prefixCourses") },
+  { key: "#", label: tr("palette.prefixDocs") },
+  { key: "!", label: tr("palette.prefixReminders") },
 ] as const;
 
 type Scope = "all" | "commands" | "courses" | "documents" | "reminders";
@@ -127,8 +127,8 @@ function CommandPalette({
       tabs.open({ kind, title, params });
       onClose();
     };
-    const G = get("palette.groupCommands", "Commandes");
-    const timerTitle = get("tools.timerTitle", "Minuteur de classe");
+    const G = tr("palette.groupCommands");
+    const timerTitle = tr("tools.timerTitle");
     const startTimer = (minutes: number) => () => {
       timer.start(minutes);
       onClose();
@@ -138,7 +138,7 @@ function CommandPalette({
       {
         id: "dash",
         group: G,
-        label: get("nav.dashboard", "Tableau de bord"),
+        label: tr("nav.dashboard"),
         aliases: cmdAliases("dashboard"),
         icon: <HomeIcon className="w-4 h-4" />,
         run: go("dashboard"),
@@ -146,7 +146,7 @@ function CommandPalette({
       {
         id: "courses",
         group: G,
-        label: get("nav.courses", "Cours"),
+        label: tr("nav.courses"),
         aliases: cmdAliases("courses"),
         icon: <BookIcon className="w-4 h-4" />,
         run: go("courses"),
@@ -154,7 +154,7 @@ function CommandPalette({
       {
         id: "docs",
         group: G,
-        label: get("nav.documents", "Documents"),
+        label: tr("nav.documents"),
         aliases: cmdAliases("documents"),
         icon: <DocIcon className="w-4 h-4" />,
         run: go("documents"),
@@ -162,7 +162,7 @@ function CommandPalette({
       {
         id: "tools",
         group: G,
-        label: get("nav.tools", "Outils"),
+        label: tr("nav.tools"),
         aliases: cmdAliases("tools"),
         icon: <ToolIcon className="w-4 h-4" />,
         run: go("tools"),
@@ -170,7 +170,7 @@ function CommandPalette({
       {
         id: "python",
         group: G,
-        label: get("nav.python", "Python"),
+        label: tr("nav.python"),
         aliases: cmdAliases("python"),
         icon: <CodeIcon className="w-4 h-4" />,
         run: go("python"),
@@ -178,7 +178,7 @@ function CommandPalette({
       {
         id: "reminders",
         group: G,
-        label: get("nav.reminders", "Rappels"),
+        label: tr("nav.reminders"),
         aliases: cmdAliases("reminders"),
         icon: <BellIcon className="w-4 h-4" />,
         run: go("reminders"),
@@ -186,33 +186,33 @@ function CommandPalette({
       {
         id: "board",
         group: G,
-        label: get("nav.whiteboard", "Tableau blanc"),
-        hint: get("palette.new", "nouveau"),
+        label: tr("nav.whiteboard"),
+        hint: tr("palette.new"),
         aliases: cmdAliases("whiteboard"),
         icon: <PenIcon className="w-4 h-4" />,
-        run: go("whiteboard", get("app.tabWhiteboard", "Tableau"), { isNew: true }),
+        run: go("whiteboard", tr("app.tabWhiteboard"), { isNew: true }),
       },
       {
         id: "note",
         group: G,
-        label: get("common.newNote", "Nouvelle note"),
-        hint: get("palette.new", "nouveau"),
+        label: tr("common.newNote"),
+        hint: tr("palette.new"),
         aliases: cmdAliases("note"),
         icon: <NoteIcon className="w-4 h-4" />,
-        run: go("note", get("common.newNote", "Nouvelle note"), { isNew: true }),
+        run: go("note", tr("common.newNote"), { isNew: true }),
       },
       {
         id: "recap",
         group: G,
-        label: get("nav.recap", "Bilan"),
+        label: tr("nav.recap"),
         aliases: cmdAliases("recap"),
         icon: <SparkleIcon className="w-4 h-4" />,
-        run: go("recap", get("nav.recap", "Bilan")),
+        run: go("recap", tr("nav.recap")),
       },
       {
         id: "settings",
         group: G,
-        label: get("nav.settings", "Réglages"),
+        label: tr("nav.settings"),
         aliases: cmdAliases("settings"),
         icon: <GearIcon className="w-4 h-4" />,
         run: go("settings"),
@@ -220,7 +220,7 @@ function CommandPalette({
       {
         id: "help",
         group: G,
-        label: get("app.shortcutsTitle", "Raccourcis"),
+        label: tr("app.shortcutsTitle"),
         aliases: cmdAliases("help"),
         icon: <HelpIcon className="w-4 h-4" />,
         run: () => {
@@ -231,13 +231,8 @@ function CommandPalette({
       {
         id: "keepawake",
         group: G,
-        label: get("tools.keepAwake", "Ne pas verrouiller l'écran"),
-        hint:
-          keepAwake == null
-            ? undefined
-            : keepAwake
-              ? t.tools?.keepAwakeOn || "L'écran reste allumé"
-              : t.tools?.keepAwakeOff || "Verrouillage écran normal",
+        label: tr("tools.keepAwake"),
+        hint: keepAwake == null ? undefined : keepAwake ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"),
         aliases: cmdAliases("keepAwake"),
         icon: <CoffeeIcon className="w-4 h-4" />,
         run: () => {
@@ -247,15 +242,10 @@ function CommandPalette({
               const next = await api.setKeepAwake(!current);
               setKeepAwake(next);
               window.dispatchEvent(new CustomEvent("eu:keepawake-changed"));
-              toast(
-                next
-                  ? t.tools?.keepAwakeOn || "L'écran reste allumé"
-                  : t.tools?.keepAwakeOff || "Verrouillage écran normal",
-                next ? "success" : "info",
-              );
+              toast(next ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"), next ? "success" : "info");
             } catch (err) {
               reportError("palette.keepAwake", err);
-              toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+              toast(errorMessage(err, tr("messages.genericError")), "error");
             }
             onClose();
           })();
@@ -264,8 +254,8 @@ function CommandPalette({
       {
         id: "projection",
         group: G,
-        label: get("appearance.projection", "Mode projection"),
-        hint: projection ? get("common.active", "Activé") : get("common.enable", "Activer"),
+        label: tr("appearance.projection"),
+        hint: projection ? tr("common.active") : tr("common.enable"),
         aliases: cmdAliases("projection"),
         icon: <ProjectorIcon className="w-4 h-4" />,
         run: () => {
@@ -276,7 +266,7 @@ function CommandPalette({
       {
         id: "capture",
         group: G,
-        label: get("capture.title", "Capture rapide"),
+        label: tr("capture.title"),
         aliases: cmdAliases("capture"),
         icon: <PlusIcon className="w-4 h-4" />,
         run: () => {
@@ -290,18 +280,18 @@ function CommandPalette({
       actions.push({
         id: `timer-${minutes}`,
         group: G,
-        label: `${timerTitle} · ${fmt(get("tools.timerMinutes", "{count} min"), { count: minutes })}`,
+        label: `${timerTitle} · ${tr("tools.timerMinutes", { count: minutes })}`,
         aliases: [...cmdAliases("timer"), String(minutes), `${minutes}min`],
         icon: <ClockIcon className="w-4 h-4" />,
         run: startTimer(minutes),
       });
     }
 
-    const linkGroup = get("palette.groupLinks", "Liens rapides");
+    const linkGroup = tr("palette.groupLinks");
     actions.push({
       id: "links-manage",
       group: linkGroup,
-      label: get("palette.manageLinks", "Gérer les liens"),
+      label: tr("palette.manageLinks"),
       aliases: cmdAliases("links"),
       icon: <LinkIcon className="w-4 h-4" />,
       run: go("tools"),
@@ -317,7 +307,7 @@ function CommandPalette({
         run: () => {
           api.openUrl(link.url).catch((err) => {
             reportError("palette.openUrl", err);
-            toast(errorMessage(err, get("messages.openUrlError", "Impossible d'ouvrir le lien")), "error");
+            toast(errorMessage(err, tr("messages.openUrlError")), "error");
           });
           onClose();
         },
@@ -332,7 +322,7 @@ function CommandPalette({
       if (r.kind === "course")
         return {
           id: `c${r.id}`,
-          group: get("palette.groupCourses", "Cours"),
+          group: tr("palette.groupCourses"),
           label: r.title,
           hint: r.subtitle,
           icon: <BookIcon className="w-4 h-4" />,
@@ -344,14 +334,14 @@ function CommandPalette({
       if (r.kind === "note")
         return {
           id: `n${r.id}`,
-          group: get("palette.groupDocs", "Documents et notes"),
-          label: r.title || get("notes.newTitle", "Note"),
-          hint: get("documents.noteKind", "note"),
+          group: tr("palette.groupDocs"),
+          label: r.title || tr("notes.newTitle"),
+          hint: tr("documents.noteKind"),
           icon: <NoteIcon className="w-4 h-4" />,
           run: () => {
             tabs.open({
               kind: "note",
-              title: r.title || get("notes.newTitle", "Note"),
+              title: r.title || tr("notes.newTitle"),
               params: { noteId: r.id },
             });
             onClose();
@@ -359,7 +349,7 @@ function CommandPalette({
         };
       return {
         id: `f${r.id}`,
-        group: get("palette.groupDocs", "Documents et notes"),
+        group: tr("palette.groupDocs"),
         label: r.title,
         hint: r.subtitle,
         snippet: r.snippet || undefined,
@@ -378,15 +368,15 @@ function CommandPalette({
 
     if (!term.trim()) {
       return wantCommands
-        ? baseActions.filter((a) => a.group === get("palette.groupCommands", "Commandes")).slice(0, 9)
+        ? baseActions.filter((a) => a.group === tr("palette.groupCommands")).slice(0, 9)
         : [];
     }
 
     const commands = wantCommands ? rankPaletteItems(baseActions, term) : [];
     const scopedResults = wantResults
       ? resultActions.filter((r) => {
-          if (scope === "courses") return r.group === get("palette.groupCourses", "Cours");
-          if (scope === "documents") return r.group === get("palette.groupDocs", "Documents et notes");
+          if (scope === "courses") return r.group === tr("palette.groupCourses");
+          if (scope === "documents") return r.group === tr("palette.groupDocs");
           if (scope === "reminders") return false;
           return true;
         })
@@ -428,7 +418,7 @@ function CommandPalette({
     <Dialog
       open={open}
       onClose={onClose}
-      label={get("shortcuts.palette", "Palette de recherche")}
+      label={tr("shortcuts.palette")}
       className="max-w-xl eu-dialog-top overflow-hidden"
     >
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line">
@@ -444,15 +434,13 @@ function CommandPalette({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKey}
-          placeholder={get("palette.placeholder", "Rechercher un cours, un document, une note…")}
+          placeholder={tr("palette.placeholder")}
           className="eu-cmdk-input flex-1 bg-transparent text-body text-ink placeholder:text-ink-faint"
         />
       </div>
       <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">
         {filtered.length === 0 ? (
-          <p className="px-3 py-6 text-center eu-t-body text-ink-muted">
-            {get("documents.nothingHere", "Aucun résultat")}
-          </p>
+          <p className="px-3 py-6 text-center eu-t-body text-ink-muted">{tr("documents.nothingHere")}</p>
         ) : (
           filtered.map((a, i) => {
             const prev = filtered[i - 1];
@@ -493,7 +481,7 @@ function CommandPalette({
         <span className="flex-1" />
         <span className="eu-t-caption flex items-center gap-1">
           <span className="eu-kbd">↵</span>
-          {get("palette.open", "ouvrir")}
+          {tr("palette.open")}
         </span>
       </div>
     </Dialog>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type QuickLink } from "../lib/api";
-import { t, get, fmt } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
@@ -27,12 +27,12 @@ export default function Tools() {
   return (
     <>
       <PageHeader
-        title={t.nav.tools}
+        title={tr("nav.tools")}
         meta={
           <>
-            <span>{get("tools.metaClassroom", "Pour la classe")}</span>
+            <span>{tr("tools.metaClassroom")}</span>
             <MetaDot />
-            <span>{get("tools.metaLinks", "Liens rapides")}</span>
+            <span>{tr("tools.metaLinks")}</span>
           </>
         }
       />
@@ -58,20 +58,15 @@ function ClassroomSection() {
       const next = await api.setKeepAwake(!on);
       setOn(next);
       window.dispatchEvent(new CustomEvent("eu:keepawake-changed"));
-      toast(
-        next
-          ? t.tools?.keepAwakeOn || "L'écran reste allumé"
-          : t.tools?.keepAwakeOff || "Verrouillage écran normal",
-        next ? "success" : "info",
-      );
+      toast(next ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"), next ? "success" : "info");
     } catch (err) {
       reportError("tools.keepAwake", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
   return (
-    <Section title={get("tools.classroomTitle", "En classe")}>
+    <Section title={tr("tools.classroomTitle")}>
       <Panel>
         <div className="eu-row justify-between">
           <div className="flex items-center gap-3 min-w-0">
@@ -79,14 +74,8 @@ function ClassroomSection() {
               <CoffeeIcon className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <p className="eu-t-body font-medium text-ink">
-                {t.tools?.keepAwake || "Ne pas verrouiller l'écran"}
-              </p>
-              <p className="eu-t-meta">
-                {on
-                  ? t.tools?.keepAwakeOn || "L'écran reste allumé"
-                  : t.tools?.keepAwakeOff || "Verrouillage écran normal"}
-              </p>
+              <p className="eu-t-body font-medium text-ink">{tr("tools.keepAwake")}</p>
+              <p className="eu-t-meta">{on ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff")}</p>
             </div>
           </div>
           <button
@@ -94,7 +83,7 @@ function ClassroomSection() {
             onClick={toggle}
             role="switch"
             aria-checked={on}
-            aria-label={t.tools?.keepAwake || "Ne pas verrouiller l'écran"}
+            aria-label={tr("tools.keepAwake")}
             className={`relative w-10 h-6 shrink-0 rounded-full border transition-colors duration-fast ${
               on ? "bg-ok-solid border-ok-solid" : "bg-panel-alt border-line"
             }`}
@@ -113,15 +102,8 @@ function ClassroomSection() {
               <ProjectorIcon className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <p className="eu-t-body font-medium text-ink">
-                {get("appearance.projection", "Mode projection")}
-              </p>
-              <p className="eu-t-meta">
-                {get(
-                  "tools.projectionHint",
-                  "Typographie agrandie, barres masquées — pour le vidéoprojecteur.",
-                )}
-              </p>
+              <p className="eu-t-body font-medium text-ink">{tr("appearance.projection")}</p>
+              <p className="eu-t-meta">{tr("tools.projectionHint")}</p>
             </div>
           </div>
           <button
@@ -130,25 +112,25 @@ function ClassroomSection() {
             aria-pressed={projection}
             className={projection ? "eu-btn-primary eu-btn-sm" : "eu-btn-ghost eu-btn-sm"}
           >
-            {projection ? get("common.active", "Activé") : get("common.enable", "Activer")}
+            {projection ? tr("common.active") : tr("common.enable")}
           </button>
         </div>
 
         <div className="eu-row gap-2 flex-wrap border-t border-line">
-          <span className="eu-t-meta mr-1">{get("tools.shortcuts", "Ouvrir :")}</span>
+          <span className="eu-t-meta mr-1">{tr("tools.shortcuts")}</span>
           <button
             type="button"
             className="eu-btn-ghost eu-btn-sm"
             onClick={() =>
               tabs.open({
                 kind: "whiteboard",
-                title: get("app.tabWhiteboard", "Tableau"),
+                title: tr("app.tabWhiteboard"),
                 params: { isNew: true },
               })
             }
           >
             <PenIcon className="w-3.5 h-3.5" />
-            {get("nav.whiteboard", "Tableau blanc")}
+            {tr("nav.whiteboard")}
           </button>
           <button
             type="button"
@@ -173,24 +155,19 @@ function TimerSection() {
   const customMinutes = Math.max(1, Math.min(180, parseInt(custom, 10) || 0));
 
   return (
-    <Section title={t.tools?.timerTitle || "Minuteur de classe"}>
+    <Section title={tr("tools.timerTitle")}>
       <Panel pad>
-        <p className="eu-t-body text-ink-muted mb-3.5 max-w-[62ch]">
-          {get(
-            "tools.timerHint",
-            "Compte à rebours dans la barre d'onglets, et en grand au tableau si le mode projection est actif. Une sonnerie douce marque la fin.",
-          )}
-        </p>
+        <p className="eu-t-body text-ink-muted mb-3.5 max-w-[62ch]">{tr("tools.timerHint")}</p>
         <div className="flex items-end gap-4 flex-wrap">
           <div className="flex items-center gap-1.5">
             {[5, 10, 15, 30].map((m) => (
               <button key={m} type="button" className="eu-btn-ghost eu-btn-sm" onClick={() => start(m)}>
-                {fmt(get("tools.timerMinutes", "{count} min"), { count: m })}
+                {tr("tools.timerMinutes", { count: m })}
               </button>
             ))}
           </div>
           <span className="w-px h-7 bg-line hidden @lg:block" />
-          <Field label={get("tools.timerCustom", "Durée libre")} className="w-auto">
+          <Field label={tr("tools.timerCustom")} className="w-auto">
             <div className="flex items-center gap-1.5">
               <input
                 type="number"
@@ -202,11 +179,11 @@ function TimerSection() {
                   if (e.key === "Enter") start(customMinutes);
                 }}
                 className="eu-input w-20 text-center tabular-nums"
-                aria-label={get("tools.timerCustom", "Durée libre")}
+                aria-label={tr("tools.timerCustom")}
               />
               <span className="eu-t-meta">min</span>
               <button type="button" className="eu-btn-primary eu-btn-sm" onClick={() => start(customMinutes)}>
-                {get("tools.timerStart", "Lancer")}
+                {tr("tools.timerStart")}
               </button>
             </div>
           </Field>
@@ -233,23 +210,23 @@ function LinksSection() {
     const normalized = url.startsWith("http") ? url : `https://${url}`;
     const created = await api.createLink(label.trim(), normalized, "");
     if (!created?.id) {
-      toast(t.common?.error || "Erreur", "error");
+      toast(tr("common.error"), "error");
       return;
     }
     setLabel("");
     setUrl("");
     setOpen(false);
-    toast(t.common?.success ? t.common.success + " — lien" : "Lien ajouté", "success");
+    toast(tr("tools.toastLinkAdded"), "success");
     window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
     refresh();
   };
 
   return (
     <Section
-      title={t.tools?.quickLinks || "Liens rapides"}
+      title={tr("tools.quickLinks")}
       action={
         <button onClick={() => setOpen(true)} className="eu-btn-ghost eu-btn-sm">
-          <PlusIcon className="w-3.5 h-3.5" /> {t.common?.add || "Ajouter"}
+          <PlusIcon className="w-3.5 h-3.5" /> {tr("common.add")}
         </button>
       }
     >
@@ -257,14 +234,11 @@ function LinksSection() {
         {links.length === 0 ? (
           <EmptyState
             icon={<LinkIcon className="w-4 h-4" />}
-            title={t.tools?.noQuickLinks || "Aucun lien rapide"}
-            hint={get(
-              "tools.noQuickLinksHint",
-              "Ajoutez les adresses que vous ouvrez tous les jours : Pronote, l'ENT, un manuel en ligne. Elles apparaissent aussi sur le tableau de bord.",
-            )}
+            title={tr("tools.noQuickLinks")}
+            hint={tr("tools.noQuickLinksHint")}
             action={
               <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newLink || "Nouveau lien"}
+                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newLink")}
               </button>
             }
           />
@@ -277,10 +251,7 @@ function LinksSection() {
                   onClick={() => {
                     void api.openUrl(l.url).catch((err) => {
                       reportError("tools.openUrl", err);
-                      toast(
-                        errorMessage(err, get("messages.openUrlError", "Impossible d'ouvrir le lien")),
-                        "error",
-                      );
+                      toast(errorMessage(err, tr("messages.openUrlError")), "error");
                     });
                   }}
                   className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
@@ -293,11 +264,11 @@ function LinksSection() {
                 <button
                   onClick={async () => {
                     const ok = await confirmDlg.ask({
-                      title: get("common.delete", "Supprimer"),
-                      message: fmt(get("tools.confirmDeleteLink", "Supprimer le lien « {name} » ?"), {
+                      title: tr("common.delete"),
+                      message: tr("tools.confirmDeleteLink", {
                         name: l.label,
                       }),
-                      confirmLabel: get("common.delete", "Supprimer"),
+                      confirmLabel: tr("common.delete"),
                       danger: true,
                     });
                     if (!ok) return;
@@ -305,8 +276,8 @@ function LinksSection() {
                     window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
                     refresh();
                   }}
-                  aria-label={`${get("common.delete", "Supprimer")} — ${l.label}`}
-                  data-tip={get("common.delete", "Supprimer")}
+                  aria-label={`${tr("common.delete")} — ${l.label}`}
+                  data-tip={tr("common.delete")}
                   className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                 >
                   <TrashIcon className="w-3.5 h-3.5" />
@@ -317,23 +288,23 @@ function LinksSection() {
         )}
       </Panel>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t.common?.newLink || "Nouveau lien"}>
+      <Modal open={open} onClose={() => setOpen(false)} title={tr("common.newLink")}>
         <div className="flex flex-col gap-3.5">
-          <Field label={get("tools.linkName", "Nom")} htmlFor="link-label">
+          <Field label={tr("tools.linkName")} htmlFor="link-label">
             <input
               id="link-label"
               autoFocus
               className="eu-input"
-              placeholder={t.tools?.linkNamePlaceholder || "Nom (ex : Manuel en ligne)"}
+              placeholder={tr("tools.linkNamePlaceholder")}
               value={label}
               onChange={(e) => setLabel(e.target.value)}
             />
           </Field>
-          <Field label={get("tools.linkUrl", "Adresse")} htmlFor="link-url">
+          <Field label={tr("tools.linkUrl")} htmlFor="link-url">
             <input
               id="link-url"
               className="eu-input"
-              placeholder={t.tools?.linkUrlPlaceholder || "Adresse (ex : eduscol.education.fr)"}
+              placeholder={tr("tools.linkUrlPlaceholder")}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
@@ -341,10 +312,10 @@ function LinksSection() {
           </Field>
           <div className="flex justify-end gap-2 mt-1">
             <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
-              {t.common?.cancel || "Annuler"}
+              {tr("common.cancel")}
             </button>
             <button className="eu-btn-primary" onClick={add} disabled={!label.trim() || !url.trim()}>
-              {t.common?.add || "Ajouter"}
+              {tr("common.add")}
             </button>
           </div>
         </div>

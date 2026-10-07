@@ -4,7 +4,7 @@ import { q } from "../api/queries";
 import { Coffee } from "lucide-react";
 import type { AppInfo, ScheduleEntry } from "../lib/api";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../lib/format";
-import { fmt, get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { tabs, useMaxTabs, useTabsStore } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
@@ -38,10 +38,10 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
   const dark = resolved === "dark";
   const themeLabel =
     pref === "auto"
-      ? `${get("appearance.auto", "Auto")} · ${dark ? get("appearance.dark", "Sombre") : get("appearance.light", "Clair")}`
+      ? `${tr("appearance.auto")} · ${dark ? tr("appearance.dark") : tr("appearance.light")}`
       : dark
-        ? get("appearance.dark", "Sombre")
-        : get("appearance.light", "Clair");
+        ? tr("appearance.dark")
+        : tr("appearance.light");
 
   return (
     <footer className="eu-statusbar">
@@ -49,21 +49,21 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
         <button
           type="button"
           onClick={() => tabs.open({ kind: "dashboard" })}
-          {...tip(get("status.openDashboard", "Ouvrir le tableau de bord"))}
+          {...tip(tr("status.openDashboard"))}
           data-tip-place="top"
           className={`eu-status-item eu-status-button ${focus.state === "current" ? "text-warn" : ""}`}
         >
           <span className="truncate max-w-[15rem]">{focus.entry.subject}</span>
           {focus.state === "current"
             ? remaining != null
-              ? fmt(get("status.remaining", "reste {time}"), { time: humanMinutes(remaining) })
-              : get("status.ending", "fin")
+              ? tr("status.remaining", { time: humanMinutes(remaining) })
+              : tr("status.ending")
             : until != null
-              ? fmt(get("status.inTime", "dans {time}"), { time: humanMinutes(until) })
+              ? tr("status.inTime", { time: humanMinutes(until) })
               : focus.entry.start_time}
         </button>
       ) : (
-        <span className="eu-status-item">{get("status.noClass", "aucun cours en cours")}</span>
+        <span className="eu-status-item">{tr("status.noClass")}</span>
       )}
 
       <StatusTimerChip />
@@ -71,22 +71,20 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
       <button
         type="button"
         onClick={() => tabs.open({ kind: "settings" })}
-        {...tip(get("status.pronoteHint", "État de la connexion Pronote"))}
+        {...tip(tr("status.pronoteHint"))}
         data-tip-place="top"
         className="eu-status-item eu-status-button"
       >
         <span className={`eu-dot ${pronote?.connected ? "bg-ok-solid" : "bg-line-strong"}`} />
         <span className={pronote?.connected ? "text-ok" : ""}>
-          {pronote?.connected
-            ? get("status.pronoteOn", "pronote connecté")
-            : get("status.pronoteOff", "pronote hors ligne")}
+          {pronote?.connected ? tr("status.pronoteOn") : tr("status.pronoteOff")}
         </span>
       </button>
 
       {keepAwake && (
         <span className="eu-status-item text-warn">
           <Icon icon={Coffee} size={14} />
-          {get("status.awake", "écran maintenu")}
+          {tr("status.awake")}
         </span>
       )}
 
@@ -94,7 +92,7 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
 
       <span className="eu-status-item eu-status-end hidden lg:flex">
         {tabCount}
-        {maxTabs > 0 ? ` / ${maxTabs}` : ""} {get("status.tabs", "onglets")}
+        {maxTabs > 0 ? ` / ${maxTabs}` : ""} {tr("status.tabs")}
       </span>
       <span
         className="eu-status-item eu-status-end hidden xl:flex max-w-[19rem] selectable"

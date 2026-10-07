@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { api, openWith, type Opener } from "../lib/api";
 import { FolderIcon, GlobeIcon, FileIcon } from "./icons";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { reportError } from "../lib/report";
 
 export function OpenWithButton({
@@ -27,9 +27,9 @@ export function OpenWithButton({
       reportError("openWith.list", err);
       // fallback minimal
       const fb: Opener[] = [
-        { name: get("openWith.browser", "Navigateur"), app: undefined, is_reveal: false },
-        { name: get("openWith.defaultApp", "Application"), app: undefined, is_reveal: false },
-        { name: get("openWith.reveal", "Dossier"), app: undefined, is_reveal: true },
+        { name: tr("openWith.browser"), app: undefined, is_reveal: false },
+        { name: tr("openWith.defaultApp"), app: undefined, is_reveal: false },
+        { name: tr("openWith.reveal"), app: undefined, is_reveal: true },
       ];
       setOptions(fb);
       return fb;
@@ -66,8 +66,8 @@ export function OpenWithButton({
 
   return (
     <div className="relative inline-block" onBlur={() => setTimeout(() => setOpen(false), 150)}>
-      <button onClick={handleClick} className={className} data-tip={get("openWith.title", "Ouvrir dehors")}>
-        {label || get("openWith.label", "Ouvrir dehors")}
+      <button onClick={handleClick} className={className} data-tip={tr("openWith.title")}>
+        {label || tr("openWith.label")}
       </button>
       {open && options && (
         <div

@@ -3,7 +3,7 @@ import { api, fileUrl, versionUrl, type FileVersion } from "../lib/api";
 import { useToast } from "./ui";
 import { DownloadIcon, PenIcon, TrashIcon, GridIcon } from "./icons";
 import { OpenWithButton } from "./OpenWithButton";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
@@ -109,10 +109,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
           // refresh versions list
           api.getFileVersions(fileId).then(setVersions).catch(logged("pdf.versions"));
           window.dispatchEvent(new CustomEvent("eu:library-changed"));
-          toast(
-            get("pdf.annotationsSaved", "Annotations enregistrées dans {name}").replace("{name}", fileName),
-            "success",
-          );
+          toast(tr("pdf.annotationsSaved").replace("{name}", fileName), "success");
         } catch (err) {
           reportError("pdf.saveAnnotations", err);
           toast(errorMessage(err, "Erreur lors de l'enregistrement des annotations"), "error");
@@ -290,10 +287,10 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   const legacySave = async () => {
     try {
       await api.saveAnnotations(fileId, JSON.stringify(legacyAnnots.current));
-      toast(get("pdf.imageAnnotationsSaved", "Annotations image enregistrées"), "success");
+      toast(tr("pdf.imageAnnotationsSaved"), "success");
     } catch (err) {
       reportError("pdf.saveImageAnnotations", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
@@ -315,13 +312,13 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
       if (!blob) throw new Error("L'image n'a pas pu être créée.");
       const f = await api.createFileBytes(`${base} (annoté).png`, await blob.arrayBuffer());
       if (!f?.id) {
-        toast(get("messages.genericError", "Erreur"), "error");
+        toast(tr("messages.genericError"), "error");
         return;
       }
-      toast(get("pdf.exported", "Exporté : {name}").replace("{name}", f.name), "success");
+      toast(tr("pdf.exported").replace("{name}", f.name), "success");
     } catch (err) {
       reportError("pdf.exportImage", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
@@ -435,7 +432,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   const setEditorMode = (mode: number) => {
     const ifr = iframeRef.current;
     if (!canControlEditor || !ifr?.contentWindow) {
-      toast(get("pdf.viewerNotReadyForEdit", "Visualiseur non prêt pour l'édition"), "info");
+      toast(tr("pdf.viewerNotReadyForEdit"), "info");
       return;
     }
     ifr.contentWindow.postMessage({ type: "euclide-set-mode", mode }, "*");
@@ -458,7 +455,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   const deleteSelected = () => {
     const ifr = iframeRef.current;
     if (!canControlEditor || !ifr?.contentWindow) {
-      toast(get("pdf.viewerError", "Visualiseur non prêt"), "info");
+      toast(tr("pdf.viewerError"), "info");
       return;
     }
     ifr.contentWindow.postMessage({ type: "euclide-delete-selected" }, "*");
@@ -485,7 +482,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         ifr?.contentWindow?.postMessage({ type: "euclide-save" }, "*");
       }, 40);
     } else {
-      toast(get("pdf.viewerError", "Visualiseur non prêt"), "error");
+      toast(tr("pdf.viewerError"), "error");
     }
   };
 
@@ -506,43 +503,43 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
     <div className="h-full flex flex-col">
       {/* Toolbar: view mode, pen, colour, zoom, versions, save. */}
       <Toolbar className="h-9 py-0">
-        <ToolGroup label={get("pdf.mode", "Affichage")}>
+        <ToolGroup label={tr("pdf.mode")}>
           <button
             onClick={() => setEditorMode(0)}
             aria-pressed={currentEditorMode === 0}
             className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
-            data-tip={get("pdf.selectTitle", "Sélection : visualiser sans annoter")}
+            data-tip={tr("pdf.selectTitle")}
           >
-            {get("pdf.select", "Sélection")}
+            {tr("pdf.select")}
           </button>
           <button
             onClick={() => setEditorMode(15)}
             aria-pressed={currentEditorMode === 15}
             className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
-            data-tip={get("pdf.penTitle", "Stylo : dessin à main levée")}
-            aria-label={get("pdf.penTitle", "Stylo : dessin à main levée")}
+            data-tip={tr("pdf.penTitle")}
+            aria-label={tr("pdf.penTitle")}
           >
             <PenIcon className="w-3.5 h-3.5" />
-            <span className="hidden @2xl:inline">{get("pdf.pen", "Stylo")}</span>
+            <span className="hidden @2xl:inline">{tr("pdf.pen")}</span>
           </button>
           <button
             onClick={togglePagesSidebar}
             aria-pressed={showPages}
-            aria-label={get("pdf.pages", "Pages")}
+            aria-label={tr("pdf.pages")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
             disabled={!canControlEditor}
-            data-tip={get("pdf.pagesTitle", "Vignettes des pages")}
+            data-tip={tr("pdf.pagesTitle")}
           >
             <GridIcon className="w-4 h-4" />
           </button>
           <button
             onClick={deleteSelected}
-            aria-label={get("pdf.deleteAnnotation", "Supprimer l'annotation")}
+            aria-label={tr("pdf.deleteAnnotation")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
             disabled={!canControlEditor}
-            data-tip={get("pdf.deleteAnnotationTitle", "Supprimer l'annotation sélectionnée (Suppr)")}
+            data-tip={tr("pdf.deleteAnnotationTitle")}
           >
             <TrashIcon className="w-4 h-4" />
           </button>
@@ -550,7 +547,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
         <ToolSep />
 
-        <ToolGroup label={get("whiteboard.colors", "Couleurs")}>
+        <ToolGroup label={tr("whiteboard.colors")}>
           {PALETTE.map((c) => (
             <button
               key={c}
@@ -569,18 +566,18 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
         <ToolSep />
 
-        <ToolGroup collapse label={get("whiteboard.zoom", "Zoom")}>
+        <ToolGroup collapse label={tr("whiteboard.zoom")}>
           <button
             onClick={() => doZoom(-1)}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-            aria-label={get("whiteboard.zoomOut", "Réduire")}
+            aria-label={tr("whiteboard.zoomOut")}
           >
             −
           </button>
           <button
             onClick={() => doZoom(1)}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-            aria-label={get("whiteboard.zoomIn", "Agrandir")}
+            aria-label={tr("whiteboard.zoomIn")}
           >
             +
           </button>
@@ -588,10 +585,10 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
 
         {!legacyMode && <ToolSep />}
         {!legacyMode && (
-          <ToolGroup collapse label={get("pdf.versions", "Versions")}>
+          <ToolGroup collapse label={tr("pdf.versions")}>
             <select
               className="eu-select eu-field-sm w-[130px]"
-              aria-label={get("pdf.versions", "Versions")}
+              aria-label={tr("pdf.versions")}
               onChange={async (e) => {
                 const versionId = Number(e.target.value);
                 if (!versionId) return;
@@ -604,27 +601,21 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                     ifr.contentWindow.postMessage({ type: "euclide-open", buffer }, "*", [buffer]);
                     setPdfLoaded(false);
                     // keep viewerReady true (iframe is still alive); the pdf-loaded msg will re-enable toolbar
-                    toast(
-                      get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"),
-                      "success",
-                    );
+                    toast(tr("pdf.versionLoaded"), "success");
                   }
                 } catch (err) {
                   reportError("pdf.loadVersion", err);
-                  toast(
-                    errorMessage(err, get("pdf.versionLoadError", "Erreur chargement de la version")),
-                    "error",
-                  );
+                  toast(errorMessage(err, tr("pdf.versionLoadError")), "error");
                 }
               }}
               value=""
             >
               <option value="" disabled>
-                {get("pdf.versions", "Versions")} ({versions.length})
+                {tr("pdf.versions")} ({versions.length})
               </option>
               {versions.length === 0 ? (
                 <option value="" disabled>
-                  {get("pdf.noVersionsYet", "Aucune version")}
+                  {tr("pdf.noVersionsYet")}
                 </option>
               ) : (
                 versions
@@ -632,9 +623,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
                   .reverse()
                   .map((v) => {
                     const label =
-                      v.timestamp === "original"
-                        ? get("pdf.original", "Original")
-                        : `v${v.version} ${v.timestamp}`;
+                      v.timestamp === "original" ? tr("pdf.original") : `v${v.version} ${v.timestamp}`;
                     return (
                       <option key={v.id} value={v.id}>
                         {label}
@@ -649,18 +638,14 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         <ToolSpacer />
 
         <ToolGroup>
-          <OpenWithButton
-            fileId={fileId}
-            className="eu-btn-quiet eu-btn-sm"
-            label={get("openWith.label", "Ouvrir dehors")}
-          />
+          <OpenWithButton fileId={fileId} className="eu-btn-quiet eu-btn-sm" label={tr("openWith.label")} />
           <button
             onClick={triggerViewerSave}
             className="eu-btn-primary eu-btn-sm"
             disabled={!canControlEditor}
-            data-tip={`${get("common.save", "Enregistrer")} (${MOD}S)`}
+            data-tip={`${tr("common.save")} (${MOD}S)`}
           >
-            {get("common.save", "Enregistrer")}
+            {tr("common.save")}
           </button>
         </ToolGroup>
       </Toolbar>
@@ -669,9 +654,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
         {!legacyMode && showPages && (
           <div className="w-[150px] shrink-0 border-r border-stage-line bg-stage-alt overflow-y-auto p-1.5">
             {thumbnails.length === 0 ? (
-              <div className="p-2 eu-t-caption text-stage-muted">
-                {get("pdf.thumbnailsLoading", "Chargement des pages…")}
-              </div>
+              <div className="p-2 eu-t-caption text-stage-muted">{tr("pdf.thumbnailsLoading")}</div>
             ) : (
               thumbnails.map((t) => (
                 <button
@@ -701,7 +684,7 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-stage/90">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-5 h-5 border-2 border-stage-line border-t-stage-ink/70 rounded-full animate-spin" />
-                <p className="text-stage-muted eu-t-small">{get("pdf.loading", "Chargement du PDF…")}</p>
+                <p className="text-stage-muted eu-t-small">{tr("pdf.loading")}</p>
               </div>
             </div>
           )}

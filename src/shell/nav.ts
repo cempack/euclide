@@ -13,7 +13,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import type { TabKind } from "../stores/tabs";
 import { keysOf } from "../lib/keymap";
 
@@ -46,18 +46,18 @@ export type NavItem = { kind: TabKind; label: string; keys?: string };
 
 /** The sidebar: what you work on, then what you work with. */
 export const NAV_WORK: NavItem[] = [
-  { kind: "dashboard", label: get("nav.dashboard", "Tableau de bord"), keys: keysOf("dashboard") },
-  { kind: "courses", label: get("nav.courses", "Cours") },
-  { kind: "documents", label: get("nav.documents", "Documents"), keys: keysOf("documents") },
-  { kind: "reminders", label: get("nav.reminders", "Rappels") },
+  { kind: "dashboard", label: tr("nav.dashboard"), keys: keysOf("dashboard") },
+  { kind: "courses", label: tr("nav.courses") },
+  { kind: "documents", label: tr("nav.documents"), keys: keysOf("documents") },
+  { kind: "reminders", label: tr("nav.reminders") },
 ];
 
 export const NAV_TOOLS: NavItem[] = [
-  { kind: "note", label: get("nav.notes", "Nouvelle note"), keys: keysOf("newNote") },
-  { kind: "whiteboard", label: get("nav.whiteboard", "Tableau blanc"), keys: keysOf("whiteboard") },
-  { kind: "python", label: get("nav.python", "Python") },
-  { kind: "tools", label: get("nav.tools", "Outils") },
-  { kind: "recap", label: get("nav.recap", "Bilan") },
+  { kind: "note", label: tr("nav.notes"), keys: keysOf("newNote") },
+  { kind: "whiteboard", label: tr("nav.whiteboard"), keys: keysOf("whiteboard") },
+  { kind: "python", label: tr("nav.python") },
+  { kind: "tools", label: tr("nav.tools") },
+  { kind: "recap", label: tr("nav.recap") },
 ];
 
 /** Whether the sidebar entry `navKind` should look current for the active tab. */

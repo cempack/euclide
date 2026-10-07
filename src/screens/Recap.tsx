@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import type { RecapData } from "../lib/api";
-import { t, fmt, get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import {
   BookIcon,
   ClockIcon,
@@ -26,9 +26,9 @@ import { humanMinutes } from "../lib/format";
 type Period = "today" | "week" | "month";
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: get("recap.todayLabel", "aujourd'hui"),
-  week: get("recap.weekLabel", "cette semaine"),
-  month: get("recap.monthLabel", "ce mois"),
+  today: tr("recap.todayLabel"),
+  week: tr("recap.weekLabel"),
+  month: tr("recap.monthLabel"),
 };
 
 type BarRow = { key: string; label: string; value: number; icon?: React.ReactNode; text: string };
@@ -78,27 +78,27 @@ export default function Recap() {
         {
           icon: <FileIcon className="w-5 h-5" />,
           value: data.files_opened,
-          label: t.recap?.stats?.filesOpened || "fichiers ouverts",
+          label: tr("recap.stats.filesOpened"),
         },
         {
           icon: <PenIcon className="w-5 h-5" />,
           value: data.notes_written,
-          label: t.recap?.stats?.notesWritten || "notes écrites",
+          label: tr("recap.stats.notesWritten"),
         },
         {
           icon: <PlayIcon className="w-5 h-5" />,
           value: data.demos_run,
-          label: t.recap?.stats?.demosRun || "démos lancées",
+          label: tr("recap.stats.demosRun"),
         },
         {
           icon: <CheckIcon className="w-5 h-5" />,
           value: data.reminders_done,
-          label: t.recap?.stats?.remindersDone || "rappels faits",
+          label: tr("recap.stats.remindersDone"),
         },
         {
           icon: <ClockIcon className="w-5 h-5" />,
           value: data.active_minutes,
-          label: t.recap?.stats?.activeMinutes || "minutes actives",
+          label: tr("recap.stats.activeMinutes"),
         },
       ]
     : [];
@@ -141,68 +141,60 @@ export default function Recap() {
   const highlights: string[] = [];
   if (data) {
     if (data.files_opened > 0) {
-      highlights.push(
-        fmt(t.recap?.highlightFiles || "Vous avez ouvert {count} fichier(s).", { count: data.files_opened }),
-      );
+      highlights.push(tr("recap.highlightFiles", { count: data.files_opened }));
     }
     if (data.notes_written > 0) {
       highlights.push(
-        fmt(t.recap?.highlightNotes || "{count} nouvelle(s) note(s) préparée(s).", {
+        tr("recap.highlightNotes", {
           count: data.notes_written,
         }),
       );
     }
     if (data.top_courses?.length > 0) {
       const top = data.top_courses[0];
-      highlights.push(
-        fmt(t.recap?.highlightTopCourse || "Cours le plus actif : {name}.", { name: top.name }),
-      );
+      highlights.push(tr("recap.highlightTopCourse", { name: top.name }));
     }
     if (data.top_documents?.length > 0) {
       const top = data.top_documents[0];
-      highlights.push(
-        fmt(t.recap?.highlightTopDoc || "Document le plus consulté : {name}.", { name: top.name }),
-      );
+      highlights.push(tr("recap.highlightTopDoc", { name: top.name }));
     }
     if (data.top_tools?.length > 0) {
       const top = data.top_tools[0];
-      highlights.push(
-        fmt(t.recap?.highlightTopTool || "Outil le plus utilisé : {name}.", { name: top.name }),
-      );
+      highlights.push(tr("recap.highlightTopTool", { name: top.name }));
     }
     if (data.reminders_done > 0) {
       highlights.push(
-        fmt(t.recap?.highlightReminders || "{count} rappel(s) accompli(s). Bravo !", {
+        tr("recap.highlightReminders", {
           count: data.reminders_done,
         }),
       );
     }
     if (highlights.length === 0) {
-      highlights.push(t.recap?.highlightEmpty || "Rien d'enregistré pour cette période. Bonne classe !");
+      highlights.push(tr("recap.highlightEmpty"));
     }
   }
 
   return (
     <>
       <PageHeader
-        title={t.nav?.recap || "Bilan"}
+        title={tr("nav.recap")}
         icon={<SparkleIcon className="w-5 h-5" />}
         meta={
           <>
             <span>{PERIOD_LABELS[period]}</span>
             <MetaDot />
-            <span>{t.recap?.subtitle || "temps passé dans l'application"}</span>
+            <span>{tr("recap.subtitle")}</span>
           </>
         }
         actions={
           <Segmented
             value={period}
             onChange={setPeriod}
-            label={get("recap.period", "Période")}
+            label={tr("recap.period")}
             options={[
-              { value: "today", label: get("recap.today", "Jour") },
-              { value: "week", label: get("recap.week", "Semaine") },
-              { value: "month", label: get("recap.month", "Mois") },
+              { value: "today", label: tr("recap.today") },
+              { value: "week", label: tr("recap.week") },
+              { value: "month", label: tr("recap.month") },
             ]}
           />
         }
@@ -210,7 +202,7 @@ export default function Recap() {
 
       {loading ? (
         <Panel>
-          <Loading label={t.recap?.loading || "Chargement de l'activité…"} />
+          <Loading label={tr("recap.loading")} />
         </Panel>
       ) : (
         <div className="flex flex-col gap-5">
@@ -221,7 +213,7 @@ export default function Recap() {
               value={
                 totalMin >= 60 ? `${hours}\u00a0h\u00a0${String(mins).padStart(2, "0")}` : `${mins}\u00a0min`
               }
-              label={t.recap?.activityTime || "Temps actif"}
+              label={tr("recap.activityTime")}
               hint={PERIOD_LABELS[period]}
             />
             {stats.map((s) => (
@@ -230,8 +222,8 @@ export default function Recap() {
           </StatStrip>
 
           <BarList
-            title={t.recap?.timeByArea || "Où le temps a été passé"}
-            hint={t.recap?.timeByAreaHint || "basé sur l'usage"}
+            title={tr("recap.timeByArea")}
+            hint={tr("recap.timeByAreaHint")}
             rows={timeByArea.map((a) => ({
               key: a.key,
               label: a.label,
@@ -242,8 +234,8 @@ export default function Recap() {
           />
 
           <BarList
-            title={t.recap?.bySubject || "Par matière"}
-            hint={t.recap?.basedOnActivity || "activité"}
+            title={tr("recap.bySubject")}
+            hint={tr("recap.basedOnActivity")}
             rows={(data?.top_courses || []).map((c) => ({
               key: c.name,
               label: c.name,
@@ -254,31 +246,31 @@ export default function Recap() {
           />
 
           <BarList
-            title={t.recap?.byDocuments || "Documents"}
-            hint={t.recap?.basedOnActivity || "activité"}
+            title={tr("recap.byDocuments")}
+            hint={tr("recap.basedOnActivity")}
             rows={(data?.top_documents || []).map((d) => ({
               key: d.name,
               label: d.name,
               icon: <DocIcon className="w-4 h-4" />,
               value: d.count,
-              text: fmt(get("recap.opens", "{count} ouverture(s)"), { count: d.count }),
+              text: tr("recap.opens", { count: d.count }),
             }))}
           />
 
           <BarList
-            title={t.recap?.byTools || "Outils"}
-            hint={t.recap?.basedOnActivity || "activité"}
+            title={tr("recap.byTools")}
+            hint={tr("recap.basedOnActivity")}
             rows={(data?.top_tools || []).map((tool) => ({
               key: tool.name,
               label: tool.name,
               icon: <ToolIcon className="w-4 h-4" />,
               value: tool.count,
-              text: fmt(get("recap.uses", "{count} utilisation(s)"), { count: tool.count }),
+              text: tr("recap.uses", { count: tool.count }),
             }))}
           />
 
           {totalMin > 0 && highlights.length > 0 && (
-            <Panel title={get("recap.highlights", "À retenir")} icon={<SparkleIcon className="w-4 h-4" />}>
+            <Panel title={tr("recap.highlights")} icon={<SparkleIcon className="w-4 h-4" />}>
               <ul className="eu-divide">
                 {highlights.map((h, i) => (
                   <li key={i} className="eu-row eu-t-body text-ink">
@@ -293,11 +285,8 @@ export default function Recap() {
             <Panel>
               <EmptyState
                 icon={<ClockIcon className="w-4 h-4" />}
-                title={get("recap.noDataTitle", "Pas encore de données")}
-                hint={
-                  t.recap?.noData ||
-                  "Le bilan se remplit au fil de vos sessions. Revenez après quelques cours."
-                }
+                title={tr("recap.noDataTitle")}
+                hint={tr("recap.noData")}
               />
             </Panel>
           )}

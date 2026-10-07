@@ -3,7 +3,7 @@ import { api, type Course, type FileItem, type Note } from "../lib/api";
 import { tabs } from "../stores/tabs";
 import { useImportFiles } from "../shell/useImportFiles";
 import { openFile } from "../lib/files";
-import { t, fmt, get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel } from "../components/layout";
@@ -94,16 +94,16 @@ function DocRow({ onOpen, onRename, onDelete, icon, title, meta, accent }: RowPr
       <span className="eu-t-caption shrink-0 hidden @xl:block">{meta}</span>
       <button
         onClick={onRename}
-        aria-label={`${get("common.rename", "Renommer")} — ${title}`}
-        data-tip={get("common.rename", "Renommer")}
+        aria-label={`${tr("common.rename")} — ${title}`}
+        data-tip={tr("common.rename")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm"
       >
         <PenIcon className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={onDelete}
-        aria-label={`${get("common.delete", "Supprimer")} — ${title}`}
-        data-tip={get("common.delete", "Supprimer")}
+        aria-label={`${tr("common.delete")} — ${title}`}
+        data-tip={tr("common.delete")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
       >
         <TrashIcon className="w-3.5 h-3.5" />
@@ -160,7 +160,7 @@ const MemoNoteItem = memo(function MemoNoteItem({
   courseName: (id: number | null) => string | undefined;
   accent?: string;
 }) {
-  const displayTitle = n.title || t.documents?.noteFallbackTitle || "Note";
+  const displayTitle = n.title || tr("documents.noteFallbackTitle");
   return (
     <DocRow
       icon={<NoteIcon className="w-4 h-4" />}
@@ -169,7 +169,7 @@ const MemoNoteItem = memo(function MemoNoteItem({
       meta={
         <>
           {n.course_id ? `${courseName(n.course_id)} · ` : ""}
-          {get("documents.noteKind", "Note")} · {relativeTime(n.updated_at)}
+          {tr("documents.noteKind")} · {relativeTime(n.updated_at)}
         </>
       }
       onOpen={() => onOpen(n)}
@@ -228,7 +228,7 @@ export default function Documents({
     setRenameValue(f.name);
   }, []);
   const startRenameNote = useCallback((n: Note) => {
-    const cur = n.title || t.documents?.noteFallbackTitle || "Note";
+    const cur = n.title || tr("documents.noteFallbackTitle");
     setRenameTarget({ kind: "note", id: n.id, current: cur });
     setRenameValue(cur);
   }, []);
@@ -238,19 +238,19 @@ export default function Documents({
   const deleteFileItem = useCallback(
     async (f: FileItem) => {
       const ok = await confirm.ask({
-        title: get("common.delete", "Supprimer"),
+        title: tr("common.delete"),
         message: `Supprimer le fichier « ${f.name} » ?`,
-        confirmLabel: get("common.delete", "Supprimer"),
+        confirmLabel: tr("common.delete"),
         danger: true,
       });
       if (!ok) return;
       try {
         await api.deleteFile(f.id);
         tabs.closeFile(f.id);
-        toast(get("documents.toastDeleted", "Supprimé"), "success");
+        toast(tr("documents.toastDeleted"), "success");
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       } catch (err: any) {
-        toast(err?.message || get("messages.genericError", "Erreur"), "error");
+        toast(err?.message || tr("messages.genericError"), "error");
       }
     },
     [confirm, toast],
@@ -259,9 +259,9 @@ export default function Documents({
   const deleteNoteItem = useCallback(
     async (n: Note) => {
       const ok = await confirm.ask({
-        title: get("notes.deleteConfirm", "Supprimer cette note ?"),
-        message: get("notes.deleteConfirm", "Supprimer cette note ?"),
-        confirmLabel: get("common.delete", "Supprimer"),
+        title: tr("notes.deleteConfirm"),
+        message: tr("notes.deleteConfirm"),
+        confirmLabel: tr("common.delete"),
         danger: true,
       });
       if (!ok) return;
@@ -271,10 +271,10 @@ export default function Documents({
           .list()
           .filter((t) => t.kind === "note" && t.params.noteId === n.id)
           .forEach((t) => tabs.close(t.id, { discard: true }));
-        toast(get("notes.deleted", "Note supprimée"), "success");
+        toast(tr("notes.deleted"), "success");
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
       } catch (err: any) {
-        toast(err?.message || get("messages.genericError", "Erreur"), "error");
+        toast(err?.message || tr("messages.genericError"), "error");
       }
     },
     [confirm, toast],
@@ -296,7 +296,7 @@ export default function Documents({
       if (renameTarget.kind === "note") {
         const renamed = await api.renameNote(renameTarget.id, newName);
         if (!renamed?.id) {
-          toast(get("messages.genericError", "Erreur"), "error");
+          toast(tr("messages.genericError"), "error");
           return;
         }
         const tid = `note:${renameTarget.id}`;
@@ -307,7 +307,7 @@ export default function Documents({
       } else {
         const updated = await api.renameFile(renameTarget.id, newName);
         if (!updated?.id) {
-          toast(get("messages.genericError", "Erreur"), "error");
+          toast(tr("messages.genericError"), "error");
           return;
         }
         const tid =
@@ -323,7 +323,7 @@ export default function Documents({
         }
         api.logEvent("file_rename", newName, updated.course_id ?? null);
       }
-      toast(fmt(t.documents?.toastRenamed || 'Renommé en "{name}"', { name: newName }), "success");
+      toast(tr("documents.toastRenamed", { name: newName }), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
     } catch (err: any) {
       toast(err?.message || "Erreur lors du renommage", "error");
@@ -395,12 +395,12 @@ export default function Documents({
   return (
     <>
       <PageHeader
-        title={t.nav.documents}
+        title={tr("nav.documents")}
         meta={
           <>
-            <span>{fmt(get("documents.metaFiles", "{count} fichiers"), { count: docs.length })}</span>
+            <span>{tr("documents.metaFiles", { count: docs.length })}</span>
             <MetaDot />
-            <span>{fmt(get("documents.metaNotes", "{count} notes"), { count: notes.length })}</span>
+            <span>{tr("documents.metaNotes", { count: notes.length })}</span>
             {totalSize > 0 && (
               <>
                 <MetaDot />
@@ -415,16 +415,16 @@ export default function Documents({
               onClick={() =>
                 tabs.open({
                   kind: "note",
-                  title: t.common?.newNote || "Nouvelle note",
+                  title: tr("common.newNote"),
                   params: { isNew: true },
                 })
               }
               className="eu-btn-ghost eu-btn-sm"
             >
-              <NoteIcon className="w-3.5 h-3.5" /> {t.common?.newNote || "Nouvelle note"}
+              <NoteIcon className="w-3.5 h-3.5" /> {tr("common.newNote")}
             </button>
             <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
-              <PlusIcon className="w-3.5 h-3.5" /> {t.common?.importFiles || "Importer"}
+              <PlusIcon className="w-3.5 h-3.5" /> {tr("common.importFiles")}
             </button>
           </>
         }
@@ -435,10 +435,10 @@ export default function Documents({
         <div className="relative">
           <input
             className="eu-input pl-8"
-            placeholder={t.documents?.searchPlaceholder || "Rechercher un document…"}
+            placeholder={tr("documents.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label={get("common.search", "Rechercher")}
+            aria-label={tr("common.search")}
           />
           <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
           {(search.trim() || filter.kind !== "all") && (
@@ -449,14 +449,14 @@ export default function Documents({
               }}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 eu-btn-quiet eu-btn-sm"
             >
-              {get("common.clear", "Effacer")}
+              {tr("common.clear")}
             </button>
           )}
         </div>
 
         <div className="flex items-center flex-wrap gap-1.5">
           <button onClick={() => setFilter({ kind: "all" })} {...chipProps(filter.kind === "all")}>
-            {get("documents.filterAll", "Tout")}
+            {tr("documents.filterAll")}
           </button>
           {TYPE_CHIPS.map((c) => (
             <button
@@ -489,22 +489,16 @@ export default function Documents({
           <EmptyState
             icon={<DocIcon className="w-4 h-4" />}
             title={
-              search.trim() || filter.kind !== "all"
-                ? get("documents.noResult", "Aucun résultat")
-                : t.documents?.nothingHere || "Rien ici pour l'instant"
+              search.trim() || filter.kind !== "all" ? tr("documents.noResult") : tr("documents.nothingHere")
             }
             hint={
               search.trim() || filter.kind !== "all"
-                ? get(
-                    "documents.noResultHint",
-                    "Essayez un autre mot-clé, changez de filtre, ou importez de nouveaux documents.",
-                  )
-                : t.documents?.nothingHint ||
-                  "Importez des fichiers (ou glissez-les dans la fenêtre), ou écrivez des notes dans vos cours."
+                ? tr("documents.noResultHint")
+                : tr("documents.nothingHint")
             }
             action={
               <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.importFiles || "Importer"}
+                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.importFiles")}
               </button>
             }
           />
@@ -550,9 +544,9 @@ export default function Documents({
 
       {/* Rename works for notes and for every file kind. */}
       {renameTarget && (
-        <Modal open={!!renameTarget} onClose={closeRename} title={get("common.rename", "Renommer")}>
+        <Modal open={!!renameTarget} onClose={closeRename} title={tr("common.rename")}>
           <div className="flex flex-col gap-4">
-            <Field label={get("documents.newName", "Nouveau nom")}>
+            <Field label={tr("documents.newName")}>
               <input
                 autoFocus
                 className="eu-input"
@@ -562,19 +556,19 @@ export default function Documents({
                   if (e.key === "Enter") doRename();
                   if (e.key === "Escape") closeRename();
                 }}
-                aria-label={get("documents.newName", "Nouveau nom")}
+                aria-label={tr("documents.newName")}
               />
             </Field>
             <div className="flex gap-2 justify-end">
               <button onClick={closeRename} className="eu-btn-ghost">
-                {get("common.cancel", "Annuler")}
+                {tr("common.cancel")}
               </button>
               <button
                 onClick={doRename}
                 className="eu-btn-primary"
                 disabled={!renameValue.trim() || renameValue.trim() === renameTarget.current}
               >
-                {get("common.rename", "Renommer")}
+                {tr("common.rename")}
               </button>
             </div>
           </div>

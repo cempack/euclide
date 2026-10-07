@@ -4,7 +4,7 @@ import { q } from "../api/queries";
 import { PanelLeftClose, PanelLeftOpen, Projector, Settings } from "lucide-react";
 import { useSetting } from "../api/hooks";
 import type { AppInfo } from "../lib/api";
-import { get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { NARROW_WINDOW, useMediaQuery } from "../lib/media";
 import { shortcutText } from "../lib/shortcuts";
 import { tabs, useActiveKind, type TabKind } from "../stores/tabs";
@@ -46,7 +46,7 @@ const NavButton = memo(function NavButton({
 /** Projection mode keeps only this: the way back. */
 export const ProjectionRail = memo(function ProjectionRail() {
   const { toggleProjection } = useAppearance();
-  const label = get("appearance.leaveProjection", "Quitter la projection");
+  const label = tr("appearance.leaveProjection");
   return (
     <aside className="eu-rail">
       <button
@@ -66,9 +66,9 @@ export const ProjectionRail = memo(function ProjectionRail() {
 
 function openNav(item: NavItem) {
   if (item.kind === "whiteboard") {
-    tabs.open({ kind: "whiteboard", title: get("app.tabWhiteboard", "Tableau"), params: { isNew: true } });
+    tabs.open({ kind: "whiteboard", title: tr("app.tabWhiteboard"), params: { isNew: true } });
   } else if (item.kind === "note") {
-    tabs.open({ kind: "note", title: get("common.newNote", "Nouvelle note"), params: { isNew: true } });
+    tabs.open({ kind: "note", title: tr("common.newNote"), params: { isNew: true } });
   } else {
     tabs.open({ kind: item.kind });
   }
@@ -87,12 +87,9 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
 
   const name = displayName || (pronote?.connected ? (pronote.account_name ?? "").trim() : "");
 
-  const projectionLabel = get("appearance.projection", "Mode projection");
-  const settingsLabel = get("nav.settings", "Réglages");
-  const foldLabel =
-    saved === "rail"
-      ? get("nav.expand", "Déplier la barre latérale")
-      : get("nav.collapse", "Réduire la barre latérale");
+  const projectionLabel = tr("appearance.projection");
+  const settingsLabel = tr("nav.settings");
+  const foldLabel = saved === "rail" ? tr("nav.expand") : tr("nav.collapse");
   const fold = narrow ? null : (
     <button
       type="button"
@@ -108,8 +105,8 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
 
   const placeFoot = rail ? "right" : "top";
   const groups = [
-    { label: get("nav.groupWork", "Travail"), items: NAV_WORK },
-    { label: get("nav.groupTools", "Outils"), items: NAV_TOOLS },
+    { label: tr("nav.groupWork"), items: NAV_WORK },
+    { label: tr("nav.groupTools"), items: NAV_TOOLS },
   ];
 
   return (
@@ -120,7 +117,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
           <>
             <div className="min-w-0 flex-1">
               <div className="eu-wordmark">EUCLIDE</div>
-              <div className="eu-t-caption truncate">{get("app.tagline", "Bureau d'enseignement")}</div>
+              <div className="eu-t-caption truncate">{tr("app.tagline")}</div>
             </div>
             {fold}
           </>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
-import { t, fmt, get } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import {
@@ -32,16 +32,16 @@ export default function Settings({ info }: { info: AppInfo | null }) {
   return (
     <>
       <PageHeader
-        title={t.nav.settings}
+        title={tr("nav.settings")}
         meta={
           <>
-            <span>{get("settings.metaAppearance", "Apparence")}</span>
+            <span>{tr("settings.metaAppearance")}</span>
             <MetaDot />
             <span>Pronote</span>
             <MetaDot />
-            <span>{get("settings.scheduleTitle", "Emploi du temps")}</span>
+            <span>{tr("settings.scheduleTitle")}</span>
             <MetaDot />
-            <span>{get("settings.dataDirTitle", "Stockage")}</span>
+            <span>{tr("settings.dataDirTitle")}</span>
           </>
         }
       />
@@ -71,28 +71,26 @@ function AppearanceSection() {
   const endLead = leadN >= 1 && leadN <= 15 ? leadN : 5;
 
   return (
-    <Section title={get("settings.metaAppearance", "Apparence")}>
+    <Section title={tr("settings.metaAppearance")}>
       <Panel pad>
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <p className="eu-t-body font-medium text-ink">{get("appearance.theme", "Thème")}</p>
-              <p className="eu-t-meta">
-                {get("appearance.themeHint", "« Auto » suit le réglage clair/sombre du système.")}
-              </p>
+              <p className="eu-t-body font-medium text-ink">{tr("appearance.theme")}</p>
+              <p className="eu-t-meta">{tr("appearance.themeHint")}</p>
             </div>
             <Segmented
               value={pref}
               onChange={setPref}
-              label={get("appearance.theme", "Thème")}
+              label={tr("appearance.theme")}
               options={[
-                { value: "auto", label: get("appearance.auto", "Auto") },
+                { value: "auto", label: tr("appearance.auto") },
                 {
                   value: "light",
                   label: (
                     <span className="flex items-center gap-1.5">
                       <SunIcon className="w-3.5 h-3.5" />
-                      {get("appearance.light", "Clair")}
+                      {tr("appearance.light")}
                     </span>
                   ),
                 },
@@ -101,7 +99,7 @@ function AppearanceSection() {
                   label: (
                     <span className="flex items-center gap-1.5">
                       <MoonIcon className="w-3.5 h-3.5" />
-                      {get("appearance.dark", "Sombre")}
+                      {tr("appearance.dark")}
                     </span>
                   ),
                 },
@@ -111,36 +109,24 @@ function AppearanceSection() {
 
           <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
             <div className="min-w-0">
-              <p className="eu-t-body font-medium text-ink">{get("appearance.density", "Densité")}</p>
-              <p className="eu-t-meta">
-                {get(
-                  "appearance.densityHint",
-                  "« Compact » resserre pages, boutons et listes. « Confortable » les aère.",
-                )}
-              </p>
+              <p className="eu-t-body font-medium text-ink">{tr("appearance.density")}</p>
+              <p className="eu-t-meta">{tr("appearance.densityHint")}</p>
             </div>
             <Segmented
               value={density}
               onChange={setDensity}
-              label={get("appearance.density", "Densité")}
+              label={tr("appearance.density")}
               options={[
-                { value: "comfortable", label: get("appearance.comfortable", "Confortable") },
-                { value: "compact", label: get("appearance.compact", "Compact") },
+                { value: "comfortable", label: tr("appearance.comfortable") },
+                { value: "compact", label: tr("appearance.compact") },
               ]}
             />
           </div>
 
           <div className="flex items-center justify-between gap-4 flex-wrap border-t border-line pt-4">
             <div className="min-w-0">
-              <p className="eu-t-body font-medium text-ink">
-                {get("classEnd.title", "Fin de cours annoncée")}
-              </p>
-              <p className="eu-t-meta max-w-[62ch]">
-                {get(
-                  "classEnd.hint",
-                  "Un rappel discret avant la sonnerie, d'après l'emploi du temps, pour boucler l'activité et donner le travail à faire.",
-                )}
-              </p>
+              <p className="eu-t-body font-medium text-ink">{tr("classEnd.title")}</p>
+              <p className="eu-t-meta max-w-[62ch]">{tr("classEnd.hint")}</p>
             </div>
             <div className="flex items-center gap-2">
               {endNotice !== "off" && (
@@ -154,7 +140,7 @@ function AppearanceSection() {
                       const n = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 1));
                       setLead(String(n));
                     }}
-                    aria-label={get("classEnd.lead", "Minutes avant la fin")}
+                    aria-label={tr("classEnd.lead")}
                     className="eu-input w-16 text-center tabular-nums"
                   />
                   <span className="eu-t-meta">min</span>
@@ -165,11 +151,11 @@ function AppearanceSection() {
                 onChange={(v) => {
                   setNotice(v);
                 }}
-                label={get("classEnd.title", "Fin de cours annoncée")}
+                label={tr("classEnd.title")}
                 options={[
-                  { value: "off", label: get("classEnd.off", "Aucune") },
-                  { value: "toast", label: get("classEnd.silent", "Silencieuse") },
-                  { value: "sound", label: get("classEnd.sound", "Sonnerie") },
+                  { value: "off", label: tr("classEnd.off") },
+                  { value: "toast", label: tr("classEnd.silent") },
+                  { value: "sound", label: tr("classEnd.sound") },
                 ]}
               />
             </div>
@@ -186,15 +172,8 @@ function AppearanceSection() {
               }}
             />
             <span className="min-w-0">
-              <span className="eu-t-body font-medium text-ink block">
-                {get("appearance.remoteIcons", "Icônes de sites distantes")}
-              </span>
-              <span className="eu-t-meta block">
-                {get(
-                  "appearance.remoteIconsHint",
-                  "Décoché, Euclide dessine les icônes de liens localement et n'émet aucune requête réseau. Coché, il télécharge les favicons réels.",
-                )}
-              </span>
+              <span className="eu-t-body font-medium text-ink block">{tr("appearance.remoteIcons")}</span>
+              <span className="eu-t-meta block">{tr("appearance.remoteIconsHint")}</span>
             </span>
           </label>
         </div>
@@ -226,10 +205,7 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
       }
     } catch (err) {
       reportError("settings.pickFolder", err);
-      toast(
-        errorMessage(err, get("settings.pickFolderError", "Impossible de sélectionner le dossier")),
-        "error",
-      );
+      toast(errorMessage(err, tr("settings.pickFolderError")), "error");
     } finally {
       setBusy(false);
     }
@@ -237,22 +213,19 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
 
   const reset = async () => {
     const ok = await confirmDlg.ask({
-      title: get("settings.resetTitle", "Dossier de stockage"),
+      title: tr("settings.resetTitle"),
       message: "Revenir au dossier par défaut (Euclide-Data à côté de l'exécutable) ?",
-      confirmLabel: get("common.done", "Terminé"),
+      confirmLabel: tr("common.done"),
       danger: true,
     });
     if (!ok) return;
     setBusy(true);
     try {
       await api.resetDataDir();
-      toast(
-        get("settings.resetSuccess", "Configuration réinitialisée. Redémarrez Euclide pour appliquer."),
-        "success",
-      );
+      toast(tr("settings.resetSuccess"), "success");
     } catch (err) {
       reportError("settings.resetDataDir", err);
-      toast(errorMessage(err, get("settings.resetError", "Erreur lors de la réinitialisation")), "error");
+      toast(errorMessage(err, tr("settings.resetError")), "error");
     } finally {
       setBusy(false);
     }
@@ -261,53 +234,42 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
   const backup = async () => {
     setBusy(true);
     try {
-      toast(get("settings.backupRunning", "Sauvegarde en cours…"), "info");
+      toast(tr("settings.backupRunning"), "info");
       const path = await api.backupDataDir();
-      toast(fmt(get("settings.backupDone", "Sauvegarde créée : {path}"), { path }), "success");
+      toast(tr("settings.backupDone", { path }), "success");
     } catch (err) {
-      toast(errorMessage(err, get("settings.backupError", "Sauvegarde impossible")), "error");
+      toast(errorMessage(err, tr("settings.backupError")), "error");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Section title={t.settings?.dataDirTitle || "Dossier de stockage"}>
+    <Section title={tr("settings.dataDirTitle")}>
       <Panel pad>
-        <Field
-          label={get("settings.dataDirLabel", "Emplacement des données")}
-          hint={
-            t.settings?.dataDirHint ||
-            "Parfait pour une clé USB : choisissez un dossier sur la clé. Le pointeur (euclide-data.json) reste à côté de l'exécutable. Un redémarrage est nécessaire après tout changement. Aucune migration automatique : copiez les anciens fichiers si besoin."
-          }
-        >
+        <Field label={tr("settings.dataDirLabel")} hint={tr("settings.dataDirHint")}>
           <p className="eu-panel-alt rounded px-2.5 py-2 font-mono text-small text-ink-muted break-all selectable">
-            {current || get("settings.dataDirUnknown", "(chemin inconnu)")}
+            {current || tr("settings.dataDirUnknown")}
           </p>
         </Field>
 
         <div className="flex flex-wrap gap-2 mt-3.5">
           <button onClick={choose} disabled={busy} className="eu-btn-ghost eu-btn-sm">
-            {get("settings.pickFolder", "Choisir un dossier…")}
+            {tr("settings.pickFolder")}
           </button>
           <button onClick={reset} disabled={busy} className="eu-btn-quiet eu-btn-sm">
-            {get("settings.resetFolder", "Réinitialiser (par défaut)")}
+            {tr("settings.resetFolder")}
           </button>
         </div>
 
         <div className="border-t border-line mt-4 pt-4 flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
-            <p className="eu-t-body font-medium text-ink">{get("settings.backupTitle", "Sauvegarde")}</p>
-            <p className="eu-t-meta max-w-[62ch]">
-              {get(
-                "settings.backupHint",
-                "Crée une archive .zip horodatée de tout le dossier de données, à côté de celui-ci. Sur une clé USB qui vit dans une poche, c'est une assurance élémentaire.",
-              )}
-            </p>
+            <p className="eu-t-body font-medium text-ink">{tr("settings.backupTitle")}</p>
+            <p className="eu-t-meta max-w-[62ch]">{tr("settings.backupHint")}</p>
           </div>
           <button onClick={backup} disabled={busy} className="eu-btn-ghost eu-btn-sm">
             <ArchiveIcon className="w-3.5 h-3.5" />
-            {get("settings.backupNow", "Sauvegarder maintenant")}
+            {tr("settings.backupNow")}
           </button>
         </div>
       </Panel>
@@ -357,9 +319,9 @@ function PronoteSection() {
         const code = jsQR(data.data, data.width, data.height);
         if (code) {
           setQrJson(code.data);
-          toast(t.settings?.toastQrRead || "QR code lu avec succès", "success");
+          toast(tr("settings.toastQrRead"), "success");
         } else {
-          toast(t.settings?.toastQrFail || "QR code illisible, réessayez", "error");
+          toast(tr("settings.toastQrFail"), "error");
         }
       };
       img.src = reader.result as string;
@@ -369,7 +331,7 @@ function PronoteSection() {
 
   const connectQr = async () => {
     if (!qrJson.trim() || pin.length < 4) {
-      toast(t.settings?.toastMissingQrPin || "QR code et code PIN requis", "error");
+      toast(tr("settings.toastMissingQrPin"), "error");
       return;
     }
     setBusy(true);
@@ -377,7 +339,7 @@ function PronoteSection() {
       const s = await api.pronoteQrLogin(qrJson.trim(), pin.trim());
       await finishConnect(s);
     } catch (err) {
-      toast(errorMessage(err, "") || t.settings?.toastConnectFail || "Connexion Pronote impossible", "error");
+      toast(errorMessage(err, "") || tr("settings.toastConnectFail"), "error");
     } finally {
       setBusy(false);
     }
@@ -385,7 +347,7 @@ function PronoteSection() {
 
   const connectDirect = async () => {
     if (!url.trim() || !username.trim() || !password) {
-      toast(t.settings?.toastMissingDirect || "URL, identifiant et mot de passe requis", "error");
+      toast(tr("settings.toastMissingDirect"), "error");
       return;
     }
     setBusy(true);
@@ -403,7 +365,7 @@ function PronoteSection() {
         setNeedsPin(true);
         toast(msg || "Code PIN requis pour cet appareil. Saisissez-le ci-dessous.", "error");
       } else {
-        toast(msg || t.settings?.toastConnectFail || "Connexion impossible", "error");
+        toast(msg || tr("settings.toastConnectFail"), "error");
       }
     } finally {
       setBusy(false);
@@ -412,12 +374,12 @@ function PronoteSection() {
 
   const finishConnect = async (s: PronoteStatus | null) => {
     if (!s) {
-      toast(t.settings?.toastConnectFailed || "Connexion échouée, vérifiez vos informations", "error");
+      toast(tr("settings.toastConnectFailed"), "error");
       return;
     }
     setStatus(s);
     if (s.connected) {
-      toast(t.settings?.toastConnected || "Connecté à Pronote", "success");
+      toast(tr("settings.toastConnected"), "success");
       setOpen(false);
       setQrJson("");
       setPin("");
@@ -427,44 +389,38 @@ function PronoteSection() {
       // Small delay to let the QR token settle before sync (token rotation race)
       await new Promise((r) => setTimeout(r, 800));
       try {
-        toast(t.settings?.toastSyncing || "Synchronisation…", "info");
+        toast(tr("settings.toastSyncing"), "info");
         const n = await api.pronoteSync();
         window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-        toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");
+        toast(tr("settings.toastSyncCount", { count: n }), "success");
       } catch {
         // Token may have rotated — retry once after a short wait
         try {
           await new Promise((r) => setTimeout(r, 1500));
           const n2 = await api.pronoteSync();
           window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-          toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n2 }), "success");
+          toast(tr("settings.toastSyncCount", { count: n2 }), "success");
         } catch (err) {
           // Sync failed but login itself worked — user can manually sync later
           reportError("settings.pronoteFirstSync", err);
-          toast(
-            errorMessage(
-              err,
-              t.settings?.toastSyncFail || "Synchronisation impossible (réessayez manuellement)",
-            ),
-            "error",
-          );
+          toast(errorMessage(err, tr("settings.toastSyncFail")), "error");
         }
       }
       refresh();
     } else {
-      toast(t.settings?.toastConnectFailed || "Connexion échouée, vérifiez vos informations", "error");
+      toast(tr("settings.toastConnectFailed"), "error");
     }
   };
 
   const sync = async () => {
     setBusy(true);
     try {
-      toast(t.settings?.toastSyncing || "Synchronisation…", "info");
+      toast(tr("settings.toastSyncing"), "info");
       const n = await api.pronoteSync();
       window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
-      toast(fmt(t.settings?.toastSyncCount || "{count} cours synchronisés", { count: n }), "success");
+      toast(tr("settings.toastSyncCount", { count: n }), "success");
     } catch (err) {
-      toast(errorMessage(err, t.settings?.toastSyncFail || "Synchronisation impossible"), "error");
+      toast(errorMessage(err, tr("settings.toastSyncFail")), "error");
     } finally {
       setBusy(false);
       refresh();
@@ -472,7 +428,7 @@ function PronoteSection() {
   };
 
   return (
-    <Section title={get("settings.pronoteTitle", "Pronote")}>
+    <Section title={tr("settings.pronoteTitle")}>
       <Panel pad>
         <div className="flex items-center gap-3.5 flex-wrap">
           <span
@@ -487,22 +443,21 @@ function PronoteSection() {
           <div className="flex-1 min-w-[24ch]">
             <p className="eu-t-body font-medium text-ink">
               {status?.connected
-                ? fmt(t.settings?.connectedAs || "Connecté - {name}", { name: status.account_name ?? "" })
-                : t.settings?.notConnected || "Non connecté"}
+                ? tr("settings.connectedAs", { name: status.account_name ?? "" })
+                : tr("settings.notConnected")}
             </p>
             <p className="eu-t-meta">
               {status?.connected
                 ? status.last_sync
-                  ? fmt(t.settings?.lastSync || "Dernière synchro : {date}", { date: status.last_sync })
-                  : t.settings?.readyToSync || "Prêt à synchroniser"
-                : t.settings?.pronoteHelp ||
-                  "Comme votre établissement utilise un ENT, la connexion se fait par QR code, sans saisir de mot de passe."}
+                  ? tr("settings.lastSync", { date: status.last_sync })
+                  : tr("settings.readyToSync")
+                : tr("settings.pronoteHelp")}
             </p>
           </div>
           {status?.connected ? (
             <div className="flex gap-2 shrink-0">
               <button onClick={sync} disabled={busy} className="eu-btn-ghost eu-btn-sm">
-                {busy ? "…" : get("settings.sync", "Synchroniser")}
+                {busy ? "…" : tr("settings.sync")}
               </button>
               <button
                 onClick={async () => {
@@ -512,32 +467,27 @@ function PronoteSection() {
                 }}
                 className="eu-btn-quiet eu-btn-sm"
               >
-                {get("settings.disconnect", "Déconnecter")}
+                {tr("settings.disconnect")}
               </button>
             </div>
           ) : (
             <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm shrink-0">
-              {t.common?.connect || "Connecter"}
+              {tr("common.connect")}
             </button>
           )}
         </div>
       </Panel>
 
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={get("settings.pronoteTitle", "Pronote")}
-        width="max-w-xl"
-      >
+      <Modal open={open} onClose={() => setOpen(false)} title={tr("settings.pronoteTitle")} width="max-w-xl">
         <div className="flex flex-col gap-4">
           <Segmented
             grow
             value={method}
             onChange={setMethod}
-            label={get("settings.pronoteTitle", "Pronote")}
+            label={tr("settings.pronoteTitle")}
             options={[
-              { value: "qr", label: get("settings.qrMethod", "QR code (ENT)") },
-              { value: "direct", label: get("settings.idMethod", "Identifiants") },
+              { value: "qr", label: tr("settings.qrMethod") },
+              { value: "direct", label: tr("settings.idMethod") },
             ]}
           />
 
@@ -577,10 +527,10 @@ function PronoteSection() {
               </div>
               <div className="flex justify-end gap-2">
                 <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
-                  {t.common?.cancel || "Annuler"}
+                  {tr("common.cancel")}
                 </button>
                 <button className="eu-btn-primary" onClick={connectQr} disabled={busy}>
-                  {busy ? "Connexion..." : t.common?.connect || "Connecter"}
+                  {busy ? "Connexion..." : tr("common.connect")}
                 </button>
               </div>
             </>
@@ -636,10 +586,10 @@ function PronoteSection() {
               )}
               <div className="flex justify-end gap-2">
                 <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
-                  {t.common?.cancel || "Annuler"}
+                  {tr("common.cancel")}
                 </button>
                 <button className="eu-btn-primary" onClick={connectDirect} disabled={busy}>
-                  {busy ? "Connexion..." : t.common?.connect || "Connecter"}
+                  {busy ? "Connexion..." : tr("common.connect")}
                 </button>
               </div>
             </>
@@ -673,17 +623,17 @@ function ScheduleSection() {
     try {
       const saved = await api.saveScheduleEntry({ ...form, source: "manual" });
       if (!saved?.id) {
-        toast(get("messages.genericError", "Erreur"), "error");
+        toast(tr("messages.genericError"), "error");
         return;
       }
-      toast(t.settings?.toastScheduleAdded || "Cours ajouté à l'emploi du temps", "success");
+      toast(tr("settings.toastScheduleAdded"), "success");
       setOpen(false);
       setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
       window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
       refresh();
     } catch (err) {
       reportError("settings.addSchedule", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
@@ -701,28 +651,22 @@ function ScheduleSection() {
 
   return (
     <Section
-      title={get("settings.scheduleTitle", "Emploi du temps")}
-      description={get(
-        "settings.scheduleWeek",
-        "Vue de la semaine — les cours Pronote sont en lecture seule.",
-      )}
+      title={tr("settings.scheduleTitle")}
+      description={tr("settings.scheduleWeek")}
       action={
         <button onClick={() => setOpen(true)} className="eu-btn-ghost eu-btn-sm">
-          <PlusIcon className="w-3.5 h-3.5" /> {t.common?.add || "Ajouter"}
+          <PlusIcon className="w-3.5 h-3.5" /> {tr("common.add")}
         </button>
       }
     >
       {entries.length === 0 ? (
         <Panel>
           <EmptyState
-            title={t.settings?.emptyScheduleTitle || "Emploi du temps vide"}
-            hint={
-              t.settings?.emptyScheduleHint ||
-              "Ajoutez vos cours à la main, ou synchronisez Pronote ci-dessus."
-            }
+            title={tr("settings.emptyScheduleTitle")}
+            hint={tr("settings.emptyScheduleHint")}
             action={
               <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.add || "Ajouter un cours"}
+                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.add")}
               </button>
             }
           />
@@ -760,15 +704,15 @@ function ScheduleSection() {
                           {e.source === "pronote" ? (
                             <span
                               className="absolute top-1 right-1 eu-t-label"
-                              data-tip={get("settings.fromPronote", "Depuis Pronote")}
+                              data-tip={tr("settings.fromPronote")}
                             >
                               P
                             </span>
                           ) : (
                             <button
                               onClick={() => void remove(e.id)}
-                              aria-label={`${get("common.delete", "Supprimer")} — ${e.subject}`}
-                              data-tip={get("common.delete", "Supprimer")}
+                              aria-label={`${tr("common.delete")} — ${e.subject}`}
+                              data-tip={tr("common.delete")}
                               className="absolute top-0.5 right-0.5 w-6 h-6 grid place-items-center rounded-sm text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger-soft transition-opacity duration-fast"
                             >
                               <TrashIcon className="w-3 h-3" />
@@ -785,16 +729,12 @@ function ScheduleSection() {
         </div>
       )}
 
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={t.settings?.addCourseModalTitle || "Ajouter un cours"}
-      >
+      <Modal open={open} onClose={() => setOpen(false)} title={tr("settings.addCourseModalTitle")}>
         <div className="flex flex-col gap-3">
           <input
             autoFocus
             className="eu-input"
-            placeholder={t.settings?.subjectPlaceholder || "Matière (ex : Mathématiques 4e B)"}
+            placeholder={tr("settings.subjectPlaceholder")}
             value={form.subject ?? ""}
             onChange={(e) => setForm({ ...form, subject: e.target.value })}
           />
@@ -826,7 +766,7 @@ function ScheduleSection() {
           <div className="grid grid-cols-2 gap-2">
             <input
               className="eu-input"
-              placeholder={t.settings?.roomOptional || "Salle (optionnel)"}
+              placeholder={tr("settings.roomOptional")}
               value={form.room ?? ""}
               onChange={(e) => setForm({ ...form, room: e.target.value })}
             />
@@ -847,10 +787,10 @@ function ScheduleSection() {
           </div>
           <div className="flex justify-end gap-2 mt-1">
             <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
-              {t.common?.cancel || "Annuler"}
+              {tr("common.cancel")}
             </button>
             <button className="eu-btn-primary" onClick={save} disabled={!form.subject?.trim()}>
-              {t.common?.add || "Ajouter"}
+              {tr("common.add")}
             </button>
           </div>
         </div>
@@ -869,45 +809,37 @@ function TabsSection() {
   const sliderVal = Math.max(MIN, Math.min(MAX, limit.fixed));
   const chip =
     mode === "unlimited"
-      ? get("settings.maxTabsUnlimited", "Illimité").toUpperCase()
+      ? tr("settings.maxTabsUnlimited").toUpperCase()
       : mode === "auto"
-        ? `${get("settings.maxTabsAutoChip", "AUTO")} · ${limit.fit || "…"}`
+        ? `${tr("settings.maxTabsAutoChip")} · ${limit.fit || "…"}`
         : `${limit.max} MAX`;
 
   return (
-    <Section title={t.settings?.tabsTitle || "Onglets"} action={<span className="eu-chip">{chip}</span>}>
+    <Section title={tr("settings.tabsTitle")} action={<span className="eu-chip">{chip}</span>}>
       <Panel pad>
         <div className="flex flex-col gap-3">
           <Segmented
             grow
             value={mode}
             onChange={(next) => tabs.setMaxTabsMode(next, sliderVal)}
-            label={get("settings.tabsTitle", "Onglets")}
+            label={tr("settings.tabsTitle")}
             options={[
-              { value: "auto", label: get("settings.maxTabsAuto", "Automatique") },
-              { value: "fixed", label: get("settings.maxTabsFixed", "Nombre fixe") },
-              { value: "unlimited", label: get("settings.maxTabsUnlimited", "Illimité") },
+              { value: "auto", label: tr("settings.maxTabsAuto") },
+              { value: "fixed", label: tr("settings.maxTabsFixed") },
+              { value: "unlimited", label: tr("settings.maxTabsUnlimited") },
             ]}
           />
 
           {mode === "auto" && (
             <p className="eu-t-meta leading-snug">
-              {fmt(
-                get(
-                  "settings.maxTabsAutoHint",
-                  "Autant d'onglets que la barre peut afficher sans défiler. Actuellement : {count}.",
-                ),
-                { count: limit.fit || "…" },
-              )}
+              {tr("settings.maxTabsAutoHint", { count: limit.fit || "…" })}
             </p>
           )}
 
           {mode === "fixed" && (
             <div>
               <div className="flex items-baseline justify-between eu-t-body mb-1.5">
-                <span className="font-medium text-ink">
-                  {t.settings?.maxTabsLabel || "Nombre maximum d'onglets"}
-                </span>
+                <span className="font-medium text-ink">{tr("settings.maxTabsLabel")}</span>
                 <span className="font-mono text-ink text-title leading-none">{sliderVal}</span>
               </div>
               <input
@@ -923,26 +855,15 @@ function TabsSection() {
                 <span>{MIN}</span>
                 <span>{MAX}</span>
               </div>
-              <p className="eu-t-meta mt-2 leading-snug">
-                {t.settings?.maxTabsHint ||
-                  "Lorsque la limite est atteinte, l’onglet le plus ancien (non actif) est automatiquement fermé à l’ouverture d’un nouveau."}
-              </p>
+              <p className="eu-t-meta mt-2 leading-snug">{tr("settings.maxTabsHint")}</p>
             </div>
           )}
 
           {mode === "unlimited" && (
-            <p className="eu-t-meta leading-snug">
-              {t.settings?.maxTabsDisabledHint ||
-                "Vous pouvez ouvrir autant d’onglets que vous voulez (le + dans la barre d’onglets reste toujours actif)."}
-            </p>
+            <p className="eu-t-meta leading-snug">{tr("settings.maxTabsDisabledHint")}</p>
           )}
         </div>
-        <p className="eu-t-meta mt-3 pt-3 border-t border-line leading-snug">
-          {get(
-            "settings.pinHint",
-            "Astuce : double-cliquez sur un onglet pour l’épingler — un onglet épinglé n’est jamais fermé automatiquement, et il se réordonne par glisser-déposer.",
-          )}
-        </p>
+        <p className="eu-t-meta mt-3 pt-3 border-t border-line leading-snug">{tr("settings.pinHint")}</p>
       </Panel>
     </Section>
   );
@@ -987,7 +908,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
       }
       setStatus("error");
       setError(err instanceof Error ? err.message : String(err));
-      if (!quiet) toast(get("updater.error", "Impossible de vérifier les mises à jour."), "error");
+      if (!quiet) toast(tr("updater.error"), "error");
     }
   };
 
@@ -1010,17 +931,11 @@ function AboutSection({ info }: { info: AppInfo | null }) {
     // The app has its own confirmation dialog; the native window.confirm()
     // that used to be here looked foreign inside the Tauri window.
     const ok = await confirmDlg.ask({
-      title: get("updater.install", "Installer"),
-      message: fmt(
-        get(
-          "updater.confirmInstall",
-          "Installer la version {version} ? Fermez ensuite Euclide, puis rouvrez-le.",
-        ),
-        {
-          version: update.version,
-        },
-      ),
-      confirmLabel: get("updater.install", "Installer"),
+      title: tr("updater.install"),
+      message: tr("updater.confirmInstall", {
+        version: update.version,
+      }),
+      confirmLabel: tr("updater.install"),
     });
     if (!ok) return;
     setStatus("installing");
@@ -1033,11 +948,10 @@ function AboutSection({ info }: { info: AppInfo | null }) {
       });
       dismissAvailableUpdate(update.version);
       setStatus("installed");
-      toast(get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le."), "success");
+      toast(tr("updater.installed"), "success");
     } catch (err) {
       setStatus("error");
-      const msg =
-        installErrorMessage(err) || get("updater.installFailed", "Impossible d'installer la mise à jour.");
+      const msg = installErrorMessage(err) || tr("updater.installFailed");
       setError(msg);
       toast(msg, "error");
     }
@@ -1045,31 +959,28 @@ function AboutSection({ info }: { info: AppInfo | null }) {
 
   const statusLine =
     status === "checking"
-      ? get("updater.checking", "Recherche…")
+      ? tr("updater.checking")
       : status === "upToDate"
-        ? get("updater.upToDate", "Euclide est à jour.")
+        ? tr("updater.upToDate")
         : status === "publishing"
-          ? get(
-              "updater.publishing",
-              "Publication encore en cours pour cette plateforme. Réessayez dans un moment.",
-            )
+          ? tr("updater.publishing")
           : status === "available" && update
-            ? fmt(get("updater.available", "Version {version} disponible (actuelle : {current})."), {
+            ? tr("updater.available", {
                 version: update.version,
                 current: update.currentVersion,
               })
             : status === "installing"
-              ? fmt(get("updater.installing", "Téléchargement… {percent}\u202f%"), {
+              ? tr("updater.installing", {
                   percent: percent ?? 0,
                 })
               : status === "installed"
-                ? get("updater.installed", "Mise à jour installée. Fermez Euclide, puis rouvrez-le.")
+                ? tr("updater.installed")
                 : status === "error"
-                  ? error || get("updater.error", "Impossible de vérifier les mises à jour.")
+                  ? error || tr("updater.error")
                   : "";
 
   return (
-    <Section title={get("about.title", "À propos")}>
+    <Section title={tr("about.title")}>
       <Panel pad>
         <div className="flex items-center gap-3.5">
           <img
@@ -1081,9 +992,9 @@ function AboutSection({ info }: { info: AppInfo | null }) {
           />
           <div className="min-w-0">
             <p className="eu-t-body font-medium text-ink">
-              {t.appName} {info && <span className="text-ink-muted font-normal">v{info.version}</span>}
+              {tr("appName")} {info && <span className="text-ink-muted font-normal">v{info.version}</span>}
             </p>
-            <p className="eu-t-meta">{t.madeBy}</p>
+            <p className="eu-t-meta">{tr("madeBy")}</p>
           </div>
         </div>
 
@@ -1096,7 +1007,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                 disabled={status === "checking" || status === "installing"}
                 className="eu-btn-ghost eu-btn-sm"
               >
-                {get("updater.check", "Vérifier les mises à jour")}
+                {tr("updater.check")}
               </button>
               {(status === "available" || status === "installing") && (
                 <button
@@ -1105,7 +1016,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                   disabled={status === "installing"}
                   className="eu-btn-primary eu-btn-sm"
                 >
-                  {get("updater.install", "Installer")}
+                  {tr("updater.install")}
                 </button>
               )}
             </div>
@@ -1123,7 +1034,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
               </div>
             )}
             <p className="eu-t-meta leading-snug">
-              {info?.windows_portable ? get("updater.hintPortable") : get("updater.hint")}
+              {info?.windows_portable ? tr("updater.hintPortable") : tr("updater.hint")}
             </p>
           </div>
         )}

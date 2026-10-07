@@ -4,7 +4,7 @@ import { tabs } from "../stores/tabs";
 import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel } from "../components/layout";
-import { get, fmt } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { logged } from "../lib/report";
 import { BookIcon, DocIcon, RefreshIcon } from "../components/icons";
 
@@ -69,11 +69,11 @@ export default function ClassContent({
     navigator.clipboard
       ?.writeText(url)
       .then(() => {
-        toast(get("classContent.linkCopied", "Lien copié dans le presse-papiers"), "success");
+        toast(tr("classContent.linkCopied"), "success");
       })
       .catch(() => {
         // No clipboard access: show the link instead.
-        toast(get("classContent.linkFallback", "Lien : {url}").replace("{url}", url), "success");
+        toast(tr("classContent.linkFallback").replace("{url}", url), "success");
       });
   };
 
@@ -90,30 +90,28 @@ export default function ClassContent({
           const selfId = tabs.activeId();
           tabs.open({
             kind: "course",
-            title: course?.name || get("nav.courses", "Cours"),
+            title: course?.name || tr("nav.courses"),
             params: { courseId },
           });
           if (selfId) tabs.close(selfId);
         }}
-        backLabel={course?.name || get("classContent.back", "Retour au cours")}
+        backLabel={course?.name || tr("classContent.back")}
         icon={<BookIcon className="w-5 h-5" />}
-        title={get("classContent.title", "Contenu — {class}").replace("{class}", className)}
+        title={tr("classContent.title").replace("{class}", className)}
         meta={
           <>
-            <span>{effectiveMatiere || get("common.none", "aucune matière")}</span>
+            <span>{effectiveMatiere || tr("common.none")}</span>
             {contents.length > 0 && (
               <>
                 <MetaDot />
-                <span>
-                  {fmt(get("classContent.metaEntries", "{count} séances"), { count: contents.length })}
-                </span>
+                <span>{tr("classContent.metaEntries", { count: contents.length })}</span>
               </>
             )}
             {lastRefresh && (
               <>
                 <MetaDot />
                 <span>
-                  {fmt(get("classContent.metaRefreshed", "actualisé à {time}"), {
+                  {tr("classContent.metaRefreshed", {
                     time: lastRefresh.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
                   })}
                 </span>
@@ -128,9 +126,7 @@ export default function ClassContent({
             disabled={loading || isRefreshing}
           >
             <RefreshIcon className={`w-3.5 h-3.5 ${loading || isRefreshing ? "animate-spin" : ""}`} />
-            {loading || isRefreshing
-              ? get("classContent.refreshing", "Actualisation…")
-              : get("classContent.refresh", "Actualiser")}
+            {loading || isRefreshing ? tr("classContent.refreshing") : tr("classContent.refresh")}
           </button>
         }
       />
@@ -138,13 +134,11 @@ export default function ClassContent({
       {error && (
         <div className="eu-panel border-danger/30 bg-danger-soft p-[14px] flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <p className="eu-t-section text-danger">
-              {get("classContent.errorTitle", "Contenu indisponible")}
-            </p>
+            <p className="eu-t-section text-danger">{tr("classContent.errorTitle")}</p>
             <p className="eu-t-body text-danger/90 mt-1">{error}</p>
           </div>
           <button className="eu-btn-ghost eu-btn-sm shrink-0" onClick={retryLoad}>
-            {get("common.retry", "Réessayer")}
+            {tr("common.retry")}
           </button>
         </div>
       )}
@@ -152,7 +146,7 @@ export default function ClassContent({
       {loading && contents.length === 0 ? (
         <Panel>
           <Loading
-            label={fmt(get("classContent.loadingFor", "Chargement du contenu Pronote pour {class}…"), {
+            label={tr("classContent.loadingFor", {
               class: className,
             })}
           />
@@ -161,14 +155,14 @@ export default function ClassContent({
         <Panel>
           <EmptyState
             icon={<BookIcon className="w-4 h-4" />}
-            title={get("classContent.noContent", "Aucun contenu Pronote")}
-            hint={get("classContent.noContentHint", "Aucun contenu de cours trouvé pour {class} / {matiere}.")
+            title={tr("classContent.noContent")}
+            hint={tr("classContent.noContentHint")
               .replace("{class}", className)
               .replace("{matiere}", effectiveMatiere)}
             action={
               <button onClick={refreshContents} className="eu-btn-ghost eu-btn-sm">
                 <RefreshIcon className="w-3.5 h-3.5" />
-                {get("classContent.refresh", "Actualiser")}
+                {tr("classContent.refresh")}
               </button>
             }
           />

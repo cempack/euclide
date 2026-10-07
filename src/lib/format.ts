@@ -1,12 +1,9 @@
-import { t, get, fmt } from "./i18n";
+import { fmt, trList } from "./i18n";
 
 export function greeting(date = new Date(), name?: string | null): string {
   // Anonymous greetings until Pronote is connected; named pool once we have an account.
   const named = !!(name && name.trim());
-  const key = named ? "greetingsNamed" : "greetings";
-  const fallback = named ? ["Bonjour {name}"] : ["Bonjour"];
-  const raw = t && t[key];
-  const pool: string[] = Array.isArray(raw) && raw.length > 0 ? raw : (get(key, fallback) as string[]);
+  const pool = trList(named ? "greetingsNamed" : "greetings");
   if (pool.length === 0) return named ? fmt("Bonjour {name}", { name: name!.trim() }) : "Bonjour";
   const seed = date.getDate() + date.getMonth() * 31 + (date.getFullYear() % 100) * 400;
   const line = pool[seed % pool.length];

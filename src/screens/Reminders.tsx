@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
-import { t, get, fmt } from "../lib/i18n";
+import { tr, trList } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
@@ -16,10 +16,10 @@ const NO_REMINDERS: Reminder[] = [];
 const NO_COURSES: Course[] = [];
 
 const REPEAT_LABELS: Record<RepeatRule, string> = {
-  none: get("reminders.repeatNone", "Une fois"),
-  daily: get("reminders.repeatDaily", "Chaque jour"),
-  weekly: get("reminders.repeatWeekly", "Chaque semaine"),
-  monthly: get("reminders.repeatMonthly", "Chaque mois"),
+  none: tr("reminders.repeatNone"),
+  daily: tr("reminders.repeatDaily"),
+  weekly: tr("reminders.repeatWeekly"),
+  monthly: tr("reminders.repeatMonthly"),
 };
 
 /**
@@ -46,12 +46,8 @@ const ReminderRow = memo(function ReminderRow({
       <button
         onClick={() => onToggle(r)}
         aria-pressed={isDone}
-        aria-label={`${
-          isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")
-        } — ${r.title}`}
-        data-tip={
-          isDone ? get("reminders.markTodo", "Marquer à faire") : get("reminders.markDone", "Marquer fait")
-        }
+        aria-label={`${isDone ? tr("reminders.markTodo") : tr("reminders.markDone")} — ${r.title}`}
+        data-tip={isDone ? tr("reminders.markTodo") : tr("reminders.markDone")}
         className={`shrink-0 w-5 h-5 grid place-items-center rounded-sm border transition-colors duration-fast ${
           isDone
             ? "bg-ok-solid border-ok-solid text-panel"
@@ -98,8 +94,8 @@ const ReminderRow = memo(function ReminderRow({
 
       <button
         onClick={() => onDelete(r.id)}
-        aria-label={`${get("common.delete", "Supprimer")} — ${r.title}`}
-        data-tip={get("common.delete", "Supprimer")}
+        aria-label={`${tr("common.delete")} — ${r.title}`}
+        data-tip={tr("common.delete")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
       >
         <TrashIcon className="w-3.5 h-3.5" />
@@ -146,10 +142,10 @@ export default function Reminders() {
         newRepeat,
       );
       if (!created?.id) {
-        toast(t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel", "error");
+        toast(tr("dashboard.toastReminderAddError"), "error");
         return;
       }
-      toast(t.dashboard?.toastReminderAdded || "Rappel ajouté", "success");
+      toast(tr("dashboard.toastReminderAdded"), "success");
       setNewTitle("");
       setNewDue("");
       setNewRepeat("none");
@@ -157,10 +153,7 @@ export default function Reminders() {
       refresh({ silent: true });
     } catch (err) {
       reportError("reminders.add", err);
-      toast(
-        errorMessage(err, t.dashboard?.toastReminderAddError || "Impossible d'ajouter le rappel"),
-        "error",
-      );
+      toast(errorMessage(err, tr("dashboard.toastReminderAddError")), "error");
     }
   };
 
@@ -181,9 +174,7 @@ export default function Reminders() {
         await api.toggleReminder(r.id, markingDone);
         if (markingDone) {
           api.logEvent("reminder_done", r.title, r.course_id);
-          const cheers: string[] = (t.dashboard?.cheers as string[] | undefined)?.length
-            ? (t.dashboard?.cheers as string[])
-            : ["Bien joué !", "Fait !", "Nickel !"];
+          const cheers = trList("dashboard.cheers");
           toast(cheers[Math.floor(Math.random() * cheers.length)], "success");
         }
         window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
@@ -193,7 +184,7 @@ export default function Reminders() {
         if (optimistic) {
           setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: !markingDone } : x)));
         }
-        toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+        toast(errorMessage(err, tr("messages.genericError")), "error");
       }
     },
     [toast, refresh],
@@ -202,9 +193,9 @@ export default function Reminders() {
   const deleteOne = useCallback(
     async (id: number) => {
       const ok = await confirm.ask({
-        title: t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?",
-        message: t.dashboard?.confirmDeleteReminder || "Supprimer ce rappel ?",
-        confirmLabel: get("common.delete", "Supprimer"),
+        title: tr("dashboard.confirmDeleteReminder"),
+        message: tr("dashboard.confirmDeleteReminder"),
+        confirmLabel: tr("common.delete"),
         danger: true,
       });
       if (!ok) return;
@@ -214,10 +205,7 @@ export default function Reminders() {
         refresh({ silent: true });
       } catch (err) {
         reportError("reminders.delete", err);
-        toast(
-          errorMessage(err, t.dashboard?.errorDeleteReminder || "Erreur lors de la suppression"),
-          "error",
-        );
+        toast(errorMessage(err, tr("dashboard.errorDeleteReminder")), "error");
       }
     },
     [toast, confirm, refresh],
@@ -227,11 +215,11 @@ export default function Reminders() {
     const done = reminders.filter((r) => r.done);
     if (done.length === 0) return;
     const ok = await confirm.ask({
-      title: get("reminders.clearDoneTitle", "Effacer les terminés"),
-      message: fmt(get("reminders.clearDoneMessage", "Supprimer les {count} rappels terminés ?"), {
+      title: tr("reminders.clearDoneTitle"),
+      message: tr("reminders.clearDoneMessage", {
         count: done.length,
       }),
-      confirmLabel: get("common.delete", "Supprimer"),
+      confirmLabel: tr("common.delete"),
       danger: true,
     });
     if (!ok) return;
@@ -268,11 +256,11 @@ export default function Reminders() {
   /** Buckets by urgency — the answer to "what do I have to do today?". */
   const groups = useMemo(() => {
     const buckets: Array<{ key: string; label: string; items: Reminder[] }> = [
-      { key: "over", label: get("reminders.groupOver", "En retard"), items: [] },
-      { key: "soon", label: get("reminders.groupSoon", "Aujourd'hui et demain"), items: [] },
-      { key: "later", label: get("reminders.groupLater", "À venir"), items: [] },
-      { key: "nodate", label: get("reminders.groupNoDate", "Sans échéance"), items: [] },
-      { key: "done", label: get("reminders.groupDone", "Terminés"), items: [] },
+      { key: "over", label: tr("reminders.groupOver"), items: [] },
+      { key: "soon", label: tr("reminders.groupSoon"), items: [] },
+      { key: "later", label: tr("reminders.groupLater"), items: [] },
+      { key: "nodate", label: tr("reminders.groupNoDate"), items: [] },
+      { key: "done", label: tr("reminders.groupDone"), items: [] },
     ];
     const by = (k: string) => buckets.find((b) => b.key === k)!;
     for (const r of filtered) {
@@ -293,20 +281,20 @@ export default function Reminders() {
   return (
     <>
       <PageHeader
-        title={t.nav?.reminders || "Rappels"}
+        title={tr("nav.reminders")}
         icon={<BellIcon className="w-5 h-5" />}
         meta={
           <>
-            <span>{fmt(get("reminders.metaPending", "{count} à faire"), { count: pendingCount })}</span>
+            <span>{tr("reminders.metaPending", { count: pendingCount })}</span>
             <MetaDot />
-            <span>{fmt(get("reminders.metaDone", "{count} terminés"), { count: doneCount })}</span>
+            <span>{tr("reminders.metaDone", { count: doneCount })}</span>
           </>
         }
         actions={
           doneCount > 0 ? (
             <button onClick={clearDone} className="eu-btn-quiet eu-btn-sm hover:text-danger">
               <TrashIcon className="w-3.5 h-3.5" />
-              {get("reminders.clearDone", "Effacer les terminés")}
+              {tr("reminders.clearDone")}
             </button>
           ) : undefined
         }
@@ -317,13 +305,13 @@ export default function Reminders() {
           <input
             autoFocus
             className="eu-input flex-1"
-            placeholder={t.dashboard?.reminderTitlePlaceholder || "Titre du rappel"}
+            placeholder={tr("dashboard.reminderTitlePlaceholder")}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") addReminder();
             }}
-            aria-label={t.dashboard?.reminderTitlePlaceholder || "Titre du rappel"}
+            aria-label={tr("dashboard.reminderTitlePlaceholder")}
           />
           <button
             type="button"
@@ -331,30 +319,30 @@ export default function Reminders() {
             aria-expanded={showDetails}
             className="eu-btn-ghost eu-btn-sm"
           >
-            {showDetails ? get("reminders.hideDetails", "Moins") : get("reminders.showDetails", "Détails")}
+            {showDetails ? tr("reminders.hideDetails") : tr("reminders.showDetails")}
           </button>
           <button onClick={addReminder} disabled={!newTitle.trim()} className="eu-btn-primary eu-btn-sm">
             <PlusIcon className="w-3.5 h-3.5" />
-            {t.dashboard?.addReminderBtn || "Ajouter"}
+            {tr("dashboard.addReminderBtn")}
           </button>
         </div>
 
         {showDetails && (
           <div className="grid grid-cols-1 @2xl:grid-cols-3 gap-3.5 mt-4 pt-4 border-t border-line">
-            <Field label={t.dashboard?.dueQuickLabel || "Échéance"}>
+            <Field label={tr("dashboard.dueQuickLabel")}>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 <button type="button" onClick={() => setQuickDue(0)} className="eu-btn-ghost eu-btn-sm">
-                  {t.dashboard?.dueToday || "Aujourd'hui"}
+                  {tr("dashboard.dueToday")}
                 </button>
                 <button type="button" onClick={() => setQuickDue(1)} className="eu-btn-ghost eu-btn-sm">
-                  {t.dashboard?.dueTomorrow || "Demain"}
+                  {tr("dashboard.dueTomorrow")}
                 </button>
                 <button type="button" onClick={() => setQuickDue(7)} className="eu-btn-ghost eu-btn-sm">
-                  {t.dashboard?.dueInWeek || "+1 sem"}
+                  {tr("dashboard.dueInWeek")}
                 </button>
                 {newDue && (
                   <button type="button" onClick={() => setQuickDue(null)} className="eu-btn-quiet eu-btn-sm">
-                    {t.dashboard?.dueNone || "Aucune"}
+                    {tr("dashboard.dueNone")}
                   </button>
                 )}
               </div>
@@ -363,18 +351,18 @@ export default function Reminders() {
                 className="eu-input"
                 value={newDue}
                 onChange={(e) => setNewDue(e.target.value)}
-                aria-label={t.dashboard?.dueQuickLabel || "Échéance"}
+                aria-label={tr("dashboard.dueQuickLabel")}
               />
             </Field>
 
-            <Field label={get("reminders.course", "Cours")}>
+            <Field label={tr("reminders.course")}>
               <select
                 className="eu-select"
                 value={newCourse}
                 onChange={(e) => setNewCourse(e.target.value === "" ? "" : Number(e.target.value))}
-                aria-label={get("reminders.course", "Cours")}
+                aria-label={tr("reminders.course")}
               >
-                <option value="">{get("reminders.noCourse", "— Aucun cours —")}</option>
+                <option value="">{tr("reminders.noCourse")}</option>
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -384,18 +372,14 @@ export default function Reminders() {
             </Field>
 
             <Field
-              label={get("reminders.repeat", "Répétition")}
-              hint={
-                newRepeat !== "none" && !newDue
-                  ? get("reminders.repeatNeedsDate", "Une répétition demande une échéance.")
-                  : undefined
-              }
+              label={tr("reminders.repeat")}
+              hint={newRepeat !== "none" && !newDue ? tr("reminders.repeatNeedsDate") : undefined}
             >
               <select
                 className="eu-select"
                 value={newRepeat}
                 onChange={(e) => setNewRepeat(e.target.value as RepeatRule)}
-                aria-label={get("reminders.repeat", "Répétition")}
+                aria-label={tr("reminders.repeat")}
               >
                 {(Object.keys(REPEAT_LABELS) as RepeatRule[]).map((k) => (
                   <option key={k} value={k}>
@@ -412,46 +396,35 @@ export default function Reminders() {
         <div className="relative flex-1 min-w-[220px]">
           <input
             className="eu-input pl-8"
-            placeholder={get("common.search", "Rechercher") + "…"}
+            placeholder={tr("common.search") + "…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label={get("common.search", "Rechercher")}
+            aria-label={tr("common.search")}
           />
           <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
         </div>
         <Segmented
           value={filter}
           onChange={setFilter}
-          label={get("reminders.filter", "Filtre")}
+          label={tr("reminders.filter")}
           options={[
-            { value: "pending", label: `${get("reminders.todo", "À faire")} (${pendingCount})` },
-            { value: "done", label: `${get("reminders.groupDone", "Terminés")} (${doneCount})` },
-            { value: "all", label: get("reminders.all", "Tous") },
+            { value: "pending", label: `${tr("reminders.todo")} (${pendingCount})` },
+            { value: "done", label: `${tr("reminders.groupDone")} (${doneCount})` },
+            { value: "all", label: tr("reminders.all") },
           ]}
         />
       </div>
 
       {loading ? (
         <Panel>
-          <Loading label={get("common.loading", "Chargement…")} />
+          <Loading label={tr("common.loading")} />
         </Panel>
       ) : groups.length === 0 ? (
         <Panel>
           <EmptyState
             icon={<BellIcon className="w-4 h-4" />}
-            title={
-              search
-                ? get("reminders.noResult", "Aucun résultat")
-                : get("reminders.emptyTitle", "Rien à afficher")
-            }
-            hint={
-              search
-                ? get("reminders.noResultHint", "Essayez un autre mot-clé ou changez de filtre.")
-                : get(
-                    "reminders.emptyHint",
-                    "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies.",
-                  )
-            }
+            title={search ? tr("reminders.noResult") : tr("reminders.emptyTitle")}
+            hint={search ? tr("reminders.noResultHint") : tr("reminders.emptyHint")}
           />
         </Panel>
       ) : (

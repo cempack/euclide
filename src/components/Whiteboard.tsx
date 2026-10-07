@@ -14,7 +14,7 @@ import {
   EllipseIcon,
   TextIcon,
 } from "./icons";
-import { get } from "../lib/i18n";
+import { tr, type StringKey } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
@@ -81,6 +81,17 @@ interface BoardDoc {
   texts?: TextItem[];
 }
 
+type Tool = "pen" | "eraser" | "line" | "rect" | "ellipse" | "text";
+
+const TOOL_LABELS: Record<Tool, StringKey> = {
+  pen: "whiteboard.pen",
+  eraser: "whiteboard.eraser",
+  line: "whiteboard.line",
+  rect: "whiteboard.rect",
+  ellipse: "whiteboard.ellipse",
+  text: "whiteboard.text",
+};
+
 export default function Whiteboard({
   tabId,
   fileId,
@@ -111,7 +122,7 @@ export default function Whiteboard({
   const [color, setColor] = useState(BASIC_COLORS[0]);
   const [size, setSize] = useState(SIZES[1]);
   const colorPresets = BASIC_COLORS.slice(0, 8);
-  const [tool, setTool] = useState<"pen" | "eraser" | "line" | "rect" | "ellipse" | "text">("pen");
+  const [tool, setTool] = useState<Tool>("pen");
   const [opacity, setOpacity] = useState(1);
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState<number | null>(null);
@@ -520,9 +531,9 @@ export default function Whiteboard({
   const clear = async () => {
     if (itemCount === 0) return;
     const ok = await confirm.ask({
-      title: get("whiteboard.clearAll", "Effacer"),
-      message: get("whiteboard.clearConfirm", "Effacer tout le tableau ?"),
-      confirmLabel: get("whiteboard.clearAll", "Effacer"),
+      title: tr("whiteboard.clearAll"),
+      message: tr("whiteboard.clearConfirm"),
+      confirmLabel: tr("whiteboard.clearAll"),
       danger: true,
     });
     if (!ok) return;
@@ -554,7 +565,7 @@ export default function Whiteboard({
         json: JSON.stringify(doc),
       });
       if (!f?.id) {
-        toast(get("messages.genericError", "Erreur"), "error");
+        toast(tr("messages.genericError"), "error");
         return;
       }
       setCurrentFileId(f.id);
@@ -565,12 +576,12 @@ export default function Whiteboard({
       }
       api.logEvent("whiteboard_save", f.name, courseId);
       setDirty(false);
-      toast(get("whiteboard.saved", "Enregistré"), "success");
+      toast(tr("whiteboard.saved"), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
       api.getFileVersions(f.id).then(setVersions).catch(logged("board.versions"));
     } catch (err) {
       reportError("board.save", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
   const exportPng = async () => {
@@ -596,13 +607,13 @@ export default function Whiteboard({
         },
       );
       if (!exported?.id) {
-        toast(get("messages.genericError", "Erreur"), "error");
+        toast(tr("messages.genericError"), "error");
         return;
       }
-      toast(get("whiteboard.exported", "Exporté"), "success");
+      toast(tr("whiteboard.exported"), "success");
     } catch (err) {
       reportError("board.exportPng", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
@@ -717,8 +728,8 @@ export default function Whiteboard({
     <div className="h-full flex flex-col">
       <Toolbar className="h-9 py-0">
         {/* Tools */}
-        <ToolGroup label={get("whiteboard.tools", "Outils")}>
-          {(["pen", "eraser", "line", "rect", "ellipse", "text"] as const).map((t) => {
+        <ToolGroup label={tr("whiteboard.tools")}>
+          {(Object.keys(TOOL_LABELS) as Tool[]).map((t) => {
             const Icon =
               t === "pen"
                 ? PenIcon
@@ -731,7 +742,7 @@ export default function Whiteboard({
                       : t === "ellipse"
                         ? EllipseIcon
                         : TextIcon;
-            const label = get(`whiteboard.tool_${t}`, t);
+            const label = tr(TOOL_LABELS[t]);
             return (
               <button
                 key={t}
@@ -753,7 +764,7 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Colours */}
-        <ToolGroup collapse label={get("whiteboard.colors", "Couleurs")}>
+        <ToolGroup collapse label={tr("whiteboard.colors")}>
           {colorPresets.map((c) => (
             <button
               key={c}
@@ -769,8 +780,8 @@ export default function Whiteboard({
           ))}
           <span
             className={`relative w-5 h-5 rounded-full border overflow-hidden cursor-pointer eu-no-drag ${!colorPresets.includes(color) && tool !== "eraser" ? "border-ink" : "border-line"}`}
-            data-tip={get("whiteboard.customColor", "Couleur personnalisée")}
-            aria-label={get("whiteboard.customColor", "Couleur personnalisée")}
+            data-tip={tr("whiteboard.customColor")}
+            aria-label={tr("whiteboard.customColor")}
           >
             <input
               type="color"
@@ -781,7 +792,7 @@ export default function Whiteboard({
                 if (tool === "eraser") setTool("pen");
               }}
               className="absolute inset-0 opacity-0 w-full h-full eu-no-drag cursor-pointer"
-              aria-label={get("whiteboard.customColor", "Couleur personnalisée")}
+              aria-label={tr("whiteboard.customColor")}
             />
             <span className="block w-full h-full" style={{ background: color }} />
           </span>
@@ -790,7 +801,7 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Stroke width */}
-        <ToolGroup collapse label={get("whiteboard.sizes", "Épaisseurs")}>
+        <ToolGroup collapse label={tr("whiteboard.sizes")}>
           {SIZES.slice(0, 5).map((s) => (
             <button
               key={s}
@@ -816,21 +827,21 @@ export default function Whiteboard({
             onClick={() => setOpacity(opacity === 1 ? 0.35 : 1)}
             role="switch"
             aria-checked={opacity < 1}
-            aria-label={get("whiteboard.opacity", "Semi-transparent")}
-            data-tip={get("whiteboard.opacity", "Semi-transparent")}
+            aria-label={tr("whiteboard.opacity")}
+            data-tip={tr("whiteboard.opacity")}
             className="eu-btn-quiet eu-btn-sm eu-btn-toggle eu-no-drag"
           >
-            {get("whiteboard.opacityShort", "Opacité")}
+            {tr("whiteboard.opacityShort")}
           </button>
         </ToolGroup>
 
         <ToolSep />
 
         {/* Zoom */}
-        <ToolGroup collapse label={get("whiteboard.zoom", "Zoom")}>
+        <ToolGroup collapse label={tr("whiteboard.zoom")}>
           <button
             onClick={zoomOut}
-            aria-label={get("whiteboard.zoomOut", "Réduire")}
+            aria-label={tr("whiteboard.zoomOut")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag"
           >
             −
@@ -838,13 +849,13 @@ export default function Whiteboard({
           <button
             onClick={resetZoom}
             className="eu-btn-quiet eu-btn-sm eu-no-drag font-mono tabular-nums w-12"
-            data-tip={get("whiteboard.zoomReset", "Réinitialiser le zoom")}
+            data-tip={tr("whiteboard.zoomReset")}
           >
             {Math.round(zoom * 100)}%
           </button>
           <button
             onClick={zoomIn}
-            aria-label={get("whiteboard.zoomIn", "Agrandir")}
+            aria-label={tr("whiteboard.zoomIn")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag"
           >
             +
@@ -854,12 +865,12 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* History */}
-        <ToolGroup collapse label={get("whiteboard.history", "Historique")}>
+        <ToolGroup collapse label={tr("whiteboard.history")}>
           <button
             onClick={undo}
             disabled={itemCount === 0}
-            aria-label={get("whiteboard.undo", "Annuler")}
-            data-tip={get("whiteboard.undo", "Annuler")}
+            aria-label={tr("whiteboard.undo")}
+            data-tip={tr("whiteboard.undo")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
           >
             <UndoIcon className="w-3.5 h-3.5" />
@@ -867,8 +878,8 @@ export default function Whiteboard({
           <button
             onClick={clear}
             disabled={itemCount === 0}
-            aria-label={get("whiteboard.clear", "Tout effacer")}
-            data-tip={get("whiteboard.clear", "Tout effacer")}
+            aria-label={tr("whiteboard.clear")}
+            data-tip={tr("whiteboard.clear")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
           >
             <TrashIcon className="w-3.5 h-3.5" />
@@ -878,11 +889,11 @@ export default function Whiteboard({
         <ToolSep />
 
         {/* Versions: load an earlier snapshot, then Enregistrer to promote it. */}
-        <ToolGroup collapse label={get("pdf.versions", "Versions")}>
+        <ToolGroup collapse label={tr("pdf.versions")}>
           <select
             className="eu-select eu-field-sm w-[130px] eu-no-drag"
             value=""
-            aria-label={get("pdf.versions", "Versions")}
+            aria-label={tr("pdf.versions")}
             onChange={async (e) => {
               const versionId = Number(e.target.value);
               if (!versionId) return;
@@ -905,25 +916,19 @@ export default function Whiteboard({
                 if (rr && rr.width > 0) updateCanvasSize(rr.width, rr.height, zoomRef.current);
                 redraw();
                 setDirty(true);
-                toast(
-                  get("pdf.versionLoaded", "Version chargée — modifiez et Enregistrer pour appliquer"),
-                  "success",
-                );
+                toast(tr("pdf.versionLoaded"), "success");
               } catch (err) {
                 reportError("board.loadVersion", err);
-                toast(
-                  errorMessage(err, get("pdf.versionLoadError", "Erreur chargement de la version")),
-                  "error",
-                );
+                toast(errorMessage(err, tr("pdf.versionLoadError")), "error");
               }
             }}
           >
             <option value="" disabled>
-              {get("pdf.versions", "Versions")} ({versions.length})
+              {tr("pdf.versions")} ({versions.length})
             </option>
             {versions.length === 0 ? (
               <option value="" disabled>
-                {get("pdf.noVersionsYet", "Aucune version")}
+                {tr("pdf.noVersionsYet")}
               </option>
             ) : (
               versions
@@ -931,9 +936,7 @@ export default function Whiteboard({
                 .reverse()
                 .map((v) => {
                   const label =
-                    v.timestamp === "original"
-                      ? get("pdf.original", "Original")
-                      : `v${v.version} ${v.timestamp}`;
+                    v.timestamp === "original" ? tr("pdf.original") : `v${v.version} ${v.timestamp}`;
                   return (
                     <option key={v.id} value={v.id}>
                       {label}
@@ -952,9 +955,9 @@ export default function Whiteboard({
             value={courseId ?? ""}
             onChange={(e) => setCourseId(e.target.value ? Number(e.target.value) : null)}
             className="eu-select eu-field-sm w-[130px] eu-no-drag"
-            aria-label={get("whiteboard.course", "Cours")}
+            aria-label={tr("whiteboard.course")}
           >
-            <option value="">{get("whiteboard.noCourse", "Sans cours")}</option>
+            <option value="">{tr("whiteboard.noCourse")}</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -964,8 +967,8 @@ export default function Whiteboard({
           <button
             onClick={exportPng}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-no-drag"
-            aria-label={get("whiteboard.exportPng", "Exporter en PNG")}
-            data-tip={get("whiteboard.exportPng", "Exporter en PNG")}
+            aria-label={tr("whiteboard.exportPng")}
+            data-tip={tr("whiteboard.exportPng")}
           >
             <DownloadIcon className="w-3.5 h-3.5" />
           </button>
@@ -974,9 +977,9 @@ export default function Whiteboard({
           <button
             onClick={save}
             className="eu-btn-primary eu-btn-sm eu-no-drag"
-            {...tip(get("common.save", "Enregistrer"), keysOf("save"))}
+            {...tip(tr("common.save"), keysOf("save"))}
           >
-            {get("common.save", "Enregistrer")}
+            {tr("common.save")}
             {dirty && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
           </button>
         </ToolGroup>

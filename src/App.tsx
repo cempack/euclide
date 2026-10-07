@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
 import { api, type AppInfo, isTauri } from "./lib/api";
-import { get, fmt } from "./lib/i18n";
+import { tr } from "./lib/i18n";
 import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
@@ -138,7 +138,7 @@ const TabPane = memo(function TabPane({
   visible: boolean;
 }) {
   return (
-    <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
+    <Suspense fallback={<Loading label={tr("common.loading")} />}>
       <TabScreen info={info} tab={tab} visible={visible} />
       {visible && tab.kind !== "dashboard" && <ReadyMark screen={tab.kind} />}
     </Suspense>
@@ -240,19 +240,19 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
         const saved = await api.saveNote({ title: payload, body: "", course_id: null });
         api.logEvent("note_write", payload, null);
         window.dispatchEvent(new CustomEvent("eu:library-changed"));
-        toast(get("capture.noteSaved", "Note créée"), "success");
+        toast(tr("capture.noteSaved"), "success");
         onClose();
         if (saved?.id) tabs.open({ kind: "note", title: payload, params: { noteId: saved.id } });
       } else {
         const created = await api.createReminder(payload, null);
         if (!created?.id) throw new Error("Le rappel n'a pas été enregistré.");
         window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-        toast(get("capture.reminderSaved", "Rappel ajouté"), "success");
+        toast(tr("capture.reminderSaved"), "success");
         onClose();
       }
     } catch (err) {
       reportError("capture.save", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
@@ -260,7 +260,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
     <Dialog
       open={open}
       onClose={onClose}
-      label={get("capture.title", "Capture rapide")}
+      label={tr("capture.title")}
       className="max-w-lg eu-dialog-top overflow-hidden"
     >
       <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-line">
@@ -274,7 +274,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
               void submit();
             }
           }}
-          placeholder={get("capture.placeholder", "Noter quelque chose… (! rappel · # note)")}
+          placeholder={tr("capture.placeholder")}
           className="flex-1 bg-transparent outline-hidden eu-t-body text-ink placeholder:text-ink-faint"
         />
       </div>
@@ -285,19 +285,19 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
             setMode(v);
             setText((t) => t.replace(/^[!#]\s*/, ""));
           }}
-          label={get("capture.target", "Enregistrer comme")}
+          label={tr("capture.target")}
           options={[
-            { value: "reminder", label: get("capture.asReminder", "Rappel") },
-            { value: "note", label: get("capture.asNote", "Note") },
+            { value: "reminder", label: tr("capture.asReminder") },
+            { value: "note", label: tr("capture.asNote") },
           ]}
         />
         <span className="flex-1" />
         <span className="eu-t-meta hidden sm:flex items-center gap-1.5">
           <span className="eu-kbd">↵</span>
-          {get("capture.save", "enregistrer")}
+          {tr("capture.save")}
         </span>
         <button type="button" onClick={onClose} className="eu-btn-quiet eu-btn-sm">
-          {get("common.cancel", "Annuler")}
+          {tr("common.cancel")}
         </button>
         <button
           type="button"
@@ -305,7 +305,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
           disabled={!payload}
           className="eu-btn-primary eu-btn-sm"
         >
-          {get("common.add", "Ajouter")}
+          {tr("common.add")}
         </button>
       </div>
     </Dialog>
@@ -367,8 +367,8 @@ function Shell() {
     async (id: string) => {
       if (editors.isDirty(id)) {
         const choice = await confirm.dirty({
-          title: get("confirm.unsavedTitle", "Modifications non enregistrées"),
-          message: get("confirm.unsavedMessage", "Enregistrer avant de fermer cet onglet ?"),
+          title: tr("confirm.unsavedTitle"),
+          message: tr("confirm.unsavedMessage"),
         });
         if (choice === "cancel") return;
         if (choice === "discard") {
@@ -379,7 +379,7 @@ function Shell() {
           await editors.flush(id);
         } catch (err) {
           reportError("tabs.closeSave", err);
-          toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+          toast(errorMessage(err, tr("messages.genericError")), "error");
           return;
         }
       }
@@ -434,7 +434,7 @@ function Shell() {
           if (notified.has(key)) continue;
           notified.add(key);
           toast(
-            fmt(get("classEnd.notice", "{subject} : fin dans {minutes} min"), {
+            tr("classEnd.notice", {
               subject: c.subject,
               minutes: left,
             }),
@@ -460,7 +460,7 @@ function Shell() {
     () =>
       onTimerDone(() => {
         chime();
-        toast(get("timer.done", "Minuteur terminé"), "success");
+        toast(tr("timer.done"), "success");
       }),
     [toast],
   );
@@ -594,10 +594,10 @@ function Shell() {
   useShortcut("documents", () => void tabs.open({ kind: "documents" }));
   useShortcut("settings", () => void tabs.open({ kind: "settings" }));
   useShortcut("newNote", () => {
-    tabs.open({ kind: "note", title: get("common.newNote", "Nouvelle note"), params: { isNew: true } });
+    tabs.open({ kind: "note", title: tr("common.newNote"), params: { isNew: true } });
   });
   useShortcut("whiteboard", () => {
-    tabs.open({ kind: "whiteboard", title: get("app.tabWhiteboard", "Tableau"), params: { isNew: true } });
+    tabs.open({ kind: "whiteboard", title: tr("app.tabWhiteboard"), params: { isNew: true } });
   });
   // Save the active editor: notes, the whiteboard and the Python editor each
   // register how (stores/editors.ts), as the unsaved-changes prompt uses.
@@ -606,10 +606,10 @@ function Shell() {
     if (!editors.isDirty(id)) return;
     editors
       .flush(id)
-      .then(() => toast(get("messages.saved", "Enregistré"), "success"))
+      .then(() => toast(tr("messages.saved"), "success"))
       .catch((err) => {
         reportError("editor.save", err);
-        toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+        toast(errorMessage(err, tr("messages.genericError")), "error");
       });
   });
   // Escape is the way out of projection mode; open dialogs close first.
@@ -654,10 +654,8 @@ function Shell() {
           <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
             <DocIcon className="w-7 h-7 text-accent shrink-0" />
             <div>
-              <p className="eu-t-section text-ink">{get("dragDrop.drop", "Déposez vos fichiers")}</p>
-              <p className="eu-t-meta mt-0.5">
-                {get("dragDrop.hint", "Ils rejoindront votre bibliothèque.")}
-              </p>
+              <p className="eu-t-section text-ink">{tr("dragDrop.drop")}</p>
+              <p className="eu-t-meta mt-0.5">{tr("dragDrop.hint")}</p>
             </div>
           </div>
         </div>

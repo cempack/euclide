@@ -3,7 +3,7 @@ import { tabs } from "../stores/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course } from "../lib/api";
-import { t, get, fmt } from "../lib/i18n";
+import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { COURSE_COLORS, COURSE_ICONS, EmptyState, Loading, Modal, useToast } from "../components/ui";
@@ -57,8 +57,8 @@ const CourseCard = memo(function CourseCard({
           e.stopPropagation();
           onEdit(c);
         }}
-        aria-label={fmt(get("courses.editCourse", "Modifier {name}"), { name: c.name })}
-        data-tip={get("courses.editCourse", "Modifier le cours")}
+        aria-label={tr("courses.editCourse", { name: c.name })}
+        data-tip={tr("courses.editCourse")}
         className="absolute top-2 right-2 eu-btn-quiet eu-btn-icon eu-btn-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-fast"
       >
         <PenIcon className="w-3.5 h-3.5" />
@@ -118,38 +118,35 @@ function CourseForm({
         <input
           autoFocus
           className="eu-input"
-          placeholder={get("courses.namePlaceholder", "Nom du cours (ex : Mathématiques, NSI)")}
+          placeholder={tr("courses.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && name.trim()) onSubmit();
           }}
-          aria-label={get("courses.name", "Nom du cours")}
+          aria-label={tr("courses.name")}
         />
       </div>
 
-      <Field label={get("courses.matiere", "Matière")}>
+      <Field label={tr("courses.matiere")}>
         <Segmented
           value={matiere}
           onChange={setMatiere}
-          label={get("courses.matiere", "Matière")}
+          label={tr("courses.matiere")}
           options={MATIERES.map((m) => ({ value: m, label: m }))}
         />
       </Field>
 
-      <Field
-        label={get("courses.description", "Description")}
-        hint={get("courses.descriptionHint", "Optionnel — s'affiche sur la carte du cours.")}
-      >
+      <Field label={tr("courses.description")} hint={tr("courses.descriptionHint")}>
         <textarea
           className="eu-textarea min-h-[64px]"
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
-          aria-label={get("courses.description", "Description")}
+          aria-label={tr("courses.description")}
         />
       </Field>
 
-      <Field label={get("courses.color", "Couleur")}>
+      <Field label={tr("courses.color")}>
         <div className="flex flex-wrap gap-1.5">
           {COURSE_COLORS.map((col) => (
             <button
@@ -167,7 +164,7 @@ function CourseForm({
         </div>
       </Field>
 
-      <Field label={get("courses.icon", "Icône")}>
+      <Field label={tr("courses.icon")}>
         <div className="flex flex-wrap gap-1.5">
           {COURSE_ICONS.map(({ key, label, Icon }) => (
             <button
@@ -191,7 +188,7 @@ function CourseForm({
 
       <div className="flex justify-end gap-2 mt-1">
         <button className="eu-btn-ghost" onClick={onCancel}>
-          {t.common?.cancel || get("common.cancel", "Annuler")}
+          {tr("common.cancel")}
         </button>
         <button className="eu-btn-primary" onClick={onSubmit} disabled={!name.trim()}>
           {submitLabel}
@@ -255,14 +252,14 @@ export default function Courses() {
           description: desc.trim(),
           matiere,
         });
-        toast(get("courses.updated", "Cours modifié"), "success");
+        toast(tr("courses.updated"), "success");
       } else {
         const created = await api.createCourse(name.trim(), iconKey, color, desc.trim(), matiere);
         if (!created?.id) {
-          toast(get("messages.genericError", "Erreur"), "error");
+          toast(tr("messages.genericError"), "error");
           return;
         }
-        toast(`${t.common?.newCourse || "Nouveau cours"} : ${name.trim()}`, "success");
+        toast(`${tr("common.newCourse")} : ${name.trim()}`, "success");
       }
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
       window.dispatchEvent(new CustomEvent("eu:course-changed"));
@@ -270,7 +267,7 @@ export default function Courses() {
       refresh();
     } catch (err) {
       reportError("courses.save", err);
-      toast(errorMessage(err, get("messages.genericError", "Erreur")), "error");
+      toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
 
@@ -281,37 +278,34 @@ export default function Courses() {
   return (
     <>
       <PageHeader
-        title={t.nav.courses}
+        title={tr("nav.courses")}
         meta={
           <>
-            <span>{fmt(get("courses.metaCount", "{count} cours"), { count: courses.length })}</span>
+            <span>{tr("courses.metaCount", { count: courses.length })}</span>
             <MetaDot />
-            <span>{get("courses.subtitle", "Classes, séquences et casiers")}</span>
+            <span>{tr("courses.subtitle")}</span>
           </>
         }
         actions={
           <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
-            <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newCourse || "Nouveau cours"}
+            <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newCourse")}
           </button>
         }
       />
 
       {loading ? (
         <Panel>
-          <Loading label={get("courses.loading", "Chargement des cours…")} />
+          <Loading label={tr("courses.loading")} />
         </Panel>
       ) : courses.length === 0 ? (
         <Panel>
           <EmptyState
             icon={<BookIcon className="w-4 h-4" />}
-            title={get("courses.emptyTitle", "Aucun cours pour le moment")}
-            hint={get(
-              "courses.emptyHint",
-              "Un cours rassemble un casier de documents, des notes, une progression par séquences, et les classes qui le suivent (noms Pronote exacts).",
-            )}
+            title={tr("courses.emptyTitle")}
+            hint={tr("courses.emptyHint")}
             action={
               <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {t.common?.newCourse || "Nouveau cours"}
+                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newCourse")}
               </button>
             }
           />
@@ -333,11 +327,7 @@ export default function Courses() {
       <Modal
         open={dialog !== "closed"}
         onClose={close}
-        title={
-          dialog === "edit"
-            ? get("courses.editTitle", "Modifier le cours")
-            : t.common?.newCourse || "Nouveau cours"
-        }
+        title={dialog === "edit" ? tr("courses.editTitle") : tr("common.newCourse")}
       >
         <CourseForm
           name={name}
@@ -353,7 +343,7 @@ export default function Courses() {
           dark={resolved === "dark"}
           onCancel={close}
           onSubmit={submit}
-          submitLabel={dialog === "edit" ? get("common.save", "Enregistrer") : t.common?.add || "Ajouter"}
+          submitLabel={dialog === "edit" ? tr("common.save") : tr("common.add")}
         />
       </Modal>
     </>
