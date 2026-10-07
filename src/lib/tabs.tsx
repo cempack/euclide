@@ -147,7 +147,10 @@ type TabsCtx = {
   activeId: string | null;
   active: Tab | null;
   open: (spec: OpenSpec) => string;
-  close: (id: string) => void;
+  /** `discard` drops unsaved changes: editors must not save on unmount. */
+  close: (id: string, opts?: { discard?: boolean }) => void;
+  /** True once if the tab was closed with `discard`; editors check it on unmount. */
+  takeDiscarded: (id: string) => boolean;
   setActive: (id: string) => void;
   rename: (id: string, title: string, paramsPatch?: Partial<TabParams>) => void;
   retarget: (oldId: string, newId: string, title?: string, paramsPatch?: Partial<TabParams>) => void;
@@ -268,6 +271,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   }, [activeId]);
 
   const flushFns = useRef(new Map<string, () => Promise<void>>());
+  const discarded = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -454,11 +458,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     setTabFitCapacityState((prev) => (prev === count ? prev : count));
   }, []);
 
-  useEffect(() => {
-    if (maxTabsMode !== "auto" || tabFitCapacity < TAB_FIT_MIN) return;
-    setTabs((prev) => evictToLimit(prev, tabFitCapacity, activeIdRef.current, dirtyStore.getSnapshot()));
-  }, [maxTabsMode, tabFitCapacity, dirtyStore]);
-
   const setMaxTabsMode = useCallback((mode: MaxTabsMode, fixed?: number) => {
     const nextFixed =
       typeof fixed === "number" && Number.isFinite(fixed)
@@ -486,7 +485,8 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     else setMaxTabsMode("fixed", n);
   }, [setMaxTabsMode]);
 
-  const close = useCallback((id: string) => {
+  const close = useCallback((id: string, opts?: { discard?: boolean }) => {
+    if (opts?.discard) discarded.current.add(id);
     dirtyStore.clear(id);
     flushFns.current.delete(id);
     setTabs((prev) => {
@@ -505,6 +505,8 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, [dirtyStore]);
+
+  const takeDiscarded = useCallback((id: string) => discarded.current.delete(id), []);
 
   const rename = useCallback((id: string, title: string, paramsPatch?: Partial<TabParams>) => {
     setTabs((prev) =>
@@ -598,6 +600,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       active: tabs.find((t) => t.id === activeId) ?? null,
       open,
       close,
+      takeDiscarded,
       setActive: setActiveId,
       rename,
       retarget,
@@ -624,6 +627,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       activeId,
       open,
       close,
+      takeDiscarded,
       rename,
       retarget,
       step,

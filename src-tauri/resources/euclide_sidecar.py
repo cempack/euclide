@@ -50,11 +50,32 @@ def run_demo(payload):
 
     out, err = io.StringIO(), io.StringIO()
     sandbox = {"__name__": "__main__", "__file__": path}
+    # stdin is the protocol pipe: a script calling input() must not read (and
+    # block on) it. An empty stdin makes input() fail fast with EOFError.
+    real_stdin = sys.stdin
+    sys.stdin = io.StringIO("")
     try:
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             exec(compile(source, path, "exec"), sandbox)  # noqa: S102 - trusted local script
         return {"ok": True, "stdout": out.getvalue(), "stderr": err.getvalue()}
-    except Exception as exc:  # noqa: BLE001 - surface any demo error to the UI
+    except SystemExit as exc:
+        # exit(), quit() and sys.exit() end the script, not the sidecar.
+        code = exc.code
+        if code is None or code == 0:
+            return {"ok": True, "stdout": out.getvalue(), "stderr": err.getvalue()}
+        message = code if isinstance(code, str) else f"Le script s'est arrêté (code {code})."
+        return {"ok": False, "stdout": out.getvalue(), "stderr": err.getvalue() + f"{message}\n"}
+    except EOFError:
+        import traceback
+
+        return {
+            "ok": False,
+            "stdout": out.getvalue(),
+            "stderr": err.getvalue()
+            + traceback.format_exc()
+            + "\ninput() n'est pas encore disponible ici : remplacez la saisie par une valeur.\n",
+        }
+    except Exception:  # noqa: BLE001 - surface any demo error to the UI
         import traceback
 
         return {
@@ -62,6 +83,8 @@ def run_demo(payload):
             "stdout": out.getvalue(),
             "stderr": err.getvalue() + traceback.format_exc(),
         }
+    finally:
+        sys.stdin = real_stdin
 
 
 # ---------------------------------------------------------------------------
@@ -1076,13 +1099,26 @@ def server_mode():
                 resp = handler(payload)
             sys.stdout.write(json.dumps(resp) + "\n")
             sys.stdout.flush()
-        except Exception as exc:  # noqa: BLE001
+        except (Exception, SystemExit) as exc:  # noqa: BLE001 - one bad request must not kill the server
             sys.stdout.write(json.dumps({"ok": False, "error": f"Erreur sidecar : {exc}"}) + "\n")
             sys.stdout.flush()
     # EOF or parent died -> graceful exit
 
 
+def use_utf8_stdio():
+    """Rust writes UTF-8. On Windows, Python would decode the pipes with the
+    ANSI code page, mangling accented paths, names and passwords."""
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        if stream is None:
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main():
+    use_utf8_stdio()
     # New persistent warm mode (preferred, used by built app):
     #   sidecar is started once, communicates over stdio JSON lines.
     # Legacy one-shot (for direct terminal use or during transition):

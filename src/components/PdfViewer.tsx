@@ -66,6 +66,10 @@ export default function PdfViewer({ fileId, fileName }: { fileId: number; fileNa
   // useLayoutEffect to catch early 'euclide-*-loaded' posts from iframe script.
   useLayoutEffect(() => {
     const onMsg = async (ev: MessageEvent) => {
+      // Every PDF tab listens on the same window: only handle messages from
+      // our own iframe, or saving one PDF would overwrite every other open PDF.
+      const own = iframeRef.current?.contentWindow;
+      if (!own || ev.source !== own) return;
       const d = ev.data;
       if (!d) return;
 
