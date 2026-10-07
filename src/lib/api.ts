@@ -248,6 +248,13 @@ export interface Note {
   updated_at: string;
 }
 
+/** Library counters (library_stats): no list needed for a number. */
+export interface LibraryStats {
+  files: number;
+  notes: number;
+  bytes: number;
+}
+
 export interface FileItem {
   id: number;
   course_id: number | null;
@@ -532,6 +539,7 @@ export const api = {
       return list;
     });
   },
+  libraryStats: () => invoke<LibraryStats>("library_stats"),
   recentFiles: (limit: number) => {
     const key = `recentFiles:${limit}`;
     const cached = getCached<FileItem[]>(key);

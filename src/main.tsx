@@ -29,9 +29,12 @@ import { ErrorBoundary } from "./components/ui";
 import { ThemeProvider } from "./lib/theme";
 import { startPerf } from "./lib/perf";
 import { startReporting } from "./lib/report";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient, startDataBridge } from "./api/client";
 
 startReporting();
 startPerf();
+startDataBridge();
 
 // Development only: ?gallery shows the UI kit (dev/Gallery.tsx) instead of
 // the app. Production builds drop the branch and its chunk.
@@ -41,15 +44,17 @@ const showGallery = Gallery !== null && new URLSearchParams(location.search).has
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ThemeProvider>
-        {showGallery && Gallery ? (
-          <React.Suspense fallback={null}>
-            <Gallery />
-          </React.Suspense>
-        ) : (
-          <App />
-        )}
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          {showGallery && Gallery ? (
+            <React.Suspense fallback={null}>
+              <Gallery />
+            </React.Suspense>
+          ) : (
+            <App />
+          )}
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>,
 );

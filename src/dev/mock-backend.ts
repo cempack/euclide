@@ -776,6 +776,12 @@ function handle(cmd: string, args: Args): unknown {
       const id = num(args, "courseId");
       return files.filter((f) => id == null || f.course_id === id);
     }
+    case "library_stats":
+      return {
+        files: files.length,
+        notes: notes.length,
+        bytes: files.reduce((n, f) => n + (f.size || 0), 0),
+      };
     case "recent_files":
       return files
         .slice()

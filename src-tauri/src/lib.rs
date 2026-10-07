@@ -167,6 +167,7 @@ pub fn run() {
             commands::notes::list_note_summaries,
             commands::files::list_files,
             commands::files::recent_files,
+            commands::files::library_stats,
             commands::files::import_files,
             commands::files::import_paths,
             commands::files::file_path,
