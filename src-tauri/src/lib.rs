@@ -259,6 +259,9 @@ pub fn run() {
                 if let Some(sc) = app_handle.try_state::<sidecar::Sidecar>() {
                     sc.shutdown(std::time::Duration::from_millis(500));
                 }
+                if let Some(db) = app_handle.try_state::<db::Db>() {
+                    db.close();
+                }
             }
         });
 }
