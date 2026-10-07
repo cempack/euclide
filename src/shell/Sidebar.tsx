@@ -1,6 +1,8 @@
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { Projector, Settings } from "lucide-react";
-import { api, type AppInfo, type PronoteStatus } from "../lib/api";
+import type { AppInfo } from "../lib/api";
 import { get } from "../lib/i18n";
 import { shortcutText } from "../lib/shortcuts";
 import { useTabs, type TabKind } from "../lib/tabs";
@@ -56,24 +58,9 @@ export const ProjectionRail = memo(function ProjectionRail() {
 export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null }) {
   const tabs = useTabs();
   const { projection, toggleProjection } = useAppearance();
-  const [pronote, setPronote] = useState<PronoteStatus | null>(null);
-  const [displayName, setDisplayName] = useState("");
+  const pronote = useQuery(q.pronoteStatus()).data ?? null;
+  const displayName = (useQuery(q.setting("teacher_display_name")).data ?? "").trim();
   const isActive = (kind: TabKind) => navKindActive(kind, tabs.active?.kind);
-
-  useEffect(() => {
-    const load = () =>
-      api
-        .pronoteStatus()
-        .then(setPronote)
-        .catch(() => {});
-    load();
-    api
-      .getSetting("teacher_display_name")
-      .then((name) => setDisplayName((name ?? "").trim()))
-      .catch(() => {});
-    window.addEventListener("eu:pronote-changed", load);
-    return () => window.removeEventListener("eu:pronote-changed", load);
-  }, []);
 
   const name = displayName || (pronote?.connected ? (pronote.account_name ?? "").trim() : "");
 

@@ -1,6 +1,7 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { CircleHelp, Pin, Plus, Search, X } from "lucide-react";
-import { api } from "../lib/api";
 import { courseVisual } from "../lib/color";
 import { get } from "../lib/i18n";
 import { fitTabCount, useDirtyMap, useTabs, type Tab } from "../lib/tabs";
@@ -48,7 +49,6 @@ export const TopBar = memo(function TopBar({
   const dirtyMap = useDirtyMap();
   const barRef = useRef<HTMLDivElement>(null);
   const extrasRef = useRef<HTMLDivElement>(null);
-  const [courseIcons, setCourseIcons] = useState<CourseIcons>({});
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -68,19 +68,12 @@ export const TopBar = memo(function TopBar({
   }, [tabs.setTabFitCapacity]);
 
   const hasCourseTab = tabs.tabs.some((t) => t.kind === "course" && typeof t.params?.courseId === "number");
-  useEffect(() => {
-    if (!hasCourseTab) return;
-    api
-      .listCourses()
-      .then((courses) => {
-        const map: CourseIcons = {};
-        for (const c of courses) {
-          if (typeof c.id === "number") map[c.id] = { key: c.emoji || "book", color: c.color };
-        }
-        setCourseIcons(map);
-      })
-      .catch(() => {});
-  }, [hasCourseTab, tabs.tabs.length]);
+  const courses = useQuery({ ...q.courses(), enabled: hasCourseTab }).data;
+  const courseIcons = useMemo(() => {
+    const map: CourseIcons = {};
+    for (const c of courses ?? []) map[c.id] = { key: c.emoji || "book", color: c.color };
+    return map;
+  }, [courses]);
 
   const atLimit = tabs.maxTabs > 0 && tabs.tabs.length >= tabs.maxTabs;
   const closeLabel = get("common.close", "Fermer");
