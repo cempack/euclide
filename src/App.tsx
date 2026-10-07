@@ -19,7 +19,7 @@ import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
 import { takeBootUpdate } from "./lib/boot";
 import { TimerProvider, useTimerControls, useTimerSec, formatTimer, chime } from "./lib/timer";
-import { tabSwitchEnd } from "./lib/perf";
+import { appReady, tabSwitchEnd } from "./lib/perf";
 
 import { TabsProvider, useTabs, useDirtyMap, fitTabCount, type Tab, type TabKind } from "./lib/tabs";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading, COURSE_ICONS } from "./components/ui";
@@ -704,9 +704,16 @@ const TabPane = memo(function TabPane({
   return (
     <Suspense fallback={<Loading label={get("common.loading", "Chargement…")} />}>
       <TabScreen info={info} tab={tab} visible={visible} />
+      {visible && tab.kind !== "dashboard" && <ReadyMark screen={tab.kind} />}
     </Suspense>
   );
 });
+
+/** perf.log's app.ready when Euclide opens on another screen than the dashboard. */
+function ReadyMark({ screen }: { screen: string }) {
+  useEffect(() => appReady(screen), [screen]);
+  return null;
+}
 
 function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; visible: boolean }) {
   switch (tab.kind) {

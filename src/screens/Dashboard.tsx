@@ -140,7 +140,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         .catch(() => {}),
     ];
     // The dashboard is the first screen: once its data is in, the app is usable.
-    void Promise.allSettled(loads).then(appReady);
+    void Promise.allSettled(loads).then(() => appReady());
   }, []);
 
   useVisibleRefresh(visible, refresh, DASHBOARD_EVENTS);
