@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import type { RecapData } from "../lib/api";
-import { tr, trn } from "../lib/i18n";
+import { get, tr, trn } from "../lib/i18n";
 import {
   BookIcon,
   ClockIcon,
@@ -19,7 +19,7 @@ import {
   BellIcon,
 } from "../components/icons";
 import { EmptyState, Loading } from "../components/ui";
-import { MetaDot, PageHeader, Panel, Segmented, StatStrip, StatTile } from "../components/layout";
+import { MetaDot, PageHeader, Panel, Segmented, StatTile } from "../components/layout";
 import { humanMinutes } from "../lib/format";
 
 // Bilan (ex-Recap) of time spent in the app + most used documents/tools (based on activity events). Only detailed activity stats live here.
@@ -95,45 +95,34 @@ export default function Recap() {
           value: data.reminders_done,
           label: tr("recap.stats.remindersDone"),
         },
-        {
-          icon: <ClockIcon className="w-5 h-5" />,
-          value: data.active_minutes,
-          label: tr("recap.stats.activeMinutes"),
-        },
       ]
     : [];
 
   const totalMin = data?.active_minutes ?? 0;
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
 
-  // Map raw area keys (tab kinds + labels from ticks) to friendly labels + icons for the "where time was spent" breakdown.
-  const AREA_META: Record<string, { label: string; icon: React.ReactNode }> = {
-    dashboard: { label: "Tableau de bord", icon: <HomeIcon className="w-4 h-4" /> },
-    courses: { label: "Cours", icon: <BookIcon className="w-4 h-4" /> },
-    course: { label: "Détail cours", icon: <BookIcon className="w-4 h-4" /> },
-    "class-content": { label: "Contenu de classe", icon: <BookIcon className="w-4 h-4" /> },
-    documents: { label: "Documents", icon: <DocIcon className="w-4 h-4" /> },
-    tools: { label: "Outils & démos", icon: <ToolIcon className="w-4 h-4" /> },
-    recap: { label: "Bilan", icon: <SparkleIcon className="w-4 h-4" /> },
-    python: { label: "Python", icon: <CodeIcon className="w-4 h-4" /> },
-    whiteboard: { label: "Tableau blanc", icon: <PenIcon className="w-4 h-4" /> },
-    pdf: { label: "PDFs", icon: <DocIcon className="w-4 h-4" /> },
-    note: { label: "Notes", icon: <PenIcon className="w-4 h-4" /> },
-    reminders: { label: "Rappels", icon: <BellIcon className="w-4 h-4" /> },
-    settings: { label: "Réglages", icon: <GearIcon className="w-4 h-4" /> },
-    app: { label: "Application", icon: <ClockIcon className="w-4 h-4" /> },
+  // Where the time went, by screen (tab kinds, plus « app » for the rest).
+  const AREA_ICONS: Record<string, React.ReactNode> = {
+    dashboard: <HomeIcon className="w-4 h-4" />,
+    courses: <BookIcon className="w-4 h-4" />,
+    course: <BookIcon className="w-4 h-4" />,
+    "class-content": <BookIcon className="w-4 h-4" />,
+    documents: <DocIcon className="w-4 h-4" />,
+    tools: <ToolIcon className="w-4 h-4" />,
+    recap: <SparkleIcon className="w-4 h-4" />,
+    python: <CodeIcon className="w-4 h-4" />,
+    whiteboard: <PenIcon className="w-4 h-4" />,
+    pdf: <DocIcon className="w-4 h-4" />,
+    note: <PenIcon className="w-4 h-4" />,
+    reminders: <BellIcon className="w-4 h-4" />,
+    settings: <GearIcon className="w-4 h-4" />,
   };
-
-  const timeByArea = (data?.time_by_area || []).map((a: any) => {
-    const meta = AREA_META[a.name] || { label: a.name, icon: <ClockIcon className="w-4 h-4" /> };
-    return {
-      key: a.name,
-      label: meta.label,
-      minutes: a.count,
-      icon: meta.icon,
-    };
-  });
+  const timeByArea = (data?.time_by_area || []).map((a) => ({
+    key: a.name,
+    label:
+      a.name in AREA_ICONS || a.name === "app" ? (get(`recap.areas.${a.name}`, a.name) as string) : a.name,
+    minutes: a.count,
+    icon: AREA_ICONS[a.name] ?? <ClockIcon className="w-4 h-4" />,
+  }));
   const totalAreaMinutes =
     timeByArea.reduce((sum: number, a: { minutes: number }) => sum + a.minutes, 0) || 1;
 
@@ -198,20 +187,20 @@ export default function Recap() {
         </Panel>
       ) : (
         <div className="flex flex-col gap-5">
-          {/* Total time for the period. */}
-          <StatStrip>
-            <StatTile
-              icon={<ClockIcon className="w-4 h-4" />}
-              value={
-                totalMin >= 60 ? `${hours}\u00a0h\u00a0${String(mins).padStart(2, "0")}` : `${mins}\u00a0min`
-              }
-              label={tr("recap.activityTime")}
-              hint={PERIOD_LABELS[period]}
-            />
+          {/* The time for the period, then what was done in it. */}
+          <div className="eu-panel eu-recap-stats">
+            <div className="eu-recap-hero">
+              <span className="eu-t-label flex items-center gap-1.5">
+                <ClockIcon className="w-3.5 h-3.5" />
+                {tr("recap.activityTime")}
+              </span>
+              <span className="eu-recap-time">{humanMinutes(totalMin)}</span>
+              <span className="eu-t-meta">{PERIOD_LABELS[period]}</span>
+            </div>
             {stats.map((s) => (
               <StatTile key={s.label} icon={s.icon} value={s.value} label={s.label} />
             ))}
-          </StatStrip>
+          </div>
 
           <BarList
             title={tr("recap.timeByArea")}

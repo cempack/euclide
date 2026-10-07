@@ -600,12 +600,13 @@ const recap: RecapData = {
     { name: "Python", count: 6 },
     { name: "Minuteur", count: 4 },
   ],
+  // Tab kinds, as App.tsx logs them each active minute.
   time_by_area: [
-    { name: "Documents", count: 124 },
-    { name: "Tableau blanc", count: 71 },
-    { name: "Notes", count: 58 },
-    { name: "Python", count: 39 },
-    { name: "Tableau de bord", count: 20 },
+    { name: "pdf", count: 124 },
+    { name: "whiteboard", count: 71 },
+    { name: "note", count: 58 },
+    { name: "python", count: 39 },
+    { name: "dashboard", count: 20 },
   ],
 };
 

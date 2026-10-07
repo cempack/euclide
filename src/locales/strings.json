@@ -388,8 +388,7 @@
       "filesOpened": "fichiers",
       "notesWritten": "notes",
       "demosRun": "scripts",
-      "remindersDone": "rappels",
-      "activeMinutes": "min"
+      "remindersDone": "rappels"
     },
     "highlightFiles": {
       "one": "{count} fichier ouvert.",
@@ -422,7 +421,23 @@
       "one": "{count} utilisation",
       "other": "{count} utilisations"
     },
-    "highlights": "À retenir"
+    "highlights": "À retenir",
+    "areas": {
+      "dashboard": "Tableau de bord",
+      "courses": "Cours",
+      "course": "Détail cours",
+      "class-content": "Contenu de classe",
+      "documents": "Documents",
+      "tools": "Outils",
+      "recap": "Bilan",
+      "python": "Python",
+      "whiteboard": "Tableau blanc",
+      "pdf": "Documents ouverts",
+      "note": "Notes",
+      "reminders": "Rappels",
+      "settings": "Réglages",
+      "app": "Application"
+    }
   },
   "notes": {
     "newTitle": "Nouvelle note",
@@ -756,7 +771,8 @@
     "noResult": "Aucun résultat",
     "emptyTitle": "Rien à afficher",
     "noResultHint": "Essayez un autre mot-clé ou changez de filtre.",
-    "emptyHint": "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies."
+    "emptyHint": "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies.",
+    "deleted": "Rappel « {name} » supprimé"
   },
   "python": {
     "newScript": "Nouveau script",

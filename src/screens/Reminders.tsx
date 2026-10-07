@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
@@ -10,7 +10,8 @@ import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layo
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { BellIcon, CheckIcon, RepeatIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
-import { formatDueLabel, localYmd, localYmdToIso, cheer } from "../lib/format";
+import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
+import { useReminderActions } from "../features/reminders/useReminderActions";
 
 const NO_REMINDERS: Reminder[] = [];
 const NO_COURSES: Course[] = [];
@@ -37,7 +38,7 @@ const ReminderRow = memo(function ReminderRow({
   course?: Course;
   dark: boolean;
   onToggle: (r: Reminder) => void;
-  onDelete: (id: number) => void;
+  onDelete: (r: Reminder) => void;
 }) {
   const due = formatDueLabel(r.due_at);
   const isDone = r.done;
@@ -93,7 +94,7 @@ const ReminderRow = memo(function ReminderRow({
       )}
 
       <button
-        onClick={() => onDelete(r.id)}
+        onClick={() => onDelete(r)}
         aria-label={`${tr("common.delete")} — ${r.title}`}
         data-tip={tr("common.delete")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
@@ -114,9 +115,6 @@ export default function Reminders() {
   const reminders = remindersQ.data ?? NO_REMINDERS;
   const loading = remindersQ.isPending;
   const courses = useQuery(q.courses()).data ?? NO_COURSES;
-  /** Optimistic edits write the shared cache; the next refetch confirms them. */
-  const setReminders = (update: (prev: Reminder[]) => Reminder[]) =>
-    queryClient.setQueryData(q.reminders().queryKey, (prev) => update(prev ?? []));
   const [filter, setFilter] = useState<"pending" | "done" | "all">("pending");
   const [search, setSearch] = useState("");
 
@@ -161,54 +159,7 @@ export default function Reminders() {
     setNewDue(days === null ? "" : localYmd(new Date(), days));
   };
 
-  const toggle = useCallback(
-    async (r: Reminder) => {
-      const markingDone = !r.done;
-      // A recurring reminder rolls forward instead of being closed, so we let
-      // the backend decide and refetch rather than guessing locally.
-      const optimistic = r.repeat_rule === "none" || !r.due_at;
-      if (optimistic) {
-        setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: markingDone } : x)));
-      }
-      try {
-        await api.toggleReminder(r.id, markingDone);
-        if (markingDone) {
-          api.logEvent("reminder_done", r.title, r.course_id);
-          toast(cheer(), "success");
-        }
-        window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-        if (!optimistic) refresh({ silent: true });
-      } catch (err) {
-        reportError("reminders.toggle", err);
-        if (optimistic) {
-          setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: !markingDone } : x)));
-        }
-        toast(errorMessage(err, tr("messages.genericError")), "error");
-      }
-    },
-    [toast, refresh],
-  );
-
-  const deleteOne = useCallback(
-    async (id: number) => {
-      const ok = await confirm.ask({
-        title: tr("dashboard.confirmDeleteReminder"),
-        message: tr("dashboard.confirmDeleteReminder"),
-        confirmLabel: tr("common.delete"),
-        danger: true,
-      });
-      if (!ok) return;
-      try {
-        await api.deleteReminder(id);
-        window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
-        refresh({ silent: true });
-      } catch (err) {
-        reportError("reminders.delete", err);
-        toast(errorMessage(err, tr("dashboard.errorDeleteReminder")), "error");
-      }
-    },
-    [toast, confirm, refresh],
-  );
+  const { toggle, remove } = useReminderActions();
 
   const clearDone = async () => {
     const done = reminders.filter((r) => r.done);
@@ -440,7 +391,7 @@ export default function Reminders() {
                       course={courseById(r.course_id)}
                       dark={resolved === "dark"}
                       onToggle={toggle}
-                      onDelete={deleteOne}
+                      onDelete={remove}
                     />
                   ))}
                 </div>
