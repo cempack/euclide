@@ -537,6 +537,25 @@
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8a84' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
 
+  /* Switch (ui/Switch.tsx): the thumb slides, on the compositor. */
+  .eu-switch {
+    @apply relative inline-flex shrink-0 items-center rounded-full border border-transparent bg-ink/20
+      transition-colors duration-fast disabled:opacity-45;
+    width: 2rem;
+    height: 1.125rem;
+  }
+  .eu-switch[aria-checked="true"] {
+    @apply bg-accent;
+  }
+  .eu-switch-thumb {
+    @apply absolute left-0.5 rounded-full bg-panel shadow-raised transition-transform duration-fast;
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+  .eu-switch[aria-checked="true"] .eu-switch-thumb {
+    transform: translateX(0.875rem);
+  }
+
   /* -------------------------------------------------------------------------
      Chips, keys, segmented control. The chosen segment is raised paper.
      ------------------------------------------------------------------------- */
@@ -1032,11 +1051,40 @@
   }
 }
 
-/* Native controls (range, checkbox, radio) follow the accent token. */
+/* Native range and radio follow the accent token; checkboxes are drawn. */
 input[type="range"],
-input[type="checkbox"],
 input[type="radio"] {
   accent-color: rgb(var(--eu-accent));
+}
+@layer base {
+  input[type="checkbox"] {
+    appearance: none;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 3px;
+    border: 1px solid rgb(var(--eu-line) / var(--eu-line-a-strong));
+    background: rgb(var(--eu-panel)) center / 0.75rem no-repeat;
+    transition:
+      background-color 120ms,
+      border-color 120ms;
+    cursor: pointer;
+  }
+  input[type="checkbox"]:hover {
+    border-color: rgb(var(--eu-ink) / 0.45);
+  }
+  input[type="checkbox"]:checked {
+    background-color: rgb(var(--eu-accent));
+    border-color: rgb(var(--eu-accent));
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
+  [data-theme="dark"] input[type="checkbox"]:checked {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23131313' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
+  input[type="checkbox"]:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
 }
 
 /* Respect the OS « reduce motion » setting: every animation is CSS. */

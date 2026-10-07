@@ -77,14 +77,16 @@ export class ErrorBoundary extends Component<
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: "#111",
-              color: "#fff",
+              // Tokens, with literal fallbacks: this screen must paint even if
+              // the stylesheet is what broke.
+              background: "var(--color-stage, #181818)",
+              color: "var(--color-stage-ink, #eceae6)",
               fontFamily: "ui-monospace, monospace",
               padding: 24,
             }}
           >
             <div style={{ maxWidth: 520, width: "100%" }}>
-              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "#fa520f" }}>
+              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "var(--color-stage-danger, #f58a96)" }}>
                 Euclide — erreur d’affichage
               </div>
               <div style={{ opacity: 0.85, marginBottom: 12, lineHeight: 1.45 }}>
@@ -93,7 +95,7 @@ export class ErrorBoundary extends Component<
               <pre
                 style={{
                   whiteSpace: "pre-wrap",
-                  background: "#1a1a1a",
+                  background: "var(--color-stage-alt, #101010)",
                   padding: 12,
                   borderRadius: 8,
                   fontSize: 12,
