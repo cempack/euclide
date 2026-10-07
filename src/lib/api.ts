@@ -724,6 +724,7 @@ export const api = {
 
   // Settings
   logPerf: (lines: string[]) => invoke<void>("log_perf", { lines }),
+  logErrors: (lines: string[]) => invoke<void>("log_errors", { lines }),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
   setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
 };

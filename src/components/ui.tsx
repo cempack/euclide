@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type ErrorInfo,
 } from "react";
+import { describeError, reportLine } from "../lib/report";
 import {
   Atom,
   Book,
@@ -54,6 +55,8 @@ export class ErrorBoundary extends Component<
     // Always log so user can open devtools / console in tauri to see the root cause
     console.error("[Euclide ErrorBoundary] Render error (this was causing black screen):", error);
     console.error("Component stack:", info?.componentStack);
+    const component = info?.componentStack?.trim().split("\n")[0]?.trim();
+    reportLine(`render ${describeError(error)}${component ? ` in ${component}` : ""}`);
     // Also expose for easy copy in devtools
     (window as any).__EUCLIDE_LAST_ERROR__ = { error, info };
     this.setState({ info });

@@ -76,7 +76,9 @@ pub fn migrate(
         r.get(0)
     })?;
     if broken > 0 {
-        eprintln!("[db] {broken} foreign key(s) point at missing rows after migration");
+        crate::applog::warn(format!(
+            "[db] {broken} foreign key(s) point at missing rows after migration"
+        ));
     }
     Ok(())
 }

@@ -4,13 +4,10 @@
 //! from the frontend every few minutes (IPC durations, tab switches, long
 //! tasks). It is capped so it never grows on the USB key.
 
-use std::io::Write;
 use std::sync::OnceLock;
 use std::time::Instant;
 
 static PROCESS_START: OnceLock<Instant> = OnceLock::new();
-
-const MAX_BYTES: u64 = 512 * 1024;
 
 /// Call first thing in `run()`.
 pub fn start() {
@@ -25,37 +22,9 @@ pub fn uptime_ms() -> u128 {
         .unwrap_or(0)
 }
 
-/// Append lines to perf.log, each prefixed with the UTC time. Keeps one
-/// previous file (perf.log.1) once the current one passes 512 KB.
+/// Append lines to perf.log, each prefixed with the UTC time.
 pub fn append(lines: &[String]) {
-    if lines.is_empty() {
-        return;
-    }
-    let dir = crate::paths::data_dir().join("logs");
-    if std::fs::create_dir_all(&dir).is_err() {
-        return;
-    }
-    let path = dir.join("perf.log");
-    if std::fs::metadata(&path)
-        .map(|m| m.len() > MAX_BYTES)
-        .unwrap_or(false)
-    {
-        let _ = std::fs::rename(&path, dir.join("perf.log.1"));
-    }
-    let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    else {
-        return;
-    };
-    let stamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ");
-    let mut out = String::new();
-    for line in lines {
-        // One record per line: never let a caller inject a newline.
-        out.push_str(&format!("{stamp} {}\n", line.replace(['\n', '\r'], " ")));
-    }
-    let _ = f.write_all(out.as_bytes());
+    crate::applog::append(crate::applog::PERF, lines);
 }
 
 /// Frontend timings. `app.ready` also records how long the whole process
