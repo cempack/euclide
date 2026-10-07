@@ -1,14 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api } from "./api";
+import { api, isTauri } from "./api";
+import { bootSetting } from "./boot";
 
 /**
  * Appearance: theme (auto / light / dark), density and projection mode.
  *
  * Persistence is deliberately doubled:
  *   - SQLite via api.setSetting(...) is the source of truth (travels with the
- *     USB key, same mechanism as `max_tabs` / `open_tabs`);
- *   - localStorage is a mirror read by the inline script in index.html so the
- *     first paint is already in the right theme (no white flash).
+ *     USB key, same mechanism as `max_tabs` / `open_tabs`), and arrives with
+ *     the page at launch (lib/boot.ts), so the first paint is right;
+ *   - localStorage is a mirror for reloads of the page and browser mode, read
+ *     by the inline script in index.html too.
  */
 
 export type ThemePref = "auto" | "light" | "dark";
@@ -48,9 +50,12 @@ function isDensity(v: unknown): v is Density {
   return v === "comfortable" || v === "compact";
 }
 
-function readLocal<T>(key: string, guard: (v: unknown) => v is T, fallback: T): T {
+/** The saved value: from the boot state at launch, else the local mirror. */
+function readSaved<T>(setting: string, localKey: string, guard: (v: unknown) => v is T, fallback: T): T {
+  const atLaunch = bootSetting(setting);
+  if (guard(atLaunch)) return atLaunch;
   try {
-    const v = localStorage.getItem(key);
+    const v = localStorage.getItem(localKey);
     return guard(v) ? v : fallback;
   } catch {
     return fallback;
@@ -70,8 +75,12 @@ function systemPrefersDark(): boolean {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [pref, setPrefState] = useState<ThemePref>(() => readLocal(LS_THEME, isThemePref, "auto"));
-  const [density, setDensityState] = useState<Density>(() => readLocal(LS_DENSITY, isDensity, "comfortable"));
+  const [pref, setPrefState] = useState<ThemePref>(() =>
+    readSaved(SETTING_THEME, LS_THEME, isThemePref, "auto"),
+  );
+  const [density, setDensityState] = useState<Density>(() =>
+    readSaved(SETTING_DENSITY, LS_DENSITY, isDensity, "comfortable"),
+  );
   const [projection, setProjectionState] = useState(false);
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
 
@@ -118,6 +127,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-density", density);
   }, [density]);
+
+  // The native title bar follows the choice ("auto" follows the system). The
+  // window was created in the saved theme, so the first run changes nothing.
+  useEffect(() => {
+    if (!isTauri()) return;
+    void import("@tauri-apps/api/window")
+      .then(({ getCurrentWindow }) => getCurrentWindow().setTheme(pref === "auto" ? null : pref))
+      .catch(() => {});
+  }, [pref]);
 
   useEffect(() => {
     if (projection) document.documentElement.setAttribute("data-projection", "on");

@@ -1,21 +1,9 @@
 {
-  "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "Euclide",
-        "decorations": true,
-        "width": 1080,
-        "height": 720,
-        "minWidth": 1000,
-        "minHeight": 680,
-        "center": true
-      }
-    ]
-  },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -24,4 +12,3 @@
     ]
   }
 }
-

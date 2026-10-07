@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { recordIpc } from "./perf";
+import { bootSetting, forgetBootSetting, takeBootPronote } from "./boot";
 
 // Simple in-memory cache for snappy UX (avoids repeated SQLite roundtrips on re-renders / tab switches).
 // TTL short because data can change via side effects; events invalidate.
@@ -677,6 +678,8 @@ export const api = {
   // Pronote
   pronoteStatus: () => {
     const key = "pronoteStatus";
+    const atLaunch = takeBootPronote();
+    if (atLaunch) setCached(key, atLaunch);
     const cached = getCached<PronoteStatus>(key);
     if (cached) return Promise.resolve(cached);
     // 30s TTL is fine; status changes only on login/logout/sync
@@ -725,8 +728,20 @@ export const api = {
   // Settings
   logPerf: (lines: string[]) => invoke<void>("log_perf", { lines }),
   logErrors: (lines: string[]) => invoke<void>("log_errors", { lines }),
-  getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
-  setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
+  getSetting: (key: string): Promise<string | null> => {
+    // Settings saved at launch arrive with the page (lib/boot.ts): the first
+    // read of each costs no round trip.
+    const saved = bootSetting(key);
+    if (saved !== undefined) {
+      forgetBootSetting(key);
+      return Promise.resolve(saved);
+    }
+    return invoke<string | null>("get_setting", { key });
+  },
+  setSetting: (key: string, value: string) => {
+    forgetBootSetting(key);
+    return invoke<void>("set_setting", { key, value });
+  },
 };
 
 /** Automatic backups (Euclide-Sauvegardes/ and the optional external mirror). */

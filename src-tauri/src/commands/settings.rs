@@ -8,7 +8,7 @@ use tauri::State;
 
 /// Settings the webview may read and write. Everything else in the table
 /// (Pronote credentials, internal bookkeeping) stays on the Rust side.
-const UI_SETTINGS: &[&str] = &[
+pub(crate) const UI_SETTINGS: &[&str] = &[
     "theme",
     "density",
     "max_tabs",

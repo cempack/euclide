@@ -1,4 +1,5 @@
 mod applog;
+mod boot;
 mod commands;
 mod db;
 mod error;
@@ -33,11 +34,7 @@ pub fn run() {
         // First, so a second launch (a double-click while the window is still
         // opening) focuses the running window instead of opening the data twice.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.unminimize();
-                let _ = win.show();
-                let _ = win.set_focus();
-            }
+            boot::focus_main_window(app);
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -48,7 +45,6 @@ pub fn run() {
             });
         })
         .setup(|app| {
-            use tauri::Manager;
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
@@ -56,10 +52,6 @@ pub fn run() {
                 std::process::exit(0);
             }
             crate::paths::freeze_data_dir();
-            let exe_dir = crate::paths::exe_dir();
-            crate::portable_update::purge_update_leftovers(&exe_dir);
-            #[cfg(windows)]
-            crate::portable_update::schedule_leftover_cleanup(&exe_dir);
             // A restore chosen in Settings is applied before the database opens.
             match jobs::backup::apply_pending_restore() {
                 Ok(Some(name)) => perf::append(&[format!("backup.restored={name}")]),
@@ -80,57 +72,53 @@ pub fn run() {
                     std::process::exit(1);
                 }
             };
-            db::seed_python_demos();
-            let _ = commands::recap::prune(&db.lock());
+            let db_ms = perf::uptime_ms();
             commands::pronote::protect_stored_password(&db.lock());
-            app.manage(db);
-            app.manage(KeepAwake::default());
+
+            // The window first: the webview starts loading while the rest of
+            // setup runs, and opens with everything its first render needs.
+            let boot_state = boot::state(&db.lock());
+            boot::create_main_window(app, &boot_state)?;
+            let window_ms = perf::uptime_ms();
+
+            let keep_awake = KeepAwake::default();
+            {
+                // On by default: a projected lesson must not lock the screen.
+                let conn = db.lock();
+                let saved = commands::get_setting_raw(&conn, "keep_awake");
+                if saved.is_none() {
+                    commands::set_setting_raw(&conn, "keep_awake", "1");
+                }
+                keepawake::set(&keep_awake, saved.as_deref() != Some("0"));
+            }
+            app.manage(db.clone());
+            app.manage(keep_awake);
             app.manage(jobs::indexer::Indexer::default());
             app.manage(commands::pronote::PronoteLane::default());
             app.manage(jobs::backup::Health::default());
+            // Started on first use: launching Python competes with the webview
+            // for the CPU and the USB key, for features a lesson may not need.
+            app.manage(sidecar::Sidecar::new(app.handle().clone()));
             jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());
-            app.manage(sidecar::Sidecar::new(app.handle().clone()));
 
-            // Keep screen from locking / sleeping by default ("Ne pas verrouiller l'écran").
-            // This matches the teaching use-case. Persisted via settings key "keep_awake" ("1"/"0").
-            // We read the saved pref (default on), ensure it's saved on every launch, and activate the guard accordingly.
-            {
-                let db = app.state::<db::Db>();
-                let ka = app.state::<KeepAwake>();
-                let conn = db.lock();
-                let val = crate::commands::get_setting_raw(&conn, "keep_awake");
-                let should_on = val.as_deref() != Some("0");
-                // Always ensure the preference is saved (defaults to on/"1" for first run).
-                crate::commands::set_setting_raw(
-                    &conn,
-                    "keep_awake",
-                    if should_on { "1" } else { "0" },
-                );
-                crate::keepawake::set(&ka, should_on);
-            }
+            // Housekeeping that the first screen doesn't wait for.
+            std::thread::Builder::new()
+                .name("startup-chores".into())
+                .spawn(move || {
+                    let exe_dir = crate::paths::exe_dir();
+                    crate::portable_update::purge_update_leftovers(&exe_dir);
+                    #[cfg(windows)]
+                    crate::portable_update::schedule_leftover_cleanup(&exe_dir);
+                    db::seed_python_demos();
+                    let _ = commands::recap::prune(&db.lock());
+                })?;
 
-            if let Some(win) = app.get_webview_window("main") {
-                // Adjust size dynamically to screen/monitor resolution for a perfect aspect ratio.
-                if let Ok(Some(monitor)) = win.current_monitor() {
-                    let size = monitor.size();
-                    let scale_factor = monitor.scale_factor();
-                    let monitor_width = (size.width as f64) / scale_factor;
-                    let monitor_height = (size.height as f64) / scale_factor;
-
-                    // Goal: 80% of screen width and height, clamped to safe desktop boundaries.
-                    let target_width = (monitor_width * 0.8).clamp(1000.0, 1280.0);
-                    let target_height = (monitor_height * 0.8).clamp(680.0, 840.0);
-
-                    let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize {
-                        width: target_width,
-                        height: target_height,
-                    }));
-                    let _ = win.center();
-                }
-            }
-
-            perf::append(&[format!("rust.setup_done_ms={}", perf::uptime_ms())]);
+            perf::append(&[
+                format!("rust.db_open_ms={db_ms}"),
+                format!("rust.window_created_ms={window_ms}"),
+                format!("rust.setup_done_ms={}", perf::uptime_ms()),
+            ]);
 
             // PDFs left unindexed by a previous session: resume once startup has settled.
             {
@@ -138,20 +126,6 @@ pub fn run() {
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(8)).await;
                     indexer.kick();
-                });
-            }
-
-            // Pre-start the Python sidecar *once* at launch and keep the process warm forever.
-            // All Python work (Pronote, scripts, Jedi, PDF index...) now goes through a single
-            // long-lived process using fast stdin/stdout JSON lines. No more per-call spawn,
-            // no repeated PyInstaller extract, imports (pronotepy + jedi + pypdf) happen once.
-            // Result: snappy even on low-end school laptops, always responsive.
-            {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    let sc: tauri::State<sidecar::Sidecar> = handle.state();
-                    // ignore error here (first real call will retry if needed)
-                    let _ = sc.start().await;
                 });
             }
 
