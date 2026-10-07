@@ -28,6 +28,9 @@ import App from "./App";
 import "./styles.css";
 import { ErrorBoundary } from "./components/ui";
 import { ThemeProvider } from "./lib/theme";
+import { startPerf } from "./lib/perf";
+
+startPerf();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

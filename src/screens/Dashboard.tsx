@@ -12,6 +12,7 @@ import {
   type ScheduleEntry,
   type RecapData,
 } from "../lib/api";
+import { appReady } from "../lib/perf";
 import { t, get, fmt } from "../lib/i18n";
 import {
   classProgress,
@@ -96,46 +97,50 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
   }, []);
 
   const refresh = useCallback(() => {
-    api
-      .getTodayClasses()
-      .then(setClasses)
-      .catch(() => {});
-    api
-      .listReminders()
-      .then((r) => setReminders(Array.isArray(r) ? r : []))
-      .catch(() => {});
-    api
-      .allNotes()
-      .then((n) => setNotes(Array.isArray(n) ? n : []))
-      .catch(() => {});
-    api
-      .listCourses()
-      .then((c) => setCourses(Array.isArray(c) ? c : []))
-      .catch(() => {});
-    api
-      .listFiles(null)
-      .then((f) => setDocCount(Array.isArray(f) ? f.length : 0))
-      .catch(() => {});
-    api
-      .listLinks()
-      .then((l) => setLinks(Array.isArray(l) ? l : []))
-      .catch(() => {});
-    api
-      .recentFiles(6)
-      .then((f) => setRecentFiles(Array.isArray(f) ? f : []))
-      .catch(() => {});
-    api
-      .pronoteStatus()
-      .then(setPronoteStatus)
-      .catch(() => {});
-    api
-      .getRecap("today")
-      .then(setRecap)
-      .catch(() => {});
-    api
-      .getSetting("remote_favicons")
-      .then((v) => setRemoteIcons(remoteFaviconsEnabled(v)))
-      .catch(() => {});
+    const loads = [
+      api
+        .getTodayClasses()
+        .then(setClasses)
+        .catch(() => {}),
+      api
+        .listReminders()
+        .then((r) => setReminders(Array.isArray(r) ? r : []))
+        .catch(() => {}),
+      api
+        .allNotes()
+        .then((n) => setNotes(Array.isArray(n) ? n : []))
+        .catch(() => {}),
+      api
+        .listCourses()
+        .then((c) => setCourses(Array.isArray(c) ? c : []))
+        .catch(() => {}),
+      api
+        .listFiles(null)
+        .then((f) => setDocCount(Array.isArray(f) ? f.length : 0))
+        .catch(() => {}),
+      api
+        .listLinks()
+        .then((l) => setLinks(Array.isArray(l) ? l : []))
+        .catch(() => {}),
+      api
+        .recentFiles(6)
+        .then((f) => setRecentFiles(Array.isArray(f) ? f : []))
+        .catch(() => {}),
+      api
+        .pronoteStatus()
+        .then(setPronoteStatus)
+        .catch(() => {}),
+      api
+        .getRecap("today")
+        .then(setRecap)
+        .catch(() => {}),
+      api
+        .getSetting("remote_favicons")
+        .then((v) => setRemoteIcons(remoteFaviconsEnabled(v)))
+        .catch(() => {}),
+    ];
+    // The dashboard is the first screen: once its data is in, the app is usable.
+    void Promise.allSettled(loads).then(appReady);
   }, []);
 
   useVisibleRefresh(visible, refresh, DASHBOARD_EVENTS);

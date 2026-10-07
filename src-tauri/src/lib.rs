@@ -3,6 +3,7 @@ mod db;
 mod keepawake;
 mod linux_env;
 mod paths;
+mod perf;
 mod portable_update;
 mod relaunch;
 mod sidecar;
@@ -18,6 +19,7 @@ pub fn apply_linux_runtime_env() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    perf::start();
     apply_linux_runtime_env();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -76,6 +78,8 @@ pub fn run() {
                     let _ = win.center();
                 }
             }
+
+            perf::append(&[format!("rust.setup_done_ms={}", perf::uptime_ms())]);
 
             // Pre-start the Python sidecar *once* at launch and keep the process warm forever.
             // All Python work (Pronote, scripts, Jedi, PDF index...) now goes through a single
@@ -181,6 +185,7 @@ pub fn run() {
             commands::set_course_class_item,
             commands::update_course_class_notes,
             commands::pronote_classes,
+            perf::log_perf,
             portable_update::apply_windows_portable_update,
             relaunch::relaunch_after_update,
         ])

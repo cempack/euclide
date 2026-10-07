@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "./api";
+import { tabSwitchBegin } from "./perf";
 
 export type TabKind =
   | "dashboard"
@@ -259,6 +260,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   }, []);
   const setActiveId = useCallback((id: string) => {
     if (id === activeIdRef.current) return;
+    tabSwitchBegin();
     activeIdRef.current = id;
     setActiveIdState(id);
   }, []);
