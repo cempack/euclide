@@ -586,7 +586,11 @@
     "unsavedMessage": "Enregistrer avant de fermer cet onglet ?",
     "save": "Enregistrer",
     "discard": "Ne pas enregistrer",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "quitTitle": "Quitter Euclide ?",
+    "quitMessage": "Ces onglets ont des modifications non enregistrées : {names}.",
+    "quitFailed": "Enregistrement impossible : Euclide reste ouvert.",
+    "quitMessageOne": "Cet onglet a des modifications non enregistrées : {names}."
   },
   "timer": {
     "done": "Minuteur terminé",
