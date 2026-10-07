@@ -1,5 +1,17 @@
-import type { ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { computePosition, flip, offset, shift } from "@floating-ui/dom";
+import { Ellipsis } from "lucide-react";
 import { ArrowRightIcon } from "./icons";
+import { get } from "../lib/i18n";
 
 /**
  * Layout primitives.
@@ -24,7 +36,7 @@ export function PageHeader({
   icon,
 }: {
   title: ReactNode;
-  /** Short mono facts: date, counts, connection state. */
+  /** Short facts under the title: date, counts, connection state. */
   meta?: ReactNode;
   actions?: ReactNode;
   onBack?: () => void;
@@ -32,30 +44,29 @@ export function PageHeader({
   icon?: ReactNode;
 }) {
   return (
-    <header className="flex flex-col gap-3">
+    <header className="flex flex-col">
       {onBack && (
-        <button type="button" onClick={onBack} className="eu-btn-quiet eu-btn-sm self-start -ml-2.5">
+        <button type="button" onClick={onBack} className="eu-btn-quiet eu-btn-sm self-start -ml-2.5 mb-2">
           <ArrowRightIcon className="w-3.5 h-3.5 rotate-180" />
           {backLabel}
         </button>
       )}
-      <div className="flex items-end justify-between gap-5 flex-wrap">
-        <div className="min-w-0">
-          <h1 className="eu-t-page text-ink flex items-center gap-2.5">
-            {icon && <span className="text-ink-faint shrink-0">{icon}</span>}
-            {title}
-          </h1>
-          {meta && <MetaLine>{meta}</MetaLine>}
-        </div>
+      {/* Actions sit on the title's line, centred on it. */}
+      <div className="flex items-center justify-between gap-x-5 gap-y-3 flex-wrap">
+        <h1 className="eu-t-page text-ink flex items-center gap-2.5 min-w-0">
+          {icon && <span className="text-ink-faint shrink-0">{icon}</span>}
+          <span className="min-w-0">{title}</span>
+        </h1>
         {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
       </div>
+      {meta && <MetaLine>{meta}</MetaLine>}
     </header>
   );
 }
 
-/** Mono context line under a page title. Children separated by `<MetaDot/>`. */
+/** The context line under a page title. Children separated by `<MetaDot/>`. */
 function MetaLine({ children }: { children: ReactNode }) {
-  return <div className="eu-t-label mt-2 flex items-center gap-2.5 flex-wrap leading-normal">{children}</div>;
+  return <div className="eu-t-caption mt-2 flex items-center gap-2 flex-wrap">{children}</div>;
 }
 
 export function MetaDot() {
@@ -104,18 +115,133 @@ export function Panel({
 }
 
 // ---------------------------------------------------------------------------
-// Toolbar — grouped controls with hairline separators (whiteboard, PDF, notes,
-// Python all used to hand-roll this).
+// Toolbar — one row of grouped controls with hairline separators. A group
+// marked `collapse` moves into a « … » popover when the row is too narrow
+// (last ones first), instead of wrapping out of the bar.
 // ---------------------------------------------------------------------------
 
 export function Toolbar({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const [hidden, setHidden] = useState(0);
+  const widths = useRef(new Map<number, number>());
+
+  // Collapsible groups, in order: the last ones leave first.
+  const items = Children.toArray(children);
+  const collapsible: number[] = [];
+  items.forEach((child, i) => {
+    if (isValidElement<{ collapse?: boolean }>(child) && child.props.collapse) collapsible.push(i);
+  });
+  const hiddenSet = new Set(collapsible.slice(collapsible.length - hidden));
+
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const fit = () => {
+      for (const el of bar.querySelectorAll<HTMLElement>(":scope > [data-collapse-index]")) {
+        widths.current.set(Number(el.dataset.collapseIndex), el.offsetWidth);
+      }
+      if (bar.scrollWidth > bar.clientWidth + 1) {
+        if (hidden < collapsible.length) setHidden(hidden + 1);
+        return;
+      }
+      if (hidden === 0) return;
+      // Room for the next group to come back? Count what the bar holds now.
+      const style = getComputedStyle(bar);
+      const gap = parseFloat(style.columnGap) || 0;
+      let used = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      for (const el of Array.from(bar.children) as HTMLElement[]) {
+        if (el.dataset.spacer === undefined) used += el.offsetWidth + gap;
+      }
+      const back = collapsible[collapsible.length - hidden];
+      const need = (widths.current.get(back) ?? Infinity) + gap;
+      // The « … » button goes away with the last hidden group.
+      const freed = hidden === 1 ? (moreRef.current?.offsetWidth ?? 0) + gap : 0;
+      if (used + need - freed <= bar.clientWidth) setHidden(hidden - 1);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(bar);
+    return () => ro.disconnect();
+  });
+
   return (
     <div
+      ref={barRef}
       role="toolbar"
-      className={`shrink-0 flex items-center gap-1.5 flex-wrap px-3 py-1.5 border-b border-line bg-panel ${className}`}
+      className={`shrink-0 flex items-center gap-1.5 flex-nowrap overflow-hidden px-3 py-1.5 border-b border-line bg-panel ${className}`}
     >
-      {children}
+      {items.map((child, i) =>
+        hiddenSet.has(i) ||
+        (isValidElement(child) &&
+          child.type === ToolSep &&
+          hiddenSet.has(i + 1)) ? null : collapsible.includes(i) ? (
+          <div key={i} data-collapse-index={i} className="eu-toolbar-slot">
+            {child}
+          </div>
+        ) : (
+          child
+        ),
+      )}
+      {hidden > 0 && (
+        <div ref={moreRef} className="shrink-0">
+          <MorePopover>{items.filter((_, i) => hiddenSet.has(i))}</MorePopover>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** The groups that did not fit, in a column under a « … » button. */
+function MorePopover({ children }: { children: ReactNode }) {
+  const popRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  const label = get("common.more", "Plus d'outils");
+
+  // The button is the popover's invoker (popoverTarget), so the browser
+  // toggles it, light dismiss included; we only place it when it opens.
+  useEffect(() => {
+    const pop = popRef.current;
+    const button = buttonRef.current;
+    if (!pop || !button) return;
+    const onToggle = (e: Event) => {
+      if ((e as ToggleEvent).newState !== "open") return;
+      void computePosition(button, pop, {
+        placement: "bottom-end",
+        strategy: "fixed",
+        middleware: [offset(4), flip(), shift({ padding: 6 })],
+      }).then(({ x, y }) => {
+        pop.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
+      });
+    };
+    pop.addEventListener("toggle", onToggle);
+    return () => pop.removeEventListener("toggle", onToggle);
+  }, []);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        popoverTarget={id}
+        aria-label={label}
+        data-tip={label}
+        className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+      >
+        <Ellipsis size={16} strokeWidth={1.75} aria-hidden />
+      </button>
+      <div
+        ref={popRef}
+        id={id}
+        popover="auto"
+        className="eu-menu eu-toolbar-more"
+        role="group"
+        aria-label={label}
+      >
+        {children}
+      </div>
+    </>
   );
 }
 
@@ -127,6 +253,8 @@ export function ToolGroup({
   children: ReactNode;
   label?: string;
   className?: string;
+  /** May move into the toolbar's « … » popover when space runs out. */
+  collapse?: boolean;
 }) {
   return (
     <div
@@ -144,7 +272,7 @@ export function ToolSep() {
 }
 
 export function ToolSpacer() {
-  return <span className="flex-1" />;
+  return <span data-spacer className="flex-1" />;
 }
 
 // ---------------------------------------------------------------------------
