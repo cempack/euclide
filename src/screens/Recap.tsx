@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
-import { api, type RecapData } from "../lib/api";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { q } from "../api/queries";
+import type { RecapData } from "../lib/api";
 import { t, fmt, get } from "../lib/i18n";
 import {
   BookIcon,
@@ -65,20 +67,11 @@ function BarList({ title, hint, rows }: { title: string; hint?: string; rows: Ba
 }
 
 export default function Recap() {
-  const [data, setData] = useState<RecapData | null>(null);
-  const [loading, setLoading] = useState(true);
   // The backend keeps 30 days of events; only the day view was ever surfaced.
   const [period, setPeriod] = useState<Period>("today");
-
-  useEffect(() => {
-    setLoading(true);
-    setData(null);
-    api
-      .getRecap(period)
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [period]);
+  const recapQ = useQuery(q.recap(period));
+  const data: RecapData | null = recapQ.data ?? null;
+  const loading = recapQ.isPending;
 
   const stats = data
     ? [

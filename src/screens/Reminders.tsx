@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
 import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
@@ -7,6 +9,9 @@ import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { BellIcon, CheckIcon, RepeatIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
 import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
+
+const NO_REMINDERS: Reminder[] = [];
+const NO_COURSES: Course[] = [];
 
 const REPEAT_LABELS: Record<RepeatRule, string> = {
   none: get("reminders.repeatNone", "Une fois"),
@@ -106,11 +111,16 @@ export default function Reminders() {
   const confirm = useConfirm();
   const { resolved } = useAppearance();
 
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const queryClient = useQueryClient();
+  const remindersQ = useQuery(q.reminders());
+  const reminders = remindersQ.data ?? NO_REMINDERS;
+  const loading = remindersQ.isPending;
+  const courses = useQuery(q.courses()).data ?? NO_COURSES;
+  /** Optimistic edits write the shared cache; the next refetch confirms them. */
+  const setReminders = (update: (prev: Reminder[]) => Reminder[]) =>
+    queryClient.setQueryData(q.reminders().queryKey, (prev) => update(prev ?? []));
   const [filter, setFilter] = useState<"pending" | "done" | "all">("pending");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Create form: one line, with the details folded away until needed.
   const [newTitle, setNewTitle] = useState("");
@@ -119,27 +129,9 @@ export default function Reminders() {
   const [newRepeat, setNewRepeat] = useState<RepeatRule>("none");
   const [showDetails, setShowDetails] = useState(false);
 
-  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    try {
-      const list = await api.listReminders();
-      setReminders(Array.isArray(list) ? list : []);
-    } catch {
-      // silent
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    api
-      .listCourses()
-      .then((c) => setCourses(Array.isArray(c) ? c : []))
-      .catch(() => {});
-    const onChange = () => refresh({ silent: true });
-    window.addEventListener("eu:reminders-changed", onChange);
-    return () => window.removeEventListener("eu:reminders-changed", onChange);
-  }, [refresh]);
+  // After a change: refetch the list (other screens follow through the cache).
+  const refresh = (_opts?: { silent?: boolean }) =>
+    void queryClient.invalidateQueries({ queryKey: q.reminders().queryKey });
 
   const addReminder = async () => {
     if (!newTitle.trim()) return;

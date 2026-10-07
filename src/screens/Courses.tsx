@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, memo } from "react";
+import { useCallback, useMemo, useState, memo } from "react";
 import { useTabs } from "../lib/tabs";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { api, type Course } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
 import { COURSE_COLORS, COURSE_ICONS, EmptyState, Loading, Modal, useToast } from "../components/ui";
@@ -7,6 +9,8 @@ import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layo
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { ChevronRightIcon, BookIcon, PenIcon, PlusIcon } from "../components/icons";
+
+const NO_COURSES: Course[] = [];
 
 type Matiere = "Mathématiques" | "NSI" | "Maths expertes";
 const MATIERES: Matiere[] = ["Mathématiques", "NSI", "Maths expertes"];
@@ -199,8 +203,10 @@ export default function Courses() {
   const tabs = useTabs();
   const toast = useToast();
   const { resolved } = useAppearance();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const coursesQ = useQuery(q.courses());
+  const courses = coursesQ.data ?? NO_COURSES;
+  const loading = coursesQ.isPending;
 
   // One dialog for both create and edit: `editing` holds the course being
   // modified, or null when creating. The two 80-line duplicated forms are gone.
@@ -212,20 +218,7 @@ export default function Courses() {
   const [color, setColor] = useState(COURSE_COLORS[0]);
   const [iconKey, setIconKey] = useState("book");
 
-  const refresh = useCallback(() => {
-    api
-      .listCourses()
-      .then((c) => setCourses(Array.isArray(c) ? c : []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const onChange = () => refresh();
-    window.addEventListener("eu:course-changed", onChange);
-    return () => window.removeEventListener("eu:course-changed", onChange);
-  }, [refresh]);
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: q.courses().queryKey });
 
   const openCreate = () => {
     setEditing(null);
