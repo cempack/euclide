@@ -74,10 +74,12 @@ pub fn run() {
             };
             let db_ms = perf::uptime_ms();
             commands::pronote::protect_stored_password(&db.lock());
+            let version = app.package_info().version.to_string();
+            let updated_from = commands::app::record_version(&db.lock(), &version);
 
             // The window first: the webview starts loading while the rest of
             // setup runs, and opens with everything its first render needs.
-            let boot_state = boot::state(&db.lock());
+            let boot_state = boot::state(&db.lock(), updated_from.as_deref());
             boot::create_main_window(app, &boot_state)?;
             let window_ms = perf::uptime_ms();
 
@@ -98,27 +100,46 @@ pub fn run() {
             app.manage(jobs::backup::Health::default());
             // Started on first use: launching Python competes with the webview
             // for the CPU and the USB key, for features a lesson may not need.
+            // A sidecar staged by an update is swapped in before that.
+            let exe_dir = crate::paths::exe_dir();
+            let sidecar_swapped =
+                portable_update::apply_staged_sidecar(&exe_dir, &version).is_some();
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
             jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());
 
             // Housekeeping that the first screen doesn't wait for.
+            let after_update = updated_from.is_some();
             std::thread::Builder::new()
                 .name("startup-chores".into())
                 .spawn(move || {
-                    let exe_dir = crate::paths::exe_dir();
-                    crate::portable_update::purge_update_leftovers(&exe_dir);
-                    #[cfg(windows)]
-                    crate::portable_update::schedule_leftover_cleanup(&exe_dir);
+                    // Files an update renamed aside: swept after each update,
+                    // otherwise only when a quick look finds some.
+                    if after_update || portable_update::leftovers_present(&exe_dir) {
+                        portable_update::purge_update_leftovers(&exe_dir);
+                        #[cfg(windows)]
+                        portable_update::schedule_leftover_cleanup(&exe_dir);
+                    }
+                    for old in portable_update::old_sidecar_dirs(&exe_dir) {
+                        let _ = std::fs::remove_dir_all(old);
+                    }
+                    portable_update::remove_stale_staging(&exe_dir);
                     db::seed_python_demos();
                     let _ = commands::recap::prune(&db.lock());
                 })?;
 
-            perf::append(&[
+            let mut marks = vec![
                 format!("rust.db_open_ms={db_ms}"),
                 format!("rust.window_created_ms={window_ms}"),
                 format!("rust.setup_done_ms={}", perf::uptime_ms()),
-            ]);
+            ];
+            if let Some(from) = &updated_from {
+                marks.push(format!("app.updated from={from} to={version}"));
+            }
+            if sidecar_swapped {
+                marks.push("app.sidecar_swapped".into());
+            }
+            perf::append(&marks);
 
             // PDFs left unindexed by a previous session: resume once startup has settled.
             {
@@ -232,14 +253,12 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Euclide")
         .run(|app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { .. } = event {
-                // Gracefully stop the warm sidecar on app exit so the Python process doesn't linger.
-                let app_handle = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Some(sc) = app_handle.try_state::<sidecar::Sidecar>() {
-                        sc.stop().await;
-                    }
-                });
+            if let tauri::RunEvent::Exit = event {
+                // Windows does not end child processes with their parent: a
+                // Python left running would hold the sidecar's files.
+                if let Some(sc) = app_handle.try_state::<sidecar::Sidecar>() {
+                    sc.shutdown(std::time::Duration::from_millis(500));
+                }
             }
         });
 }

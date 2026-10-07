@@ -17,6 +17,7 @@ import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "./lib/
 import { courseVisual } from "./lib/color";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
+import { takeBootUpdate } from "./lib/boot";
 import { TimerProvider, useTimerControls, useTimerSec, formatTimer, chime } from "./lib/timer";
 import { tabSwitchEnd } from "./lib/perf";
 
@@ -1159,6 +1160,12 @@ function Shell() {
       window.clearInterval(interval);
       window.clearTimeout(seed);
     };
+  }, [toast]);
+
+  // First launch after an update: say so, once.
+  useEffect(() => {
+    const updated = takeBootUpdate();
+    if (updated) toast(`Euclide a été mis à jour vers la version ${updated.to}.`, "success");
   }, [toast]);
 
   useEffect(() => {

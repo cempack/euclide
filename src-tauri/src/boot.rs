@@ -15,9 +15,10 @@ use crate::commands::settings::{get_setting_raw, UI_SETTINGS};
 const CANVAS_LIGHT: Color = Color(250, 249, 248, 255);
 const CANVAS_DARK: Color = Color(19, 19, 19, 255);
 
-/// Every UI setting (null when never saved), the Pronote status, and a nonce
-/// that lets the frontend tell a fresh boot from a reload of the page.
-pub fn state(conn: &Connection) -> Value {
+/// Every UI setting (null when never saved), the Pronote status, the version
+/// Euclide was just updated from if any, and a nonce that lets the frontend
+/// tell a fresh boot from a reload of the page.
+pub fn state(conn: &Connection, updated_from: Option<&str>) -> Value {
     let settings: Map<String, Value> = UI_SETTINGS
         .iter()
         .map(|key| {
@@ -29,6 +30,7 @@ pub fn state(conn: &Connection) -> Value {
         "nonce": uuid::Uuid::new_v4().to_string(),
         "settings": settings,
         "pronote": crate::commands::pronote::status(conn),
+        "updated": updated_from.map(|from| json!({ "from": from, "to": env!("CARGO_PKG_VERSION") })),
     })
 }
 
@@ -99,7 +101,7 @@ mod tests {
         let conn = crate::db::migrations_for_tests();
         crate::commands::settings::put(&conn, "theme", "dark").unwrap();
         crate::commands::settings::put(&conn, "pronote_password", "secret").unwrap();
-        let boot = state(&conn);
+        let boot = state(&conn, Some("0.2.0"));
         let settings = boot["settings"].as_object().unwrap();
         assert_eq!(settings.len(), UI_SETTINGS.len());
         assert_eq!(settings["theme"], "dark");
@@ -108,5 +110,7 @@ mod tests {
         assert!(!boot.to_string().contains("secret"));
         assert_eq!(boot["pronote"]["connected"], false);
         assert_eq!(boot["nonce"].as_str().unwrap().len(), 36);
+        assert_eq!(boot["updated"]["from"], "0.2.0");
+        assert!(state(&conn, None)["updated"].is_null());
     }
 }
