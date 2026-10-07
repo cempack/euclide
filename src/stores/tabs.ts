@@ -353,6 +353,15 @@ export const tabs = {
 
   setActive,
 
+  /**
+   * A file was deleted: its tabs go, and their editors must not write it
+   * back on the way out.
+   */
+  closeFile(fileId: number) {
+    for (const t of state().tabs.filter((t) => t.params.fileId === fileId))
+      tabs.close(t.id, { discard: true });
+  },
+
   /** No-op when nothing changes: notes rename their tab on every keystroke. */
   rename(id: string, title: string, paramsPatch?: Partial<TabParams>) {
     const prev = state().tabs;

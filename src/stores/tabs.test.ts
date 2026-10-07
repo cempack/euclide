@@ -107,6 +107,14 @@ describe("tabs store", () => {
     expect(tabs.list().map((t) => t.kind)).toEqual(["dashboard"]);
   });
 
+  it("closes a deleted file's tabs without letting their editors save it back", () => {
+    const board = tabs.open({ kind: "whiteboard", params: { fileId: 5 } });
+    tabs.open({ kind: "pdf", params: { fileId: 6 } });
+    tabs.closeFile(5);
+    expect(tabs.list().some((t) => t.params.fileId === 5)).toBe(false);
+    expect(editors.takeDiscarded(board)).toBe(true);
+  });
+
   it("does not touch state when a rename changes nothing", () => {
     const before = tabs.list();
     tabs.rename("dashboard", "Tableau de bord");
