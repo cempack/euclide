@@ -108,6 +108,8 @@ export const q = {
       queryFn: () => api.listSchedule(),
     }),
   links: () => queryOptions({ queryKey: ["links"], queryFn: () => api.listLinks() }),
+  /** Automatic backups: copies, the external folder, the integrity check. */
+  backups: () => queryOptions({ queryKey: ["backups"], queryFn: () => api.getBackupStatus() }),
   pronoteStatus: () =>
     queryOptions({
       queryKey: ["pronote", "status"],

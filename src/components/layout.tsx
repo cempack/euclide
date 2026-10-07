@@ -415,14 +415,17 @@ export function Section({
   action,
   children,
   description,
+  id,
 }: {
   title: string;
   action?: ReactNode;
   description?: ReactNode;
   children: ReactNode;
+  /** An anchor for in-page navigation (Réglages). */
+  id?: string;
 }) {
   return (
-    <section className="flex flex-col gap-2.5">
+    <section id={id} className="flex flex-col gap-2.5 scroll-mt-14">
       <div className="flex items-center justify-between gap-3 min-h-7">
         <div className="min-w-0">
           <h2 className="eu-t-section text-ink">{title}</h2>

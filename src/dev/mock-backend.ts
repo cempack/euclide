@@ -27,6 +27,7 @@ import type {
   Sequence,
   SequenceItem,
   StepResource,
+  BackupStatus,
 } from "../lib/api";
 
 type Args = Record<string, unknown> | undefined;
@@ -442,6 +443,27 @@ const settings = new Map<string, string>([
   ["class_end_notice", "5"],
 ]);
 
+/** Automatic backups: a week of daily copies, a mirror on the PC's disk. */
+const backups = {
+  external: "D:\\Sauvegardes\\Euclide" as string | null,
+  restore: null as string | null,
+};
+function backupStatus(): BackupStatus {
+  const days = [0, 1, 2, 3, 4, 5, 6, 13, 20].map((n) => localYmdOf(addDays(-n)));
+  return {
+    snapshots: days.map((day, i) => ({ name: `${day}.db`, day, size: 2_150_400 - i * 36_864 })),
+    folder: "/media/CLE-USB/Euclide-Sauvegardes",
+    external_dir: backups.external,
+    external_reachable: backups.external != null,
+    last_mirror: backups.external ? `${days[0]} 08:12` : null,
+    integrity: "ok",
+    restore_pending: backups.restore != null,
+  };
+}
+function localYmdOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 let keepAwake = true;
 const pronote: PronoteStatus = {
   connected: true,
@@ -654,7 +676,26 @@ function handle(cmd: string, args: Args): unknown {
         version: "0.1.13",
         data_dir: "/media/CLE-USB/Euclide-Data",
         windows_portable: false,
+        data_format: 2,
       } satisfies AppInfo;
+    case "get_backup_status":
+      return backupStatus();
+    case "backup_now":
+      return backupStatus();
+    case "choose_backup_folder":
+      backups.external = "D:\\Sauvegardes\\Euclide";
+      return backups.external;
+    case "clear_backup_folder":
+      backups.external = null;
+      return null;
+    case "restore_snapshot":
+      backups.restore = str(args, "name");
+      return null;
+    case "cancel_restore":
+      backups.restore = null;
+      return null;
+    case "open_folder":
+      return null;
     case "get_setting":
       return settings.get(str(args, "key")) ?? null;
     case "set_setting":

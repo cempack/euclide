@@ -15,6 +15,7 @@ pub async fn get_app_info() -> AppResult<AppInfo> {
         version: env!("CARGO_PKG_VERSION").into(),
         data_dir: crate::paths::data_dir().to_string_lossy().to_string(),
         windows_portable: crate::portable_update::is_windows_portable(),
+        data_format: crate::db::DATA_FORMAT,
     })
     .await?)
 }

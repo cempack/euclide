@@ -223,6 +223,14 @@ pub fn schedule_restore(name: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Forget a scheduled restore (nothing scheduled is fine).
+pub fn cancel_restore() -> AppResult<()> {
+    match fs::remove_file(restore_marker()) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+        _ => Ok(()),
+    }
+}
+
 /// Called at startup, before the database opens: put a scheduled snapshot in
 /// place. The current database is set aside, never deleted.
 pub fn apply_pending_restore() -> AppResult<Option<String>> {

@@ -6,6 +6,7 @@ use crate::jobs::backup::{self, BackupStatus};
 use std::fs;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 async fn pick_folder(app: &AppHandle) -> Option<std::path::PathBuf> {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -192,6 +193,29 @@ pub async fn clear_backup_folder(db: State<'_, Db>) -> AppResult<()> {
 #[tauri::command]
 pub async fn restore_snapshot(name: String) -> AppResult<()> {
     tauri::async_runtime::spawn_blocking(move || backup::schedule_restore(&name)).await?
+}
+
+/// Keep the current data after all: the scheduled restore will not happen.
+#[tauri::command]
+pub async fn cancel_restore() -> AppResult<()> {
+    tauri::async_runtime::spawn_blocking(backup::cancel_restore).await?
+}
+
+/// Opens one of Euclide's folders in the file manager: the data, the
+/// backups or the logs. The webview names the folder, never a path.
+#[tauri::command]
+pub async fn open_folder(app: AppHandle, which: String) -> AppResult<()> {
+    let dir = match which.as_str() {
+        "data" => crate::paths::data_dir(),
+        "backups" => crate::paths::backups_dir(),
+        "logs" => crate::paths::data_dir().join("logs"),
+        _ => return Err(AppError::user("Dossier inconnu.")),
+    };
+    let target = dir.clone();
+    tauri::async_runtime::spawn_blocking(move || fs::create_dir_all(target)).await??;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| AppError::user(format!("Impossible d'ouvrir le dossier : {e}")))
 }
 
 #[cfg(test)]

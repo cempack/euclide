@@ -10,6 +10,8 @@ pub struct AppInfo {
     pub version: String,
     pub data_dir: String,
     pub windows_portable: bool,
+    /// The database format this copy reads and writes (`PRAGMA user_version`).
+    pub data_format: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

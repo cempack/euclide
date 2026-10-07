@@ -246,6 +246,8 @@ pub fn run() {
             commands::storage::choose_backup_folder,
             commands::storage::clear_backup_folder,
             commands::storage::restore_snapshot,
+            commands::storage::cancel_restore,
+            commands::storage::open_folder,
             commands::settings::set_keep_awake,
             commands::settings::set_keep_awake_mode,
             commands::settings::keep_awake_status,

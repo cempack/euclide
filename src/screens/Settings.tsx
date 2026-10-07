@@ -16,8 +16,10 @@ import {
 import { DAY_LABELS, isoDayOfWeek } from "../lib/format";
 
 import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
-import { Field, MetaDot, PageHeader, Panel, Section, Segmented } from "../components/layout";
-import { ArchiveIcon, CheckIcon, MoonIcon, PlusIcon, QrIcon, SunIcon, TrashIcon } from "../components/icons";
+import { PageHeader, Panel, Section, Segmented } from "../components/layout";
+import { BackupsSection } from "../features/settings/BackupsSection";
+import { SettingRow, SettingsNav, type NavSection } from "../features/settings/SettingRow";
+import { CheckIcon, MoonIcon, PlusIcon, QrIcon, SunIcon, TrashIcon } from "../components/icons";
 import { tabs, useTabLimit } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,31 +30,63 @@ import { remoteFaviconsEnabled } from "../components/Favicon";
 const NO_ENTRIES: ScheduleEntry[] = [];
 const NO_COURSES: Course[] = [];
 
+const SECTIONS: NavSection[] = [
+  { id: "profil", label: tr("settings.profileTitle") },
+  { id: "apparence", label: tr("settings.metaAppearance") },
+  { id: "pronote", label: tr("settings.pronoteTitle") },
+  { id: "emploi-du-temps", label: tr("settings.scheduleTitle") },
+  { id: "onglets", label: tr("settings.tabsTitle") },
+  { id: "sauvegardes", label: tr("backups.title") },
+  { id: "donnees", label: tr("settings.dataDirTitle") },
+  { id: "a-propos", label: tr("about.title") },
+];
+
 export default function Settings({ info }: { info: AppInfo | null }) {
   return (
     <>
-      <PageHeader
-        title={tr("nav.settings")}
-        meta={
-          <>
-            <span>{tr("settings.metaAppearance")}</span>
-            <MetaDot />
-            <span>Pronote</span>
-            <MetaDot />
-            <span>{tr("settings.scheduleTitle")}</span>
-            <MetaDot />
-            <span>{tr("settings.dataDirTitle")}</span>
-          </>
-        }
-      />
+      <PageHeader title={tr("nav.settings")} />
+      <SettingsNav sections={SECTIONS} />
 
+      <ProfileSection />
       <AppearanceSection />
       <PronoteSection />
       <ScheduleSection />
       <TabsSection />
+      <BackupsSection id="sauvegardes" />
       <DataStorageSection info={info} />
       <AboutSection info={info} />
     </>
+  );
+}
+
+/** The teacher's name, as the dashboard greets them and the sidebar shows it. */
+function ProfileSection() {
+  const [saved, setSaved] = useSetting("teacher_display_name");
+  const pronoteName = useQuery(q.pronoteStatus()).data?.account_name ?? "";
+  const [draft, setDraft] = useState<string | null>(null);
+  const value = draft ?? saved ?? "";
+  const commit = () => {
+    if (draft == null) return;
+    const next = draft.trim();
+    if (next !== (saved ?? "")) setSaved(next);
+    setDraft(null);
+  };
+  return (
+    <Section title={tr("settings.profileTitle")} id="profil">
+      <Panel pad>
+        <SettingRow title={tr("settings.displayName")} hint={tr("settings.displayNameHint")}>
+          <input
+            className="eu-input w-64"
+            value={value}
+            placeholder={pronoteName || tr("settings.displayNamePlaceholder")}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+            aria-label={tr("settings.displayName")}
+          />
+        </SettingRow>
+      </Panel>
+    </Section>
   );
 }
 
@@ -71,7 +105,7 @@ function AppearanceSection() {
   const endLead = leadN >= 1 && leadN <= 15 ? leadN : 5;
 
   return (
-    <Section title={tr("settings.metaAppearance")}>
+    <Section title={tr("settings.metaAppearance")} id="apparence">
       <Panel pad>
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -198,10 +232,7 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
     try {
       const p = await api.chooseDataDir();
       if (p) {
-        toast(
-          "Dossier de stockage sélectionné. Redémarrez Euclide pour utiliser le nouveau dossier (toute la DB, fichiers, scripts…).",
-          "success",
-        );
+        toast(tr("settings.dataDirChosen"), "success");
       }
     } catch (err) {
       reportError("settings.pickFolder", err);
@@ -214,8 +245,8 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
   const reset = async () => {
     const ok = await confirmDlg.ask({
       title: tr("settings.resetTitle"),
-      message: "Revenir au dossier par défaut (Euclide-Data à côté de l'exécutable) ?",
-      confirmLabel: tr("common.done"),
+      message: tr("settings.resetMessage"),
+      confirmLabel: tr("settings.resetConfirm"),
       danger: true,
     });
     if (!ok) return;
@@ -231,47 +262,34 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
     }
   };
 
-  const backup = async () => {
-    setBusy(true);
-    try {
-      toast(tr("settings.backupRunning"), "info");
-      const path = await api.backupDataDir();
-      toast(tr("settings.backupDone", { path }), "success");
-    } catch (err) {
-      toast(errorMessage(err, tr("settings.backupError")), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <Section title={tr("settings.dataDirTitle")}>
+    <Section title={tr("settings.dataDirTitle")} id="donnees">
       <Panel pad>
-        <Field label={tr("settings.dataDirLabel")} hint={tr("settings.dataDirHint")}>
-          <p className="eu-panel-alt rounded px-2.5 py-2 font-mono text-small text-ink-muted break-all selectable">
-            {current || tr("settings.dataDirUnknown")}
-          </p>
-        </Field>
-
-        <div className="flex flex-wrap gap-2 mt-3.5">
+        <SettingRow
+          title={tr("settings.dataDirLabel")}
+          hint={
+            <>
+              {tr("settings.dataDirHint")}
+              <span className="block mt-1.5 font-mono text-small text-ink-muted break-all selectable">
+                {current || tr("settings.dataDirUnknown")}
+              </span>
+            </>
+          }
+        >
+          <button
+            className="eu-btn-quiet eu-btn-sm"
+            disabled={!isTauri()}
+            onClick={() => void api.openFolder("data").catch((err) => toast(errorMessage(err), "error"))}
+          >
+            {tr("backups.openFolder")}
+          </button>
           <button onClick={choose} disabled={busy} className="eu-btn-ghost eu-btn-sm">
             {tr("settings.pickFolder")}
           </button>
           <button onClick={reset} disabled={busy} className="eu-btn-quiet eu-btn-sm">
             {tr("settings.resetFolder")}
           </button>
-        </div>
-
-        <div className="border-t border-line mt-4 pt-4 flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <p className="eu-t-body font-medium text-ink">{tr("settings.backupTitle")}</p>
-            <p className="eu-t-meta max-w-[62ch]">{tr("settings.backupHint")}</p>
-          </div>
-          <button onClick={backup} disabled={busy} className="eu-btn-ghost eu-btn-sm">
-            <ArchiveIcon className="w-3.5 h-3.5" />
-            {tr("settings.backupNow")}
-          </button>
-        </div>
+        </SettingRow>
       </Panel>
     </Section>
   );
@@ -428,7 +446,7 @@ function PronoteSection() {
   };
 
   return (
-    <Section title={tr("settings.pronoteTitle")}>
+    <Section title={tr("settings.pronoteTitle")} id="pronote">
       <Panel pad>
         <div className="flex items-center gap-3.5 flex-wrap">
           <span
@@ -651,6 +669,7 @@ function ScheduleSection() {
 
   return (
     <Section
+      id="emploi-du-temps"
       title={tr("settings.scheduleTitle")}
       description={tr("settings.scheduleWeek")}
       action={
@@ -815,7 +834,7 @@ function TabsSection() {
         : `${limit.max} MAX`;
 
   return (
-    <Section title={tr("settings.tabsTitle")} action={<span className="eu-chip">{chip}</span>}>
+    <Section title={tr("settings.tabsTitle")} id="onglets" action={<span className="eu-chip">{chip}</span>}>
       <Panel pad>
         <div className="flex flex-col gap-3">
           <Segmented
@@ -870,6 +889,17 @@ function TabsSection() {
 }
 
 // About
+
+/** The engine that draws Euclide: WebView2 on Windows, WebKitGTK on Linux. */
+function webviewName(): string {
+  const ua = navigator.userAgent;
+  const edge = /Edg\/([\d.]+)/.exec(ua);
+  if (edge) return `WebView2 ${edge[1]}`;
+  const chrome = /Chrome\/([\d.]+)/.exec(ua);
+  if (chrome) return `Chromium ${chrome[1]}`;
+  const webkit = /AppleWebKit\/([\d.]+)/.exec(ua);
+  return webkit ? `WebKit ${webkit[1]}` : ua;
+}
 
 function AboutSection({ info }: { info: AppInfo | null }) {
   const toast = useToast();
@@ -986,7 +1016,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                   : "";
 
   return (
-    <Section title={tr("about.title")}>
+    <Section title={tr("about.title")} id="a-propos">
       <Panel pad>
         <div className="flex items-center gap-3.5">
           <img
@@ -1044,6 +1074,32 @@ function AboutSection({ info }: { info: AppInfo | null }) {
             </p>
           </div>
         )}
+      </Panel>
+
+      {/* What to tell when something goes wrong. */}
+      <Panel pad>
+        <SettingRow title={tr("about.diagnostics")} hint={tr("about.diagnosticsHint")}>
+          <button
+            className="eu-btn-quiet eu-btn-sm"
+            disabled={!isTauri()}
+            onClick={() => void api.openFolder("logs").catch((err) => toast(errorMessage(err), "error"))}
+          >
+            {tr("about.openLogs")}
+          </button>
+        </SettingRow>
+        <dl className="eu-facts selectable">
+          <dt>{tr("about.version")}</dt>
+          <dd>
+            {info ? info.version : "—"}
+            {info?.windows_portable ? ` · ${tr("about.portable")}` : ""}
+          </dd>
+          <dt>{tr("about.dataFormat")}</dt>
+          <dd>{info?.data_format ?? "—"}</dd>
+          <dt>{tr("about.engine")}</dt>
+          <dd>{webviewName()}</dd>
+          <dt>{tr("about.dataFolder")}</dt>
+          <dd className="break-all">{info?.data_dir ?? "—"}</dd>
+        </dl>
       </Panel>
     </Section>
   );
