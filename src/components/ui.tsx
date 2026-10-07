@@ -227,33 +227,45 @@ type ConfirmState =
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConfirmState>(null);
+  // Updated synchronously by show/close so back-to-back questions see each other.
   const stateRef = React.useRef<ConfirmState>(null);
-  stateRef.current = state;
   const panelRef = React.useRef<HTMLDivElement>(null);
   const restoreRef = React.useRef<HTMLElement | null>(null);
 
+  // A new question replaces the open one: settle the old promise as a
+  // cancel so its caller does not wait forever.
+  const show = useCallback((next: NonNullable<ConfirmState>) => {
+    const prev = stateRef.current;
+    if (prev?.mode === "ask") prev.resolve(false);
+    else if (prev?.mode === "dirty") prev.resolve("cancel");
+    stateRef.current = next;
+    setState(next);
+  }, []);
+
   const ask = useCallback((opts: ConfirmAskOpts) => {
     return new Promise<boolean>((resolve) => {
-      setState({ mode: "ask", opts, resolve });
+      show({ mode: "ask", opts, resolve });
     });
-  }, []);
+  }, [show]);
 
   const dirty = useCallback((opts: ConfirmDirtyOpts) => {
     return new Promise<"save" | "discard" | "cancel">((resolve) => {
-      setState({ mode: "dirty", opts, resolve });
+      show({ mode: "dirty", opts, resolve });
     });
-  }, []);
+  }, [show]);
 
   const api = useMemo<ConfirmApi>(() => ({ ask, dirty }), [ask, dirty]);
 
   const closeAsk = useCallback((value: boolean) => {
     const s = stateRef.current;
     if (s?.mode === "ask") s.resolve(value);
+    stateRef.current = null;
     setState(null);
   }, []);
   const closeDirty = useCallback((value: "save" | "discard" | "cancel") => {
     const s = stateRef.current;
     if (s?.mode === "dirty") s.resolve(value);
+    stateRef.current = null;
     setState(null);
   }, []);
 
@@ -514,7 +526,7 @@ export function Loading({ label = "Chargement…", size = "default" }: { label?:
         />
         {/* spinning arc */}
         <motion.div
-          className={`absolute inset-0 rounded-full border ${isSmall ? "border-2" : "border-[3px]"} border-t-primary border-transparent`}
+          className={`absolute inset-0 rounded-full border ${isSmall ? "border-2" : "border-[3px]"} border-transparent border-t-ink`}
           animate={{ rotate: 360 }}
           transition={{ duration: 0.75, repeat: Infinity, ease: "linear" }}
         />

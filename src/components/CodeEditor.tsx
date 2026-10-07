@@ -15,13 +15,6 @@ const PYTHON_BUILTINS = new Set([
   "repr", "str", "chr", "ord", "hex", "bin", "oct",
 ]);
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 type Token = { text: string; type: "keyword" | "builtin" | "string" | "comment" | "number" | "plain" };
 
 function tokenizePython(src: string): Token[] {
@@ -457,7 +450,7 @@ export default function CodeEditor({
         >
           {tokens.map((tok, idx) => (
             <span key={idx} className={`tok-${tok.type}`}>
-              {escapeHtml(tok.text)}
+              {tok.text}
             </span>
           ))}
         </pre>

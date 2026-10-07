@@ -269,7 +269,7 @@ export default function Documents({ filterHint, visible = true }: { filterHint?:
       await api.deleteNote(n.id);
       tabs.tabs
         .filter((t) => t.kind === "note" && t.params.noteId === n.id)
-        .forEach((t) => tabs.close(t.id));
+        .forEach((t) => tabs.close(t.id, { discard: true }));
       toast(get("notes.deleted", "Note supprimée"), "success");
       window.dispatchEvent(new CustomEvent("eu:library-changed"));
     } catch (err: any) {
