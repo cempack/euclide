@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, memo } from "react";
-import { motion } from "framer-motion";
 import { useTabs } from "../lib/tabs";
 import { api, type Course } from "../lib/api";
 import { t, get, fmt } from "../lib/i18n";
@@ -31,12 +30,7 @@ const CourseCard = memo(function CourseCard({
   const visual = useMemo(() => courseVisual(c.color, dark), [c.color, dark]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
-      className="eu-panel group relative flex overflow-hidden hover:border-line-strong transition-colors duration-fast"
-    >
+    <div className="eu-panel eu-enter group relative flex overflow-hidden hover:border-line-strong transition-colors duration-fast">
       <span aria-hidden className="w-1 shrink-0" style={{ background: visual.fg }} />
       <button type="button" onClick={() => onOpen(c)} className="flex-1 min-w-0 text-left p-[14px] pr-9">
         <span
@@ -67,7 +61,7 @@ const CourseCard = memo(function CourseCard({
         aria-hidden
         className="absolute bottom-3 right-2.5 w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
       />
-    </motion.div>
+    </div>
   );
 });
 

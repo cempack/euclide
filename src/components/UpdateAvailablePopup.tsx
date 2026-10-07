@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { XIcon } from "./icons";
 import { useConfirm, useToast } from "./ui";
@@ -81,16 +80,12 @@ export function UpdateAvailablePopup({
   };
 
   return (
-    <AnimatePresence>
+    <>
       {update && (
-        <motion.div
+        <div
           role="status"
           aria-live="polite"
-          initial={{ opacity: 0, y: 12, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={{ type: "spring", stiffness: 420, damping: 30 }}
-          className="fixed bottom-9 right-5 z-overlay w-[min(calc(100vw-2.5rem),320px)] eu-panel shadow-pop p-3.5"
+          className="eu-enter fixed bottom-9 right-5 z-overlay w-[min(calc(100vw-2.5rem),20rem)] eu-panel shadow-pop p-3.5"
         >
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
@@ -143,8 +138,8 @@ export function UpdateAvailablePopup({
               </button>
             )}
           </div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

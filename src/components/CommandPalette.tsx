@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { Dialog } from "../ui/Dialog";
 import { api, type QuickLink, type SearchResult } from "../lib/api";
 import { useTabs } from "../lib/tabs";
 import { get, fmt, t } from "../lib/i18n";
@@ -422,111 +422,82 @@ function CommandPalette({
     } else if (e.key === "Enter") {
       e.preventDefault();
       filtered[sel]?.run();
-    } else if (e.key === "Escape") {
-      onClose();
     }
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-palette flex items-start justify-center pt-[14vh] px-6">
-          <motion.div
-            className="eu-scrim"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            onClick={onClose}
-          />
-          <motion.div
-            className="relative w-full max-w-xl eu-panel shadow-pop overflow-hidden"
-            initial={{ opacity: 0, scale: 0.97, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.985 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          >
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line">
-              {scope === "all" ? (
-                <SearchIcon className="w-4 h-4 text-ink-faint shrink-0" />
-              ) : (
-                <span className="font-mono text-[14px] font-semibold text-accent shrink-0 w-4 text-center">
-                  {query.charAt(0)}
-                </span>
-              )}
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={onKey}
-                placeholder={get("palette.placeholder", "Rechercher un cours, un document, une note…")}
-                className="eu-cmdk-input flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-faint"
-              />
-            </div>
-            <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">
-              {filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center eu-t-body text-ink-muted">
-                  {get("documents.nothingHere", "Aucun résultat")}
-                </p>
-              ) : (
-                filtered.map((a, i) => {
-                  const prev = filtered[i - 1];
-                  const showGroup = !prev || prev.group !== a.group;
-                  return (
-                    <div key={a.id}>
-                      {showGroup && <p className="eu-t-label px-2.5 pt-2.5 pb-1.5">{a.group}</p>}
-                      <button
-                        data-sel={i}
-                        onClick={a.run}
-                        onMouseEnter={() => setSel(i)}
-                        className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded text-left transition-colors duration-fast ${
-                          i === sel ? "bg-ink text-panel" : "text-ink hover:bg-panel-alt"
-                        }`}
-                      >
-                        <span className={`mt-px shrink-0 ${i === sel ? "opacity-90" : "text-ink-faint"}`}>
-                          {a.icon}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="eu-t-body block truncate">{a.label}</span>
-                          {a.snippet && (
-                            <span className={`block eu-t-meta truncate ${i === sel ? "text-panel/70" : ""}`}>
-                              {a.snippet}
-                            </span>
-                          )}
-                        </span>
-                        {a.hint && (
-                          <span
-                            className={`eu-t-label normal-case tracking-normal shrink-0 mt-0.5 ${
-                              i === sel ? "text-panel/70" : ""
-                            }`}
-                          >
-                            {a.hint}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      label={get("shortcuts.palette", "Palette de recherche")}
+      className="max-w-xl eu-dialog-top overflow-hidden"
+    >
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line">
+        {scope === "all" ? (
+          <SearchIcon className="w-4 h-4 text-ink-faint shrink-0" />
+        ) : (
+          <span className="font-mono text-[14px] font-semibold text-accent shrink-0 w-4 text-center">
+            {query.charAt(0)}
+          </span>
+        )}
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onKey}
+          placeholder={get("palette.placeholder", "Rechercher un cours, un document, une note…")}
+          className="eu-cmdk-input flex-1 bg-transparent text-body text-ink placeholder:text-ink-faint"
+        />
+      </div>
+      <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">
+        {filtered.length === 0 ? (
+          <p className="px-3 py-6 text-center eu-t-body text-ink-muted">
+            {get("documents.nothingHere", "Aucun résultat")}
+          </p>
+        ) : (
+          filtered.map((a, i) => {
+            const prev = filtered[i - 1];
+            const showGroup = !prev || prev.group !== a.group;
+            return (
+              <div key={a.id}>
+                {showGroup && <p className="eu-t-label px-2.5 pt-2.5 pb-1.5">{a.group}</p>}
+                <button
+                  data-sel={i}
+                  onClick={a.run}
+                  onMouseEnter={() => setSel(i)}
+                  className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded text-left text-ink transition-colors duration-fast ${
+                    i === sel ? "bg-pressed" : ""
+                  }`}
+                >
+                  <span className={`mt-px shrink-0 ${i === sel ? "text-ink" : "text-ink-faint"}`}>
+                    {a.icon}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="eu-t-body block truncate">{a.label}</span>
+                    {a.snippet && <span className="block eu-t-meta truncate">{a.snippet}</span>}
+                  </span>
+                  {a.hint && <span className="eu-t-caption shrink-0 mt-0.5">{a.hint}</span>}
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
 
-            <div className="flex items-center gap-3 px-3 py-1.5 border-t border-line bg-panel-alt">
-              {PREFIXES.map((p) => (
-                <span key={p.key} className="eu-t-label normal-case tracking-normal flex items-center gap-1">
-                  <span className="eu-kbd">{p.key}</span>
-                  {p.label}
-                </span>
-              ))}
-              <span className="flex-1" />
-              <span className="eu-t-label normal-case tracking-normal flex items-center gap-1">
-                <span className="eu-kbd">↵</span>
-                {get("palette.open", "ouvrir")}
-              </span>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+      <div className="flex items-center gap-3 px-3 py-1.5 border-t border-line bg-panel-alt">
+        {PREFIXES.map((p) => (
+          <span key={p.key} className="eu-t-caption flex items-center gap-1">
+            <span className="eu-kbd">{p.key}</span>
+            {p.label}
+          </span>
+        ))}
+        <span className="flex-1" />
+        <span className="eu-t-caption flex items-center gap-1">
+          <span className="eu-kbd">↵</span>
+          {get("palette.open", "ouvrir")}
+        </span>
+      </div>
+    </Dialog>
   );
 }
 

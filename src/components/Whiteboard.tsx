@@ -973,7 +973,11 @@ export default function Whiteboard({
           }
         }}
       >
-        <div style={{ position: "relative", width: `${pageSize.w}px`, height: `${pageSize.h}px` }}>
+        {/* The board is paper in both themes, as it exports: dark-mode ink stayed invisible. */}
+        <div
+          className="bg-paper"
+          style={{ position: "relative", width: `${pageSize.w}px`, height: `${pageSize.h}px` }}
+        >
           <canvas
             ref={canvasRef}
             onPointerDown={start}
