@@ -28,3 +28,8 @@ src-tauri/resources/euclide-sidecar/
 *.log
 .vscode/
 .idea/
+
+# screenshot harness (reference images are per machine)
+.shots/
+test-results/
+playwright-report/

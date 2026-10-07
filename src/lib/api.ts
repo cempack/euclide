@@ -99,6 +99,12 @@ export async function openExternalUrl(url: string): Promise<void> {
  */
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
+    // The dev server runs against an in-memory backend with realistic data;
+    // production builds never include it.
+    if (import.meta.env.DEV) {
+      const { mockInvoke } = await import("../dev/mock-backend");
+      return mockInvoke<T>(cmd, args);
+    }
     console.warn(`[euclide] invoke("${cmd}") called outside Tauri - returning fallback.`);
     return fallback<T>(cmd, args);
   }

@@ -12,7 +12,9 @@
     "tauri": "tauri",
     "app": "tauri dev",
     "app:build": "tauri build",
-    "app:build:usb": "tauri build --config src-tauri/tauri.usb.conf.json"
+    "app:build:usb": "tauri build --config src-tauri/tauri.usb.conf.json",
+    "shots": "playwright test",
+    "shots:update": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -36,6 +38,7 @@
     "remark-math": "^6.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.1.0",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
