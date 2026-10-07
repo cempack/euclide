@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useRef, useState, useCallback } from "react";
 import { useTabs } from "../lib/tabs";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
@@ -18,6 +18,32 @@ interface NoteEditorProps {
   isNew?: boolean;
   initialCourseId?: number;
 }
+
+// Built once: new plugin arrays or components on each render made
+// react-markdown parse the note and re-render all its formulas on every
+// keystroke, even while the preview text itself had not changed.
+const REMARK_PLUGINS = [remarkMath];
+const REHYPE_PLUGINS = [rehypeKatex];
+const MARKDOWN_COMPONENTS = {
+  a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a {...props} target="_blank" rel="noopener noreferrer" />
+  ),
+};
+
+/** The rendered note; renders again only when its text changes. */
+const MarkdownPreview = memo(function MarkdownPreview({ body }: { body: string }) {
+  return (
+    <div className="eu-prose max-w-[68ch]">
+      <ReactMarkdown
+        remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={REHYPE_PLUGINS}
+        components={MARKDOWN_COMPONENTS}
+      >
+        {body}
+      </ReactMarkdown>
+    </div>
+  );
+});
 
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const tabs = useTabs();
@@ -576,17 +602,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
           <p className="eu-t-label px-3 py-1.5 border-b border-line">{get("notes.preview", "Aperçu")}</p>
           <div className="flex-1 min-h-0 overflow-auto p-4 bg-panel selectable">
             {previewBody ? (
-              <div className="eu-prose max-w-[68ch]">
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
-                  }}
-                >
-                  {previewBody}
-                </ReactMarkdown>
-              </div>
+              <MarkdownPreview body={previewBody} />
             ) : (
               <p className="eu-t-body text-ink-faint italic">
                 {get("notes.previewEmpty", "L'aperçu apparaîtra ici pendant que vous écrivez.")}

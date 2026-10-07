@@ -1,5 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "../ui/Dialog";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { q } from "../api/queries";
 import { api, type QuickLink, type SearchResult } from "../lib/api";
 import { useTabs } from "../lib/tabs";
 import { get, fmt, t } from "../lib/i18n";
@@ -26,6 +28,8 @@ import {
   SparkleIcon,
   ToolIcon,
 } from "./icons";
+
+const NO_LINKS: QuickLink[] = [];
 
 interface Action {
   id: string;
@@ -81,8 +85,10 @@ function CommandPalette({
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [links, setLinks] = useState<QuickLink[]>([]);
-  const [keepAwake, setKeepAwake] = useState<boolean | null>(null);
+  const queryClient = useQueryClient();
+  const links = useQuery({ ...q.links(), enabled: open }).data ?? NO_LINKS;
+  const keepAwake = useQuery({ ...q.keepAwake(), enabled: open }).data ?? null;
+  const setKeepAwake = (on: boolean) => queryClient.setQueryData(q.keepAwake().queryKey, on);
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -92,14 +98,6 @@ function CommandPalette({
     setResults([]);
     setSel(0);
     setTimeout(() => inputRef.current?.focus(), 30);
-    api
-      .listLinks()
-      .then((l) => setLinks(Array.isArray(l) ? l : []))
-      .catch(() => setLinks([]));
-    api
-      .keepAwakeStatus()
-      .then((s) => setKeepAwake(!!s))
-      .catch(() => {});
   }, [open]);
 
   // global search across courses, files (name + content) and notes

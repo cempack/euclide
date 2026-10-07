@@ -18,6 +18,8 @@ import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
 import { TooltipLayer } from "./ui/Tooltip";
+import { useQueryClient } from "@tanstack/react-query";
+import { q } from "./api/queries";
 import { Dialog } from "./ui/Dialog";
 import { DocIcon, PlusIcon } from "./components/icons";
 import Dashboard from "./screens/Dashboard";
@@ -310,6 +312,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 function Shell() {
+  const queryClient = useQueryClient();
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
@@ -399,8 +402,8 @@ function Shell() {
 
     const readPrefs = async () => {
       const [m, l] = await Promise.all([
-        api.getSetting("class_end_notice").catch(() => null),
-        api.getSetting("class_end_lead").catch(() => null),
+        queryClient.fetchQuery(q.setting("class_end_notice")).catch(() => null),
+        queryClient.fetchQuery(q.setting("class_end_lead")).catch(() => null),
       ]);
       if (cancelled) return;
       if (m === "off" || m === "toast" || m === "sound") mode = m;
@@ -414,7 +417,8 @@ function Shell() {
     const tick = async () => {
       if (mode === "off") return;
       try {
-        const classes = await api.getTodayClasses();
+        // From the shared cache: the dashboard and status bar keep it current.
+        const classes = await queryClient.fetchQuery(q.todayClasses());
         const now = new Date();
         for (const c of classes) {
           const left = minutesRemaining(c, now);
@@ -443,7 +447,7 @@ function Shell() {
       window.clearInterval(interval);
       window.clearTimeout(seed);
     };
-  }, [toast]);
+  }, [toast, queryClient]);
 
   // First launch after an update: say so, once.
   useEffect(() => {
