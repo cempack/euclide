@@ -1658,6 +1658,35 @@ input[type="radio"] {
   }
 }
 
+/* A lesson of the cahier de textes (screens/ClassContent.tsx). */
+.eu-lesson {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+}
+.eu-lesson-date {
+  width: 8.5rem;
+  flex-shrink: 0;
+}
+.eu-resource-copy {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  border-left: 1px solid var(--color-line);
+  color: var(--color-ink-faint);
+}
+.eu-resource-copy:hover {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+@container (width < 40rem) {
+  .eu-lesson {
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+}
+
 /* The resource picker: a search field, then the library by group. */
 .eu-search {
   display: flex;

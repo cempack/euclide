@@ -54,6 +54,16 @@ const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }> = [
       await settle(p);
     },
   },
+  {
+    name: "class-content",
+    go: async (p) => {
+      await p
+        .getByRole("button", { name: /MATHEMATIQUES · 2NDE7/ })
+        .first()
+        .click();
+      await settle(p);
+    },
+  },
   { name: "documents", go: (p) => nav(p, "Documents") },
   { name: "reminders", go: (p) => nav(p, "Rappels") },
   { name: "whiteboard", go: (p) => nav(p, "Tableau blanc") },

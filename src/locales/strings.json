@@ -552,9 +552,9 @@
   },
   "classContent": {
     "back": "Retour au cours",
-    "title": "Contenu du cours — {class}",
+    "title": "Cahier de textes — {class}",
     "refresh": "Rafraîchir",
-    "refreshing": "Rafraîchissement...",
+    "refreshing": "Rafraîchissement…",
     "noContent": "Aucun contenu Pronote",
     "noContentHint": "Aucun contenu de cours trouvé pour {class} / {matiere}.",
     "linkCopied": "Lien copié dans le presse-papiers",
@@ -565,7 +565,19 @@
     },
     "metaRefreshed": "actualisé à {time}",
     "errorTitle": "Contenu indisponible",
-    "loadingFor": "Chargement du contenu Pronote pour {class}…"
+    "loadingFor": "Chargement du contenu Pronote pour {class}…",
+    "noMatiere": "Aucune matière définie pour ce cours. Choisissez Mathématiques, NSI ou Maths expertes sur la page du cours.",
+    "loadError": "Impossible de récupérer le cahier de textes. Vérifiez la connexion à Pronote.",
+    "untitled": "Sans titre",
+    "groups": "Groupes : {groups}",
+    "openInBrowser": "Ouvrir dans le navigateur",
+    "copyLink": "Copier le lien de « {name} »",
+    "copyLinkTip": "Copier le lien Pronote",
+    "weekThis": "Cette semaine",
+    "weekLast": "Semaine dernière",
+    "weekNext": "Semaine prochaine",
+    "weekOf": "Semaine du {date}",
+    "weekUnknown": "Sans date"
   },
   "dragDrop": {
     "drop": "Déposez vos fichiers",
