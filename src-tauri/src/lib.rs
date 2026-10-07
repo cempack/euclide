@@ -33,6 +33,7 @@ pub fn run() {
             if !crate::paths::ensure_writable_data_dir() {
                 std::process::exit(0);
             }
+            crate::paths::freeze_data_dir();
             let exe_dir = crate::paths::exe_dir();
             crate::portable_update::purge_update_leftovers(&exe_dir);
             #[cfg(windows)]
