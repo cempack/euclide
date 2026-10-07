@@ -6,5 +6,6 @@
 
 pub mod courses;
 pub mod legacy;
+pub mod notes;
 
 pub(crate) use legacy::{get_setting_raw, set_setting_raw};
