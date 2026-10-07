@@ -1013,6 +1013,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "futures-util",
+ "gtk",
  "keepawake",
  "minisign-verify",
  "reqwest",
@@ -1029,6 +1030,9 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "uuid",
+ "webkit2gtk",
+ "webview2-com",
+ "windows",
  "windows-sys 0.61.2",
  "zip",
 ]

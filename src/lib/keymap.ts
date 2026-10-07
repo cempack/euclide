@@ -95,6 +95,12 @@ export const KEYMAP = {
     group: "actions",
     inFields: true,
   },
+  print: {
+    keys: "mod+P",
+    label: tr("shortcuts.print"),
+    group: "actions",
+    inFields: true,
+  },
   projection: {
     keys: "mod+shift+P",
     label: tr("appearance.projection"),

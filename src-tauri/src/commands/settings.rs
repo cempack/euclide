@@ -24,6 +24,7 @@ pub(crate) const UI_SETTINGS: &[&str] = &[
     "python_output_height",
     "documents_view",
     "keep_awake_mode",
+    "note_templates",
 ];
 
 fn ui_key(key: &str) -> AppResult<&str> {

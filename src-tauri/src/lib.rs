@@ -12,6 +12,7 @@ mod models;
 mod paths;
 mod perf;
 mod portable_update;
+mod print;
 mod protocol;
 mod relaunch;
 mod runner;
@@ -228,6 +229,7 @@ pub fn run() {
             commands::python::import_python_script,
             thumbs::missing_thumbnails,
             thumbs::save_thumbnail,
+            print::print_to_pdf,
             runner::python_run,
             runner::python_input,
             runner::python_stop,

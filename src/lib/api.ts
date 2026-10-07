@@ -467,6 +467,13 @@ export const api = {
       ...(opts.courseId != null ? { "x-eu-course-id": String(opts.courseId) } : {}),
       ...(opts.folder ? { "x-eu-folder": opts.folder } : {}),
     }),
+  /**
+   * Print the page (its `@media print` layout) into `title.pdf` in the
+   * library, without a dialog. Fails with code `print_unsupported` where the
+   * webview cannot, `print_failed` when printing did not finish.
+   */
+  printToPdf: (title: string, courseId: number | null) =>
+    invoke<FileItem>("print_to_pdf", { title, courseId }),
   /** Documents waiting for a preview (a few at a time). */
   missingThumbnails: () => invoke<ThumbJob[]>("missing_thumbnails").then(asList<ThumbJob>),
   saveThumbnail: (fileId: number, jpeg: ArrayBuffer) =>

@@ -593,6 +593,9 @@ function Shell() {
   // F5 presents a note (NoteEditor binds it); anywhere else it does nothing,
   // rather than reload the window and lose what is not saved.
   useShortcut("present", () => {});
+  // Ctrl+P prints a note (NoteEditor binds it); the app's own screen would
+  // print blank (styles.css keeps only the print sheet).
+  useShortcut("print", () => {});
   useShortcut("projection", toggleProjection);
   useShortcut("newTab", openDashboard);
   useShortcut("dashboard", openDashboard);
