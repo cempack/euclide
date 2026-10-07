@@ -53,11 +53,7 @@
     "quickLinks": "Liens",
     "inProgress": "EN COURS",
     "past": "passé",
-    "cheers": [
-      "Bien joué !",
-      "Fait !",
-      "Nickel !"
-    ],
+    "cheers": ["Bien joué !", "Fait !", "Nickel !"],
     "confirmDeleteReminder": "Supprimer le rappel ?",
     "errorDeleteReminder": "Suppression impossible",
     "toastReminderAdded": "Rappel ajouté",
@@ -94,14 +90,7 @@
     "openContent": "Cahier de textes",
     "linkCourse": "Associer un cours"
   },
-  "greetings": [
-    "Bonjour",
-    "Prêt ?",
-    "On y va ?",
-    "Bonjour !",
-    "Bonne journée",
-    "En forme ?"
-  ],
+  "greetings": ["Bonjour", "Prêt ?", "On y va ?", "Bonjour !", "Bonne journée", "En forme ?"],
   "greetingsNamed": [
     "Bonjour {name}",
     "Prêt {name} ?",
