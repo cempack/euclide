@@ -3655,9 +3655,16 @@ mod classroom_flow_tests {
 
         let dest = write_data_dir_backup(&src, &snapshot).unwrap();
         assert!(dest.exists());
+        // Compare path components, not a string: Windows uses another separator.
+        assert_eq!(
+            dest.parent().and_then(|p| p.file_name()).unwrap(),
+            "Euclide-Sauvegardes"
+        );
         assert!(dest
+            .file_name()
+            .unwrap()
             .to_string_lossy()
-            .contains("Euclide-Sauvegardes/euclide-"));
+            .starts_with("euclide-"));
 
         let mut archive = zip::ZipArchive::new(fs::File::open(&dest).unwrap()).unwrap();
         let mut names = Vec::new();
@@ -3801,7 +3808,12 @@ mod hardening_tests {
 
     #[test]
     fn plain_file_names_only() {
-        for ok in ["cours.pdf", "Théorème de Pythagore.pdf", "a..b.txt", ".hidden"] {
+        for ok in [
+            "cours.pdf",
+            "Théorème de Pythagore.pdf",
+            "a..b.txt",
+            ".hidden",
+        ] {
             assert!(plain_file_name(ok).is_ok(), "{ok} should be accepted");
         }
         for bad in [
