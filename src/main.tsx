@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { MotionConfig } from "framer-motion";
 
 // Bundled typefaces. Euclide is local and portable (USB key, classrooms with no
 // network): fonts must ship with the app, not come from a CDN. Latin +
@@ -37,13 +36,9 @@ startPerf();
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      {/* reducedMotion="user" makes every framer-motion animation honour the
-          OS accessibility setting, with no per-component change. */}
-      <MotionConfig reducedMotion="user">
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </MotionConfig>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
     </ErrorBoundary>
   </React.StrictMode>,
 );

@@ -816,6 +816,114 @@
     @apply border-danger bg-danger-soft text-danger;
   }
 
+  /* Waiting: a spinner that appears only if the wait lasts, and skeleton
+     blocks that hold a screen's layout while its data loads. */
+  .eu-loading {
+    @apply flex flex-col items-center justify-center text-center;
+    animation: eu-appear 180ms var(--ease-out) 200ms both;
+  }
+  .eu-spinner {
+    @apply inline-block rounded-full border-2 border-ink/15 border-t-ink animate-spin;
+  }
+  .eu-skeleton {
+    @apply rounded bg-ink/6;
+    animation: eu-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* Something new on screen arrives this way (cards, popups). */
+  .eu-enter {
+    animation: eu-rise 180ms var(--ease-out) both;
+  }
+
+  /* Toasts (components/ui.tsx), centred above the status bar (the update
+     notice holds the bottom-right corner). */
+  .eu-toasts {
+    @apply fixed inset-auto left-1/2 -translate-x-1/2 bottom-9 m-0 p-0 border-0 bg-transparent overflow-visible
+      flex flex-col items-center gap-2 pointer-events-none z-toast;
+  }
+  .eu-toasts:not(:popover-open):empty {
+    display: none;
+  }
+  .eu-toast {
+    @apply rounded-md bg-panel border border-line shadow-pop pointer-events-auto flex items-center gap-2.5 pl-3 pr-1.5 py-1.5 text-body text-ink
+      max-w-[min(92vw,26rem)] min-h-10;
+    animation: eu-rise 180ms var(--ease-out) both;
+    transition:
+      opacity 120ms var(--ease-in),
+      translate 120ms var(--ease-in);
+  }
+  .eu-toast[data-leaving] {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  .eu-toast-icon {
+    @apply shrink-0 text-ink-faint;
+  }
+  .eu-toast[data-tone="success"] .eu-toast-icon {
+    @apply text-ok;
+  }
+  .eu-toast[data-tone="error"] {
+    @apply border-danger/40;
+  }
+  .eu-toast[data-tone="error"] .eu-toast-icon {
+    @apply text-danger;
+  }
+  .eu-toast-close {
+    @apply shrink-0 w-6 h-6 grid place-items-center rounded-sm text-ink-faint hover:bg-hover hover:text-ink;
+  }
+
+  /* Dialogs (ui/Dialog.tsx): the native <dialog>, in the top layer. It comes
+     in over 180 ms (fade, 4 px rise, 0.98 scale) and leaves in 120 ms. */
+  .eu-dialog {
+    @apply m-auto p-0 w-[calc(100%-3rem)] max-h-[calc(100%-3rem)] rounded-lg border border-line bg-panel text-ink
+      shadow-pop overflow-visible;
+    transition:
+      opacity 120ms var(--ease-in),
+      translate 120ms var(--ease-in),
+      scale 120ms var(--ease-in),
+      overlay 120ms allow-discrete,
+      display 120ms allow-discrete;
+  }
+  .eu-dialog:not([open]) {
+    opacity: 0;
+    translate: 0 4px;
+    scale: 0.98;
+  }
+  /* With nothing to focus inside, the browser focuses the dialog itself. */
+  .eu-dialog:focus-visible {
+    outline: none;
+  }
+  .eu-dialog[open] {
+    transition-duration: 180ms;
+    transition-timing-function: var(--ease-out);
+  }
+  @starting-style {
+    .eu-dialog[open] {
+      opacity: 0;
+      translate: 0 4px;
+      scale: 0.98;
+    }
+  }
+  /* Palette and quick capture open high, where the eye already is. */
+  .eu-dialog.eu-dialog-top {
+    margin-top: 18vh;
+  }
+  .eu-dialog::backdrop {
+    background: var(--color-scrim, rgb(10 8 6 / 0.34));
+    transition:
+      opacity 120ms,
+      overlay 120ms allow-discrete,
+      display 120ms allow-discrete;
+  }
+  .eu-dialog:not([open])::backdrop {
+    opacity: 0;
+  }
+  @starting-style {
+    .eu-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
   /* Tooltip (ui/Tooltip.tsx): a small ink label, keys as faint keycaps. */
   .eu-tooltip {
     @apply fixed m-0 p-0 border-0 left-0 top-0 flex items-center gap-2 max-w-72 px-2 py-1 rounded bg-ink text-panel
@@ -841,6 +949,23 @@
   }
 }
 
+@keyframes eu-appear {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes eu-rise {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+@keyframes eu-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* Native controls (range, checkbox, radio) follow the accent token. */
 input[type="range"],
 input[type="checkbox"],
@@ -848,8 +973,7 @@ input[type="radio"] {
   accent-color: rgb(var(--eu-accent));
 }
 
-/* Respect the OS « reduce motion » setting. framer-motion is handled by
-   <MotionConfig reducedMotion="user"> in main.tsx; this covers CSS. */
+/* Respect the OS « reduce motion » setting: every animation is CSS. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

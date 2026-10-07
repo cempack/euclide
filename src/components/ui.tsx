@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import * as React from "react";
 import {
   Component,
@@ -16,19 +15,23 @@ import {
   Atom,
   Book,
   Calculator,
+  CircleAlert,
+  CircleCheck,
   Code,
   Dumbbell,
   FlaskConical,
   Globe,
+  Info,
   Leaf,
   MessageCircle,
   Music,
   Palette,
   Pencil,
   Ruler,
+  X,
 } from "lucide-react";
-import { CheckCircleIcon, XIcon } from "./icons";
 import { get } from "../lib/i18n";
+import { Dialog, EXIT_MS } from "../ui/Dialog";
 
 // ---------------------------------------------------------------------------
 // ErrorBoundary — critical for Tauri transparent/vibrancy windows.
@@ -110,27 +113,8 @@ export class ErrorBoundary extends Component<
 }
 
 // ---------------------------------------------------------------------------
-// Modal
+// Modal — a titled dialog (ui/Dialog.tsx: native <dialog>, top layer).
 // ---------------------------------------------------------------------------
-
-const FOCUSABLE = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
-
-function trapFocus(container: HTMLElement, e: KeyboardEvent) {
-  if (e.key !== "Tab") return;
-  const items = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1 && el.offsetParent !== null,
-  );
-  if (!items.length) return;
-  const first = items[0];
-  const last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
-}
 
 export function Modal({
   open,
@@ -145,65 +129,24 @@ export function Modal({
   children: ReactNode;
   width?: string;
 }) {
-  const panelRef = React.useRef<HTMLDivElement>(null);
-  const restoreRef = React.useRef<HTMLElement | null>(null);
-  const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    if (!open) return;
-    restoreRef.current = document.activeElement as HTMLElement | null;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
-      if (panelRef.current) trapFocus(panelRef.current, e);
-    };
-    window.addEventListener("keydown", onKey);
-    const t = window.setTimeout(() => {
-      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
-      first?.focus();
-    }, 20);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      clearTimeout(t);
-      restoreRef.current?.focus?.();
-    };
-  }, [open]);
-
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <motion.div
-            className="eu-scrim"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            onClick={onClose}
-          />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            className={`relative w-full ${width} eu-panel shadow-pop p-5`}
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 6 }}
-            transition={{ type: "spring", stiffness: 480, damping: 32, mass: 0.9 }}
-          >
-            <h2 className="eu-t-section text-ink text-[16px] mb-4">{title}</h2>
-            {children}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    <Dialog open={open} onClose={onClose} label={title} className={width}>
+      <div className="p-5">
+        <h2 className="eu-t-title text-ink mb-4">{title}</h2>
+        {children}
+      </div>
+    </Dialog>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Confirm — questions wait their turn: a second one never cancels the first.
+// ---------------------------------------------------------------------------
 
 export type ConfirmAskOpts = {
   title: string;
   message: string;
+  /** A verb for what happens: « Supprimer », not « OK ». */
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
@@ -226,216 +169,165 @@ export const useConfirm = (): ConfirmApi => {
   return c;
 };
 
-type ConfirmState =
+type ConfirmRequest =
   | { mode: "ask"; opts: ConfirmAskOpts; resolve: (v: boolean) => void }
-  | { mode: "dirty"; opts: ConfirmDirtyOpts; resolve: (v: "save" | "discard" | "cancel") => void }
-  | null;
+  | { mode: "dirty"; opts: ConfirmDirtyOpts; resolve: (v: "save" | "discard" | "cancel") => void };
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ConfirmState>(null);
-  // Updated synchronously by show/close so back-to-back questions see each other.
-  const stateRef = React.useRef<ConfirmState>(null);
-  const panelRef = React.useRef<HTMLDivElement>(null);
-  const restoreRef = React.useRef<HTMLElement | null>(null);
+  const [queue, setQueue] = useState<ConfirmRequest[]>([]);
+  const current = queue[0] ?? null;
+  // What the dialog shows while it fades out after the last answer.
+  const [shown, setShown] = useState<ConfirmRequest | null>(null);
+  if (current && current !== shown) setShown(current);
+  const view = current ?? shown;
 
-  // A new question replaces the open one: settle the old promise as a
-  // cancel so its caller does not wait forever.
-  const show = useCallback((next: NonNullable<ConfirmState>) => {
-    const prev = stateRef.current;
-    if (prev?.mode === "ask") prev.resolve(false);
-    else if (prev?.mode === "dirty") prev.resolve("cancel");
-    stateRef.current = next;
-    setState(next);
-  }, []);
-
-  const ask = useCallback(
-    (opts: ConfirmAskOpts) => {
-      return new Promise<boolean>((resolve) => {
-        show({ mode: "ask", opts, resolve });
-      });
-    },
-    [show],
+  const enqueue = useCallback((request: ConfirmRequest) => setQueue((q) => [...q, request]), []);
+  const api = useMemo<ConfirmApi>(
+    () => ({
+      ask: (opts) => new Promise<boolean>((resolve) => enqueue({ mode: "ask", opts, resolve })),
+      dirty: (opts) =>
+        new Promise<"save" | "discard" | "cancel">((resolve) => enqueue({ mode: "dirty", opts, resolve })),
+    }),
+    [enqueue],
   );
 
-  const dirty = useCallback(
-    (opts: ConfirmDirtyOpts) => {
-      return new Promise<"save" | "discard" | "cancel">((resolve) => {
-        show({ mode: "dirty", opts, resolve });
-      });
-    },
-    [show],
-  );
-
-  const api = useMemo<ConfirmApi>(() => ({ ask, dirty }), [ask, dirty]);
-
-  const closeAsk = useCallback((value: boolean) => {
-    const s = stateRef.current;
-    if (s?.mode === "ask") s.resolve(value);
-    stateRef.current = null;
-    setState(null);
-  }, []);
-  const closeDirty = useCallback((value: "save" | "discard" | "cancel") => {
-    const s = stateRef.current;
-    if (s?.mode === "dirty") s.resolve(value);
-    stateRef.current = null;
-    setState(null);
-  }, []);
-
-  useEffect(() => {
-    if (!state) return;
-    restoreRef.current = document.activeElement as HTMLElement | null;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        const s = stateRef.current;
-        if (s?.mode === "ask") closeAsk(false);
-        else if (s?.mode === "dirty") closeDirty("cancel");
-      }
-      if (panelRef.current) trapFocus(panelRef.current, e);
-    };
-    window.addEventListener("keydown", onKey);
-    const t = window.setTimeout(() => {
-      const buttons = panelRef.current?.querySelectorAll<HTMLElement>("button");
-      const primary = buttons?.[buttons.length - 1];
-      primary?.focus();
-    }, 20);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      clearTimeout(t);
-      restoreRef.current?.focus?.();
-    };
-  }, [state, closeAsk, closeDirty]);
+  const answer = (value: boolean | "save" | "discard" | "cancel") => {
+    const head = current;
+    if (!head) return;
+    if (head.mode === "ask") head.resolve(value === true);
+    else head.resolve(typeof value === "string" ? value : "cancel");
+    setQueue((q) => (q[0] === head ? q.slice(1) : q));
+  };
+  const cancel = () => answer(current?.mode === "dirty" ? "cancel" : false);
 
   return (
     <ConfirmCtx.Provider value={api}>
       {children}
-      <AnimatePresence>
-        {state && (
-          <div className="fixed inset-0 z-confirm flex items-center justify-center p-6">
-            <motion.div
-              className="eu-scrim"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.1 }}
-              onClick={() => (state.mode === "ask" ? closeAsk(false) : closeDirty("cancel"))}
-            />
-            <motion.div
-              ref={panelRef}
-              role="dialog"
-              aria-modal="true"
-              aria-label={state.opts.title}
-              className="relative w-full max-w-md eu-panel shadow-pop p-5"
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 6 }}
-              transition={{ type: "spring", stiffness: 480, damping: 32, mass: 0.9 }}
-            >
-              <h2 className="eu-t-section text-ink text-[16px] mb-1.5">{state.opts.title}</h2>
-              <p className="eu-t-body text-ink-muted mb-5">{state.opts.message}</p>
-              {state.mode === "ask" ? (
-                <div className="flex justify-end gap-2">
-                  <button className="eu-btn-ghost" onClick={() => closeAsk(false)}>
-                    {state.opts.cancelLabel || "Annuler"}
-                  </button>
-                  <button
-                    className={state.opts.danger ? "eu-btn-danger" : "eu-btn-primary"}
-                    onClick={() => closeAsk(true)}
-                  >
-                    {state.opts.confirmLabel || "Confirmer"}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex justify-end gap-2 flex-wrap">
-                  <button className="eu-btn-ghost" onClick={() => closeDirty("cancel")}>
-                    {get("confirm.cancel", "Annuler")}
-                  </button>
-                  <button className="eu-btn-ghost" onClick={() => closeDirty("discard")}>
-                    {get("confirm.discard", "Ne pas enregistrer")}
-                  </button>
-                  <button className="eu-btn-primary" onClick={() => closeDirty("save")}>
-                    {get("confirm.save", "Enregistrer")}
-                  </button>
-                </div>
-              )}
-            </motion.div>
+      <Dialog open={!!current} onClose={cancel} label={view?.opts.title ?? ""} className="max-w-md">
+        {view && (
+          <div className="p-5">
+            <h2 className="eu-t-title text-ink mb-1.5">{view.opts.title}</h2>
+            <p className="eu-t-body text-ink-muted mb-5">{view.opts.message}</p>
+            {view.mode === "ask" ? (
+              <div className="flex justify-end gap-2">
+                <button className="eu-btn-ghost" onClick={() => answer(false)}>
+                  {view.opts.cancelLabel || get("confirm.cancel", "Annuler")}
+                </button>
+                <button
+                  className={view.opts.danger ? "eu-btn-danger" : "eu-btn-primary"}
+                  // A destructive question starts on « Annuler »; the others on the action.
+                  data-autofocus={view.opts.danger ? undefined : true}
+                  onClick={() => answer(true)}
+                >
+                  {view.opts.confirmLabel || get("confirm.ok", "Confirmer")}
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-2 flex-wrap">
+                <button className="eu-btn-ghost" onClick={() => answer("cancel")}>
+                  {get("confirm.cancel", "Annuler")}
+                </button>
+                <button className="eu-btn-ghost" onClick={() => answer("discard")}>
+                  {get("confirm.discard", "Ne pas enregistrer")}
+                </button>
+                <button className="eu-btn-primary" data-autofocus onClick={() => answer("save")}>
+                  {get("confirm.save", "Enregistrer")}
+                </button>
+              </div>
+            )}
           </div>
         )}
-      </AnimatePresence>
+      </Dialog>
     </ConfirmCtx.Provider>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Toasts
+// Toasts — bottom right, above any open dialog, with an icon per tone and an
+// optional action (« Annuler » after a deletion).
 // ---------------------------------------------------------------------------
 
-type Toast = { id: number; message: string; tone: "info" | "success" | "error" };
-const ToastCtx = createContext<(message: string, tone?: Toast["tone"]) => void>(() => {});
+type ToastTone = "info" | "success" | "error";
+export type ToastOptions = {
+  action?: { label: string; run: () => void };
+  /** Milliseconds on screen; longer when there is an action to take. */
+  duration?: number;
+};
+type ToastItem = { id: number; message: string; tone: ToastTone; options?: ToastOptions; leaving?: boolean };
+type ToastFn = (message: string, tone?: ToastTone, options?: ToastOptions) => void;
+
+const ToastCtx = createContext<ToastFn>(() => {});
 
 export const useToast = () => useContext(ToastCtx);
 
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+const TOAST_ICONS = { info: Info, success: CircleCheck, error: CircleAlert } as const;
 
-  const push = useCallback((message: string, tone: Toast["tone"] = "info") => {
-    const id = Date.now() + Math.random();
-    // Cap the stack: a burst of imports used to push toasts off-screen.
-    setToasts((t) => [...t, { id, message, tone }].slice(-4));
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
-  }, []);
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const layerRef = React.useRef<HTMLDivElement>(null);
+  const nextId = React.useRef(1);
 
   const dismiss = useCallback((id: number) => {
-    setToasts((t) => t.filter((x) => x.id !== id));
+    setToasts((t) => t.map((x) => (x.id === id ? { ...x, leaving: true } : x)));
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), EXIT_MS);
   }, []);
+
+  const push = useCallback<ToastFn>(
+    (message, tone = "info", options) => {
+      const id = nextId.current++;
+      // Cap the stack: a burst of imports used to push toasts off-screen.
+      setToasts((t) => [...t, { id, message, tone, options }].slice(-4));
+      window.setTimeout(() => dismiss(id), options?.duration ?? (options?.action ? 6000 : 3600));
+    },
+    [dismiss],
+  );
+
+  // Toasts must show above a dialog opened before them: re-enter the top layer.
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer || !("showPopover" in layer)) return;
+    if (layer.matches(":popover-open")) layer.hidePopover();
+    if (toasts.length) layer.showPopover();
+  }, [toasts.length]);
 
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div
-        role="status"
-        aria-live="polite"
-        className="fixed bottom-9 left-1/2 -translate-x-1/2 z-overlay flex flex-col gap-2 items-center pointer-events-none"
-      >
-        <AnimatePresence>
-          {toasts.map((toast) => {
-            const toneClass =
-              toast.tone === "error"
-                ? "border-l-2 border-l-danger"
-                : toast.tone === "success"
-                  ? "border-l-2 border-l-ok"
-                  : "";
-            const iconClass =
-              toast.tone === "error"
-                ? "text-danger"
-                : toast.tone === "success"
-                  ? "text-ok"
-                  : "text-ink-faint";
-            const Icon =
-              toast.tone === "success" ? (
-                <CheckCircleIcon className="w-4 h-4 shrink-0" />
-              ) : toast.tone === "error" ? (
-                <XIcon className="w-4 h-4 shrink-0" />
-              ) : (
-                <div className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
-              );
-            return (
-              <motion.button
+      <div ref={layerRef} popover="manual" role="status" aria-live="polite" className="eu-toasts">
+        {toasts.map((toast) => {
+          const ToneIcon = TOAST_ICONS[toast.tone];
+          return (
+            <div
+              key={toast.id}
+              className="eu-toast"
+              data-tone={toast.tone}
+              data-leaving={toast.leaving || undefined}
+            >
+              <ToneIcon size={16} strokeWidth={1.75} aria-hidden className="eu-toast-icon" />
+              <span className="flex-1 wrap-break-word">{toast.message}</span>
+              {toast.options?.action && (
+                <button
+                  type="button"
+                  className="eu-btn-quiet eu-btn-sm"
+                  onClick={() => {
+                    toast.options?.action?.run();
+                    dismiss(toast.id);
+                  }}
+                >
+                  {toast.options.action.label}
+                </button>
+              )}
+              <button
                 type="button"
-                key={toast.id}
-                initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.97 }}
-                transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                className="eu-toast-close"
+                aria-label={get("common.close", "Fermer")}
                 onClick={() => dismiss(toast.id)}
-                className={`eu-panel shadow-pop pointer-events-auto pl-3 pr-3.5 py-2.5 eu-t-body text-ink flex items-center gap-2.5 text-left max-w-[min(92vw,400px)] ${toneClass}`}
-                title={get("common.close", "Fermer")}
               >
-                <span className={`grid place-items-center ${iconClass}`}>{Icon}</span>
-                <span className="wrap-break-word">{toast.message}</span>
-              </motion.button>
-            );
-          })}
-        </AnimatePresence>
+                <X size={14} strokeWidth={1.75} aria-hidden />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastCtx.Provider>
   );
@@ -518,9 +410,9 @@ export const COURSE_ICONS: Array<{ key: string; label: string; Icon: React.Compo
 ];
 
 // ---------------------------------------------------------------------------
-/** Nice reusable loading indicator with smooth animation.
- *  Use everywhere we wait for data (courses, cours detail, contenu, etc).
- *  Prevents "freeze" feel by being lightweight + lets parent keep interactive chrome (tabs, sidebar, drag).
+/**
+ * Waiting for data. A CSS spinner (runs on the compositor, not the main
+ * thread), shown only after 200 ms so quick loads don't flash.
  */
 export function Loading({
   label = "Chargement…",
@@ -529,31 +421,11 @@ export function Loading({
   label?: string;
   size?: "default" | "small";
 }) {
-  const isSmall = size === "small";
+  const small = size === "small";
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className={`flex flex-col items-center justify-center ${isSmall ? "py-2 gap-1.5" : "py-10 gap-3"} text-center`}
-    >
-      <div className={`relative ${isSmall ? "w-5 h-5" : "w-9 h-9"}`}>
-        {/* track */}
-        <div
-          className={`absolute inset-0 rounded-full border ${isSmall ? "border-2" : "border-[3px]"} border-ink/15`}
-        />
-        {/* spinning arc */}
-        <motion.div
-          className={`absolute inset-0 rounded-full border ${isSmall ? "border-2" : "border-[3px]"} border-transparent border-t-ink`}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.75, repeat: Infinity, ease: "linear" }}
-        />
-      </div>
-      {label && (
-        <p className={`${isSmall ? "text-[11px]" : "text-sm"} text-ink-muted font-mono tracking-tight`}>
-          {label}
-        </p>
-      )}
-    </motion.div>
+    <div role="status" className={`eu-loading ${small ? "py-2 gap-1.5" : "py-10 gap-3"}`}>
+      <span aria-hidden className={`eu-spinner ${small ? "w-4 h-4" : "w-6 h-6"}`} />
+      {label && <p className="eu-t-caption">{label}</p>}
+    </div>
   );
 }

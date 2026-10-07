@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { api, type AppInfo, type FileItem, isTauri } from "./lib/api";
 import { get, fmt } from "./lib/i18n";
 import { isMac } from "./lib/shortcuts";
@@ -19,6 +18,7 @@ import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
 import { TooltipLayer } from "./ui/Tooltip";
+import { Dialog } from "./ui/Dialog";
 import { DocIcon, PlusIcon } from "./components/icons";
 import Dashboard from "./screens/Dashboard";
 
@@ -210,24 +210,15 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
   const tabs = useTabs();
   const [text, setText] = useState("");
   const [mode, setMode] = useState<"reminder" | "note">("reminder");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    if (!open) return;
-    setText("");
-    setMode("reminder");
-    const t = window.setTimeout(() => inputRef.current?.focus(), 30);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  // A fresh line each time it opens.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setText("");
+      setMode("reminder");
+    }
+  }
 
   // Prefix shortcuts: `!` forces a reminder, `#` forces a note.
   const effectiveMode = text.startsWith("!") ? "reminder" : text.startsWith("#") ? "note" : mode;
@@ -256,77 +247,58 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-palette flex items-start justify-center pt-[18vh] px-6">
-          <motion.div
-            className="eu-scrim"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            onClick={onClose}
-          />
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label={get("capture.title", "Capture rapide")}
-            className="relative w-full max-w-lg eu-panel shadow-pop overflow-hidden"
-            initial={{ opacity: 0, scale: 0.97, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.985 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          >
-            <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-line">
-              <PlusIcon className="w-4 h-4 text-ink-faint shrink-0" />
-              <input
-                ref={inputRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void submit();
-                  }
-                }}
-                placeholder={get("capture.placeholder", "Noter quelque chose… (! rappel · # note)")}
-                className="flex-1 bg-transparent outline-hidden eu-t-body text-ink placeholder:text-ink-faint"
-              />
-            </div>
-            <div className="flex items-center gap-2 px-3.5 py-2.5">
-              <Segmented
-                value={effectiveMode}
-                onChange={(v) => {
-                  setMode(v);
-                  setText((t) => t.replace(/^[!#]\s*/, ""));
-                }}
-                label={get("capture.target", "Enregistrer comme")}
-                options={[
-                  { value: "reminder", label: get("capture.asReminder", "Rappel") },
-                  { value: "note", label: get("capture.asNote", "Note") },
-                ]}
-              />
-              <span className="flex-1" />
-              <span className="eu-t-meta hidden sm:flex items-center gap-1.5">
-                <span className="eu-kbd">↵</span>
-                {get("capture.save", "enregistrer")}
-              </span>
-              <button type="button" onClick={onClose} className="eu-btn-quiet eu-btn-sm">
-                {get("common.cancel", "Annuler")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={!payload}
-                className="eu-btn-primary eu-btn-sm"
-              >
-                {get("common.add", "Ajouter")}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      label={get("capture.title", "Capture rapide")}
+      className="max-w-lg eu-dialog-top overflow-hidden"
+    >
+      <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-line">
+        <PlusIcon className="w-4 h-4 text-ink-faint shrink-0" />
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void submit();
+            }
+          }}
+          placeholder={get("capture.placeholder", "Noter quelque chose… (! rappel · # note)")}
+          className="flex-1 bg-transparent outline-hidden eu-t-body text-ink placeholder:text-ink-faint"
+        />
+      </div>
+      <div className="flex items-center gap-2 px-3.5 py-2.5">
+        <Segmented
+          value={effectiveMode}
+          onChange={(v) => {
+            setMode(v);
+            setText((t) => t.replace(/^[!#]\s*/, ""));
+          }}
+          label={get("capture.target", "Enregistrer comme")}
+          options={[
+            { value: "reminder", label: get("capture.asReminder", "Rappel") },
+            { value: "note", label: get("capture.asNote", "Note") },
+          ]}
+        />
+        <span className="flex-1" />
+        <span className="eu-t-meta hidden sm:flex items-center gap-1.5">
+          <span className="eu-kbd">↵</span>
+          {get("capture.save", "enregistrer")}
+        </span>
+        <button type="button" onClick={onClose} className="eu-btn-quiet eu-btn-sm">
+          {get("common.cancel", "Annuler")}
+        </button>
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!payload}
+          className="eu-btn-primary eu-btn-sm"
+        >
+          {get("common.add", "Ajouter")}
+        </button>
+      </div>
+    </Dialog>
   );
 }
 
