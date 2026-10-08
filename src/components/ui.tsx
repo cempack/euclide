@@ -30,6 +30,7 @@ import {
   Ruler,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { tr } from "../lib/i18n";
 import { Dialog, EXIT_MS } from "../ui/Dialog";
 
@@ -47,7 +48,7 @@ export class ErrorBoundary extends Component<
   { children: ReactNode; fallback?: ReactNode },
   ErrorBoundaryState
 > {
-  constructor(props: any) {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
     super(props);
     this.state = { error: null, info: null };
   }
@@ -61,7 +62,7 @@ export class ErrorBoundary extends Component<
     const component = info?.componentStack?.trim().split("\n")[0]?.trim();
     reportLine(`render ${describeError(error)}${component ? ` in ${component}` : ""}`);
     // Also expose for easy copy in devtools
-    (window as any).__EUCLIDE_LAST_ERROR__ = { error, info };
+    (window as unknown as { __EUCLIDE_LAST_ERROR__?: unknown }).__EUCLIDE_LAST_ERROR__ = { error, info };
     this.setState({ info });
   }
   render() {
@@ -402,7 +403,7 @@ export const COURSE_COLORS = [
 ];
 
 // Icons for courses using lucide-react (clean, professional, recognizable SVGs for subjects)
-export const COURSE_ICONS: Array<{ key: string; label: string; Icon: React.ComponentType<any> }> = [
+export const COURSE_ICONS: Array<{ key: string; label: string; Icon: LucideIcon }> = [
   { key: "book", label: "Livre / Français", Icon: Book },
   { key: "calc", label: "Maths", Icon: Calculator },
   { key: "flask", label: "Sciences", Icon: FlaskConical },

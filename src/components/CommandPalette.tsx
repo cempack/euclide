@@ -4,7 +4,7 @@ import { Dialog } from "../ui/Dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type FileItem, type QuickLink, type SearchResult } from "../lib/api";
-import { tabs } from "../stores/tabs";
+import { tabs, type TabKind, type TabParams } from "../stores/tabs";
 import { openFile } from "../lib/files";
 import { timer } from "../stores/timer";
 import { scene } from "../stores/scene";
@@ -81,7 +81,7 @@ function scopeOf(query: string): { scope: Scope; term: string } {
 }
 
 function cmdAliases(key: string): string[] {
-  return aliasesOf(get(`palette.aliases.${key}`, ""));
+  return aliasesOf(String(get(`palette.aliases.${key}`, "")));
 }
 
 function CommandPalette({
@@ -104,7 +104,6 @@ function CommandPalette({
   const links = useQuery({ ...q.links(), enabled: open }).data ?? NO_LINKS;
   const recent = useQuery({ ...q.recentFiles(5), enabled: open }).data ?? NO_RECENT;
   const keepAwake = useQuery({ ...q.keepAwake(), enabled: open }).data ?? null;
-  const setKeepAwake = (on: boolean) => queryClient.setQueryData(q.keepAwake().queryKey, on);
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -144,7 +143,7 @@ function CommandPalette({
   const results = (searching && search.data) || NO_RESULTS;
 
   const baseActions = useMemo<Action[]>(() => {
-    const go = (kind: any, title?: string, params?: any) => () => {
+    const go = (kind: TabKind, title?: string, params?: TabParams) => () => {
       tabs.open({ kind, title, params });
       onClose();
     };
@@ -263,7 +262,7 @@ function CommandPalette({
             try {
               const current = keepAwake ?? (await api.keepAwakeStatus());
               const next = await api.setKeepAwake(!current);
-              setKeepAwake(next);
+              queryClient.setQueryData(q.keepAwake().queryKey, next);
               changed("keepAwake");
               toast(next ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"), next ? "success" : "info");
             } catch (err) {
@@ -352,7 +351,7 @@ function CommandPalette({
     }
 
     return actions;
-  }, [onClose, onHelp, toast, projection, toggleProjection, keepAwake, links]);
+  }, [onClose, onHelp, onCapture, toast, projection, toggleProjection, keepAwake, queryClient, links]);
 
   const resultActions = useMemo<Action[]>(() => {
     return results.map((r) => {

@@ -194,7 +194,6 @@ export const PdfView = forwardRef<
   // The tool, once the pages are there (PDF.js refuses it before).
   useEffect(() => {
     if (!readOnly && ready) void setMode(MODES[tool]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, readOnly, ready]);
 
   // Its colour: the pen and notes share it; the highlighter has its own.
