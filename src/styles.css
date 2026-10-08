@@ -1198,6 +1198,47 @@
   .eu-template-card-remove:focus-visible {
     @apply opacity-100;
   }
+  /* The gallery's dialog keeps one height whatever the level shows; the
+     levels run down a chrome side, the chosen one raised paper. */
+  .eu-gallery {
+    @apply flex flex-col;
+    height: min(44rem, calc(100dvh - 6rem));
+  }
+  .eu-gallery-head {
+    @apply shrink-0 flex items-center justify-between gap-3 pl-5 pr-3 border-b border-line;
+    height: 3.25rem;
+  }
+  .eu-gallery-body {
+    @apply flex-1 min-h-0 flex;
+  }
+  .eu-gallery-side {
+    @apply w-60 shrink-0 flex flex-col gap-3 p-3 border-r border-line bg-chrome overflow-y-auto;
+  }
+  .eu-gallery-levels {
+    @apply flex flex-col gap-0.5;
+  }
+  .eu-gallery-level {
+    @apply flex items-center gap-2 px-2.5 rounded-md border border-transparent text-left text-body text-ink-muted
+      transition-colors duration-fast hover:bg-hover hover:text-ink;
+    height: var(--eu-control);
+  }
+  .eu-gallery-level[aria-selected="true"] {
+    @apply bg-panel border-line text-ink font-medium shadow-raised hover:bg-panel;
+  }
+  .eu-gallery-count {
+    @apply ml-auto font-mono text-caption text-ink-faint tabular-nums;
+  }
+  .eu-gallery-list {
+    @apply flex-1 min-w-0 overflow-y-auto p-3;
+  }
+  .eu-gallery-foot {
+    @apply shrink-0 flex items-center justify-between gap-2 px-5 py-3 border-t border-line;
+  }
+  /* The empty editor's way into the catalogue: a tile per level. */
+  .eu-level-tile {
+    @apply flex flex-col gap-1 p-3 text-left rounded-lg border border-line bg-panel shadow-raised
+      transition-colors duration-fast hover:border-line-strong;
+  }
   /* The Python output (python/OutputPanel.tsx): a desk in the app's theme
      under the editor, tabs underlined in the accent, the run's state as a
      coloured dot; drawings sit on paper in both themes. */
