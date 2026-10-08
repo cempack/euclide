@@ -114,7 +114,8 @@ def plot(*args, label=None, color=None, linestyle=None, ls=None, marker=None, li
             "x": xs,
             "y": ys,
             "color": _color(color or fcolor, _fig),
-            "style": linestyle or ls or fstyle or "-",
+            # « "o" » alone draws the points, without a line through them.
+            "style": linestyle or ls or fstyle or ("None" if fmarker else "-"),
             "marker": marker or fmarker,
             "width": float(linewidth or lw or 2),
             "label": label,
@@ -228,8 +229,11 @@ def title(s, **_):
     _fig.title = str(s)
 
 
-def legend(*_args, **_kwargs):
-    _fig.legend = True
+LOCATIONS = {"upper right", "upper left", "lower left", "lower right"}
+
+
+def legend(*_args, loc="best", **_kwargs):
+    _fig.legend = loc if loc in LOCATIONS else "best"
 
 
 def grid(visible=True, *_args, **_kwargs):
@@ -341,8 +345,11 @@ def _nice_ticks(lo, hi, count=6):
 
 
 def _fmt(v, step):
-    decimals = max(0, -math.floor(math.log10(step))) if step < 1 else 0
+    """A tick label, with as many decimals as its step has (2,5 · 5,0 · 7,5)."""
+    decimals = next((d for d in builtins.range(10) if abs(step * 10**d - round(step * 10**d)) < 1e-6), 10)
     text = f"{v:.{decimals}f}"
+    if text.lstrip("-").strip("0.") == "":
+        text = text.lstrip("-")
     return text.replace("-", "−").replace(".", ",")
 
 
@@ -531,20 +538,70 @@ def render(fig):
 
     labelled = [s for s in fig.series if s.get("label")]
     if fig.legend and labelled:
-        lx, ly = left + pw - 12, top + 12
         width = max(len(str(s["label"])) for s in labelled) * 7 + 34
+        height = len(labelled) * 18 + 8
+        lx, ly = _legend_corner(fig, (left, top, pw, ph), (width, height), X, Y)
         out.append(
-            f'<rect x="{lx - width:.1f}" y="{ly - 4}" width="{width}" height="{len(labelled) * 18 + 8}" '
-            f'rx="4" fill="{PAPER}" stroke="{LINE}"/>'
+            f'<rect x="{lx:.1f}" y="{ly:.1f}" width="{width}" height="{height}" '
+            f'rx="4" fill="{PAPER}" fill-opacity="0.92" stroke="{LINE}"/>'
         )
         for i, s in enumerate(labelled):
-            y = ly + 9 + i * 18
+            y = ly + 13 + i * 18
+            out.append(_legend_sample(s, lx + 8, y))
             out.append(
-                f'<line x1="{lx - width + 8:.1f}" y1="{y}" x2="{lx - width + 24:.1f}" y2="{y}" '
-                f'stroke="{s["color"]}" stroke-width="3"/>'
-            )
-            out.append(
-                f'<text x="{lx - width + 30:.1f}" y="{y + 4}" fill="{INK}">{escape(str(s["label"]))}</text>'
+                f'<text x="{lx + 30:.1f}" y="{y + 4:.1f}" fill="{INK}">{escape(str(s["label"]))}</text>'
             )
     out.append("</svg>")
     return "".join(out)
+
+
+def _legend_corner(fig, plot, size, X, Y):  # noqa: N803
+    """Where the legend goes: the corner asked for, or the one hiding the
+    least of the drawing (matplotlib's « best »)."""
+    left, top, pw, ph = plot
+    w, h = size
+    corners = {
+        "upper right": (left + pw - 10 - w, top + 10),
+        "upper left": (left + 10, top + 10),
+        "lower left": (left + 10, top + ph - 10 - h),
+        "lower right": (left + pw - 10 - w, top + ph - 10 - h),
+    }
+    if fig.legend in corners:
+        return corners[fig.legend]
+    points = []
+    for s in fig.series:
+        if s["kind"] in ("bar", "hist"):
+            # A bar hides what is under it: sample its whole height.
+            xs = (
+                s["x"]
+                if s["kind"] == "bar"
+                else [(a + b) / 2 for a, b in zip(s["edges"], s["edges"][1:], strict=False)]
+            )
+            for x, y in zip(xs, s["y"], strict=False):
+                points += [(x, y * k / 4) for k in builtins.range(5)]
+        else:
+            points += list(zip(s["x"], s["y"], strict=False))
+    pixels = [(X(x), Y(y)) for x, y in points if math.isfinite(x) and math.isfinite(y)]
+
+    def hidden(corner):
+        x, y = corners[corner]
+        return sum(1 for px, py in pixels if x - 6 <= px <= x + w + 6 and y - 6 <= py <= y + h + 6)
+
+    return corners[min(corners, key=hidden)]
+
+
+def _legend_sample(s, x, y):
+    """The legend's picture of a series: its line, its marker, or a swatch."""
+    color = s["color"]
+    if s["kind"] in ("bar", "hist"):
+        return f'<rect x="{x:.1f}" y="{y - 5:.1f}" width="16" height="10" rx="1.5" fill="{color}"/>'
+    if s["kind"] == "scatter":
+        return _marker(s["marker"], x + 8, y, 4, color)
+    out = ""
+    if s["style"] not in (None, "", "None", " "):
+        dash = _dash(s["style"])
+        dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
+        out += f'<line x1="{x:.1f}" y1="{y:.1f}" x2="{x + 16:.1f}" y2="{y:.1f}" stroke="{color}" stroke-width="3"{dash_attr}/>'
+    if s["marker"]:
+        out += _marker(s["marker"], x + 8, y, 3.5, color)
+    return out

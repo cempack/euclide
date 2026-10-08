@@ -6,6 +6,7 @@ Run from sidecar/: python -m unittest discover -s tests -t .
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -130,6 +131,34 @@ class Shims(unittest.TestCase):
         self.assertTrue(plots[0]["svg"].startswith("<svg"))
         self.assertIn("&lt;carré&gt;", plots[0]["svg"])
 
+    def test_pyplot_ticks_keep_their_decimals(self):
+        from euclide_sidecar.shims.pyplot import _fmt, _nice_ticks
+
+        ticks, step = _nice_ticks(0, 11)
+        self.assertEqual([_fmt(v, step) for v in ticks], ["0,0", "2,5", "5,0", "7,5", "10,0"])
+        ticks, step = _nice_ticks(-2.4, 2.4)
+        self.assertEqual([_fmt(v, step) for v in ticks], ["−2", "−1", "0", "1", "2"])
+
+    def test_pyplot_marker_format_draws_no_line(self):
+        code = 'import matplotlib.pyplot as plt\nplt.plot([1, 2, 3], [1, 4, 9], "o")\n'
+        svg = next(e["svg"] for e in run(code) if e["t"] == "plot")
+        self.assertEqual(svg.count("<circle"), 3)
+        self.assertNotIn("<path", svg)
+
+    def test_pyplot_legend_leaves_the_data_in_view(self):
+        # The curve fills the upper right: the legend goes elsewhere.
+        code = (
+            "import matplotlib.pyplot as plt\n"
+            "xs = [x / 10 for x in range(101)]\n"
+            'plt.plot(xs, [x**3 for x in xs], label="cube")\n'
+            'plt.scatter([1, 2], [1, 2], label="points")\n'
+            "plt.legend()\n"
+        )
+        svg = next(e["svg"] for e in run(code) if e["t"] == "plot")
+        legend = re.search(r'<rect x="([\d.]+)" y="([\d.]+)" width="\d+" height="\d+" rx="4"', svg)
+        self.assertLess(float(legend[1]), 300, "the legend sits on the left")
+        self.assertLess(float(legend[2]), 100, "and at the top, where the cube is still low")
+
     def test_scripts_can_read_files_next_to_them(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "notes.csv").write_text("12\n15\n", encoding="utf-8")
@@ -140,6 +169,22 @@ class Shims(unittest.TestCase):
 class Checks(unittest.TestCase):
     def checks(self, events):
         return [e for e in events if e["t"] == "check"]
+
+    def test_a_decorated_function_keeps_its_examples(self):
+        script = (
+            "from functools import cache\n@cache\ndef fib(n):\n"
+            '    """\n    >>> fib(10)\n    55\n    """\n    return n if n < 2 else fib(n - 1) + fib(n - 2)\n'
+        )
+        results = self.checks(run(script, checks={"source": ""}))
+        self.assertEqual([(r["name"], r["ok"]) for r in results], [("fib", True)])
+
+    def test_a_function_is_checked_once_whatever_holds_it(self):
+        script = (
+            'def carre(x):\n    """\n    >>> carre(3)\n    9\n    """\n    return x * x\n'
+            "for f in (carre,):\n    print(f(2))\nautre = carre\n"
+        )
+        results = self.checks(run(script, checks={"source": ""}))
+        self.assertEqual([r["name"] for r in results], ["carre"])
 
     def test_companion_file_with_egal_and_bare_assert(self):
         script = "def carre(x):\n    return x * x\n"

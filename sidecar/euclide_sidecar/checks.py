@@ -84,8 +84,15 @@ class _Collect(doctest.DocTestRunner):
 def _doctests(script_ns, script_name):
     """The examples of the script's functions, and of its classes (their
     docstring and their methods')."""
+    seen = set()
     for name, obj in list(script_ns.items()):
-        code = getattr(obj, "__code__", None)
+        # A function is checked once, under its own name: not again through
+        # a variable that happens to hold it (`for f in (carre, cube):`).
+        if id(obj) in seen or getattr(obj, "__name__", name) != name:
+            continue
+        seen.add(id(obj))
+        # Through a decorator (`@cache`) to the function the script wrote.
+        code = getattr(getattr(obj, "__wrapped__", obj), "__code__", None)
         if callable(obj) and code is not None and code.co_filename == script_name:
             finder = doctest.DocTestFinder(recurse=False)
         elif isinstance(obj, type) and obj.__module__ == script_ns.get("__name__"):
