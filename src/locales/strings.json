@@ -517,7 +517,14 @@
     "portable": "portable",
     "dataFormat": "Format des données",
     "engine": "Affichage",
-    "dataFolder": "Données"
+    "dataFolder": "Données",
+    "reindex": "Relire les documents",
+    "reindexHint": "Si la recherche ne trouve pas un mot pourtant écrit dans un PDF : Euclide relit tous les documents, en arrière-plan.",
+    "reindexAction": "Relire",
+    "reindexStarted": {
+      "one": "{count} document à relire, en arrière-plan.",
+      "other": "{count} documents à relire, en arrière-plan."
+    }
   },
   "updater": {
     "check": "Vérifier les mises à jour",
@@ -741,7 +748,10 @@
     "renameStep": "Renommer l'étape",
     "renameHint": "Double-clic ou F2 pour renommer",
     "deleteStepTitle": "Supprimer l'étape « {name} » ?",
-    "deleteStepMessage": "Les documents, notes et scripts de l'étape restent dans la bibliothèque."
+    "deleteStepMessage": "Les documents, notes et scripts de l'étape restent dans la bibliothèque.",
+    "renameSequence": "Renommer la séquence",
+    "collapse": "Replier « {name} »",
+    "expand": "Déplier « {name} »"
   },
   "reminders": {
     "markDone": "Marquer fait",
@@ -779,7 +789,10 @@
     "emptyTitle": "Rien à afficher",
     "noResultHint": "Essayez un autre mot-clé ou changez de filtre.",
     "emptyHint": "Notez ce qu'il ne faut pas oublier : corriger un DS, réserver la salle info, préparer des photocopies.",
-    "deleted": "Rappel « {name} » supprimé"
+    "deleted": "Rappel « {name} » supprimé",
+    "edit": "Modifier",
+    "editTitle": "Titre du rappel",
+    "editDue": "Échéance"
   },
   "python": {
     "newScript": "Nouveau script",

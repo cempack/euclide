@@ -71,5 +71,17 @@ export function useReminderActions() {
     }
   };
 
-  return { toggle, remove };
+  /** New title and date, at once in the list. */
+  const edit = async (r: Reminder, title: string, dueAt: string | null) => {
+    patch((list) => list.map((x) => (x.id === r.id ? { ...x, title, due_at: dueAt } : x)));
+    try {
+      await api.updateReminder(r.id, title, dueAt, r.course_id, r.repeat_rule);
+    } catch (err) {
+      reportError("reminders.edit", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    }
+    changed("reminders");
+  };
+
+  return { toggle, remove, edit };
 }

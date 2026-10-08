@@ -81,6 +81,7 @@ export function Progression({
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const [picking, setPicking] = useState<number | null>(null);
   const [renaming, setRenaming] = useState<{ id: number; title: string } | null>(null);
+  const [renamingSeq, setRenamingSeq] = useState<{ id: number; title: string } | null>(null);
 
   const reload = async () => {
     await queryClient.invalidateQueries({ queryKey: q.progression(courseId).queryKey });
@@ -117,6 +118,14 @@ export function Progression({
       // A new lesson is mostly about what it opens: choose it now.
       setPicking(created.id);
     });
+  };
+
+  const renameSeq = () => {
+    if (!renamingSeq) return;
+    const { id, title } = renamingSeq;
+    setRenamingSeq(null);
+    if (!title.trim()) return;
+    void attempt("course.renameSequence", () => api.renameSequence(id, title));
   };
 
   const rename = () => {
@@ -193,7 +202,9 @@ export function Progression({
                   <button
                     onClick={() => setCollapsed((c) => ({ ...c, [seq.id]: !c[seq.id] }))}
                     aria-expanded={!isCollapsed}
-                    aria-label={seq.title}
+                    aria-label={tr(isCollapsed ? "sequences.expand" : "sequences.collapse", {
+                      name: seq.title,
+                    })}
                     className="eu-btn-quiet eu-btn-icon eu-btn-sm shrink-0"
                   >
                     <Icon
@@ -202,7 +213,30 @@ export function Progression({
                       className={`w-3.5 h-3.5 transition-transform duration-fast ${isCollapsed ? "-rotate-90" : ""}`}
                     />
                   </button>
-                  <span className="eu-t-body font-medium text-ink truncate flex-1">{seq.title}</span>
+                  {renamingSeq?.id === seq.id ? (
+                    <input
+                      autoFocus
+                      className="eu-input eu-field-sm flex-1 min-w-24 font-medium"
+                      value={renamingSeq.title}
+                      onChange={(e) => setRenamingSeq({ id: seq.id, title: e.target.value })}
+                      onBlur={renameSeq}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") renameSeq();
+                        if (e.key === "Escape") setRenamingSeq(null);
+                      }}
+                      aria-label={tr("sequences.renameSequence")}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="eu-t-body font-medium text-ink truncate flex-1 text-left"
+                      onDoubleClick={() => setRenamingSeq({ id: seq.id, title: seq.title })}
+                      onKeyDown={(e) => e.key === "F2" && setRenamingSeq({ id: seq.id, title: seq.title })}
+                      data-tip={tr("sequences.renameHint")}
+                    >
+                      {seq.title}
+                    </button>
+                  )}
                   <span className="eu-chip shrink-0">{trn("sequences.stepCount", seqItems.length)}</span>
                   <div className="eu-row-actions eu-row-tools flex items-center gap-0.5 shrink-0">
                     <button

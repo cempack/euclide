@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { changed } from "../api/client";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import {
@@ -1029,6 +1029,20 @@ function AboutSection({ info }: { info: AppInfo | null }) {
             onClick={() => void api.openFolder("logs").catch((err) => toast(errorMessage(err), "error"))}
           >
             {tr("about.openLogs")}
+          </button>
+        </SettingRow>
+        <SettingRow title={tr("about.reindex")} hint={tr("about.reindexHint")}>
+          <button
+            className="eu-btn-quiet eu-btn-sm"
+            disabled={!isTauri()}
+            onClick={() =>
+              void api
+                .reindexDocuments()
+                .then((n) => toast(trn("about.reindexStarted", n), "success"))
+                .catch((err) => toast(errorMessage(err), "error"))
+            }
+          >
+            {tr("about.reindexAction")}
           </button>
         </SettingRow>
         <dl className="eu-facts selectable">
