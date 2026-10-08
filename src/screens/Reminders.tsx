@@ -10,7 +10,7 @@ import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import { Bell, Check, Plus, Repeat, Search, Trash2 } from "lucide-react";
+import { Bell, Check, PenLine, Plus, Repeat, Search, Trash2 } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
 import { useReminderActions } from "../features/reminders/useReminderActions";
@@ -35,15 +35,59 @@ const ReminderRow = memo(function ReminderRow({
   dark,
   onToggle,
   onDelete,
+  onEdit,
 }: {
   r: Reminder;
   course?: Course;
   dark: boolean;
   onToggle: (r: Reminder) => void;
   onDelete: (r: Reminder) => void;
+  onEdit: (r: Reminder, title: string, dueAt: string | null) => void;
 }) {
   const due = formatDueLabel(r.due_at);
   const isDone = r.done;
+  const [editing, setEditing] = useState<{ title: string; day: string } | null>(null);
+  const startEdit = () => setEditing({ title: r.title, day: r.due_at ? localYmd(new Date(r.due_at)) : "" });
+  const saveEdit = () => {
+    if (!editing) return;
+    const title = editing.title.trim();
+    setEditing(null);
+    const dueAt = editing.day ? localYmdToIso(editing.day) : null;
+    if (title && (title !== r.title || dueAt !== r.due_at)) onEdit(r, title, dueAt);
+  };
+  if (editing)
+    return (
+      <div className="eu-row gap-2">
+        <input
+          autoFocus
+          className="eu-input eu-field-sm flex-1 min-w-0"
+          value={editing.title}
+          onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveEdit();
+            if (e.key === "Escape") setEditing(null);
+          }}
+          aria-label={tr("reminders.editTitle")}
+        />
+        <input
+          type="date"
+          className="eu-input eu-field-sm w-40"
+          value={editing.day}
+          onChange={(e) => setEditing({ ...editing, day: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveEdit();
+            if (e.key === "Escape") setEditing(null);
+          }}
+          aria-label={tr("reminders.editDue")}
+        />
+        <button className="eu-btn-primary eu-btn-sm" onClick={saveEdit} disabled={!editing.title.trim()}>
+          {tr("common.save")}
+        </button>
+        <button className="eu-btn-quiet eu-btn-sm" onClick={() => setEditing(null)}>
+          {tr("common.cancel")}
+        </button>
+      </div>
+    );
   return (
     <div className={`eu-row group ${isDone ? "bg-panel-alt/50" : "hover:bg-panel-alt"}`}>
       <button
@@ -61,7 +105,10 @@ const ReminderRow = memo(function ReminderRow({
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`eu-t-body truncate ${isDone ? "line-through text-ink-faint" : "text-ink"}`}>
+        <p
+          className={`eu-t-body truncate ${isDone ? "line-through text-ink-faint" : "text-ink"}`}
+          onDoubleClick={startEdit}
+        >
           {r.title}
         </p>
         {(course || r.repeat_rule !== "none") && (
@@ -95,6 +142,14 @@ const ReminderRow = memo(function ReminderRow({
         </span>
       )}
 
+      <button
+        onClick={startEdit}
+        aria-label={`${tr("reminders.edit")} — ${r.title}`}
+        data-tip={tr("reminders.edit")}
+        className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm"
+      >
+        <Icon icon={PenLine} size={14} />
+      </button>
       <button
         onClick={() => onDelete(r)}
         aria-label={`${tr("common.delete")} — ${r.title}`}
@@ -161,7 +216,7 @@ export default function Reminders() {
     setNewDue(days === null ? "" : localYmd(new Date(), days));
   };
 
-  const { toggle, remove } = useReminderActions();
+  const { toggle, remove, edit } = useReminderActions();
 
   const clearDone = async () => {
     const done = reminders.filter((r) => r.done);
@@ -398,6 +453,7 @@ export default function Reminders() {
                       dark={resolved === "dark"}
                       onToggle={toggle}
                       onDelete={remove}
+                      onEdit={edit}
                     />
                   ))}
                 </div>

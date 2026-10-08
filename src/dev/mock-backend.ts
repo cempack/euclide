@@ -696,7 +696,10 @@ function pronoteContents(args: Args) {
 }
 
 export function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
-  return handle(cmd, args) as T;
+  // A copy, as the backend's JSON is: the page must never hold the sample
+  // data itself (a change would mutate what the query cache compares).
+  const out = handle(cmd, args);
+  return (out == null ? out : structuredClone(out)) as T;
 }
 
 function handle(cmd: string, args: Args): unknown {
@@ -823,6 +826,11 @@ function handle(cmd: string, args: Args): unknown {
       };
       sequences.push(created);
       return created;
+    }
+    case "rename_sequence": {
+      const sq = sequences.find((x) => x.id === num(args, "id"));
+      if (sq) sq.title = str(args, "title");
+      return null;
     }
     case "list_sequence_items": {
       const courseId = num(args, "courseId");
@@ -1039,6 +1047,14 @@ function handle(cmd: string, args: Args): unknown {
       };
       reminders.push(r);
       return r;
+    }
+    case "update_reminder": {
+      const r = reminders.find((x) => x.id === num(args, "id"));
+      if (r) {
+        r.title = str(args, "title");
+        r.due_at = (args?.dueAt as string | null) ?? null;
+      }
+      return r ? { ...r } : null;
     }
     case "toggle_reminder": {
       const r = reminders.find((x) => x.id === num(args, "id"));
