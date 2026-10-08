@@ -1,3 +1,0 @@
-# Script Python
-
-print("Bonjour")

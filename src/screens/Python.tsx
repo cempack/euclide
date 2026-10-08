@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChartSpline, CircleStop, Keyboard, ListChecks, Turtle, type LucideIcon } from "lucide-react";
+import { CircleStop, ListChecks } from "lucide-react";
 import { api, isTauri, type PythonDemo } from "../lib/api";
 import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
@@ -18,21 +18,13 @@ import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { keysOf, useShortcut } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { CodeXml, Play, Plus, Trash2 } from "lucide-react";
-import { NewScriptDialog, TemplateGallery } from "../features/python/Templates";
-import type { ScriptTemplate } from "../features/python/templates";
+import { NewScriptDialog, TemplateLevels } from "../features/python/Templates";
+import type { LevelId, ScriptTemplate } from "../features/python/templates";
+import { scriptIcon } from "../features/python/scriptIcon";
 
 const TIME_LIMITS = [10, 30, 60, 300, 0];
 const NO_SCRIPTS: PythonDemo[] = [];
 const OUTPUT_MIN = 96;
-
-/** What a script does, at a glance in the list: draws, plots, is checked, asks. */
-function scriptIcon(code: string): LucideIcon {
-  if (/^\s*(from\s+turtle\s+import|import\s+turtle)\b/m.test(code)) return Turtle;
-  if (/\bmatplotlib\b/.test(code)) return ChartSpline;
-  if (/^\s*>>>/m.test(code)) return ListChecks;
-  if (/\binput\s*\(/.test(code)) return Keyboard;
-  return CodeXml;
-}
 
 /** The file name the runner shows in tracebacks and checks look up. */
 function fileName(script: { name: string; path?: string }): string {
@@ -162,7 +154,9 @@ export default function Python({ request }: { request?: { script: string; at: nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestAt, requested, handledRequest, scriptsQ.isSuccess, demos]);
 
-  const [gallery, setGallery] = useState(false);
+  /** The template gallery, open on a level (or the last one seen). */
+  const [gallery, setGallery] = useState<{ level?: LevelId } | null>(null);
+  const [lastLevel, setLastLevel] = useState<LevelId>("bases");
   /** A new script from a template: an unsaved buffer, saved under the template's name. */
   const create = async (t: ScriptTemplate) => {
     if (openScript?.isDirty) {
@@ -406,8 +400,10 @@ export default function Python({ request }: { request?: { script: string; at: nu
   return (
     <div className="h-full min-h-0 flex eu-no-drag">
       <NewScriptDialog
-        open={gallery}
-        onClose={() => setGallery(false)}
+        open={gallery !== null}
+        level={gallery?.level ?? lastLevel}
+        onLevel={setLastLevel}
+        onClose={() => setGallery(null)}
         onPick={(t) => void create(t)}
         current={openScript ? { name: openScript.name, code: openScript.code } : null}
       />
@@ -417,7 +413,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
           <span className="eu-t-label">{tr("tools.scripts")}</span>
           <div className="flex items-center gap-0.5">
             <button
-              onClick={() => setGallery(true)}
+              onClick={() => setGallery({})}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
               aria-label={tr("python.newScript")}
               aria-haspopup="dialog"
@@ -443,7 +439,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
               data-tip={tr("python.tempScript")}
               aria-label={tr("python.tempScript")}
             >
-              <Icon icon={CodeXml} size={14} className="shrink-0 text-ink-faint" />
+              <Icon icon={scriptIcon(openScript.code)} size={14} className="shrink-0 text-ink-faint" />
               <span className="eu-t-meta text-ink truncate flex-1">{openScript.name}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0" />
             </div>
@@ -469,7 +465,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
           )}
           <button
             type="button"
-            onClick={() => setGallery(true)}
+            onClick={() => setGallery({})}
             aria-haspopup="dialog"
             className="eu-nav-item w-full h-7 px-2 gap-2 mt-1 text-ink-faint eu-no-drag"
           >
@@ -611,7 +607,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
                 <div className="max-w-3xl mx-auto px-6 py-8">
                   <p className="eu-t-section text-ink">{tr("python.emptyTitle")}</p>
                   <p className="eu-t-body text-ink-muted mt-1 mb-5">{tr("tools.emptyEditorHint")}</p>
-                  <TemplateGallery onPick={(t) => void create(t)} />
+                  <TemplateLevels onPick={(t) => void create(t)} onOpen={(level) => setGallery({ level })} />
                 </div>
               </div>
             )}

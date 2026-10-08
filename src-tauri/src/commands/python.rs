@@ -60,15 +60,30 @@ fn script_in_python_dir(path: &str) -> AppResult<PathBuf> {
     }
 }
 
+/// A script's file stem from the name the teacher gave it: letters,
+/// digits, hyphens and apostrophes stay (« Courbe d'une fonction »), any
+/// other run of characters becomes one `_`, which the list shows as a space.
 fn slugify(name: &str) -> String {
-    let s: String = name
-        .trim()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect();
-    let s = s.trim_matches('_').to_string();
+    let mut s = String::new();
+    for c in name.trim().chars() {
+        if c.is_alphanumeric() || matches!(c, '-' | '\'' | '’') {
+            s.push(c);
+        } else if !s.ends_with('_') {
+            s.push('_');
+        }
+    }
+    let s = s.trim_matches(|c| c == '_' || c == '-').to_string();
+    // Windows keeps these names for devices, extension or not.
+    const DEVICES: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
+    let upper = s.to_uppercase();
+    let device = DEVICES.contains(&upper.as_str())
+        || ((upper.starts_with("COM") || upper.starts_with("LPT"))
+            && upper.len() == 4
+            && upper.as_bytes()[3].is_ascii_digit());
     if s.is_empty() {
         "script".into()
+    } else if device {
+        format!("{s}_script")
     } else {
         s
     }
@@ -246,4 +261,27 @@ pub async fn python_complete(
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slugify;
+
+    #[test]
+    fn a_script_name_keeps_its_words() {
+        assert_eq!(slugify("Courbe d'une fonction"), "Courbe_d'une_fonction");
+        assert_eq!(slugify("Est-ce un multiple ?"), "Est-ce_un_multiple");
+        assert_eq!(slugify("π par Archimède"), "π_par_Archimède");
+        assert_eq!(slugify("  Si… sinon  "), "Si_sinon");
+    }
+
+    #[test]
+    fn a_script_name_is_never_a_path_or_a_device() {
+        assert_eq!(slugify("../../etc/passwd"), "etc_passwd");
+        assert_eq!(slugify("a\\b:c*d?"), "a_b_c_d");
+        assert_eq!(slugify("?!"), "script");
+        assert_eq!(slugify("con"), "con_script");
+        assert_eq!(slugify("COM1"), "COM1_script");
+        assert_eq!(slugify("Comète"), "Comète");
+    }
 }
