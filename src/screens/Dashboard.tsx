@@ -293,23 +293,22 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             title={tr("dashboard.todayTitle")}
             icon={<Icon icon={Calendar} size={14} />}
             action={
-              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
+              <button
+                className="eu-btn-quiet eu-btn-sm"
+                onClick={() =>
+                  tabs.open({
+                    kind: "settings",
+                    params: { section: "emploi-du-temps", sectionAt: Date.now() },
+                  })
+                }
+              >
                 {tr("dashboard.schedule")}
                 <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
               </button>
             }
           >
             {classes.length === 0 ? (
-              <EmptyState
-                icon={<Icon icon={Calendar} size={16} />}
-                title={tr("dashboard.noClassTitle")}
-                hint={tr("dashboard.noClassesToday")}
-                action={
-                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
-                    {tr("dashboard.schedule")}
-                  </button>
-                }
-              />
+              <EmptyState compact title={tr("dashboard.noClassesToday")} />
             ) : (
               <div className="eu-divide">
                 {classes.map((c, i) => (
@@ -326,42 +325,38 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           </Panel>
 
           <Panel
-            title={tr("dashboard.quickLinks")}
-            icon={<Icon icon={Link} size={14} />}
+            title={tr("dashboard.resumeTitle")}
+            icon={<Icon icon={Clock} size={14} />}
             action={
-              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
-                {tr("common.manage")}
+              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "documents" })}>
+                {tr("nav.documents")}
                 <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
               </button>
             }
           >
-            {links.length === 0 ? (
+            {recentFiles.length === 0 ? (
               <EmptyState
-                title={tr("dashboard.noLinksTitle")}
-                hint={tr("dashboard.noLinksHint")}
+                compact
+                title={tr("dashboard.noRecentHint")}
                 action={
-                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
-                    {tr("common.add")}
+                  <button className="eu-btn-ghost eu-btn-sm" onClick={importDocs}>
+                    {tr("common.importFiles")}
                   </button>
                 }
               />
             ) : (
-              <div className="flex flex-wrap gap-1.5 p-[14px]">
-                {links.slice(0, 8).map((l) => (
+              <div className="eu-divide">
+                {recentFiles.map((f) => (
                   <button
-                    key={l.id}
-                    type="button"
-                    onClick={() => {
-                      void api.openUrl(l.url).catch((err) => {
-                        reportError("dashboard.openUrl", err);
-                        toast(errorMessage(err, tr("messages.openUrlError")), "error");
-                      });
-                    }}
-                    className="eu-btn-ghost eu-btn-sm"
-                    data-tip={l.url}
+                    key={f.id}
+                    onClick={() => openFile(f)}
+                    className="eu-row-hover w-full text-left"
+                    data-tip={f.name}
+                    aria-label={f.name}
                   >
-                    <Favicon url={l.url} className="w-4 h-4 text-[0.5625rem]" remote={remoteIcons} />
-                    <span className="truncate max-w-[18ch]">{l.label}</span>
+                    <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
+                    <span className="eu-t-body text-ink truncate flex-1">{f.name}</span>
+                    <span className="eu-t-caption shrink-0">{relativeTime(f.added_at)}</span>
                   </button>
                 ))}
               </div>
@@ -384,15 +379,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             }
           >
             {pending.length === 0 ? (
-              <EmptyState
-                title={tr("dashboard.noRemindersTitle")}
-                hint={tr("dashboard.noReminders")}
-                action={
-                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "reminders" })}>
-                    {tr("common.newReminder")}
-                  </button>
-                }
-              />
+              <EmptyState compact title={tr("dashboard.noReminders")} />
             ) : (
               <div className="eu-divide">
                 {pending.slice(0, 6).map((r) => {
@@ -446,38 +433,42 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
           </Panel>
 
           <Panel
-            title={tr("dashboard.resumeTitle")}
-            icon={<Icon icon={Clock} size={14} />}
+            title={tr("dashboard.quickLinks")}
+            icon={<Icon icon={Link} size={14} />}
             action={
-              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "documents" })}>
-                {tr("nav.documents")}
+              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
+                {tr("common.manage")}
                 <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
               </button>
             }
           >
-            {recentFiles.length === 0 ? (
+            {links.length === 0 ? (
               <EmptyState
-                title={tr("dashboard.noRecentTitle")}
-                hint={tr("dashboard.noRecentHint")}
+                compact
+                title={tr("dashboard.noLinksHint")}
                 action={
-                  <button className="eu-btn-ghost eu-btn-sm" onClick={importDocs}>
-                    {tr("common.importFiles")}
+                  <button className="eu-btn-ghost eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
+                    {tr("common.add")}
                   </button>
                 }
               />
             ) : (
-              <div className="eu-divide">
-                {recentFiles.map((f) => (
+              <div className="flex flex-wrap gap-1.5 p-[14px]">
+                {links.slice(0, 8).map((l) => (
                   <button
-                    key={f.id}
-                    onClick={() => openFile(f)}
-                    className="eu-row-hover w-full text-left"
-                    data-tip={f.name}
-                    aria-label={f.name}
+                    key={l.id}
+                    type="button"
+                    onClick={() => {
+                      void api.openUrl(l.url).catch((err) => {
+                        reportError("dashboard.openUrl", err);
+                        toast(errorMessage(err, tr("messages.openUrlError")), "error");
+                      });
+                    }}
+                    className="eu-btn-ghost eu-btn-sm"
+                    data-tip={l.url}
                   >
-                    <FileKindIcon kind={f.kind} className="w-4 h-4 text-ink-faint shrink-0" />
-                    <span className="eu-t-body text-ink truncate flex-1">{f.name}</span>
-                    <span className="eu-t-caption shrink-0">{relativeTime(f.added_at)}</span>
+                    <Favicon url={l.url} className="w-4 h-4 text-[0.5625rem]" remote={remoteIcons} />
+                    <span className="truncate max-w-[18ch]">{l.label}</span>
                   </button>
                 ))}
               </div>

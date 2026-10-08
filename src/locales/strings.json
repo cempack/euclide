@@ -48,8 +48,8 @@
     "undo": "Annuler"
   },
   "dashboard": {
-    "noClassesToday": "Aucun cours aujourd'hui.",
-    "noReminders": "Aucun rappel.",
+    "noClassesToday": "Pas de cours aujourd’hui.",
+    "noReminders": "Rien à retenir pour l’instant.",
     "quickLinks": "Liens",
     "inProgress": "EN COURS",
     "past": "passé",
@@ -75,13 +75,9 @@
     "newBoard": "Tableau",
     "todayTitle": "Aujourd'hui",
     "schedule": "Emploi du temps",
-    "noClassTitle": "Aucun cours aujourd'hui",
-    "noLinksTitle": "Aucun lien rapide",
-    "noLinksHint": "Ajoutez depuis Outils les adresses que vous ouvrez tous les jours.",
-    "noRemindersTitle": "Rien à retenir",
+    "noLinksHint": "Vos sites du quotidien, à un clic.",
     "resumeTitle": "Reprendre",
-    "noRecentTitle": "Rien d'ouvert récemment",
-    "noRecentHint": "Importez des PDF, des images ou créez un tableau : ils apparaîtront ici.",
+    "noRecentHint": "Les documents ouverts récemment viendront ici.",
     "activeToday": "Aujourd'hui",
     "nowLabel": "En cours",
     "nextLabel": "Prochain cours",
@@ -647,12 +643,19 @@
     "remaining": "reste {time}",
     "ending": "fin",
     "inTime": "dans {time}",
-    "noClass": "aucun cours en cours",
     "pronoteHint": "État de la connexion Pronote",
     "pronoteOn": "pronote connecté",
     "pronoteOff": "pronote hors ligne",
     "awake": "écran maintenu",
-    "tabs": "onglets"
+    "noMoreClass": "plus de cours aujourd’hui",
+    "noClassToday": "pas de cours aujourd’hui",
+    "tabCount": {
+      "one": "{count} onglet",
+      "other": "{count} onglets"
+    },
+    "tabLimit": "Au-delà de {max}, ouvrir un onglet ferme le plus ancien.",
+    "themeHint": "Changer de thème",
+    "aboutHint": "À propos d’Euclide"
   },
   "capture": {
     "noteSaved": "Note créée",

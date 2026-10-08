@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { changed } from "../api/client";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { tr, trn } from "../lib/i18n";
@@ -40,7 +40,19 @@ const SECTIONS: NavSection[] = [
   { id: "a-propos", label: tr("about.title") },
 ];
 
-export default function Settings({ info }: { info: AppInfo | null }) {
+export default function Settings({
+  info,
+  request,
+}: {
+  info: AppInfo | null;
+  /** A section asked for from elsewhere (the status bar, the dashboard). */
+  request?: { section: string; at: number };
+}) {
+  const section = request?.section;
+  const at = request?.at;
+  useEffect(() => {
+    if (section) document.getElementById(section)?.scrollIntoView({ block: "start" });
+  }, [section, at]);
   return (
     <>
       <PageHeader title={tr("nav.settings")} />

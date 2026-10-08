@@ -354,12 +354,22 @@ export function EmptyState({
   title,
   hint,
   action,
+  compact,
 }: {
   icon?: ReactNode;
   title: string;
   hint?: string;
   action?: ReactNode;
+  /** One quiet line (a dashboard panel already says what it holds). */
+  compact?: boolean;
 }) {
+  if (compact)
+    return (
+      <div className="flex items-center justify-between gap-3 flex-wrap px-[14px] py-3">
+        <p className="eu-t-body text-ink-muted">{title}</p>
+        {action}
+      </div>
+    );
   return (
     <div className="flex items-start gap-3.5 p-[14px]">
       {icon && (

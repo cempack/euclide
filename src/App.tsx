@@ -184,7 +184,14 @@ function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; vis
         />
       );
     case "settings":
-      return <Settings info={info} />;
+      return (
+        <Settings
+          info={info}
+          request={
+            tab.params.section ? { section: tab.params.section, at: tab.params.sectionAt ?? 0 } : undefined
+          }
+        />
+      );
     case "reminders":
       return <Reminders />;
     case "recap":
