@@ -153,6 +153,21 @@ class Checks(unittest.TestCase):
         self.assertEqual(results[1]["message"], "attendu 5, obtenu 4")
         self.assertIn("assert carre(0) == 1", results[2]["message"])
 
+    def test_doctests_of_a_class_and_its_methods(self):
+        script = (
+            "class Compteur:\n"
+            '    """\n    >>> Compteur().valeur\n    0\n    """\n\n'
+            "    def __init__(self):\n        self.valeur = 0\n\n"
+            "    def plus(self):\n"
+            '        """\n        >>> c = Compteur()\n        >>> c.plus()\n        2\n        """\n'
+            "        self.valeur += 1\n        return self.valeur\n"
+        )
+        results = self.checks(run(script, checks={"source": ""}))
+        self.assertEqual(
+            [(r["name"], r["ok"]) for r in results], [("Compteur", True), ("Compteur.plus", False)]
+        )
+        self.assertIn("attendu '2', obtenu '1'", results[1]["message"])
+
     def test_doctests_when_there_is_no_companion_file(self):
         script = 'def double(x):\n    """\n    >>> double(2)\n    4\n    >>> double(5)\n    11\n    """\n    return 2 * x\n'
         results = self.checks(run(script, checks={"source": ""}))

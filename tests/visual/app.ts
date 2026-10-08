@@ -98,6 +98,14 @@ export const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }>
     },
   },
   { name: "python", go: (p) => nav(p, "Python") },
+  {
+    name: "python-templates",
+    go: async (p) => {
+      await nav(p, "Python");
+      await p.getByRole("button", { name: "Nouveau script" }).first().click();
+      await settle(p);
+    },
+  },
   { name: "tools", go: (p) => nav(p, "Outils") },
   { name: "recap", go: (p) => nav(p, "Bilan") },
   {

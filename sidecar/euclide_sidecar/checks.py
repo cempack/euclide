@@ -82,17 +82,23 @@ class _Collect(doctest.DocTestRunner):
 
 
 def _doctests(script_ns, script_name):
-    finder = doctest.DocTestFinder(recurse=False)
+    """The examples of the script's functions, and of its classes (their
+    docstring and their methods')."""
     for name, obj in list(script_ns.items()):
         code = getattr(obj, "__code__", None)
-        if not callable(obj) or code is None or code.co_filename != script_name:
+        if callable(obj) and code is not None and code.co_filename == script_name:
+            finder = doctest.DocTestFinder(recurse=False)
+        elif isinstance(obj, type) and obj.__module__ == script_ns.get("__name__"):
+            finder = doctest.DocTestFinder(recurse=True)
+        else:
             continue
-        for test in finder.find(obj, name, globs=dict(script_ns)):
+        # module=False: the script is no module; every method is its own.
+        for test in finder.find(obj, name, module=False, globs=dict(script_ns)):
             if not test.examples:
                 continue
             runner = _Collect()
             runner.run(test, out=lambda _text: None, clear_globs=True)
-            yield {"name": name, "ok": not runner.problems, "message": "\n".join(runner.problems)}
+            yield {"name": test.name, "ok": not runner.problems, "message": "\n".join(runner.problems)}
 
 
 def run(source, script_ns, script_name):
