@@ -13,10 +13,10 @@ use crate::error::{AppError, AppResult};
 use rusqlite::{params, Connection, Transaction};
 use std::path::Path;
 
-pub const LATEST: i64 = 2;
+pub const LATEST: i64 = 3;
 
 type Up = fn(&Transaction, &Path) -> AppResult<()>;
-const MIGRATIONS: &[(i64, Up)] = &[(1, v1), (2, v2)];
+const MIGRATIONS: &[(i64, Up)] = &[(1, v1), (2, v2), (3, v3)];
 
 /// Columns added by releases that predate versioned migrations. Each statement
 /// fails harmlessly when the column already exists.
@@ -315,6 +315,23 @@ fn v2(tx: &Transaction, _data_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// v3
+// ---------------------------------------------------------------------------
+
+/// Format 1 copied versions, annotations and the search index into tables
+/// and kept the old copies for one release (0.3): they go now.
+fn v3(tx: &Transaction, _data_dir: &Path) -> AppResult<()> {
+    tx.execute_batch(
+        r"DROP TABLE IF EXISTS doc_index;
+          DELETE FROM settings
+          WHERE key LIKE 'file\_versions\_%' ESCAPE '\'
+             OR key LIKE 'pdf\_versions\_%' ESCAPE '\'
+             OR key LIKE 'pdf\_annot\_%' ESCAPE '\';",
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,6 +349,34 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("documents/.versions")).unwrap();
         dir
+    }
+
+    #[test]
+    fn v3_drops_what_format_1_kept_for_one_release() {
+        let mut conn = legacy_db();
+        conn.execute_batch(
+            "INSERT INTO settings (key, value) VALUES
+                 ('file_versions_7', '[]'), ('pdf_annot_8', '{}'), ('pdf_versions_9', '[]'),
+                 ('theme', 'dark'), ('file_versionsX', 'kept');",
+        )
+        .unwrap();
+        migrate(&mut conn, Path::new("/nonexistent"), None).unwrap();
+        let keys: Vec<String> = conn
+            .prepare("SELECT key FROM settings ORDER BY key")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(keys, ["file_versionsX", "theme"]);
+        let index: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name = 'doc_index'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(index, 0);
     }
 
     #[test]

@@ -292,16 +292,6 @@ pub async fn delete_file(db: State<'_, Db>, id: i64) -> AppResult<()> {
             .query_map([id], |r| r.get(0))?
             .collect::<Result<_, _>>()?;
         tx.execute("DELETE FROM files WHERE id=?1", [id])?;
-        // Leftovers of the pre-format-1 bookkeeping, kept for one release.
-        tx.execute(
-            "DELETE FROM settings WHERE key IN (?1, ?2, ?3)",
-            params![
-                format!("file_versions_{id}"),
-                format!("pdf_versions_{id}"),
-                format!("pdf_annot_{id}")
-            ],
-        )?;
-        tx.execute("DELETE FROM doc_index WHERE file_id=?1", [id])?;
         tx.commit()?;
         for rel in &versions {
             if let Ok(path) = abs_path(rel) {
