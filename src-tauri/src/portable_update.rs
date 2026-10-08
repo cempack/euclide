@@ -18,7 +18,10 @@
 //! 5. Stages the new sidecar as `euclide-sidecar.next/` beside the current one
 //!    (the archive is unpacked on the key itself, so this is a rename). The
 //!    next launch of the new version swaps the folders before Python starts:
-//!    the sidecar is replaced whole or not at all, never file by file.
+//!    the sidecar is replaced whole or not at all, never file by file. When
+//!    the archive's sidecar is the one installed (same `.euclide-build`
+//!    fingerprint, written by sidecar/build.py), it is not unpacked at all:
+//!    an update of the app alone writes a few files to the key, not hundreds.
 //!
 //! Should a launch still find a sidecar of another version (a swap held off
 //! by an antivirus, an update by Euclide 0.1 that copied files one by one),
@@ -43,6 +46,8 @@ const SIDECAR_NEXT: &str = "euclide-sidecar.next";
 const SIDECAR_OLD_PREFIX: &str = "euclide-sidecar.old-";
 /// Written last inside `euclide-sidecar.next/`: the version it belongs to.
 const STAGED_MARKER: &str = ".euclide-staged";
+/// In every sidecar bundle: a hash of its files (sidecar/build.py).
+const FINGERPRINT: &str = ".euclide-build";
 /// Where an update is unpacked, on the same volume as the app.
 const STAGING_DIR: &str = ".euclide-update";
 
@@ -266,6 +271,11 @@ pub fn is_allowed_overlay_rel(path: &Path) -> bool {
 /// Overlay allowed app files onto `dest`. Unknown files already in `dest` are left
 /// untouched — no deletes, no purge of `Euclide-Data`.
 pub fn extract_allowed_overlay(bytes: &[u8], dest: &Path) -> Result<usize, String> {
+    extract_overlay(bytes, dest, true)
+}
+
+/// The same, leaving the sidecar's files out when `sidecar` is false.
+fn extract_overlay(bytes: &[u8], dest: &Path, sidecar: bool) -> Result<usize, String> {
     if bytes.len() < 4 || &bytes[0..2] != b"PK" {
         return Err(
             "La mise à jour portable attend une archive zip (pas un installateur NSIS).".into(),
@@ -303,6 +313,9 @@ pub fn extract_allowed_overlay(bytes: &[u8], dest: &Path) -> Result<usize, Strin
             // extracted, never used as a reason to wipe the destination.
             continue;
         }
+        if !sidecar && top_name_lower(&rel).as_deref() == Some(SIDECAR_DIR) {
+            continue;
+        }
         let out_path = dest.join(&rel);
         if let Some(parent) = out_path.parent() {
             std::fs::create_dir_all(parent)
@@ -324,6 +337,39 @@ pub fn extract_allowed_overlay(bytes: &[u8], dest: &Path) -> Result<usize, Strin
         );
     }
     Ok(written)
+}
+
+/// The fingerprint of the sidecar an update archive carries, read in memory.
+fn archive_fingerprint(bytes: &[u8]) -> Option<String> {
+    use std::io::Read;
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).ok()?;
+    let suffix = format!("{SIDECAR_DIR}/{FINGERPRINT}");
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).ok()?;
+        let name = file.name().replace('\\', "/").to_ascii_lowercase();
+        if name == suffix || name.ends_with(&format!("/{suffix}")) {
+            let mut text = String::new();
+            file.read_to_string(&mut text).ok()?;
+            return Some(text.trim().to_string()).filter(|t| !t.is_empty());
+        }
+    }
+    None
+}
+
+/// Whether the archive brings the sidecar already installed in `dest`: same
+/// fingerprint, and its program still there.
+fn sidecar_unchanged(bytes: &[u8], dest: &Path) -> bool {
+    let installed = dest.join(SIDECAR_DIR);
+    let program = if cfg!(windows) {
+        "euclide-sidecar.exe"
+    } else {
+        "euclide-sidecar"
+    };
+    let Some(theirs) = archive_fingerprint(bytes) else {
+        return false;
+    };
+    let ours = std::fs::read_to_string(installed.join(FINGERPRINT)).unwrap_or_default();
+    ours.trim() == theirs && installed.join(program).is_file()
 }
 
 pub fn is_update_leftover_name(name: &str) -> bool {
@@ -859,8 +905,10 @@ fn install_portable(
     std::fs::create_dir_all(&staging)
         .map_err(|e| format!("Dossier temporaire de mise à jour: {e}"))?;
 
+    // The same sidecar as the installed one: it stays as it is.
+    let unchanged = sidecar_unchanged(bytes, &dest);
     let result = (|| {
-        extract_allowed_overlay(bytes, &staging)?;
+        extract_overlay(bytes, &staging, !unchanged)?;
         stage_sidecar(&staging, &dest, version)?;
         // Python must not hold files of the current sidecar: the next launch
         // renames that folder.
@@ -1345,6 +1393,73 @@ mod tests {
         assert!(dest.join("euclide-sidecar").is_dir());
         assert!(!dest.join(SIDECAR_NEXT).exists());
         let _ = std::fs::remove_dir_all(&dest);
+    }
+
+    /// A USB folder whose sidecar carries `fingerprint`.
+    fn usb_with_sidecar(name: &str, fingerprint: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("euclide-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(SIDECAR_DIR)).unwrap();
+        for program in ["euclide-sidecar", "euclide-sidecar.exe"] {
+            std::fs::write(dir.join(SIDECAR_DIR).join(program), b"installed").unwrap();
+        }
+        std::fs::write(
+            dir.join(SIDECAR_DIR).join(FINGERPRINT),
+            format!("{fingerprint}\n"),
+        )
+        .unwrap();
+        dir
+    }
+
+    #[test]
+    fn an_update_leaves_the_same_sidecar_in_place() {
+        let zip = zip_with(&[
+            ("euclide.exe", b"new exe"),
+            ("euclide-sidecar/euclide-sidecar.exe", b"new"),
+            ("euclide-sidecar/euclide-sidecar", b"new"),
+            ("euclide-sidecar/.euclide-build", b"abc123\n"),
+        ]);
+        assert_eq!(archive_fingerprint(&zip).as_deref(), Some("abc123"));
+        let same = usb_with_sidecar("same-sidecar", "abc123");
+        assert!(sidecar_unchanged(&zip, &same));
+        let staging = same.join(STAGING_DIR);
+        extract_overlay(&zip, &staging, false).unwrap();
+        assert!(staging.join("euclide.exe").is_file());
+        assert!(
+            !staging.join(SIDECAR_DIR).exists(),
+            "nothing of the sidecar is written"
+        );
+        assert!(!stage_sidecar(&staging, &same, "0.4.1").unwrap());
+        assert!(!same.join(SIDECAR_NEXT).exists());
+
+        // Another fingerprint, or the installed program gone: unpacked as ever.
+        let other = usb_with_sidecar("other-sidecar", "def456");
+        assert!(!sidecar_unchanged(&zip, &other));
+        for program in ["euclide-sidecar", "euclide-sidecar.exe"] {
+            std::fs::remove_file(same.join(SIDECAR_DIR).join(program)).unwrap();
+        }
+        assert!(!sidecar_unchanged(&zip, &same));
+        // A bundle from before fingerprints (0.4.0 and older).
+        let old = zip_with(&[
+            ("euclide.exe", b"x"),
+            ("euclide-sidecar/euclide-sidecar.exe", b"y"),
+        ]);
+        assert_eq!(archive_fingerprint(&old), None);
+        assert!(!sidecar_unchanged(&old, &other));
+        let _ = std::fs::remove_dir_all(&same);
+        let _ = std::fs::remove_dir_all(&other);
+    }
+
+    #[test]
+    fn the_fingerprint_is_found_in_a_wrapped_windows_zip() {
+        let zip = zip_with(&[
+            ("Euclide-portable\\euclide.exe", b"x"),
+            (
+                "Euclide-portable\\euclide-sidecar\\.euclide-build",
+                b" f00d \n",
+            ),
+        ]);
+        assert_eq!(archive_fingerprint(&zip).as_deref(), Some("f00d"));
     }
 
     #[test]
