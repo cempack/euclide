@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import {
@@ -118,7 +119,7 @@ function PdfPane({ tabId, fileId, fileName }: { tabId: string; fileId: number; f
       view.markSaved();
       setDirty(false);
       void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
     } catch (err) {
       reportError("pdf.save", err);
       toast(errorMessage(err, tr("messages.genericError")), "error");
@@ -139,7 +140,7 @@ function PdfPane({ tabId, fileId, fileName }: { tabId: string; fileId: number; f
       setDirty(false);
       setCurrent((c) => ({ url: fileUrl(fileId), revision: c.revision + 1 }));
       void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
       toast(tr("pdf.restored"), "success");
     } catch (err) {
       reportError("pdf.restore", err);

@@ -1,4 +1,5 @@
 import { useCallback, useState, useMemo } from "react";
+import { changed } from "../api/client";
 import { tabs } from "../stores/tabs";
 import { openFile } from "../lib/files";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -150,7 +151,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   const updateMatiere = async (newMatiere: string) => {
     if (!course) return;
     await api.updateCourse({ ...course, matiere: newMatiere });
-    window.dispatchEvent(new CustomEvent("eu:course-changed"));
+    changed("courses");
     toast(`Matière mise à jour : ${newMatiere || "(aucune)"}`, "success");
   };
 
@@ -181,7 +182,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       if (added.length) {
         added.forEach((f) => api.logEvent("file_import", f.name, courseId));
         toast(trn("courseDetail.importedFilesToast", added.length), "success");
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        changed("library");
       }
       setShowAttach(false);
       refreshFiles();
@@ -266,7 +267,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                 });
                 if (!ok) return;
                 await api.deleteCourse(courseId);
-                window.dispatchEvent(new CustomEvent("eu:course-changed"));
+                changed("courses");
                 tabs.open({ kind: "courses" });
                 tabs.close(`course:${courseId}`);
               }}
@@ -571,7 +572,7 @@ function FilesPane({
               try {
                 await api.deleteFile(f.id);
                 tabs.closeFile(f.id);
-                window.dispatchEvent(new CustomEvent("eu:library-changed"));
+                changed("library");
                 onChanged();
               } catch (err: any) {
                 toast(err?.message || tr("messages.genericError"), "error");

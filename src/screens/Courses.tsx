@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, memo } from "react";
+import { changed } from "../api/client";
 import { tabs } from "../stores/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
@@ -264,8 +265,8 @@ export default function Courses() {
         }
         toast(`${tr("common.newCourse")} : ${name.trim()}`, "success");
       }
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
-      window.dispatchEvent(new CustomEvent("eu:course-changed"));
+      changed("library");
+      changed("courses");
       close();
       refresh();
     } catch (err) {

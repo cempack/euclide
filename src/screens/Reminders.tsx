@@ -1,4 +1,5 @@
 import { useState, useMemo, memo } from "react";
+import { changed } from "../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type Course, type Reminder, type RepeatRule } from "../lib/api";
@@ -148,7 +149,7 @@ export default function Reminders() {
       setNewTitle("");
       setNewDue("");
       setNewRepeat("none");
-      window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
+      changed("reminders");
       refresh({ silent: true });
     } catch (err) {
       reportError("reminders.add", err);
@@ -180,7 +181,7 @@ export default function Reminders() {
         reportError("reminders.clearDone", err);
       }
     }
-    window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
+    changed("reminders");
     refresh({ silent: true });
   };
 

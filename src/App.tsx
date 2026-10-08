@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense, memo } from "react";
+import { changed, onChanged } from "./api/client";
 import { api, type AppInfo, isTauri } from "./lib/api";
 import { tr } from "./lib/i18n";
 import { minutesRemaining } from "./lib/format";
@@ -257,14 +258,14 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
       if (effectiveMode === "note") {
         const saved = await api.saveNote({ title: payload, body: "", course_id: null });
         api.logEvent("note_write", payload, null);
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        changed("library");
         toast(tr("capture.noteSaved"), "success");
         onClose();
         if (saved?.id) tabs.open({ kind: "note", title: payload, params: { noteId: saved.id } });
       } else {
         const created = await api.createReminder(payload, null);
         if (!created?.id) throw new Error("Le rappel n'a pas été enregistré.");
-        window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
+        changed("reminders");
         toast(tr("capture.reminderSaved"), "success");
         onClose();
       }
@@ -377,6 +378,7 @@ function Shell() {
   const handleSearch = useCallback(() => setPalette(true), []);
   const closePalette = useCallback(() => setPalette(false), []);
   const closeCapture = useCallback(() => setCaptureOpen(false), []);
+  const openCapture = useCallback(() => setCaptureOpen(true), []);
   const closeHelp = useCallback(() => setHelp(false), []);
 
   const requestClose = useCallback(
@@ -408,12 +410,6 @@ function Shell() {
     api.appInfo().then(setInfo).catch(logged("app.info"));
   }, []);
 
-  useEffect(() => {
-    const onCapture = () => setCaptureOpen(true);
-    window.addEventListener("eu:capture-open", onCapture);
-    return () => window.removeEventListener("eu:capture-open", onCapture);
-  }, []);
-
   // « Fin de cours annoncée »: one discreet notice a few minutes before the bell,
   // driven by the schedule. Off / silent / with a chime, from Réglages.
   useEffect(() => {
@@ -434,8 +430,7 @@ function Shell() {
       if (!Number.isNaN(n) && n >= 1 && n <= 15) lead = n;
     };
     void readPrefs();
-    const onPrefs = () => void readPrefs();
-    window.addEventListener("eu:settings-changed", onPrefs);
+    const stopPrefs = onChanged("settings", () => void readPrefs());
 
     const tick = async () => {
       if (mode === "off") return;
@@ -466,7 +461,7 @@ function Shell() {
     const seed = window.setTimeout(tick, 8_000);
     return () => {
       cancelled = true;
-      window.removeEventListener("eu:settings-changed", onPrefs);
+      stopPrefs();
       window.clearInterval(interval);
       window.clearTimeout(seed);
     };
@@ -651,7 +646,7 @@ function Shell() {
 
       {paletteUsed && (
         <Suspense fallback={null}>
-          <CommandPalette open={palette} onClose={closePalette} onHelp={handleHelp} />
+          <CommandPalette open={palette} onClose={closePalette} onHelp={handleHelp} onCapture={openCapture} />
         </Suspense>
       )}
       <QuickCapture open={captureOpen} onClose={closeCapture} />

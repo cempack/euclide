@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { changed } from "../api/client";
 import { useToast } from "../components/ui";
 import { api, type FileItem } from "../lib/api";
 import { errorMessage } from "../lib/errors";
@@ -18,7 +19,7 @@ export function useImportFiles() {
         const added = (await load()) ?? [];
         if (!added.length) return;
         for (const f of added) api.logEvent("file_import", f.name, f.course_id).catch(logged("import.log"));
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        changed("library");
         toast(trn("documents.toastImported", added.length), "success");
       } catch (err) {
         reportError(where, err);

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { changed } from "../api/client";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { tr } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
@@ -200,7 +201,7 @@ function AppearanceSection() {
               checked={remoteIcons}
               onChange={(e) => {
                 setFavicons(e.target.checked ? "1" : "0");
-                window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
+                changed("links");
               }}
             />
             <span className="min-w-0">
@@ -407,14 +408,14 @@ function PronoteSection() {
       try {
         toast(tr("settings.toastSyncing"), "info");
         const n = await api.pronoteSync();
-        window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+        changed("schedule");
         toast(tr("settings.toastSyncCount", { count: n }), "success");
       } catch {
         // Token may have rotated — retry once after a short wait
         try {
           await new Promise((r) => setTimeout(r, 1500));
           const n2 = await api.pronoteSync();
-          window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+          changed("schedule");
           toast(tr("settings.toastSyncCount", { count: n2 }), "success");
         } catch (err) {
           // Sync failed but login itself worked — user can manually sync later
@@ -433,7 +434,7 @@ function PronoteSection() {
     try {
       toast(tr("settings.toastSyncing"), "info");
       const n = await api.pronoteSync();
-      window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+      changed("schedule");
       toast(tr("settings.toastSyncCount", { count: n }), "success");
     } catch (err) {
       toast(errorMessage(err, tr("settings.toastSyncFail")), "error");
@@ -478,7 +479,7 @@ function PronoteSection() {
               <button
                 onClick={async () => {
                   await api.pronoteLogout();
-                  window.dispatchEvent(new CustomEvent("eu:pronote-changed"));
+                  changed("pronote");
                   refresh();
                 }}
                 className="eu-btn-quiet eu-btn-sm"
@@ -645,7 +646,7 @@ function ScheduleSection() {
       toast(tr("settings.toastScheduleAdded"), "success");
       setOpen(false);
       setForm({ day_of_week: 1, start_time: "08:00", end_time: "09:00", subject: "", room: "" });
-      window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+      changed("schedule");
       refresh();
     } catch (err) {
       reportError("settings.addSchedule", err);
@@ -661,7 +662,7 @@ function ScheduleSection() {
 
   const remove = async (id: number) => {
     await api.deleteScheduleEntry(id);
-    window.dispatchEvent(new CustomEvent("eu:schedule-changed"));
+    changed("schedule");
     refresh();
   };
 

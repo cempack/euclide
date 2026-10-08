@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { changed, onChanged } from "../api/client";
 import { useQuery } from "@tanstack/react-query";
 import { LayoutGrid, List } from "lucide-react";
 import { api, thumbUrl, type Course, type FileItem, type Note, type SearchResult } from "../lib/api";
@@ -111,8 +112,7 @@ function subscribeThumbs(onChange: () => void) {
     thumbsVersion += 1;
     onChange();
   };
-  window.addEventListener("eu:thumbnails-changed", handler);
-  return () => window.removeEventListener("eu:thumbnails-changed", handler);
+  return onChanged("thumbnails", handler);
 }
 const useThumbsVersion = () => useSyncExternalStore(subscribeThumbs, () => thumbsVersion);
 
@@ -322,7 +322,7 @@ export default function Documents({
             .forEach((t) => tabs.close(t.id, { discard: true }));
           toast(tr("notes.deleted"), "success");
         }
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        changed("library");
       } catch (err) {
         reportError("documents.delete", err);
         toast(errorMessage(err, tr("messages.genericError")), "error");
@@ -382,7 +382,7 @@ export default function Documents({
         api.logEvent("file_rename", newName, updated.course_id ?? null).catch(logged("documents.logRename"));
       }
       toast(tr("documents.toastRenamed", { name: newName }), "success");
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
     } catch (err) {
       reportError("documents.rename", err);
       toast(errorMessage(err, tr("messages.genericError")), "error");

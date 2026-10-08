@@ -27,6 +27,14 @@ export default tseslint.config(
     rules: {
       // Empty catches hide failures from the teacher; make each one visible.
       "no-empty": ["warn", { allowEmptyCatch: false }],
+      // Data changes go through changed() (src/api/client.ts), not window events.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "NewExpression[callee.name='CustomEvent'][arguments.0.value=/^eu:/]",
+          message: "Announce data changes with changed(scope) from src/api/client.ts.",
+        },
+      ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       // React Compiler rules: code that breaks them is not compiled (and

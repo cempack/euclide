@@ -1,4 +1,5 @@
 import { api, fileUrl, isTauri } from "../../lib/api";
+import { changed, onChanged } from "../../api/client";
 import { reportError } from "../../lib/report";
 
 /**
@@ -74,7 +75,7 @@ async function pass() {
           reportError(`thumbs.${job.kind}`, err);
         }
       }
-      window.dispatchEvent(new CustomEvent("eu:thumbnails-changed"));
+      changed("thumbnails");
     }
   } catch (err) {
     reportError("thumbs.pass", err);
@@ -88,9 +89,9 @@ export function startThumbnailer(): () => void {
   if (!isTauri()) return () => {};
   const kick = () => void pass();
   const first = window.setTimeout(kick, 12_000);
-  window.addEventListener("eu:library-changed", kick);
+  const stop = onChanged("library", kick);
   return () => {
     window.clearTimeout(first);
-    window.removeEventListener("eu:library-changed", kick);
+    stop();
   };
 }

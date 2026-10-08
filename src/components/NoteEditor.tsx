@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, useCallback } from "react";
+import { changed } from "../api/client";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ClipboardCheck, FileDown, Presentation, Printer } from "lucide-react";
@@ -164,7 +165,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     } else {
       tabs.rename(tabId, tabTitle);
     }
-    window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    changed("library");
     return saved;
   }, [tabId, commitDraft, commitDirty]);
 
@@ -354,7 +355,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     if (!ok) return;
     await api.deleteNote(draft.id);
     toast(tr("notes.deleted"), "success");
-    window.dispatchEvent(new CustomEvent("eu:library-changed"));
+    changed("library");
     tabs.close(tabId, { discard: true });
   };
 
@@ -444,7 +445,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       try {
         const file = await api.printToPdf(title, draft.course_id ?? null);
         api.logEvent("note_export", file.name, draft.course_id ?? null);
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        changed("library");
         toast(tr("print.saved", { name: file.name }), "success", {
           action: { label: tr("print.open"), run: () => openFile(file) },
         });
