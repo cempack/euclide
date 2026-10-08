@@ -1176,7 +1176,7 @@
   .eu-menu-sep {
     @apply my-1 mx-1 h-px bg-line;
   }
-  /* The script template gallery (python/Templates.tsx): a card per
+  /* The script template gallery (python/TemplateGallery.tsx): a card per
      template, its glyph turning accent under the pointer. */
   .eu-template-card {
     @apply relative flex items-center rounded-md transition-colors duration-fast hover:bg-hover;
@@ -1645,7 +1645,7 @@ input[type="radio"] {
   font-weight: 600;
 }
 
-/* Notes presented as slides (features/notes/Slides.tsx): paper in every
+/* Notes presented as slides (features/notes/SlideShow.tsx): paper in every
    theme, the text sized per slide to fill the screen. */
 .eu-slides {
   position: fixed;
@@ -2288,7 +2288,7 @@ input[type="radio"] {
   color: var(--color-ink);
 }
 
-/* An empty note offers its templates (features/notes/Templates.tsx). */
+/* An empty note offers its templates (features/notes/TemplatePicker.tsx). */
 .eu-template-strip {
   display: flex;
   flex-wrap: wrap;

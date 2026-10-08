@@ -16,7 +16,7 @@
     "shots": "playwright test",
     "shots:update": "playwright test --update-snapshots=all",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
-    "lint": "eslint . --max-warnings 0 && node scripts/design-lint.mjs",
+    "lint": "eslint . --max-warnings 0 && node scripts/design-lint.mjs && node scripts/check-names.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

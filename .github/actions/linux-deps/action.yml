@@ -14,13 +14,14 @@ inputs:
 runs:
   using: composite
   steps:
-    # The files apt would fetch, versions included: any update changes the key.
+    # The .deb files apt would fetch, versions in their names: any update
+    # changes the key, whichever mirror the runner uses.
     - name: Resolve the packages
       id: plan
       shell: bash
       run: |
         sudo apt-get update -qq
-        files=$(apt-get install --print-uris -qq -y ${{ inputs.packages }} | cut -d"'" -f2 | sort)
+        files=$(apt-get install --print-uris -qq -y ${{ inputs.packages }} | cut -d"'" -f2 | sed 's#.*/##' | sort)
         hash=$(printf '%s' "$files" | sha256sum | cut -c1-16)
         echo "key=apt-$(lsb_release -rs)-${{ runner.arch }}-$hash" >> "$GITHUB_OUTPUT"
         echo "prefix=apt-$(lsb_release -rs)-${{ runner.arch }}-" >> "$GITHUB_OUTPUT"

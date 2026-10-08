@@ -24,7 +24,7 @@ import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
 import { Markdown } from "../features/notes/Markdown";
 import { PrintSheet, printDialog, sheetReady, type PrintJob } from "../features/notes/PrintSheet";
-import { TemplateMenu, TemplateStrip } from "../features/notes/Templates";
+import { TemplateMenu, TemplateStrip } from "../features/notes/TemplatePicker";
 import { fillTemplate, type NoteTemplate } from "../features/notes/templates";
 
 interface NoteEditorProps {
@@ -36,7 +36,7 @@ interface NoteEditorProps {
 
 type NoteView = "edit" | "split" | "preview";
 
-const Slides = lazy(() => import("../features/notes/Slides"));
+const Slides = lazy(() => import("../features/notes/SlideShow"));
 
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const toast = useToast();
