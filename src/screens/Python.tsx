@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleStop, ListChecks } from "lucide-react";
+import { ChartSpline, CircleStop, Keyboard, ListChecks, Turtle, type LucideIcon } from "lucide-react";
 import { api, isTauri, type PythonDemo } from "../lib/api";
 import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
@@ -24,6 +24,15 @@ import type { ScriptTemplate } from "../features/python/templates";
 const TIME_LIMITS = [10, 30, 60, 300, 0];
 const NO_SCRIPTS: PythonDemo[] = [];
 const OUTPUT_MIN = 96;
+
+/** What a script does, at a glance in the list: draws, plots, is checked, asks. */
+function scriptIcon(code: string): LucideIcon {
+  if (/^\s*(from\s+turtle\s+import|import\s+turtle)\b/m.test(code)) return Turtle;
+  if (/\bmatplotlib\b/.test(code)) return ChartSpline;
+  if (/^\s*>>>/m.test(code)) return ListChecks;
+  if (/\binput\s*\(/.test(code)) return Keyboard;
+  return CodeXml;
+}
 
 /** The file name the runner shows in tracebacks and checks look up. */
 function fileName(script: { name: string; path?: string }): string {
@@ -279,18 +288,31 @@ export default function Python({ request }: { request?: { script: string; at: nu
   useShortcut("checkPython", () => void run(true), shown);
 
   // Drag the bar between editor and console; the height is remembered.
+  const [dragging, setDragging] = useState(false);
+  /** The output's height, kept between the minimum and room for the editor. */
+  const clampHeight = (h: number) => {
+    const box = splitRef.current?.getBoundingClientRect();
+    return Math.round(Math.min((box?.height ?? h + 80) - 80, Math.max(OUTPUT_MIN, h)));
+  };
+  const resizeTo = (h: number) => {
+    const next = clampHeight(h);
+    setOutputHeight(next);
+    setSavedHeight(String(next));
+  };
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     const box = splitRef.current?.getBoundingClientRect();
     if (!box) return;
     e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
     let last: number | null = null;
     const move = (ev: PointerEvent) => {
-      last = Math.round(Math.min(box.height - 80, Math.max(OUTPUT_MIN, box.bottom - ev.clientY)));
+      last = clampHeight(box.bottom - ev.clientY);
       setOutputHeight(last);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      setDragging(false);
       if (last != null) setSavedHeight(String(last));
     };
     window.addEventListener("pointermove", move);
@@ -301,12 +323,8 @@ export default function Python({ request }: { request?: { script: string; at: nu
     if (!openScript) return;
     if (openScript.path) {
       const ok = await confirm.ask({
-        title: tr("tools.confirmDeleteScript", {
-          name: openScript.name,
-        }),
-        message: tr("tools.confirmDeleteScript", {
-          name: openScript.name,
-        }),
+        title: tr("tools.confirmDeleteScript", { name: openScript.name }),
+        message: tr("python.deleteScriptBody"),
         confirmLabel: tr("common.delete"),
         danger: true,
       });
@@ -443,12 +461,21 @@ export default function Python({ request }: { request?: { script: string; at: nu
                   aria-current={isSel ? "page" : undefined}
                   className="eu-nav-item w-full h-7 px-2 gap-2 eu-no-drag"
                 >
-                  <Icon icon={CodeXml} size={14} className="eu-nav-icon" />
+                  <Icon icon={scriptIcon(d.code)} size={14} className="eu-nav-icon" />
                   <span className="eu-t-small truncate">{d.name}</span>
                 </button>
               );
             })
           )}
+          <button
+            type="button"
+            onClick={() => setGallery(true)}
+            aria-haspopup="dialog"
+            className="eu-nav-item w-full h-7 px-2 gap-2 mt-1 text-ink-faint eu-no-drag"
+          >
+            <Icon icon={Plus} size={14} className="eu-nav-icon" />
+            <span className="eu-t-small truncate">{tr("python.newScript")}</span>
+          </button>
         </div>
 
         <div className="px-2.5 py-2 border-t border-line">
@@ -590,13 +617,23 @@ export default function Python({ request }: { request?: { script: string; at: nu
             )}
           </div>
 
-          {/* The bar between editor and console: drag it to share the height. */}
+          {/* The bar between editor and console: drag it, or use the arrows, to share the height. */}
           <div
             role="separator"
             aria-orientation="horizontal"
             aria-label={tr("python.resize")}
+            aria-valuenow={height}
+            aria-valuemin={OUTPUT_MIN}
+            tabIndex={0}
             onPointerDown={startResize}
-            className="shrink-0 h-1.5 -my-0.5 z-1 cursor-row-resize bg-line hover:bg-accent/40 transition-colors duration-fast"
+            onKeyDown={(e) => {
+              const step = e.key === "ArrowUp" ? 24 : e.key === "ArrowDown" ? -24 : 0;
+              if (!step) return;
+              e.preventDefault();
+              resizeTo(height + step);
+            }}
+            data-dragging={dragging || undefined}
+            className="eu-split"
           />
           <div className="shrink-0 min-h-0" style={{ height }}>
             <OutputPanel
@@ -609,6 +646,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
               checks={runner.checks}
               scriptName={openScript ? fileName(openScript) : "script.py"}
               onAnswer={runner.answer}
+              onClear={runner.clear}
             />
           </div>
         </div>
