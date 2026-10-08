@@ -85,7 +85,9 @@ export function TemplateGallery({ onPick }: { onPick: (t: ScriptTemplate) => voi
                     </span>
                     <span className="min-w-0">
                       <span className="block eu-t-body font-medium text-ink truncate">{t.name}</span>
-                      {t.hint && <span className="block eu-t-small text-ink-muted line-clamp-2">{t.hint}</span>}
+                      {t.hint && (
+                        <span className="block eu-t-small text-ink-muted line-clamp-2">{t.hint}</span>
+                      )}
                     </span>
                   </button>
                   {t.group === "mine" && (
