@@ -701,14 +701,7 @@
     box-shadow: inset 0 -1px 0 var(--color-line);
   }
   .eu-wordmark {
-    @apply font-mono text-[0.75rem] leading-none font-semibold tracking-[0.18em] text-ink mb-1;
-  }
-  /* A compact strip only has room for the name. */
-  [data-density="compact"] .eu-sidebar-head .eu-t-caption {
-    display: none;
-  }
-  [data-density="compact"] .eu-wordmark {
-    @apply mb-0;
+    @apply font-mono text-[0.75rem] leading-none font-semibold tracking-[0.18em] text-ink;
   }
   .eu-sidebar-body {
     @apply flex-1 min-h-0 overflow-y-auto flex flex-col;

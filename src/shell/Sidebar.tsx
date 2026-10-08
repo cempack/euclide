@@ -128,10 +128,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
         <Logo size={24} className="shrink-0" />
         {!rail && (
           <>
-            <div className="min-w-0 flex-1">
-              <div className="eu-wordmark">EUCLIDE</div>
-              <div className="eu-t-caption truncate">{tr("app.tagline")}</div>
-            </div>
+            <div className="eu-wordmark min-w-0 flex-1">EUCLIDE</div>
             {fold}
           </>
         )}
