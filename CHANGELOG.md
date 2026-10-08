@@ -35,7 +35,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 - Chaque script tourne dans son propre processus : `input()` pose sa question dans la console, le bouton Stop arrête tout, une limite de temps coupe les boucles sans fin.
 - **turtle et matplotlib** dessinent directement dans Euclide, sans rien installer : le dessin s'affiche dès qu'il arrive, et s'enregistre dans la bibliothèque.
 - **« Vérifier » corrige un exercice.** Les exemples (`>>>`) écrits sous une fonction ou une classe, ou un fichier `nom.checks.py`, deviennent des vérifications : réussies, ou l'attendu face à l'obtenu.
-- **143 modèles de scripts**, rangés par niveau et par thème : premiers pas, Seconde (nombres, géométrie, fonctions, statistiques, échantillonnage), Première et Terminale (listes, suites, dérivation, exponentielle, intégration, combinatoire, lois de probabilité), Maths expertes (arithmétique, chiffrement, complexes, matrices et graphes), NSI Première et Terminale (données, tables, algorithmes, objets, arbres, graphes), dessins et graphiques. Une recherche les trouve tous ; chacun fonctionne tel quel et passe « Vérifier ». Et ceux qu'on se fait.
+- **143 modèles de scripts**, rangés par niveau et par thème : premiers pas, Seconde (nombres, géométrie, fonctions, statistiques, échantillonnage), Première et Terminale (listes, suites, dérivation, exponentielle, intégration, combinatoire, lois de probabilité), Maths expertes (arithmétique, chiffrement, complexes, matrices et graphes), NSI Première et Terminale (données, tables, algorithmes, objets, arbres, graphes), dessins et graphiques. Une recherche les trouve tous ; chacun fonctionne tel quel et passe « Vérifier ». Tout script peut aussi devenir un modèle.
 - Un nouvel éditeur : coloration, complétion, recherche. Ctrl+Entrée exécute, Ctrl+Maj+Entrée vérifie.
 
 <p>
@@ -51,7 +51,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 - Une note devient un **diaporama** (F5). Une ligne `---` sépare les diapositives, et formules et code s'ajustent à l'écran. Flèches et télécommandes avancent, B ou W donnent un écran noir ou blanc.
 - **Export en vrai PDF** (A4, avec en-tête du cours, de la classe et de la date) et impression papier.
-- **Modèles** : cours, exercices, évaluation, fiche méthode, activité, et toute note qu'on garde comme modèle.
+- **Modèles** : cours, exercices, évaluation, fiche méthode, activité, et toute note gardée comme modèle.
 - Une formule seule sur sa ligne est centrée.
 
 <p>
@@ -75,7 +75,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 - **Un nouveau logo** : deux cercles tracés au compas, et le point où ils se coupent, la première construction des Éléments d'Euclide.
 - **Un nouveau design** : les mêmes couleurs, en plus lisible. La sélection en « papier relevé », une seule famille d'icônes, des infobulles partout et un thème sombre soigné.
 - Le tableau de bord se recompose autour du cours en cours, de la journée, des rappels et des documents à reprendre.
-- Onglets qu'on glisse, épingle et ferme par lots ; un menu les liste quand ils débordent.
+- Les onglets se déplacent, s'épinglent et se ferment par lots ; un menu les liste quand ils débordent.
 - Des raccourcis qui fonctionnent sur un clavier français, et tout au clavier, onglets et choix compris (flèches). Contrastes conformes WCAG 2.1 AA, en clair comme en sombre.
 - Une nouvelle version s'annonce dans la barre d'état plutôt qu'en fenêtre par-dessus l'écran, qui peut être projeté.
 - Réglages par sections : profil, apparence, Pronote, emploi du temps, sauvegardes restaurables, diagnostic.
@@ -90,6 +90,9 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 - Fermer la fenêtre ne perd plus de travail non enregistré.
 - Pronote récupère l'emploi du temps de la semaine en une seule requête au lieu de sept.
+- Pronote ne redemande plus le mot de passe à chaque ouverture, ni d'un PC à l'autre. Quand l'établissement le permet, Euclide l'échange contre le jeton de connexion de Pronote, comme l'application mobile, et ne garde aucun mot de passe. Sinon, le mot de passe est chiffré avec une clé rangée dans le dossier de données.
+- Si le module Python ne correspond pas à la version d'Euclide (mise à jour interrompue, mise à jour depuis une version 0.1), Euclide le remet en place tout seul.
+- Euclide cherche une nouvelle version au démarrage, puis toutes les 6 heures s'il reste ouvert.
 - Sous Windows, les processus Python s'arrêtent avec Euclide, même après un plantage.
 - Format de données 3 : la mise à niveau est automatique, précédée d'une copie de la base.
 - Démarrage et changements d'onglet plus rapides : chaque écran ne se charge qu'à sa première ouverture.

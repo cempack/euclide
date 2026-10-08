@@ -1,8 +1,8 @@
 /*
- * The release keynote (dev/Recap.tsx, ?recap): 16:9 slides of 1920 × 1080
+ * What changes in 0.4 (dev/Recap.tsx, ?recap): 16:9 slides of 1920 × 1080
  * in the app's own design language — its type, its tokens, the panel with
- * a hairline, the stage it projects on — one idea and one real screenshot
- * each. Printed, each slide is a page (scripts/changelog/recap.mjs).
+ * a hairline, the stage it projects on — one change and one real
+ * screenshot each. Printed, each slide is a page (scripts/changelog/recap.mjs).
  */
 .k-deck {
   display: flex;
@@ -85,9 +85,6 @@
 .k-sub.center {
   margin-inline: auto;
   max-width: 52ch;
-}
-.k-sub.full {
-  max-width: 68ch;
 }
 .stage .k-sub {
   color: var(--color-stage-muted);
@@ -379,186 +376,88 @@
   text-wrap: balance;
 }
 
-/* The overview: everything new on a 12 × 6 board of tiles. */
-.k-overview {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  padding: 40px;
-  background: var(--color-chrome);
-}
-.k-tile {
-  position: relative;
-  overflow: hidden;
+/* The overview: every change on one page, part by part, each under its
+   picture (also the changelog's picture). */
+.k-summary {
   display: flex;
   flex-direction: column;
-  padding: 26px 28px;
+  gap: 22px;
+  padding: 36px 40px 40px;
+  background: var(--color-chrome);
+}
+.k-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 84px;
+}
+.k-summary-title {
+  margin: 0;
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+.k-summary-title span {
+  color: var(--color-accent);
+}
+.k-summary-sub {
+  margin: 0 0 0 auto;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--color-ink-muted);
+}
+.k-summary-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.k-part {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: 20px;
   background: var(--color-panel);
   box-shadow: var(--eu-shadow-raised);
 }
-.k-tile.stage {
-  border-color: transparent;
-  background: var(--color-stage);
-  color: var(--color-stage-ink);
+.k-part-pic {
+  position: relative;
+  flex: 0 0 170px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-paper);
 }
-.k-tile .k-eyebrow {
-  font-size: 13px;
-  letter-spacing: 0.16em;
-}
-.k-tile .k-shot {
-  border-radius: 12px;
-  box-shadow: var(--eu-shadow-pop);
-}
-.k-tile.stage .k-shot {
-  border-color: var(--color-stage-line);
-}
-.k-tile-title {
-  margin: 12px 0 0;
-  max-width: 17ch;
-  font-size: 34px;
-  line-height: 1.08;
+.k-part-title {
+  margin: 18px 24px 0;
+  font-size: 26px;
+  line-height: 1.15;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-.k-tile-title.wide {
-  max-width: 24ch;
-}
-.k-tile .k-keys {
-  margin-top: 16px;
-}
-.k-tile .k-keys kbd {
-  font-size: 15px;
-  padding: 8px 10px;
-  min-width: 0;
-}
-.k-hero {
-  justify-content: space-between;
-  padding: 34px 36px;
-}
-.k-wordmark {
-  font: 600 16px/1 var(--font-mono);
-  letter-spacing: 0.24em;
-}
-.k-hero-title {
-  margin: 0;
-  font-size: 104px;
-  line-height: 0.92;
-  font-weight: 700;
-  letter-spacing: -0.045em;
-}
-.k-hero-title span {
-  color: var(--color-accent);
-}
-.k-hero-promise {
-  margin: 16px 0 0;
-  max-width: 24ch;
-  font-size: 27px;
-  line-height: 1.2;
-  font-weight: 500;
   letter-spacing: -0.015em;
-  color: var(--color-ink-muted);
 }
-.k-number {
-  margin-top: auto;
-  font-size: 128px;
-  line-height: 0.8;
-  font-weight: 700;
-  letter-spacing: -0.06em;
-}
-.k-number + .k-tile-title {
-  margin-top: 14px;
-  max-width: 11ch;
-  font-size: 28px;
-}
-
-/* Code in a headline: the editor's mono, in the accent. */
-.k-title code {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  color: var(--color-accent);
-}
-.stage .k-title code {
-  color: var(--color-stage-accent);
-}
-
-/* Every template by name: one running text, each level's name in the
-   accent, the classics lit up. A name never breaks across lines. */
-.k-names {
-  position: absolute;
-  left: 112px;
-  right: 112px;
-  top: 300px;
-  margin: 0;
-  font-size: 21px;
-  line-height: 1.62;
-  text-align: center;
-  text-wrap: pretty;
-  color: var(--color-stage-muted);
-}
-.k-name {
-  white-space: nowrap;
-}
-.k-name::after {
-  content: "\00a0·";
-  margin-left: 0.1em;
-  opacity: 0.45;
-}
-.k-name:has(+ .k-names-level)::after,
-.k-name:last-child::after {
-  content: none;
-}
-.k-name.classic {
-  color: var(--color-stage-ink);
-  font-weight: 600;
-}
-.k-names-level {
-  white-space: nowrap;
-  margin-left: 0.9em;
-  font: 600 15px/1 var(--font-mono);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-stage-accent);
-}
-.k-names-level:first-child {
-  margin-left: 0;
-}
-
-/* The release in numbers: a figure, and what it counts. */
-.k-figures {
-  position: absolute;
-  left: 112px;
-  right: 112px;
-  top: 310px;
+.k-part-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 56px 44px;
+  gap: 8px;
+  margin: 12px 24px 0;
+  padding: 0;
+  list-style: none;
 }
-.k-figures > div {
-  border-top: 1px solid var(--color-line);
-  padding-top: 26px;
+.k-part-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 19px;
+  line-height: 1.3;
+  text-wrap: pretty;
 }
-.k-figure-n {
-  display: block;
-  font-size: 136px;
-  line-height: 0.86;
-  font-weight: 700;
-  letter-spacing: -0.06em;
-  font-variant-numeric: tabular-nums;
-}
-.k-figure-label {
-  display: block;
-  margin-top: 22px;
-  max-width: 21ch;
-  font-size: 24px;
-  line-height: 1.28;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--color-ink-muted);
-  text-wrap: balance;
+.k-part-list li::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 0.5em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }

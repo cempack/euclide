@@ -308,15 +308,6 @@ const SHOTS = {
     await settle(page);
     return page;
   },
-  // A word found inside the documents, in maths and in NSI alike.
-  recherche: async () => {
-    const page = await open();
-    await page.keyboard.press("Control+k");
-    await page.getByRole("textbox", { name: /Rechercher un cours/ }).fill("sommet");
-    await page.getByText("TP — Piles et files.pdf").waitFor();
-    await settle(page);
-    return page;
-  },
   reglages: async () => {
     const page = await open();
     await page.keyboard.press("Control+Comma");
@@ -350,7 +341,6 @@ const PARTS = {
   "python-verifier": { verifications: (p) => p.locator(".eu-output").first() },
   "python-modeles": { modeles: (p) => p.getByRole("dialog") },
   palette: { palette: (p) => p.getByRole("dialog") },
-  recherche: { recherche: (p) => p.getByRole("dialog") },
   "cahier-de-textes": { semaine: (p) => p.locator("main section:visible").first() },
 };
 
