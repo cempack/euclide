@@ -80,6 +80,8 @@ pub fn run() {
                 }
             };
             let db_ms = perf::uptime_ms();
+            // The Pronote password's key travels with the data (`secrets`).
+            crate::secrets::use_key_dir(&crate::paths::data_dir());
             commands::pronote::protect_stored_password(&db.lock());
             let version = app.package_info().version.to_string();
             let updated_from = commands::app::record_version(&db.lock(), &version);

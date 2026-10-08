@@ -6,6 +6,7 @@ returns a plain dict; the server wraps it in the protocol envelope.
 """
 
 import json
+import os
 
 
 def _account_name(client):
@@ -185,6 +186,52 @@ def _open_password_client(pronotepy, url, username, password, pin, device_name, 
         raise
 
 
+# The establishment handed out no QR code once: don't ask again this session.
+_token_refused = False
+
+
+def _trade_for_token(pronotepy, client, uuid, account_pin=None, device_name=None):
+    """The same account, logged in again with a token instead of its
+    password, as Pronote's mobile app does with a QR code: the session asks
+    for the QR code's data itself. From then on Euclide keeps Pronote's
+    rotating token only, never the password, and any PC can use it.
+
+    None where the establishment hands out no QR code (the public demo
+    doesn't): the password login goes on as before.
+    """
+    global _token_refused
+    if _token_refused or not uuid:
+        return None
+    pin = f"{int.from_bytes(os.urandom(2), 'big') % 10000:04d}"
+    try:
+        data = client.request_qr_code_data(pin)
+    except Exception:  # noqa: BLE001
+        data = {}
+    if not data.get("jeton") or not data.get("login"):
+        _token_refused = True
+        return None
+    try:
+        token = pronotepy.Client.qrcode_login(
+            data, pin, uuid, account_pin=account_pin, device_name=device_name
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    return token if getattr(token, "logged_in", False) else None
+
+
+def _credentials_reply(client):
+    """What Euclide keeps for the next call: the token that just rotated, or
+    the login of a password session; `token` says which."""
+    return {
+        "username": client.username,
+        "password": client.password,
+        "client_identifier": getattr(client, "client_identifier", None) or "",
+        "token": getattr(client, "login_mode", "") == "token",
+        "url": client.pronote_url,
+        "uuid": getattr(client, "uuid", None) or "",
+    }
+
+
 def _get_client(payload):
     global _cached_client, _cached_url, _cached_username, _cached_password
     import pronotepy
@@ -193,7 +240,7 @@ def _get_client(payload):
     url = _normalize_pronote_url(payload.get("url") or "")
     username = payload.get("username")
     password = payload.get("password")
-    uuid = str(payload.get("uuid", ""))
+    uuid = str(payload.get("uuid") or "")
     pin = payload.get("pin") or None
     device_name = payload.get("device_name") or None
     client_id = payload.get("client_identifier") or None
@@ -214,6 +261,10 @@ def _get_client(payload):
     client = None
     if mode == "password":
         client = _open_password_client(pronotepy, url, username, password, pin, device_name, client_id)
+        token = _trade_for_token(pronotepy, client, uuid, pin, device_name)
+        if token is not None:
+            _save_to_cache(token, token.pronote_url, token.username, token.password)
+            return token
     else:
         try:
             login_args = [url, username, password, uuid]
@@ -306,6 +357,11 @@ def pronote_password_login(payload):
     if not getattr(client, "logged_in", False):
         return {"ok": False, "error": "Identifiants invalides."}
 
+    token = _trade_for_token(pronotepy, client, str(payload.get("uuid") or ""), pin, device_name)
+    if token is not None:
+        _save_to_cache(token, token.pronote_url, token.username, token.password)
+        return {"ok": True, "mode": "qr", "account_name": _account_name(token), **_credentials_reply(token)}
+
     # Save to cache
     _save_to_cache(client, url, username, password)
 
@@ -341,16 +397,12 @@ def pronote_sync(payload):
         except Exception as retry_exc:  # noqa: BLE001
             return {"ok": False, "error": f"Session Pronote expiree ou erreur : {retry_exc}"}
 
-    # In QR mode the token rotates on every login - return the fresh one so it
-    # is persisted. In password mode the credentials stay the same.
-    cid = getattr(client, "client_identifier", None) or ""
+    # A token rotates on every login: return the fresh one so it is kept.
     return {
         "ok": True,
         "account_name": _account_name(client),
-        "username": client.username,
-        "password": client.password,
         "lessons": lessons,
-        "client_identifier": cid,
+        **_credentials_reply(client),
     }
 
 
@@ -835,17 +887,14 @@ def pronote_contents(payload):
         if name
     ]
 
-    # Return fresh token so caller can persist (like sync) + extra context
-    cid = getattr(client, "client_identifier", None) or ""
+    # The fresh token, kept like sync's, and the contents.
     return {
         "ok": True,
-        "username": client.username,
-        "password": client.password,
         "account_name": _account_name(client),
         "contents": filtered,
         "matieres": matieres,
         "classe_used": classe_dict,
-        "client_identifier": cid,
+        **_credentials_reply(client),
     }
 
 
@@ -886,12 +935,9 @@ def pronote_classes(payload):
                 }
             )
 
-    cid = getattr(client, "client_identifier", None) or ""
     return {
         "ok": True,
         "classes": classes,
         "account_name": _account_name(client),
-        "username": client.username,
-        "password": client.password,
-        "client_identifier": cid,
+        **_credentials_reply(client),
     }

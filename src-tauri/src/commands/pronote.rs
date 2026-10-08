@@ -3,9 +3,12 @@
 //!
 //! Credentials:
 //! - QR-code accounts keep Pronote's rotating token, saved after every call;
-//! - password accounts never store the password in clear on the key: it is
-//!   encrypted for this Windows user (DPAPI) or kept for the session (see
-//!   `secrets`). Another PC asks for it again (`pronote_password_required`).
+//! - password accounts trade the password for such a token at login, or at
+//!   their next call after an update, where the establishment allows it (the
+//!   sidecar asks for a QR code's data itself): then they are QR-code
+//!   accounts like the others and no password is kept;
+//! - otherwise the password is sealed with the data folder's key (see
+//!   `secrets`), which every PC can read: no PC asks for it again.
 //!
 //! Calls run one at a time: two concurrent calls would both rotate the
 //! token, and the one saved last could already be dead.
@@ -23,6 +26,9 @@ use tokio::sync::Mutex;
 #[derive(Default)]
 pub struct PronoteLane(Mutex<()>);
 
+/// The password, sealed with the data folder's key (`secrets::seal`).
+const PASSWORD_SEALED: &str = "pronote_password_sealed";
+/// Euclide 0.3's: encrypted for one Windows user on one PC.
 const PASSWORD_DPAPI: &str = "pronote_password_dpapi";
 
 fn account_key(url: &str, username: &str) -> String {
@@ -36,26 +42,25 @@ fn credentials(conn: &Connection, extra: Value) -> AppResult<Value> {
     let mode = get_setting_raw(conn, "pronote_mode").unwrap_or_else(|| "qr".into());
     let username = get_setting_raw(conn, "pronote_username").unwrap_or_default();
     let password = if mode == "password" {
-        let key = account_key(&url, &username);
-        crate::secrets::recall(&key)
-            .or_else(|| {
-                get_setting_raw(conn, PASSWORD_DPAPI).and_then(|c| crate::secrets::unprotect(&c))
-            })
-            .ok_or_else(|| {
-                AppError::coded(
-                    "pronote_password_required",
-                    "Pronote demande votre mot de passe sur ce PC. Reconnectez-vous dans Réglages.",
-                )
-            })?
+        stored_password(conn, &url, &username).ok_or_else(|| {
+            AppError::coded(
+                "pronote_password_required",
+                "Pronote demande votre mot de passe. Reconnectez-vous dans Réglages.",
+            )
+        })?
     } else {
         get_setting_raw(conn, "pronote_password").unwrap_or_default()
     };
+    // A password account gets a device id to trade its password for a token
+    // with; the reply hands it back to keep when the trade is made.
+    let uuid =
+        get_setting_raw(conn, "pronote_uuid").unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut creds = json!({
         "mode": mode,
         "url": url,
         "username": username,
         "password": password,
-        "uuid": get_setting_raw(conn, "pronote_uuid"),
+        "uuid": uuid,
         "device_name": get_setting_raw(conn, "pronote_device_name"),
         "client_identifier": get_setting_raw(conn, "pronote_client_identifier"),
     });
@@ -81,14 +86,53 @@ fn ensure_ok(res: &Value, fallback: &str) -> AppResult<()> {
     Err(AppError::user(err))
 }
 
+/// A password account's password: this session's, else the sealed one, else
+/// Euclide 0.3's where this PC can read it.
+fn stored_password(conn: &Connection, url: &str, username: &str) -> Option<String> {
+    crate::secrets::recall(&account_key(url, username))
+        .or_else(|| get_setting_raw(conn, PASSWORD_SEALED).and_then(|c| crate::secrets::open(&c)))
+        .or_else(|| {
+            get_setting_raw(conn, PASSWORD_DPAPI).and_then(|c| crate::secrets::open_legacy(&c))
+        })
+}
+
+/// Every copy of a password account's password, gone.
+fn forget_password(conn: &Connection) -> rusqlite::Result<()> {
+    let url = get_setting_raw(conn, "pronote_url").unwrap_or_default();
+    let username = get_setting_raw(conn, "pronote_username").unwrap_or_default();
+    crate::secrets::forget(&account_key(&url, &username));
+    for key in ["pronote_password", PASSWORD_SEALED, PASSWORD_DPAPI] {
+        conn.execute("DELETE FROM settings WHERE key=?1", [key])?;
+    }
+    Ok(())
+}
+
 /// Pronote rotates its login token on every session: save the new one (and the
 /// PIN device id) for the next call, and strip them from the response so
-/// credentials never reach the webview. Password accounts keep no token.
+/// credentials never reach the webview. Password accounts keep no token,
+/// unless the sidecar just traded their password for one: from then on they
+/// keep that token only.
 pub(crate) fn take_rotated_credentials(conn: &Connection, res: &mut Value) {
-    let password_mode = get_setting_raw(conn, "pronote_mode").as_deref() == Some("password");
     let Some(obj) = res.as_object_mut() else {
         return;
     };
+    let token = obj.remove("token").and_then(|t| t.as_bool()) == Some(true);
+    let url = obj.remove("url");
+    let uuid = obj.remove("uuid");
+    let mut password_mode = get_setting_raw(conn, "pronote_mode").as_deref() == Some("password");
+    if password_mode && token && forget_password(conn).is_ok() {
+        set_setting_raw(conn, "pronote_mode", "qr");
+        for (key, value) in [("pronote_url", &url), ("pronote_uuid", &uuid)] {
+            if let Some(v) = value
+                .as_ref()
+                .and_then(|v| v.as_str())
+                .filter(|v| !v.is_empty())
+            {
+                set_setting_raw(conn, key, v);
+            }
+        }
+        password_mode = false;
+    }
     for key in ["username", "password"] {
         if let Some(v) = obj.remove(key) {
             if let Some(v) = v.as_str() {
@@ -105,20 +149,28 @@ pub(crate) fn take_rotated_credentials(conn: &Connection, res: &mut Value) {
     }
 }
 
-/// Databases from before this release kept the password in clear: encrypt it
-/// (Windows) or keep it for this session, and delete the clear copy.
+/// Passwords from earlier versions, at startup: in clear (before 0.3), or
+/// encrypted for one Windows user (0.3), which only that PC could read. Both
+/// are sealed with the data folder's key, which every PC can; a 0.3 value
+/// this PC cannot read stays for the PC that can.
 pub fn protect_stored_password(conn: &Connection) {
     if get_setting_raw(conn, "pronote_mode").as_deref() != Some("password") {
         return;
     }
-    let Some(plain) = get_setting_raw(conn, "pronote_password").filter(|p| !p.is_empty()) else {
+    let Some(plain) = get_setting_raw(conn, "pronote_password")
+        .filter(|p| !p.is_empty())
+        .or_else(|| {
+            get_setting_raw(conn, PASSWORD_DPAPI).and_then(|c| crate::secrets::open_legacy(&c))
+        })
+    else {
         return;
     };
     let url = get_setting_raw(conn, "pronote_url").unwrap_or_default();
     let username = get_setting_raw(conn, "pronote_username").unwrap_or_default();
     crate::secrets::remember(&account_key(&url, &username), &plain);
-    if let Some(cipher) = crate::secrets::protect(&plain) {
-        set_setting_raw(conn, PASSWORD_DPAPI, &cipher);
+    if let Some(sealed) = crate::secrets::seal(&plain) {
+        set_setting_raw(conn, PASSWORD_SEALED, &sealed);
+        let _ = conn.execute("DELETE FROM settings WHERE key=?1", [PASSWORD_DPAPI]);
     }
     let _ = conn.execute("DELETE FROM settings WHERE key='pronote_password'", []);
 }
@@ -178,7 +230,7 @@ pub async fn pronote_qr_login(
         put(&tx, "pronote_connected", "1")?;
         put(&tx, "pronote_mode", "qr")?;
         put(&tx, "pronote_account", &name)?;
-        tx.execute("DELETE FROM settings WHERE key=?1", [PASSWORD_DPAPI])?;
+        forget_password(&tx)?;
         for key in ["url", "username", "password"] {
             if let Some(v) = res.get(key).and_then(|x| x.as_str()) {
                 put(&tx, &format!("pronote_{key}"), v)?;
@@ -225,8 +277,17 @@ pub async fn pronote_password_login(
     // registration). A leftover client id from another account makes Pronote
     // derive the wrong AES key.
     let (u, n) = (url.clone(), username.clone());
-    let (device_name, client_id) = db
+    let (device_name, client_id, uuid) = db
         .write(move |conn| {
+            // The device id a token would be bound to: it never changes.
+            let uuid = match get_setting_raw(conn, "pronote_uuid") {
+                Some(u) => u,
+                None => {
+                    let u = uuid::Uuid::new_v4().to_string();
+                    put(conn, "pronote_uuid", &u)?;
+                    u
+                }
+            };
             let device_name = match get_setting_raw(conn, "pronote_device_name") {
                 Some(d) => d,
                 None => {
@@ -242,11 +303,12 @@ pub async fn pronote_password_login(
                 &n,
                 get_setting_raw(conn, "pronote_client_identifier").as_deref(),
             );
-            Ok((device_name, client_id))
+            Ok((device_name, client_id, uuid))
         })
         .await?;
 
-    let mut payload = json!({ "url": url, "username": username, "password": password });
+    let mut payload =
+        json!({ "url": url, "username": username, "password": password, "uuid": uuid });
     if let Some(p) = pin.as_ref().filter(|s| !s.is_empty()) {
         payload["pin"] = Value::String(p.clone());
         payload["device_name"] = Value::String(device_name);
@@ -262,13 +324,36 @@ pub async fn pronote_password_login(
         .and_then(|x| x.as_str())
         .unwrap_or("")
         .to_string();
+    // The establishment handed out a token: keep it, as for a QR code, and
+    // no password at all.
+    if res.get("mode").and_then(|m| m.as_str()) == Some("qr") {
+        let name = account.clone();
+        let mut res = res;
+        db.write(move |conn| {
+            let tx = conn.transaction()?;
+            forget_password(&tx)?;
+            put(&tx, "pronote_connected", "1")?;
+            put(&tx, "pronote_mode", "qr")?;
+            put(&tx, "pronote_account", &name)?;
+            take_rotated_credentials(&tx, &mut res);
+            tx.commit()?;
+            Ok(())
+        })
+        .await?;
+        return Ok(PronoteStatus {
+            connected: true,
+            account_name: Some(account),
+            last_sync: None,
+        });
+    }
+
     let stored_url = res
         .get("url")
         .and_then(|x| x.as_str())
         .unwrap_or(&url)
         .to_string();
     crate::secrets::remember(&account_key(&stored_url, &username), &password);
-    let cipher = crate::secrets::protect(&password);
+    let sealed = crate::secrets::seal(&password);
     let name = account.clone();
     db.write(move |conn| {
         let tx = conn.transaction()?;
@@ -277,13 +362,12 @@ pub async fn pronote_password_login(
         put(&tx, "pronote_account", &name)?;
         put(&tx, "pronote_url", &stored_url)?;
         put(&tx, "pronote_username", &username)?;
-        // Never the password in clear: ciphertext for this Windows user, or nothing.
-        tx.execute("DELETE FROM settings WHERE key='pronote_password'", [])?;
-        match cipher {
-            Some(c) => put(&tx, PASSWORD_DPAPI, &c)?,
-            None => {
-                tx.execute("DELETE FROM settings WHERE key=?1", [PASSWORD_DPAPI])?;
-            }
+        // Never the password in clear: sealed with the data folder's key.
+        for key in ["pronote_password", PASSWORD_SEALED, PASSWORD_DPAPI] {
+            tx.execute("DELETE FROM settings WHERE key=?1", [key])?;
+        }
+        if let Some(sealed) = &sealed {
+            put(&tx, PASSWORD_SEALED, sealed)?;
         }
         if let Some(cid) = res
             .get("client_identifier")
@@ -366,6 +450,7 @@ pub async fn pronote_logout(db: State<'_, Db>) -> AppResult<()> {
             "pronote_url",
             "pronote_username",
             "pronote_password",
+            PASSWORD_SEALED,
             PASSWORD_DPAPI,
             "pronote_last_sync",
             "pronote_client_identifier",
@@ -462,38 +547,111 @@ mod tests {
         );
     }
 
-    #[test]
-    fn password_accounts_never_keep_the_password_in_clear() {
-        let conn = conn();
+    /// The data folder's key, in a folder of the tests' own.
+    fn with_key_dir() {
+        static DIR: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+        DIR.get_or_init(|| crate::secrets::use_key_dir(&crate::secrets::test_dir("pronote-key")));
+    }
+
+    fn password_account(conn: &Connection, url: &str, username: &str) {
         for (k, v) in [
             ("pronote_mode", "password"),
-            ("pronote_url", "https://x/pronote/professeur.html"),
-            ("pronote_username", "prof"),
-            ("pronote_password", "s3cret"),
+            ("pronote_url", url),
+            ("pronote_username", username),
         ] {
-            put(&conn, k, v).unwrap();
+            put(conn, k, v).unwrap();
         }
+    }
+
+    #[test]
+    fn earlier_passwords_are_sealed_for_every_pc() {
+        with_key_dir();
+        let conn = conn();
+        password_account(&conn, "https://x/pronote/professeur.html", "prof");
+        put(&conn, "pronote_password", "s3cret").unwrap();
         protect_stored_password(&conn);
         assert_eq!(get_setting_raw(&conn, "pronote_password"), None);
+        let sealed = get_setting_raw(&conn, PASSWORD_SEALED).expect("sealed");
+        assert!(!sealed.contains("s3cret"));
+        // Another PC, or the next launch: nothing in memory, the key on disk.
+        crate::secrets::forget(&account_key("https://x/pronote/professeur.html", "prof"));
         let creds = credentials(&conn, json!({ "subject": "NSI" })).unwrap();
-        assert_eq!(creds["password"], "s3cret", "available for this session");
+        assert_eq!(creds["password"], "s3cret");
         assert_eq!(creds["subject"], "NSI");
-        // A token in a reply is not stored for a password account.
-        let mut res = json!({ "ok": true, "password": "not-a-token" });
+        assert!(
+            creds["uuid"].as_str().is_some_and(|u| !u.is_empty()),
+            "a device id to trade with"
+        );
+        // A reply that is no token leaves the password account as it is.
+        let mut res =
+            json!({ "ok": true, "username": "prof", "password": "s3cret", "token": false });
         take_rotated_credentials(&conn, &mut res);
+        assert_eq!(res, json!({ "ok": true }));
         assert_eq!(get_setting_raw(&conn, "pronote_password"), None);
+        assert_eq!(get_setting_raw(&conn, PASSWORD_SEALED), Some(sealed));
+    }
+
+    #[test]
+    fn a_traded_password_leaves_only_the_token() {
+        with_key_dir();
+        let conn = conn();
+        password_account(&conn, "https://t/pronote/professeur.html", "maths");
+        put(&conn, PASSWORD_SEALED, &crate::secrets::seal("pw").unwrap()).unwrap();
+        put(&conn, PASSWORD_DPAPI, "AAAA").unwrap();
+        let mut res = json!({
+            "ok": true,
+            "lessons": [],
+            "token": true,
+            "username": "login-1",
+            "password": "token-1",
+            "url": "https://t/pronote/mobile.professeur.html?fd=1&login=true",
+            "uuid": "device-1",
+            "client_identifier": "cid",
+        });
+        take_rotated_credentials(&conn, &mut res);
+        assert_eq!(res, json!({ "ok": true, "lessons": [] }));
+        assert_eq!(
+            get_setting_raw(&conn, "pronote_mode").as_deref(),
+            Some("qr")
+        );
+        assert_eq!(
+            get_setting_raw(&conn, "pronote_password").as_deref(),
+            Some("token-1")
+        );
+        assert_eq!(
+            get_setting_raw(&conn, "pronote_username").as_deref(),
+            Some("login-1")
+        );
+        assert_eq!(
+            get_setting_raw(&conn, "pronote_uuid").as_deref(),
+            Some("device-1")
+        );
+        assert_eq!(
+            get_setting_raw(&conn, "pronote_url").as_deref(),
+            Some("https://t/pronote/mobile.professeur.html?fd=1&login=true")
+        );
+        assert_eq!(get_setting_raw(&conn, PASSWORD_SEALED), None);
+        assert_eq!(get_setting_raw(&conn, PASSWORD_DPAPI), None);
+        let creds = credentials(&conn, json!({})).unwrap();
+        assert_eq!(
+            (creds["mode"].as_str(), creds["password"].as_str()),
+            (Some("qr"), Some("token-1"))
+        );
     }
 
     #[test]
     fn missing_password_asks_again() {
+        with_key_dir();
         let conn = conn();
-        for (k, v) in [
-            ("pronote_mode", "password"),
-            ("pronote_url", "https://y"),
-            ("pronote_username", "nobody"),
-        ] {
-            put(&conn, k, v).unwrap();
-        }
+        password_account(&conn, "https://y", "nobody");
+        // Euclide 0.3's value from another PC: unreadable here.
+        put(&conn, PASSWORD_DPAPI, "AAAA").unwrap();
+        protect_stored_password(&conn);
+        assert_eq!(
+            get_setting_raw(&conn, PASSWORD_DPAPI).as_deref(),
+            Some("AAAA"),
+            "kept for its PC"
+        );
         assert_eq!(
             credentials(&conn, json!({})).unwrap_err().code(),
             "pronote_password_required"

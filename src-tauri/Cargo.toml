@@ -35,6 +35,8 @@ tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macr
 # "You need to choose a zlib backend". zlib-rs is pure Rust (no system zlib).
 zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 minisign-verify = "0.2"
+# Already built for TLS: seals the Pronote password (src/secrets.rs).
+ring = "0.17"
 tauri-plugin-single-instance = "2"
 
 [target.'cfg(windows)'.dependencies]
