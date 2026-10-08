@@ -222,7 +222,8 @@ const DocCard = memo(function DocCard({
   version: number;
 }) {
   const [noPreview, setNoPreview] = useState(false);
-  const previewable = it.t === "file" && (it.f.kind === "pdf" || it.f.kind === "image");
+  const previewable =
+    it.t === "file" && (it.f.kind === "pdf" || it.f.kind === "image" || it.f.kind === "board");
   return (
     <div
       role="option"

@@ -39,17 +39,6 @@ export default tseslint.config(
     },
   },
   {
-    // Rewritten in M7 (the whiteboard): warnings until then.
-    files: ["src/components/Whiteboard.tsx"],
-    rules: {
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/refs": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
-    },
-  },
-  {
     files: ["*.config.{js,ts}", "scripts/**/*.{js,mjs}", "tests/**/*.ts"],
     languageOptions: { globals: { ...globals.node } },
   },
