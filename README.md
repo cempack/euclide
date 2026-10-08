@@ -1,3 +1,4 @@
+<p align="center"><img src="public/logo.svg" alt="" width="72" height="72"></p>
 <h1 align="center">Euclide</h1>
 <p align="center">Le bureau d'enseignement</p>
 <p align="center">

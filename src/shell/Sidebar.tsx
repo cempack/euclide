@@ -11,6 +11,7 @@ import { shortcutText } from "../lib/shortcuts";
 import { tabs, useActiveKind, type TabKind } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
+import { Logo } from "../ui/Logo";
 import { tip } from "../ui/Tooltip";
 import { keysOf } from "../lib/keymap";
 import { KIND_ICONS, NAV_TOOLS, NAV_WORK, navKindActive, type NavItem } from "./nav";
@@ -124,7 +125,7 @@ export const Sidebar = memo(function Sidebar({ info }: { info: AppInfo | null })
   return (
     <aside className="eu-sidebar" data-rail={rail || undefined}>
       <div className="eu-sidebar-head">
-        <img src="/logo-64.png" alt="" width={24} height={24} className="w-6 h-6 shrink-0 object-contain" />
+        <Logo size={24} className="shrink-0" />
         {!rail && (
           <>
             <div className="min-w-0 flex-1">
