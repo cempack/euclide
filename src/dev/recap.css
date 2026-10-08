@@ -86,6 +86,9 @@
   margin-inline: auto;
   max-width: 52ch;
 }
+.k-sub.full {
+  max-width: 68ch;
+}
 .stage .k-sub {
   color: var(--color-stage-muted);
 }
@@ -372,6 +375,9 @@
   flex-shrink: 0;
   color: var(--color-accent);
 }
+.k-chip span {
+  text-wrap: balance;
+}
 
 /* The overview: everything new on a 12 × 6 board of tiles. */
 .k-overview {
@@ -467,4 +473,92 @@
   margin-top: 14px;
   max-width: 11ch;
   font-size: 28px;
+}
+
+/* Code in a headline: the editor's mono, in the accent. */
+.k-title code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--color-accent);
+}
+.stage .k-title code {
+  color: var(--color-stage-accent);
+}
+
+/* Every template by name: one running text, each level's name in the
+   accent, the classics lit up. A name never breaks across lines. */
+.k-names {
+  position: absolute;
+  left: 112px;
+  right: 112px;
+  top: 300px;
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.62;
+  text-align: center;
+  text-wrap: pretty;
+  color: var(--color-stage-muted);
+}
+.k-name {
+  white-space: nowrap;
+}
+.k-name::after {
+  content: "\00a0·";
+  margin-left: 0.1em;
+  opacity: 0.45;
+}
+.k-name:has(+ .k-names-level)::after,
+.k-name:last-child::after {
+  content: none;
+}
+.k-name.classic {
+  color: var(--color-stage-ink);
+  font-weight: 600;
+}
+.k-names-level {
+  white-space: nowrap;
+  margin-left: 0.9em;
+  font: 600 15px/1 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-stage-accent);
+}
+.k-names-level:first-child {
+  margin-left: 0;
+}
+
+/* The release in numbers: a figure, and what it counts. */
+.k-figures {
+  position: absolute;
+  left: 112px;
+  right: 112px;
+  top: 310px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 56px 44px;
+}
+.k-figures > div {
+  border-top: 1px solid var(--color-line);
+  padding-top: 26px;
+}
+.k-figure-n {
+  display: block;
+  font-size: 136px;
+  line-height: 0.86;
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+}
+.k-figure-label {
+  display: block;
+  margin-top: 22px;
+  max-width: 21ch;
+  font-size: 24px;
+  line-height: 1.28;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-ink-muted);
+  text-wrap: balance;
 }

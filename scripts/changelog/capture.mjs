@@ -4,9 +4,9 @@
 //
 //   node scripts/changelog/capture.mjs [out-dir] [shot…]
 //
-// Writes <name>.png at twice 1440 × 900, and part-<name>.png cut-outs, in
-// scripts/changelog/shots unless told otherwise (the recap page reads them
-// from there).
+// Writes <name>.png at twice 1440 × 900 (a few in a narrower window), and
+// part-<name>.png cut-outs, in scripts/changelog/shots unless told otherwise
+// (the recap page reads them from there).
 import { readFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,23 +17,30 @@ const out = resolve(process.argv[2] ?? resolve(here, "shots"));
 mkdirSync(out, { recursive: true });
 const recorded = JSON.parse(readFileSync(resolve(here, "run-events.json"), "utf8"));
 const NOW = new Date("2026-10-06T10:40:00");
+// The release the changelog tells of (its first heading): the version the
+// pictures show, in the sidebar and the status bar.
+const release = readFileSync(resolve(here, "../../CHANGELOG.md"), "utf8").match(/^## (\d+\.\d+\.\d+)/m)[1];
 
 const browser = await chromium.launch(
   process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
 );
 
-async function open(theme = "light") {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+async function open(theme = "light", viewport = { width: 1440, height: 900 }) {
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 2 });
   const page = await context.newPage();
   await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
   await page.clock.install({ time: NOW });
-  await page.addInitScript((runs) => {
-    let seed = 42;
-    Math.random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-    localStorage.setItem("eu:theme", "auto");
-    localStorage.setItem("eu:density", "comfortable");
-    globalThis.__euRecordedRuns = runs;
-  }, recorded);
+  await page.addInitScript(
+    ([runs, version]) => {
+      let seed = 42;
+      Math.random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+      localStorage.setItem("eu:theme", "auto");
+      localStorage.setItem("eu:density", "comfortable");
+      globalThis.__euRecordedRuns = runs;
+      globalThis.__euRelease = version;
+    },
+    [recorded, release],
+  );
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.abort());
   await page.goto("http://localhost:1420/");
   await settle(page);
@@ -65,6 +72,31 @@ const python = async (page, script) => {
     await page.mouse.up();
   }
 };
+/** A lesson as a teacher writes it, for the note's screenshot. */
+const LESSON = `## Définition
+
+La fonction carré est la fonction $f$ définie sur $\\mathbb{R}$ par $f(x) = x^2$.
+
+## Variations
+
+- $f$ est **décroissante** sur $]-\\infty ; 0]$ et **croissante** sur $[0 ; +\\infty[$.
+- Son minimum vaut $0$, atteint en $x = 0$.
+
+## Propriétés
+
+Pour tout réel $x$, $(-x)^2 = x^2$ : la courbe est symétrique par rapport à l'axe des ordonnées.
+
+Pour tous réels $a$ et $b$ :
+
+$$a^2 - b^2 = (a - b)(a + b)$$
+
+## Résoudre $x^2 = k$
+
+- si $k < 0$, aucune solution ;
+- si $k = 0$, une seule : $x = 0$ ;
+- si $k > 0$, deux : $x = -\\sqrt{k}$ et $x = \\sqrt{k}$.
+`;
+
 /** The pointer out of the way: no tooltip in the picture. */
 const away = (page) => page.mouse.move(1430, 450);
 
@@ -149,10 +181,15 @@ const SHOTS = {
     await settle(page);
     return page;
   },
+  // The sample lesson, written out: headings, a list, LaTeX inline and on
+  // its own line, side by side with what it gives.
   note: async () => {
     const page = await open();
     await nav(page, "Documents");
     await page.getByText("Fonction carré — cours").first().click();
+    await settle(page, 400);
+    await page.locator("main textarea").first().fill(LESSON);
+    await away(page);
     await settle(page, 800);
     return page;
   },
@@ -271,14 +308,24 @@ const SHOTS = {
     await settle(page);
     return page;
   },
+  // A word found inside the documents, in maths and in NSI alike.
+  recherche: async () => {
+    const page = await open();
+    await page.keyboard.press("Control+k");
+    await page.getByRole("textbox", { name: /Rechercher un cours/ }).fill("sommet");
+    await page.getByText("TP — Piles et files.pdf").waitFor();
+    await settle(page);
+    return page;
+  },
   reglages: async () => {
     const page = await open();
     await page.keyboard.press("Control+Comma");
     await settle(page);
     return page;
   },
+  // In a narrower window, where the panel's words and buttons sit closer.
   sauvegardes: async () => {
-    const page = await open();
+    const page = await open("light", { width: 1120, height: 860 });
     await page.keyboard.press("Control+Comma");
     await settle(page);
     await page.getByRole("button", { name: "Sauvegardes" }).first().click();
@@ -303,6 +350,7 @@ const PARTS = {
   "python-verifier": { verifications: (p) => p.locator(".eu-output").first() },
   "python-modeles": { modeles: (p) => p.getByRole("dialog") },
   palette: { palette: (p) => p.getByRole("dialog") },
+  recherche: { recherche: (p) => p.getByRole("dialog") },
   "cahier-de-textes": { semaine: (p) => p.locator("main section:visible").first() },
 };
 

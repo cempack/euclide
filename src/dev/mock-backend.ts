@@ -575,6 +575,9 @@ if (empty) {
   pronote.last_sync = null;
 }
 
+/** The release a changelog's screenshots show (scripts/changelog/capture.mjs). */
+const release = (globalThis as { __euRelease?: string }).__euRelease;
+
 /**
  * Real runs, recorded by scripts/changelog/run-events.mjs for screenshots:
  * their scripts join the list, and running one replays its events.
@@ -805,7 +808,7 @@ function handle(cmd: string, args: Args): unknown {
       return {
         teacher_name: pronote.account_name ?? "",
         author: "Elliot Moreau",
-        version: "0.1.13",
+        version: release ?? "0.1.13",
         data_dir: "/media/CLE-USB/Euclide-Data",
         windows_portable: false,
         data_format: 2,
