@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type KeyboardEvent,
   type ReactNode,
 } from "react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
@@ -296,18 +297,43 @@ export function Segmented<T extends string | number>({
   grow?: boolean;
   className?: string;
 }) {
+  // As any tab list: one stop in the Tab order (the chosen option), arrows
+  // and Home / End choose another.
+  const current = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  );
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const to =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? current + 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? current - 1
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? options.length - 1
+              : null;
+    if (to == null || !options.length) return;
+    e.preventDefault();
+    const i = (to + options.length) % options.length;
+    onChange(options[i].value);
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[i]?.focus();
+  };
   return (
     <div
       className={`eu-segment ${grow ? "eu-segment-fill" : ""} ${className}`}
       role="tablist"
       aria-label={label}
+      onKeyDown={onKeyDown}
     >
-      {options.map((o) => (
+      {options.map((o, i) => (
         <button
           key={String(o.value)}
           type="button"
           role="tab"
           aria-selected={value === o.value}
+          tabIndex={i === current ? 0 : -1}
           data-tip={o.title}
           onClick={() => onChange(o.value)}
         >
