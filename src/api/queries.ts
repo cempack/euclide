@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { bootSetting } from "../lib/boot";
+import { parseLessonDate } from "../lib/format";
 
 /** One lesson's contents as the Pronote sidecar returns them. */
 export type PronoteContent = {
@@ -81,8 +82,9 @@ export const q = {
         const res = await api.pronoteContents(subject, className, from);
         if (!res?.ok) throw new Error(res?.error || "Erreur Pronote");
         const items: PronoteContent[] = Array.isArray(res.contents) ? res.contents : [];
-        // Newest first (the sidecar already sorts; cheap to be sure).
-        return [...items].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+        // Newest first; Pronote writes dates as « 01/10/2026 08:00:00 ».
+        const t = (c: PronoteContent) => parseLessonDate(c.date)?.getTime() ?? 0;
+        return [...items].sort((a, b) => t(b) - t(a));
       },
       staleTime: 10 * 60_000,
       retry: 1,

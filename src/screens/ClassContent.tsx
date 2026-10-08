@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { tr, trn } from "../lib/i18n";
+import { parseLessonDate } from "../lib/format";
 import { logged } from "../lib/report";
 import { BookOpen, FileText, RefreshCw } from "lucide-react";
 import { Copy } from "lucide-react";
@@ -45,8 +46,8 @@ function byWeek(items: ContentItem[]): { key: string; label: string; items: Cont
   const DAY = 86_400_000;
   const weeks = new Map<number, ContentItem[]>();
   for (const c of items) {
-    const [y, m, d] = (c.date ?? "").slice(0, 10).split("-").map(Number);
-    const at = y ? mondayOf(new Date(y, m - 1, d)).getTime() : 0;
+    const day = parseLessonDate(c.date);
+    const at = day ? mondayOf(day).getTime() : 0;
     weeks.set(at, [...(weeks.get(at) ?? []), c]);
   }
   return [...weeks.entries()]
@@ -70,7 +71,9 @@ function byWeek(items: ContentItem[]): { key: string; label: string; items: Cont
                 });
       const sorted = list
         .slice()
-        .sort((a, b) => `${b.date}${b.start_time}`.localeCompare(`${a.date}${a.start_time}`));
+        .sort(
+          (a, b) => (parseLessonDate(b.date)?.getTime() ?? 0) - (parseLessonDate(a.date)?.getTime() ?? 0),
+        );
       return { key: String(at), label, items: sorted };
     });
 }

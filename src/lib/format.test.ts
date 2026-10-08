@@ -65,3 +65,14 @@ describe("formatDueLabel", () => {
     expect(formatDueLabel("pas une date").text).toBe("");
   });
 });
+
+describe("parseLessonDate", () => {
+  it("reads Pronote's dates and ISO ones", async () => {
+    const { parseLessonDate } = await import("./format");
+    expect(parseLessonDate("01/10/2026 08:00:00")).toEqual(new Date(2026, 9, 1, 8, 0));
+    expect(parseLessonDate("2026-10-01")).toEqual(new Date(2026, 9, 1));
+    expect(parseLessonDate("2026-10-01T15:30")).toEqual(new Date(2026, 9, 1, 15, 30));
+    expect(parseLessonDate("")).toBeNull();
+    expect(parseLessonDate("demain")).toBeNull();
+  });
+});

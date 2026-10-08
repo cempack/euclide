@@ -670,7 +670,8 @@ function pronoteContents(args: Args) {
   const contents = [0, -2, -7, -9, -14].map((offset, i) => {
     const d = day(offset);
     return {
-      date: d.toISOString().slice(0, 10),
+      // As Pronote writes them: « 01/10/2026 08:00:00 ».
+      date: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} 08:00:00`,
       date_label: d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
       start_time: "08:00",
       end_time: "09:00",

@@ -229,3 +229,16 @@ export function cheer(): string {
   lastCheer = i;
   return pool[i];
 }
+
+/**
+ * A date as Pronote writes it (« 01/10/2026 08:00:00 ») or as ISO
+ * (« 2026-10-01 », « 2026-10-01T08:00 »), in local time; null otherwise.
+ */
+export function parseLessonDate(text: string | null | undefined): Date | null {
+  const s = (text ?? "").trim();
+  let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(s);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] ?? 0), +(m[5] ?? 0));
+  m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(s);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 0), +(m[5] ?? 0));
+  return null;
+}
