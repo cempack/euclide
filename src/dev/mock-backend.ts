@@ -209,6 +209,52 @@ const files: FileItem[] = [
     size: 22_016,
     added_at: sqlUtc(addDays(-31)),
   },
+  // The library's own documents, older than the dashboard's six recent ones.
+  {
+    id: 12,
+    course_id: null,
+    name: "Évaluation — Statistiques.pdf",
+    rel_path: "documents/evaluation-statistiques.pdf",
+    kind: "pdf",
+    size: 184_220,
+    added_at: sqlUtc(addDays(-8)),
+  },
+  {
+    id: 13,
+    course_id: null,
+    name: "Activité — Algorithmes gloutons.pdf",
+    rel_path: "documents/activite-gloutons.pdf",
+    kind: "pdf",
+    size: 211_874,
+    added_at: sqlUtc(addDays(-10)),
+  },
+  {
+    id: 14,
+    course_id: null,
+    name: "Plan de travail — Vecteurs.pdf",
+    rel_path: "documents/plan-de-travail-vecteurs.pdf",
+    kind: "pdf",
+    size: 96_512,
+    added_at: sqlUtc(addDays(-12)),
+  },
+  {
+    id: 15,
+    course_id: null,
+    name: "Corrigé — DS 1 Second degré.pdf",
+    rel_path: "documents/corrige-ds1.pdf",
+    kind: "pdf",
+    size: 143_006,
+    added_at: sqlUtc(addDays(-16)),
+  },
+  {
+    id: 16,
+    course_id: null,
+    name: "Tableau — Cercle trigonométrique.euboard",
+    rel_path: "whiteboards/cercle-trigo.euboard",
+    kind: "board",
+    size: 52_404,
+    added_at: sqlUtc(addDays(-18)),
+  },
 ];
 
 const sequenceItems: Omit<SequenceItem, "resources">[] = [
@@ -1262,23 +1308,34 @@ function mockSquare() {
 }
 
 /*
- * Files in browser mode: PDFs show a sample course (fixtures/cours.pdf),
- * images a drawn picture; a saved file keeps its new bytes in memory and
+ * Files in browser mode: each document of the data set is a real page
+ * (fixtures/docs/<id>.pdf, with its preview in fixtures/thumbs/<id>.jpg,
+ * both from scripts/sample-documents.mjs); others show a sample course,
+ * images a drawn picture. A saved file keeps its new bytes in memory and
  * its old ones as a version.
  */
 const fileUrls = new Map<number, string>();
 const versionUrls = new Map<number, string>();
 const fileVersions = new Map<number, import("../lib/api").FileVersion[]>();
 
+const byId = (urls: Record<string, string>) =>
+  new Map(Object.entries(urls).map(([path, url]) => [Number(path.match(/(\d+)\.\w+$/)?.[1]), url]));
+const sampleDocs = byId(
+  import.meta.glob<string>("./fixtures/docs/*.pdf", { query: "?url", import: "default", eager: true }),
+);
+const sampleThumbs = byId(
+  import.meta.glob<string>("./fixtures/thumbs/*.jpg", { query: "?url", import: "default", eager: true }),
+);
+
 function devFileUrl(kind: "file" | "version" | "thumb", id: number): string {
-  if (kind === "version") return versionUrls.get(id) ?? samplePdf;
-  // No previews in browser mode: the grid shows the type's icon.
-  if (kind === "thumb") return "";
+  if (kind === "version") return versionUrls.get(id) ?? sampleDocs.get(id) ?? samplePdf;
+  // A document saved in this session has no preview until it is drawn again.
+  if (kind === "thumb") return fileUrls.has(id) ? "" : (sampleThumbs.get(id) ?? "");
   const saved = fileUrls.get(id);
   if (saved) return saved;
   const f = files.find((x) => x.id === id);
   if (f && /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name)) return sampleImage;
-  return samplePdf;
+  return sampleDocs.get(id) ?? samplePdf;
 }
 
 const sampleImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
