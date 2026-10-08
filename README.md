@@ -83,7 +83,7 @@ What changed goes in `CHANGELOG.md`, with pictures from `scripts/changelog/`,
 on the sample data (`npm run dev` running):
 
 ```sh
-node scripts/sample-documents.mjs                    # the sample data's documents and previews
+node scripts/sample-documents.mjs                    # the sample data's documents, previews and text
 node scripts/changelog/run-events.mjs                # real Python output to replay
 node scripts/changelog/capture.mjs                   # the screens, at 2×
 node scripts/changelog/recap.mjs                     # the keynote: slides, overview, PDF
