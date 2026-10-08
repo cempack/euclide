@@ -67,6 +67,16 @@ const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }> = [
   { name: "documents", go: (p) => nav(p, "Documents") },
   { name: "reminders", go: (p) => nav(p, "Rappels") },
   { name: "whiteboard", go: (p) => nav(p, "Tableau blanc") },
+  {
+    // A board saved by an older Euclide (format 2), opened in format 3.
+    name: "board",
+    go: async (p) => {
+      await p.keyboard.press("Control+k");
+      await p.getByRole("textbox", { name: /Rechercher un cours/ }).fill("Vecteurs");
+      await p.getByRole("dialog").getByText("Tableau — Vecteurs.euboard").click();
+      await settle(p);
+    },
+  },
   { name: "python", go: (p) => nav(p, "Python") },
   { name: "tools", go: (p) => nav(p, "Outils") },
   { name: "recap", go: (p) => nav(p, "Bilan") },

@@ -464,6 +464,38 @@ function localYmdOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Saved boards: « Tableau — Vecteurs » is a format 2 drawing (fractions of the window). */
+const boards = new Map<number, string>([
+  [
+    6,
+    JSON.stringify({
+      version: 2,
+      strokes: [
+        {
+          color: "#2196f3",
+          size: 6,
+          eraser: false,
+          pts: Array.from({ length: 24 }, (_, i) => ({
+            x: 0.62 + i * 0.012,
+            y: 0.3 + Math.sin(i / 4) * 0.04,
+          })),
+        },
+      ],
+      shapes: [
+        { type: "line", x1: 0.15, y1: 0.7, x2: 0.4, y2: 0.35, color: "#000000", size: 3 },
+        { type: "line", x1: 0.4, y1: 0.35, x2: 0.55, y2: 0.62, color: "#f44336", size: 3 },
+        { type: "line", x1: 0.15, y1: 0.7, x2: 0.55, y2: 0.62, color: "#4caf50", size: 3 },
+        { type: "ellipse", x1: 0.62, y1: 0.5, x2: 0.8, y2: 0.78, color: "#9c27b0", size: 3 },
+      ],
+      texts: [
+        { x: 0.24, y: 0.45, text: "u", color: "#000000", size: 26 },
+        { x: 0.49, y: 0.42, text: "v", color: "#f44336", size: 26 },
+        { x: 0.3, y: 0.7, text: "u + v", color: "#4caf50", size: 26 },
+      ],
+    }),
+  ],
+]);
+
 let keepAwake = true;
 const pronote: PronoteStatus = {
   connected: true,
@@ -1088,7 +1120,30 @@ function handle(cmd: string, args: Args): unknown {
 
     // Whiteboards & versions
     case "read_board":
-      return "{}";
+      return boards.get(num(args, "id") ?? 0) ?? "{}";
+    case "save_board": {
+      const save = (args?.save ?? {}) as {
+        file_id?: number | null;
+        course_id?: number | null;
+        name?: string;
+        json: string;
+      };
+      let f = save.file_id ? files.find((x) => x.id === save.file_id) : undefined;
+      if (!f) {
+        f = {
+          id: newId(),
+          course_id: save.course_id ?? null,
+          name: `${save.name || "Tableau"}.euboard`,
+          rel_path: "whiteboards/tableau.euboard",
+          kind: "board",
+          size: save.json.length,
+          added_at: sqlUtc(new Date()),
+        } as FileItem;
+        files.push(f);
+      }
+      boards.set(f.id, save.json);
+      return { ...f };
+    }
     case "get_file_versions":
       return (fileVersions.get(num(args, "fileId") ?? 0) ?? []).slice();
     case "read_annotations":

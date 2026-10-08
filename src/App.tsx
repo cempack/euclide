@@ -43,7 +43,7 @@ const screenModules = {
   reminders: () => import("./screens/Reminders"),
   recap: () => import("./screens/Recap"),
   classContent: () => import("./screens/ClassContent"),
-  whiteboard: () => import("./components/Whiteboard"),
+  whiteboard: () => import("./features/board/Board"),
   pdf: () => import("./features/pdf/DocumentPane"),
   note: () => import("./components/NoteEditor"),
   palette: () => import("./components/CommandPalette"),
@@ -188,7 +188,14 @@ function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; vis
     case "recap":
       return <Recap />;
     case "whiteboard":
-      return <Whiteboard tabId={tab.id} fileId={tab.params.fileId} visible={visible} />;
+      return (
+        <Whiteboard
+          tabId={tab.id}
+          fileId={tab.params.fileId}
+          initialCourseId={tab.params.courseId}
+          visible={visible}
+        />
+      );
     case "pdf":
       return (
         <PdfViewer tabId={tab.id} fileId={tab.params.fileId!} fileName={tab.params.fileName ?? tab.title} />
