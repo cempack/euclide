@@ -38,6 +38,20 @@ export async function settle(page: Page) {
   await page.waitForTimeout(400);
 }
 
+/** Python, once the editor has laid out its gutter (a busy machine measures it late). */
+async function openPython(page: Page) {
+  await nav(page, "Python");
+  await page.locator(".cm-editor .cm-lineNumbers .cm-gutterElement").nth(1).waitFor();
+  await page.waitForFunction(() => {
+    const el = document.querySelectorAll(".cm-lineNumbers .cm-gutterElement")[1];
+    const line = document.querySelector(".cm-line");
+    if (!el || !line) return false;
+    // The gutter's numbers sit level with the text's lines.
+    return Math.abs(el.getBoundingClientRect().top - line.getBoundingClientRect().top) < 1;
+  });
+  await page.waitForTimeout(200);
+}
+
 export async function nav(page: Page, label: string) {
   await page.getByRole("navigation").getByRole("button", { name: label, exact: false }).first().click();
   await settle(page);
@@ -97,11 +111,11 @@ export const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }>
       await settle(p);
     },
   },
-  { name: "python", go: (p) => nav(p, "Python") },
+  { name: "python", go: (p) => openPython(p) },
   {
     name: "python-templates",
     go: async (p) => {
-      await nav(p, "Python");
+      await openPython(p);
       await p.getByRole("button", { name: "Nouveau script" }).first().click();
       await settle(p);
     },

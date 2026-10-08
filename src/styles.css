@@ -1278,14 +1278,18 @@ input[type="radio"] {
   }
 }
 
-/* Respect the OS « reduce motion » setting: every animation is CSS. */
+/* Respect the OS « reduce motion » setting: every animation is CSS.
+   Transitions get no duration at all: 0.01 ms on every element would turn
+   transitions *on* for all their properties (transition-property defaults
+   to all), and a font size or a line height read in the next frame would
+   still be the old one (the code editor measured its lines that way). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
 }
