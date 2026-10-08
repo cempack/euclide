@@ -376,88 +376,210 @@
   text-wrap: balance;
 }
 
-/* The overview: every change on one page, part by part, each under its
-   picture (also the changelog's picture). */
-.k-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  padding: 36px 40px 40px;
+/* The overview: a wall of tiles on a pale ground, one change each, the
+   tiles at its edges running off the slide (also the changelog's picture). */
+.k-wallpage {
   background: var(--color-chrome);
 }
-.k-summary-head {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  height: 84px;
-}
-.k-summary-title {
-  margin: 0;
-  font-size: 64px;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-}
-.k-summary-title span {
-  color: var(--color-accent);
-}
-.k-summary-sub {
-  margin: 0 0 0 auto;
-  font-size: 28px;
-  letter-spacing: -0.01em;
-  color: var(--color-ink-muted);
-}
-.k-summary-grid {
-  flex: 1;
+.k-mosaic {
+  position: absolute;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(14, 132px);
+  grid-template-rows: repeat(9, 114px);
+  gap: 14px;
 }
-.k-part {
+.k-cell {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 26px;
   background: var(--color-panel);
-  box-shadow: var(--eu-shadow-raised);
+  text-align: center;
 }
-.k-part-pic {
-  position: relative;
-  flex: 0 0 170px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-paper);
+.k-cell.row {
+  flex-direction: row;
+  gap: 14px;
+  text-align: left;
 }
-.k-part-title {
-  margin: 18px 24px 0;
-  font-size: 26px;
-  line-height: 1.15;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+.k-cell.dark {
+  background: var(--color-stage);
+  color: var(--color-stage-ink);
 }
-.k-part-list {
-  display: grid;
-  gap: 8px;
-  margin: 12px 24px 0;
-  padding: 0;
-  list-style: none;
+.k-cell-label {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  text-wrap: balance;
 }
-.k-part-list li {
-  position: relative;
-  padding-left: 18px;
-  font-size: 19px;
-  line-height: 1.3;
-  text-wrap: pretty;
+.k-cell.dark .k-cell-label {
+  color: var(--color-stage-ink);
 }
-.k-part-list li::before {
-  content: "";
+.k-cell.pic .k-cell-label {
   position: absolute;
-  left: 1px;
-  top: 0.5em;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-accent);
+  left: 12px;
+  right: 12px;
+}
+.k-cell.row .k-cell-label {
+  max-width: 13ch;
+}
+.k-cell-glyph svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+.k-cell.row .k-cell-glyph svg {
+  width: 34px;
+  height: 34px;
+}
+.k-cell-glyph.accent {
+  color: var(--color-accent);
+}
+.k-cell-glyph.ok {
+  color: var(--color-ok);
+}
+.k-cell-glyph.warn {
+  color: var(--color-warn);
+}
+.k-cell-glyph.danger {
+  color: var(--color-danger);
+}
+.k-cell-glyph.ink {
+  color: var(--color-ink);
+}
+.k-cell-number {
+  font-size: 112px;
+  line-height: 0.85;
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+.k-cell-number.small {
+  font-size: 58px;
+}
+.k-cell-math {
+  font:
+    italic 400 30px/1 "KaTeX_Main",
+    "Latin Modern Math",
+    "STIX Two Math",
+    "Cambria Math",
+    serif;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.k-cell-math sup {
+  font-size: 0.6em;
+  font-style: normal;
+}
+.k-cell-code {
+  font: 600 30px/1 var(--font-mono);
+  color: var(--color-accent);
+}
+.k-cell .k-keys {
+  margin: 0;
+  gap: 8px;
+}
+.k-cell .k-keys kbd {
+  min-width: 0;
+  padding: 8px 11px 7px;
+  font-size: 17px;
+}
+.k-cell-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 500;
+  color: var(--color-accent);
+}
+
+/* The four paper backgrounds, as little sheets. */
+.k-papers {
+  display: inline-flex;
+  gap: 8px;
+}
+.k-paper {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  background-color: var(--color-paper);
+}
+.k-paper.seyes {
+  background-image:
+    linear-gradient(90deg, transparent 6px, rgb(229 115 115 / 0.9) 6px 7px, transparent 7px),
+    repeating-linear-gradient(0deg, rgb(157 184 232 / 0.9) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(0deg, rgb(214 226 246) 0 1px, transparent 1px 2.75px);
+}
+.k-paper.squares {
+  background-image:
+    repeating-linear-gradient(0deg, rgb(157 184 232 / 0.8) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(90deg, rgb(157 184 232 / 0.8) 0 1px, transparent 1px 7px);
+}
+.k-paper.dots {
+  background-image: radial-gradient(circle, rgb(120 130 150) 1px, transparent 1.4px);
+  background-size: 7px 7px;
+}
+.k-paper.axes {
+  background-image:
+    linear-gradient(90deg, transparent 21px, rgb(40 40 40) 21px 22px, transparent 22px),
+    linear-gradient(0deg, transparent 21px, rgb(40 40 40) 21px 22px, transparent 22px),
+    repeating-linear-gradient(0deg, rgb(214 226 246) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(90deg, rgb(214 226 246) 0 1px, transparent 1px 7px);
+}
+
+/* The hero: the release's name on the accent, the logo's two circles
+   drawn large behind it. */
+.k-cell-hero {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 36px 40px;
+  color: rgb(255 255 255);
+  background:
+    radial-gradient(120% 90% at 85% 10%, rgb(255 255 255 / 0.22), transparent 60%),
+    linear-gradient(140deg, var(--color-accent), color-mix(in oklab, var(--color-accent) 60%, rgb(10 20 60)));
+  text-align: left;
+}
+.k-cell-hero h1 {
+  position: relative;
+  margin: 0;
+  font-size: 92px;
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+.k-cell-hero h1 span {
+  color: rgb(255 255 255 / 0.72);
+}
+.k-cell-hero p {
+  position: relative;
+  margin: 10px 0 0;
+  font-size: 28px;
+  font-weight: 500;
+  color: rgb(255 255 255 / 0.85);
+}
+.k-cell-hero-mark {
+  position: absolute;
+  right: -40px;
+  top: -70px;
+  width: 400px;
+  height: 400px;
+  fill: none;
+  stroke: rgb(255 255 255 / 0.28);
+  stroke-width: 0.5;
+}
+.k-cell-hero-mark .dot {
+  fill: rgb(255 255 255 / 0.6);
+  stroke: none;
 }

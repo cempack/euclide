@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import {
   ArchiveRestore,
+  ArrowUpCircle,
   CalendarRange,
   ChartSpline,
   CircleStop,
@@ -196,196 +197,273 @@ function templateCounts() {
 }
 
 // ---------------------------------------------------------------------------
-// The overview: every change on one page (also the changelog's picture).
+// The overview: everything new as a wall of tiles, one change each, as Apple
+// shows a release (also the changelog's picture).
 // ---------------------------------------------------------------------------
 
-/** One part of Euclide: a picture, its name, what changed in it. */
-function Part({ title, lines, children }: { title: string; lines: string[]; children: ReactNode }) {
+/** The wall's grid: 14 × 9 cells, larger than the slide, so the tiles at
+ * its edges run off it. */
+const GRID = { cols: 14, rows: 9, w: 132, h: 114, gap: 14 };
+const BLEED = {
+  x: (GRID.cols * GRID.w + (GRID.cols - 1) * GRID.gap - 1920) / 2,
+  y: (GRID.rows * GRID.h + (GRID.rows - 1) * GRID.gap - 1080) / 2,
+};
+/** Room for a picture tile's caption, under its picture. */
+const CAPTION = 50;
+
+type At = [col: number, row: number, cols: number, rows: number];
+
+/** A tile's size, and how much of each side runs off the slide. */
+function geometry([col, row, cols, rows]: At) {
+  return {
+    width: cols * GRID.w + (cols - 1) * GRID.gap,
+    height: rows * GRID.h + (rows - 1) * GRID.gap,
+    left: col === 1 ? BLEED.x : 0,
+    right: col + cols - 1 === GRID.cols ? BLEED.x : 0,
+    top: row === 1 ? BLEED.y : 0,
+    bottom: row + rows - 1 === GRID.rows ? BLEED.y : 0,
+  };
+}
+
+/**
+ * One tile of the wall: a picture (a crop of a screenshot) or anything
+ * else, centred in what the slide shows of it, and a caption under it.
+ */
+function Cell({
+  at,
+  label,
+  tone,
+  row,
+  pic,
+  children,
+}: {
+  at: At;
+  label?: string;
+  tone?: "dark" | "accent";
+  /** Side by side rather than stacked (a short tile). */
+  row?: boolean;
+  pic?: { src: string; crop: [number, number, number, number]; size?: [number, number]; paper?: boolean };
+  children?: ReactNode;
+}) {
+  const g = geometry(at);
+  const [col, line, cols, rows] = at;
+  const style: CSSProperties = {
+    gridColumn: `${col} / span ${cols}`,
+    gridRow: `${line} / span ${rows}`,
+    paddingLeft: g.left + 14,
+    paddingRight: g.right + 14,
+    paddingTop: g.top + 12,
+    paddingBottom: g.bottom + 12,
+  };
   return (
-    <section className="k-part">
-      <div className="k-part-pic">{children}</div>
-      <h2 className="k-part-title">{title}</h2>
-      <ul className="k-part-list">
-        {lines.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-    </section>
+    <div className={`k-cell ${tone ?? ""} ${row ? "row" : ""} ${pic ? "pic" : ""}`} style={style}>
+      {pic && (
+        <Shot
+          src={pic.src}
+          size={pic.size}
+          box={{
+            left: g.left,
+            top: g.top,
+            width: g.width - g.left - g.right,
+            height: g.height - g.top - g.bottom - CAPTION,
+          }}
+          crop={pic.crop}
+          paper={pic.paper}
+          className="flat borderless"
+        />
+      )}
+      {children}
+      {label && (
+        <p className="k-cell-label" style={pic ? { bottom: g.bottom + 15 } : undefined}>
+          {fr(label)}
+        </p>
+      )}
+    </div>
   );
 }
 
-/** A part's picture: the strip across its top, or half of it. */
-const STRIP = { width: 448, height: 170 };
-const HALF = { width: 224, height: 170 };
+/** A glyph in one of the app's colours. */
+function Glyph({
+  icon,
+  tone = "accent",
+}: {
+  icon: LucideIcon;
+  tone?: "accent" | "ok" | "warn" | "danger" | "ink";
+}) {
+  return (
+    <span className={`k-cell-glyph ${tone}`}>
+      <Icon icon={icon} size={20} />
+    </span>
+  );
+}
+
+/** The four paper backgrounds of the whiteboard, as swatches. */
+function Papers() {
+  return (
+    <span className="k-papers">
+      {["seyes", "squares", "dots", "axes"].map((p) => (
+        <span key={p} className={`k-paper ${p}`} />
+      ))}
+    </span>
+  );
+}
 
 function Overview() {
   return (
-    <Slide name="vue-d-ensemble" className="k-summary">
-      <header className="k-summary-head">
-        <Logo size={64} />
-        <h1 className="k-summary-title">
-          Euclide <span>0.4</span>
-        </h1>
-        <p className="k-summary-sub">Tout ce qui change dans cette version.</p>
-      </header>
-      <div className="k-summary-grid">
-        <Part
-          title="En classe"
-          lines={[
-            "Minuteur et horloge en plein écran.",
-            "Minutes au clavier : 1 à 9, + et −.",
-            "La séance du jour s'ouvre en un clic.",
-            "« Séance faite » passe à l'étape suivante.",
-            "L'écran reste allumé pendant les cours.",
-          ].map(fr)}
+    <Slide name="vue-d-ensemble" className="k-wallpage">
+      <div className="k-mosaic" style={{ left: -BLEED.x, top: -BLEED.y }}>
+        <Cell
+          at={[1, 1, 2, 2]}
+          label="Dessins turtle"
+          pic={{ src: "part-koch", size: [1944, 738], crop: [652, 2, 640, 734], paper: true }}
+        />
+        <Cell
+          at={[3, 1, 3, 2]}
+          tone="dark"
+          label="Minuteur plein écran"
+          pic={{ src: "minuteur", crop: [560, 480, 1760, 677] }}
+        />
+        <Cell at={[6, 1, 2, 2]} label="modèles Python">
+          <span className="k-cell-number">{BUILT_IN.length}</span>
+        </Cell>
+        <Cell
+          at={[8, 1, 4, 3]}
+          label="Règle, équerre, rapporteur et compas"
+          pic={{ src: "part-tableau", size: [2416, 1584], crop: [100, 400, 1760, 898], paper: true }}
+        />
+        <Cell at={[12, 1, 3, 1]} label="Seyès, carreaux, points, repère" row>
+          <Papers />
+        </Cell>
+        <Cell at={[12, 2, 3, 1]} label="Courbes de fonctions" row>
+          <span className="k-cell-math">
+            f(x) = x<sup>2</sup> − 2x
+          </span>
+        </Cell>
+
+        <Cell at={[1, 3, 2, 1]} label="Horloge de classe">
+          <Keys keys={[["Ctrl", "Maj", "H"]]} />
+        </Cell>
+        <Cell
+          at={[3, 3, 2, 2]}
+          label="Graphiques matplotlib"
+          pic={{ src: "part-mandelbrot", size: [1284, 742], crop: [500, 78, 600, 560], paper: true }}
+        />
+        <Cell at={[5, 3, 1, 1]} label="Écran allumé">
+          <Glyph icon={MonitorPlay} />
+        </Cell>
+        <Cell at={[6, 3, 2, 1]} label="Recherche dans les PDF">
+          <Keys keys={[["Ctrl", "K"]]} />
+        </Cell>
+        <Cell at={[12, 3, 3, 2]} label="Nouveau logo">
+          <Logo size={96} />
+        </Cell>
+
+        <Cell
+          at={[1, 4, 2, 2]}
+          label="Planche de Galton"
+          pic={{ src: "part-galton", size: [1284, 742], crop: [200, 80, 960, 620], paper: true }}
+        />
+        <Cell at={[5, 4, 1, 1]} label="Bouton Stop">
+          <Glyph icon={CircleStop} tone="danger" />
+        </Cell>
+        <div
+          className="k-cell accent k-cell-hero"
+          style={{ gridColumn: "6 / span 4", gridRow: "4 / span 3" }}
         >
-          <Shot
-            src="minuteur"
-            box={{ left: 0, top: 0, ...STRIP }}
-            crop={[700, 533, 1480, 562]}
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Tableau blanc"
-          lines={[
-            "Règle, équerre, rapporteur et compas.",
-            "Feuille infinie, avec zoom.",
-            "Fonds Seyès, carreaux, points ou repère.",
-            "Tracés aimantés et courbes de fonctions.",
-            "Export en PNG et en PDF.",
-          ].map(fr)}
-        >
-          <Shot
-            src="part-tableau"
-            size={[2416, 1584]}
-            box={{ left: 0, top: 0, ...STRIP }}
-            crop={[150, 760, 2100, 797]}
-            paper
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Python"
-          lines={[
-            `${BUILT_IN.length} modèles, de la Seconde à la NSI.`,
-            "turtle et matplotlib intégrés.",
-            "« Vérifier » corrige les exercices.",
-            "input(), bouton Stop, limite de temps.",
-            "Nouvel éditeur, avec complétion.",
-          ].map(fr)}
-        >
-          <Shot
-            src="part-koch"
-            size={[1944, 738]}
-            box={{ left: 0, top: 0, ...HALF }}
-            crop={[652, 2, 640, 734]}
-            paper
-            className="flat borderless"
-          />
-          <Shot
-            src="part-mandelbrot"
-            size={[1284, 742]}
-            box={{ left: 224, top: 0, ...HALF }}
-            crop={[500, 80, 620, 560]}
-            paper
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Notes"
-          lines={[
-            "Une note devient un diaporama (F5).",
-            "Export en PDF au format A4.",
-            "Modèles : cours, exercices, évaluation…",
-            "Toute note peut servir de modèle.",
-            "Les formules seules sont centrées.",
-          ].map(fr)}
-        >
-          <Shot
-            src="part-diapo"
-            box={{ left: 0, top: 0, ...STRIP }}
-            crop={[200, 150, 2450, 790]}
-            paper
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Documents"
-          lines={[
-            "Aperçu de la première page.",
-            "La recherche lit le texte des PDF.",
-            "Ctrl K propose d'abord les récents.",
-            "PDF annotés, avec leurs versions.",
-            "Tout au clavier : ↑ ↓ Entrée F2 Suppr.",
-          ].map(fr)}
-        >
-          <Shot
-            src="part-apercus"
-            size={[2416, 1752]}
-            box={{ left: 0, top: 0, ...STRIP }}
-            crop={[188, 540, 1380, 524]}
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Pronote"
-          lines={[
-            "Cahier de textes rangé par semaine.",
-            "Sur 4 semaines, 3 mois ou l'année.",
-            "Le texte se sélectionne et se copie.",
-            "Emploi du temps en une seule requête.",
-            "Le mot de passe n'est plus redemandé.",
-          ].map(fr)}
-        >
-          <Shot
-            src="cahier-de-textes"
-            box={{ left: 0, top: 0, ...STRIP }}
-            crop={[620, 200, 1700, 645]}
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Interface"
-          lines={[
-            "Nouveau logo et nouveau design.",
-            "Thème clair ou sombre.",
-            "Onglets déplaçables et épinglables.",
-            "Raccourcis adaptés au clavier français.",
-            "Mises à jour dans la barre d'état.",
-          ].map(fr)}
-        >
-          <Shot
-            src="tableau-de-bord"
-            box={{ left: 0, top: 0, ...HALF }}
-            crop={[464, 80, 1240, 941]}
-            className="flat borderless"
-          />
-          <Shot
-            src="tableau-de-bord-sombre"
-            box={{ left: 224, top: 0, ...HALF }}
-            crop={[464, 80, 1240, 941]}
-            className="flat borderless"
-          />
-        </Part>
-        <Part
-          title="Données"
-          lines={[
-            "Sauvegardes quotidiennes, restaurables.",
-            "Rien n'est perdu à la fermeture.",
-            "Copie de la base avant une mise à niveau.",
-            "Python s'arrête avec Euclide.",
-            "Démarrage et onglets plus rapides.",
-          ].map(fr)}
-        >
-          <Shot
-            src="sauvegardes"
-            size={[2240, 1720]}
-            box={{ left: 0, top: 0, ...STRIP }}
-            crop={[500, 200, 1700, 645]}
-            className="flat borderless"
-          />
-        </Part>
+          <svg className="k-cell-hero-mark" viewBox="0 0 24 24" aria-hidden>
+            <circle cx="8.5" cy="13.2" r="7" />
+            <circle cx="15.5" cy="13.2" r="7" />
+            <circle cx="12" cy="7.14" r="0.9" className="dot" />
+          </svg>
+          <h1>
+            Euclide <span>0.4</span>
+          </h1>
+          <p>Les nouveautés</p>
+        </div>
+        <Cell
+          at={[10, 4, 2, 2]}
+          label="Cahier de textes par semaine"
+          pic={{ src: "cahier-de-textes", crop: [640, 196, 1160, 800] }}
+        />
+
+        <Cell
+          at={[3, 5, 3, 2]}
+          label="« Vérifier » corrige"
+          pic={{ src: "part-verifications", size: [1996, 922], crop: [10, 80, 860, 390] }}
+        />
+        <Cell
+          at={[12, 5, 3, 2]}
+          tone="dark"
+          label="Thème sombre"
+          pic={{ src: "tableau-de-bord-sombre", crop: [464, 80, 1400, 730] }}
+        />
+        <Cell at={[1, 6, 2, 1]} label="dans la console" row>
+          <span className="k-cell-code">input()</span>
+        </Cell>
+        <Cell at={[10, 6, 2, 1]} label="requête Pronote au lieu de 7" row>
+          <span className="k-cell-number small">1</span>
+        </Cell>
+
+        <Cell
+          at={[1, 7, 3, 2]}
+          label="Diaporama (F5)"
+          pic={{ src: "diaporama", crop: [200, 150, 2300, 1094], paper: true }}
+        />
+        <Cell at={[4, 7, 1, 1]} label="Export PDF">
+          <Glyph icon={FileText} tone="danger" />
+        </Cell>
+        <Cell at={[5, 7, 1, 1]} label="Modèles de notes">
+          <Glyph icon={LayoutTemplate} tone="warn" />
+        </Cell>
+        <Cell
+          at={[6, 7, 3, 2]}
+          label="Aperçus des documents"
+          pic={{ src: "part-apercus", size: [2416, 1752], crop: [188, 500, 1500, 680] }}
+        />
+        <Cell at={[9, 7, 2, 1]} label="Sauvegardes restaurables" row>
+          <Glyph icon={ArchiveRestore} tone="ok" />
+        </Cell>
+        <Cell
+          at={[11, 7, 4, 2]}
+          label="La séance en un clic"
+          pic={{ src: "part-maintenant", size: [2032, 474], crop: [20, 20, 1130, 421] }}
+        />
+        <Cell at={[4, 8, 2, 1]} label="Mises à jour dans la barre d'état">
+          <span className="k-cell-update">
+            <Icon icon={ArrowUpCircle} size={14} />
+            Mise à jour 0.4.1
+          </span>
+        </Cell>
+        <Cell at={[9, 8, 1, 1]} label="Pronote retient la connexion">
+          <Glyph icon={KeyRound} tone="warn" />
+        </Cell>
+        <Cell at={[10, 8, 1, 1]} label="Contrastes AA">
+          <Glyph icon={Contrast} tone="ink" />
+        </Cell>
+
+        <Cell at={[1, 9, 2, 1]} label="Onglets épinglés" row>
+          <Glyph icon={Pin} tone="danger" />
+        </Cell>
+        <Cell at={[3, 9, 2, 1]} label="Clavier français" row>
+          <Glyph icon={Keyboard} tone="ink" />
+        </Cell>
+        <Cell at={[5, 9, 2, 1]} label="Rien de perdu à la fermeture" row>
+          <Glyph icon={ShieldCheck} tone="ok" />
+        </Cell>
+        <Cell at={[7, 9, 2, 1]} label="Python s'arrête avec Euclide" row>
+          <Glyph icon={Power} tone="accent" />
+        </Cell>
+        <Cell at={[9, 9, 2, 1]} label="thèmes, par niveau" row>
+          <span className="k-cell-number small">
+            {LEVELS.filter((l) => l.id !== "mine").reduce((n, l) => n + l.themes.length, 0)}
+          </span>
+        </Cell>
+        <Cell at={[11, 9, 2, 1]} label="Démarrage plus rapide" row>
+          <Glyph icon={Gauge} tone="ok" />
+        </Cell>
+        <Cell at={[13, 9, 2, 1]} label="Réglages par sections" row>
+          <Glyph icon={Settings2} tone="ink" />
+        </Cell>
       </div>
     </Slide>
   );
