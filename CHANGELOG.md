@@ -23,7 +23,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 ### Tableau blanc
 
-- Une feuille infinie, où l'on zoome et se déplace, sur fond uni, Seyès, petits carreaux, points ou repère gradué.
+- Une feuille infinie, avec zoom et déplacement, sur fond uni, Seyès, petits carreaux, points ou repère gradué.
 - **Règle, équerre, rapporteur et compas**, à leur vraie taille et lisibles à tout zoom. Le stylo suit le bord de la règle, le rapporteur lit un angle, le compas trace arcs et cercles.
 - Segments, cercles et rectangles exacts, qui s'accrochent aux points, aux extrémités et aux intersections, et courbes de fonctions `f(x) = …`.
 - Export en PNG et en PDF. Le tableau reste couleur papier, même en thème sombre.
