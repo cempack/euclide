@@ -125,11 +125,10 @@
       "one": "{count} script",
       "other": "{count} scripts"
     },
-    "emptyEditorHint": "Créez un script temporaire (+) ou sélectionnez. Enregistrer pour le conserver.",
+    "emptyEditorHint": "Partez d’un modèle, ou choisissez un script à gauche. Un nouveau script reste temporaire tant qu’il n’est pas enregistré.",
     "noScriptSelected": "Aucun script ouvert",
     "linkNamePlaceholder": "Nom",
     "linkUrlPlaceholder": "URL",
-    "starterCode": "# Script Python\n\nprint(\"Bonjour\")\n",
     "metaClassroom": "Pour la classe",
     "metaLinks": "Liens rapides",
     "classroomTitle": "En classe",
@@ -800,7 +799,7 @@
   },
   "python": {
     "newScript": "Nouveau script",
-    "newScriptTitle": "Nouveau script temporaire (non enregistré)",
+    "newScriptTitle": "Nouveau script, à partir d’un modèle",
     "importTitle": "Importer un fichier .py",
     "tempScript": "Script temporaire (non enregistré)",
     "namePlaceholder": "Nom du script",
@@ -837,7 +836,17 @@
     "clear": "Effacer",
     "resize": "Redimensionner la console",
     "editorLabel": "Code Python : {name}",
-    "scriptMissing": "Le script « {name} » n'existe plus."
+    "scriptMissing": "Le script « {name} » n'existe plus.",
+    "galleryTitle": "Nouveau script",
+    "saveAsTemplate": "Garder « {name} » comme modèle",
+    "saveTemplateTitle": "Garder ce script comme modèle",
+    "templateName": "Nom du modèle",
+    "templateHint": "En une ligne (facultatif)",
+    "templateHintPlaceholder": "Ce que ce script montre",
+    "templateNameTaken": "Un modèle intégré porte déjà ce nom.",
+    "templateSaved": "Modèle « {name} » enregistré",
+    "templateDeleted": "Modèle « {name} » supprimé",
+    "templateDelete": "Supprimer le modèle « {name} »"
   },
   "colors": {
     "black": "Noir",

@@ -18,8 +18,8 @@ import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { keysOf, useShortcut } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { CodeXml, Play, Plus, Trash2 } from "lucide-react";
-
-const STARTER_CODE = tr("tools.starterCode");
+import { NewScriptDialog, TemplateGallery } from "../features/python/Templates";
+import type { ScriptTemplate } from "../features/python/templates";
 
 const TIME_LIMITS = [10, 30, 60, 300, 0];
 const NO_SCRIPTS: PythonDemo[] = [];
@@ -153,7 +153,9 @@ export default function Python({ request }: { request?: { script: string; at: nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestAt, requested, handledRequest, scriptsQ.isSuccess, demos]);
 
-  const create = async () => {
+  const [gallery, setGallery] = useState(false);
+  /** A new script from a template: an unsaved buffer, saved under the template's name. */
+  const create = async (t: ScriptTemplate) => {
     if (openScript?.isDirty) {
       const ok = await confirm.ask({
         title: tr("tools.unsavedTitle"),
@@ -166,8 +168,8 @@ export default function Python({ request }: { request?: { script: string; at: nu
     // Create a temporary / unsaved script buffer that immediately appears in the file tree.
     // Clicking Enregistrer on it will persist it (using the name shown in the tree).
     setOpenScript({
-      name: "nouveau script",
-      code: STARTER_CODE,
+      name: t.scriptName ?? t.name,
+      code: t.code,
       isDirty: true,
     });
   };
@@ -385,15 +387,22 @@ export default function Python({ request }: { request?: { script: string; at: nu
 
   return (
     <div className="h-full min-h-0 flex eu-no-drag">
+      <NewScriptDialog
+        open={gallery}
+        onClose={() => setGallery(false)}
+        onPick={(t) => void create(t)}
+        current={openScript ? { name: openScript.name, code: openScript.code } : null}
+      />
       {/* Script explorer */}
       <aside className="w-[210px] @max-3xl:w-40 shrink-0 h-full flex flex-col border-r border-line bg-canvas">
         <div className="flex items-center justify-between gap-1 px-2.5 h-9 shrink-0 border-b border-line">
           <span className="eu-t-label">{tr("tools.scripts")}</span>
           <div className="flex items-center gap-0.5">
             <button
-              onClick={create}
+              onClick={() => setGallery(true)}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
               aria-label={tr("python.newScript")}
+              aria-haspopup="dialog"
               data-tip={tr("python.newScriptTitle")}
             >
               <Icon icon={Plus} size={14} />
@@ -571,15 +580,11 @@ export default function Python({ request }: { request?: { script: string; at: nu
                 }}
               />
             ) : (
-              <div className="h-full grid place-items-center">
-                <div className="max-w-[46ch] text-center">
-                  <p className="font-mono eu-t-page text-ink-faint opacity-50 mb-3">{"</>"}</p>
+              <div className="h-full overflow-y-auto @container">
+                <div className="max-w-3xl mx-auto px-6 py-8">
                   <p className="eu-t-section text-ink">{tr("python.emptyTitle")}</p>
-                  <p className="eu-t-body text-ink-muted mt-1.5">{tr("tools.emptyEditorHint")}</p>
-                  <button onClick={create} className="eu-btn-primary eu-btn-sm mt-3.5">
-                    <Icon icon={Plus} size={14} />
-                    {tr("python.newScript")}
-                  </button>
+                  <p className="eu-t-body text-ink-muted mt-1 mb-5">{tr("tools.emptyEditorHint")}</p>
+                  <TemplateGallery onPick={(t) => void create(t)} />
                 </div>
               </div>
             )}
