@@ -269,7 +269,19 @@ export function TurtleCanvas({ ops, label }: { ops: TurtleOp[]; label: string })
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="w-full h-full block bg-paper" role="img" aria-label={label} />;
+  // The canvas sits out of the flow: its pixel size (CSS size × the screen's
+  // scale) would otherwise widen its box, which widened it again (on a
+  // screen scaled 125 % or more, it grew until the browser gave up).
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full block bg-paper"
+        role="img"
+        aria-label={label}
+      />
+    </div>
+  );
 }
 
 /** The drawing as a PNG, for the library. */

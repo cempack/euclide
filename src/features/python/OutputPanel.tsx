@@ -248,11 +248,9 @@ function Drawing({ turtle, plots, scriptName }: { turtle: TurtleOp[]; plots: str
     // Each drawing takes the pane's height; several scroll sideways.
     <div className="h-full overflow-x-auto overflow-y-hidden p-3 flex gap-3 bg-stage-alt">
       {turtle.length > 0 && (
-        <figure className="m-0 h-full shrink-0 flex flex-col gap-1.5">
-          <div
-            ref={turtleBox}
-            className="flex-1 min-h-0 aspect-[4/3] rounded border border-stage-line overflow-hidden"
-          >
+        // The turtle's sheet takes the room left; its drawing scales to fit.
+        <figure className="m-0 h-full flex-1 min-w-64 flex flex-col gap-1.5">
+          <div ref={turtleBox} className="flex-1 min-h-0 rounded border border-stage-line overflow-hidden">
             <TurtleCanvas ops={turtle} label={tr("python.turtleLabel")} />
           </div>
           <SaveButton onClick={saveTurtle} />

@@ -166,14 +166,14 @@ class Checks(unittest.TestCase):
         self.assertEqual(
             [(r["name"], r["ok"]) for r in results], [("Compteur", True), ("Compteur.plus", False)]
         )
-        self.assertIn("attendu '2', obtenu '1'", results[1]["message"])
+        self.assertEqual(results[1]["message"], "c.plus() : attendu 2, obtenu 1")
 
     def test_doctests_when_there_is_no_companion_file(self):
         script = 'def double(x):\n    """\n    >>> double(2)\n    4\n    >>> double(5)\n    11\n    """\n    return 2 * x\n'
         results = self.checks(run(script, checks={"source": ""}))
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0]["ok"])
-        self.assertIn("attendu '11', obtenu '10'", results[0]["message"])
+        self.assertEqual(results[0]["message"], "double(5) : attendu 11, obtenu 10")
 
     def test_no_checks_when_the_script_fails(self):
         results = self.checks(run("1 / 0\n", checks={"source": "def test_a():\n    pass\n"}))
