@@ -1252,6 +1252,9 @@
   .eu-output-tabs {
     @apply flex items-stretch self-stretch gap-0.5;
   }
+  .eu-output-dot {
+    @apply w-1.5 h-1.5 rounded-full bg-accent;
+  }
   .eu-output-tab {
     @apply inline-flex items-center gap-1.5 px-2.5 text-small font-medium text-ink-muted border-b-2
       border-transparent transition-colors duration-fast hover:text-ink;
