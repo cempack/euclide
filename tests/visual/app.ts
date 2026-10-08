@@ -77,6 +77,17 @@ export const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }>
       await settle(p);
     },
   },
+  {
+    // The four instruments, placed where they cover each other least.
+    name: "board-instruments",
+    go: async (p) => {
+      await nav(p, "Tableau blanc");
+      const palette = p.getByRole("toolbar", { name: /Outils/ });
+      for (const name of ["Règle", "Équerre", "Rapporteur", "Compas"])
+        await palette.getByRole("button", { name }).click();
+      await settle(p);
+    },
+  },
   { name: "python", go: (p) => nav(p, "Python") },
   { name: "tools", go: (p) => nav(p, "Outils") },
   { name: "recap", go: (p) => nav(p, "Bilan") },

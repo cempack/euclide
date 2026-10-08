@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Circle as CircleIcon,
   Crosshair,
+  DraftingCompass,
   Ellipsis,
   Eraser,
   Grid3x3,
@@ -78,6 +79,19 @@ interface Doc {
 
 const COLORS = ["#111213", "#1d4ed8", "#d32f2f", "#2e7d32", "#7b1fa2", "#ef6c00"];
 const HIGHLIGHTS = ["#ffe600", "#7ee787", "#ff8fc7", "#79c0ff"];
+/** What a swatch is called (its tooltip, and its name for a screen reader). */
+const COLOR_NAMES: Record<string, StringKey> = {
+  "#111213": "board.colorBlack",
+  "#1d4ed8": "board.colorBlue",
+  "#d32f2f": "board.colorRed",
+  "#2e7d32": "board.colorGreen",
+  "#7b1fa2": "board.colorPurple",
+  "#ef6c00": "board.colorOrange",
+  "#ffe600": "board.colorYellow",
+  "#7ee787": "board.colorLightGreen",
+  "#ff8fc7": "board.colorPink",
+  "#79c0ff": "board.colorLightBlue",
+};
 const WIDTHS = [
   { value: 2, label: "board.thin" },
   { value: 3.5, label: "board.medium" },
@@ -113,7 +127,7 @@ const TOOLS: { tool: Tool; icon: LucideIcon; label: StringKey }[][] = [
   ],
 ];
 
-/** A protractor and a compass, drawn like the lucide set (no such glyphs there). */
+/** A protractor, drawn like the lucide set (there is no such glyph there). */
 function ProtractorGlyph() {
   return (
     <svg
@@ -127,34 +141,18 @@ function ProtractorGlyph() {
       strokeLinejoin="round"
       aria-hidden
     >
-      <path d="M3 18a9 9 0 0 1 18 0Z" />
-      <path d="M12 18 7.5 10.5" />
+      <path d="M2 17a10 10 0 0 1 20 0Z" />
+      <path d="M7 17a5 5 0 0 1 10 0" />
+      <path d="M12 17v-2" />
     </svg>
   );
 }
-function CompassGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={16}
-      height={16}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="4.5" r="1.5" />
-      <path d="M11 6 6 21M13 6l5 15M8 15h8" />
-    </svg>
-  );
-}
+
 const INSTRUMENTS: { kind: InstrumentKind; label: StringKey; icon: React.ReactNode }[] = [
   { kind: "ruler", label: "board.ruler", icon: <Icon icon={Ruler} size={16} /> },
   { kind: "square", label: "board.square", icon: <Icon icon={TriangleRight} size={16} /> },
   { kind: "protractor", label: "board.protractor", icon: <ProtractorGlyph /> },
-  { kind: "compass", label: "board.compass", icon: <CompassGlyph /> },
+  { kind: "compass", label: "board.compass", icon: <Icon icon={DraftingCompass} size={16} /> },
 ];
 
 /** Tools whose clicks land on remarkable places (points, crossings, grid). */
@@ -836,15 +834,7 @@ export default function Board({
   const toggleInstrument = (kind: InstrumentKind) => {
     const at = instruments.findIndex((i) => i.kind === kind);
     if (at >= 0) setInstruments(instruments.filter((_, i) => i !== at));
-    else {
-      // Each new one a little lower and to the right, not on top of the last.
-      const placedOne = placeInstrument(kind, view, size.w, size.h);
-      const shift = (instruments.length * 1.5 * CM) / Math.max(1, view.zoom);
-      setInstruments([
-        ...instruments,
-        { ...placedOne, at: { x: placedOne.at.x + shift, y: placedOne.at.y + shift } },
-      ]);
-    }
+    else setInstruments([...instruments, placeInstrument(kind, view, size.w, size.h, instruments)]);
   };
 
   // ---- view ------------------------------------------------------------------
@@ -864,7 +854,7 @@ export default function Board({
     }));
 
   const swatches = (list: string[], value: string, set: (c: string) => void) => (
-    <ToolGroup className="gap-1" label={tr("board.color")}>
+    <ToolGroup className="gap-2" label={tr("board.color")}>
       {list.map((c) => (
         <button
           key={c}
@@ -872,7 +862,8 @@ export default function Board({
           className="eu-board-swatch"
           style={{ background: c }}
           aria-pressed={value === c}
-          aria-label={c}
+          aria-label={tr(COLOR_NAMES[c])}
+          {...tip(tr(COLOR_NAMES[c]))}
           onClick={() => set(c)}
         />
       ))}
@@ -883,18 +874,14 @@ export default function Board({
     value: number,
     set: (v: T) => void,
   ) => (
-    <ToolGroup className="gap-0.5" label={tr("board.size")}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          className="eu-btn-toggle eu-btn-sm"
-          aria-pressed={value === o.value}
-          onClick={() => set(o.value)}
-        >
-          {tr(o.label)}
-        </button>
-      ))}
+    <ToolGroup label={tr("board.size")}>
+      <div className="eu-segment eu-segment-sm">
+        {options.map((o) => (
+          <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => set(o.value)}>
+            {tr(o.label)}
+          </button>
+        ))}
+      </div>
     </ToolGroup>
   );
 
@@ -1152,7 +1139,7 @@ export default function Board({
               <button
                 key={ins.kind}
                 type="button"
-                className="eu-btn-toggle eu-btn-icon"
+                className="eu-btn-toggle eu-btn-icon eu-board-out"
                 aria-pressed={instruments.some((i) => i.kind === ins.kind)}
                 aria-label={tr(ins.label)}
                 data-tip={tr(ins.label)}
