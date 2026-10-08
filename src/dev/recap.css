@@ -1,27 +1,388 @@
 /*
- * The release recap (dev/Recap.tsx, ?recap): a 16:9 board of tiles in the
- * app's own design language — chrome ground, panels with hairlines and
- * raised shadows, mono labels in the accent, the stage for what is
- * projected — each tile one feature, one line, one real screenshot.
+ * The release keynote (dev/Recap.tsx, ?recap): 16:9 slides of 1920 × 1080
+ * in the app's own design language — its type, its tokens, the panel with
+ * a hairline, the stage it projects on — one idea and one real screenshot
+ * each. Printed, each slide is a page (scripts/changelog/recap.mjs).
  */
-.recap {
+.k-deck {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 48px;
+  padding: 48px;
+  width: max-content;
+  background: var(--color-chrome);
+}
+@media print {
+  @page {
+    size: 1920px 1080px;
+    margin: 0;
+  }
+  .k-deck {
+    gap: 0;
+    padding: 0;
+  }
+  .k-slide {
+    break-after: page;
+  }
+}
+
+.k-slide {
+  position: relative;
   box-sizing: border-box;
   width: 1920px;
   height: 1080px;
-  padding: 40px;
+  overflow: hidden;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  print-color-adjust: exact;
+}
+.k-slide * {
+  box-sizing: border-box;
+}
+.k-slide.stage {
+  background: var(--color-stage);
+  color: var(--color-stage-ink);
+}
+
+/* Words: an accent eyebrow in mono, a headline, one sentence under it. */
+.k-text {
+  position: absolute;
+}
+.k-eyebrow {
+  margin: 0;
+  font: 600 17px/1 var(--font-mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.stage .k-eyebrow {
+  color: var(--color-stage-accent);
+}
+.k-title {
+  margin: 22px 0 0;
+  font-size: 82px;
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.k-sub {
+  margin: 30px 0 0;
+  max-width: 30ch;
+  font-size: 30px;
+  line-height: 1.34;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+.k-sub.wide {
+  max-width: 54ch;
+}
+.k-sub.center {
+  margin-inline: auto;
+  max-width: 52ch;
+}
+.stage .k-sub {
+  color: var(--color-stage-muted);
+}
+
+/* A screenshot: the app on its panel, a hairline, a long soft shadow; a
+   drawing on paper. Edges that run off the slide lose border and corner. */
+.k-shot {
+  position: absolute;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  background-color: var(--color-panel);
+  box-shadow:
+    0 2px 6px rgb(16 12 8 / 0.06),
+    0 24px 64px -16px rgb(16 12 8 / 0.28);
+}
+.stage .k-shot {
+  border-color: var(--color-stage-line);
+  box-shadow: 0 30px 90px -20px rgb(0 0 0 / 0.75);
+}
+.k-shot-pic {
+  position: absolute;
+  background-repeat: no-repeat;
+}
+.k-shot:has(.k-shot-pic) {
+  overflow: hidden;
+}
+.k-shot.paper {
+  background-color: var(--color-paper);
+}
+.k-shot.flat {
+  box-shadow: none;
+}
+.k-shot.borderless {
+  border: 0;
+  border-radius: 0;
+}
+.k-shot.bleed-right {
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.k-shot.bleed-bottom {
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.k-shot.bleed-left {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+/* The projected picture: a screen's edge rather than a window's. */
+.k-shot.k-screen {
+  border-radius: 14px;
+  outline: 10px solid rgb(255 255 255 / 0.04);
+}
+/* The app rising from the cover's foot. */
+.k-shot.k-rise {
+  border-radius: 22px 22px 0 0;
+}
+/* The dark screen laid over the light one. */
+.k-shot.k-on-dark {
+  border-color: rgb(255 255 255 / 0.14);
+  box-shadow: 0 34px 90px -18px rgb(0 0 0 / 0.55);
+}
+
+/* Features in a few words, each glyph on a raised tile. */
+.k-points {
+  position: absolute;
+  display: grid;
+  gap: 22px;
+}
+.k-points-2 {
+  grid-template-columns: 1fr 1fr;
+  gap: 26px 24px;
+}
+.k-point {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.k-point-icon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-panel);
+  color: var(--color-accent);
+  box-shadow: var(--eu-shadow-raised);
+}
+.k-point-icon svg,
+.k-chip svg {
+  width: 26px;
+  height: 26px;
+}
+.stage .k-point-icon {
+  border-color: var(--color-stage-line);
+  background: var(--color-stage-alt);
+  color: var(--color-stage-accent);
+  box-shadow: none;
+}
+.k-point-title {
+  display: block;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.k-point-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 19px;
+  line-height: 1.35;
+  color: var(--color-ink-muted);
+}
+.stage .k-point-text {
+  color: var(--color-stage-muted);
+}
+
+/* Keys as on the keyboard, in the app's Kbd style, larger. */
+.k-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 34px;
+}
+.k-keygroup {
+  display: inline-flex;
+  gap: 6px;
+}
+.k-keys kbd {
+  min-width: 46px;
+  padding: 10px 13px 9px;
+  border: 1px solid var(--color-line-strong);
+  border-bottom-width: 3px;
+  border-radius: 9px;
+  background: var(--color-panel);
+  color: var(--color-ink);
+  font: 600 20px/1 var(--font-mono);
+  text-align: center;
+}
+.stage .k-keys kbd {
+  border-color: var(--color-stage-line);
+  background: var(--color-stage-alt);
+  color: var(--color-stage-ink);
+}
+.k-keyrows {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.k-keyrows > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 22px;
+  color: var(--color-stage-muted);
+}
+.k-keyrows .k-keys {
+  margin: 0;
+}
+.k-keyrows > div > span + .k-keys {
+  margin-left: 18px;
+}
+
+/* The cover and the last slide: the mark, the name, the promise. */
+.k-cover {
+  position: absolute;
+  inset: 120px 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.k-cover.end {
+  inset: 0;
+  justify-content: center;
+}
+.k-cover .k-eyebrow {
+  margin-top: 56px;
+}
+.k-cover .k-title {
+  margin-top: 18px;
+}
+.k-cover-title {
+  margin: 44px 0 0;
+  font-size: 150px;
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+.k-cover-title span {
+  color: var(--color-stage-accent);
+}
+.k-cover-sub {
+  margin: 30px 0 0;
+  font-size: 34px;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  color: var(--color-stage-muted);
+}
+
+/* The templates counted by level. */
+.k-counts {
+  position: absolute;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px 36px;
+}
+.k-counts > div {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 18px;
+}
+.k-count-n {
+  min-width: 2ch;
+  font: 600 56px/1 var(--font-mono);
+  letter-spacing: -0.04em;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+.k-count-label {
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+/* Drawings on their sheet, a caption under each. */
+.k-sheet {
+  position: absolute;
+  margin: 0;
+  width: 540px;
+  height: 480px;
+}
+.k-sheet .k-shot {
+  border-radius: 16px;
+  border: 0;
+}
+.k-sheet figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 448px;
+  text-align: center;
+  font: 500 18px/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--color-stage-muted);
+}
+
+/* « Et bien plus encore » : the rest, as a wall of chips. */
+.k-wall {
+  position: absolute;
+  left: 112px;
+  right: 112px;
+  top: 300px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.k-chip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 104px;
+  padding: 22px 26px;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  background: var(--color-panel);
+  box-shadow: var(--eu-shadow-raised);
+  font-size: 24px;
+  line-height: 1.28;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.k-chip svg {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+/* The overview: everything new on a 12 × 6 board of tiles. */
+.k-overview {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: repeat(6, minmax(0, 1fr));
   gap: 16px;
+  padding: 40px;
   background: var(--color-chrome);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
 }
-.recap * {
-  box-sizing: border-box;
-}
-.recap-tile {
+.k-tile {
   position: relative;
   overflow: hidden;
   display: flex;
@@ -32,26 +393,23 @@
   background: var(--color-panel);
   box-shadow: var(--eu-shadow-raised);
 }
-.recap-tile.stage {
+.k-tile.stage {
   border-color: transparent;
   background: var(--color-stage);
   color: var(--color-stage-ink);
 }
-.recap-tile.accent {
-  border-color: transparent;
-  background: var(--color-accent);
-  color: var(--color-panel);
-}
-.recap-eyebrow {
-  font: 600 13px/1 var(--font-mono);
+.k-tile .k-eyebrow {
+  font-size: 13px;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-accent);
 }
-.stage .recap-eyebrow {
-  color: var(--color-stage-accent);
+.k-tile .k-shot {
+  border-radius: 12px;
+  box-shadow: var(--eu-shadow-pop);
 }
-.recap-h {
+.k-tile.stage .k-shot {
+  border-color: var(--color-stage-line);
+}
+.k-tile-title {
   margin: 12px 0 0;
   max-width: 17ch;
   font-size: 34px;
@@ -60,94 +418,53 @@
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
-.recap-h.wide {
+.k-tile-title.wide {
   max-width: 24ch;
 }
-
-/* A screenshot set in a tile: on paper, a hairline and the app's pop
-   shadow; `bleed` runs it off the tile's bottom and right edges. */
-.recap-shot {
-  position: absolute;
-  overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-paper);
-  box-shadow: var(--eu-shadow-pop);
+.k-tile .k-keys {
+  margin-top: 16px;
 }
-.recap-shot img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: left top;
+.k-tile .k-keys kbd {
+  font-size: 15px;
+  padding: 8px 10px;
+  min-width: 0;
 }
-.recap-shot.bleed {
-  border-bottom-right-radius: 0;
-  border-right: 0;
-  border-bottom: 0;
-}
-
-/* The hero: the mark, the name, the promise. */
-.recap-hero {
+.k-hero {
   justify-content: space-between;
   padding: 34px 36px;
 }
-.recap-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+.k-wordmark {
+  font: 600 16px/1 var(--font-mono);
+  letter-spacing: 0.24em;
 }
-.recap-word {
-  font: 600 15px/1 var(--font-mono);
-  letter-spacing: 0.22em;
-}
-.recap-title {
+.k-hero-title {
   margin: 0;
   font-size: 104px;
   line-height: 0.92;
   font-weight: 700;
   letter-spacing: -0.045em;
 }
-.recap-title span {
+.k-hero-title span {
   color: var(--color-accent);
 }
-.recap-promise {
-  margin: 14px 0 0;
+.k-hero-promise {
+  margin: 16px 0 0;
+  max-width: 24ch;
   font-size: 27px;
   line-height: 1.2;
   font-weight: 500;
   letter-spacing: -0.015em;
   color: var(--color-ink-muted);
-  max-width: 22ch;
 }
-
-/* A number that is the point of its tile. */
-.recap-number {
+.k-number {
   margin-top: auto;
-  font-size: 150px;
+  font-size: 128px;
   line-height: 0.8;
   font-weight: 700;
   letter-spacing: -0.06em;
 }
-.recap-number + .recap-h {
+.k-number + .k-tile-title {
   margin-top: 14px;
-}
-.recap-keys {
-  display: flex;
-  gap: 6px;
-  margin-top: 14px;
-}
-.recap-keys kbd {
-  font: 600 15px/1 var(--font-mono);
-  padding: 8px 10px;
-  border-radius: 7px;
-  border: 1px solid var(--color-line-strong);
-  border-bottom-width: 3px;
-  background: var(--color-panel);
-  color: var(--color-ink);
-}
-.stage .recap-keys kbd {
-  border-color: var(--color-stage-line);
-  background: var(--color-stage-alt);
-  color: var(--color-stage-ink);
+  max-width: 11ch;
+  font-size: 28px;
 }

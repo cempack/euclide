@@ -9,11 +9,23 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const python = process.env.PYTHON ?? (process.platform === "win32" ? "python" : "python3");
-const template = (f) => readFileSync(resolve(root, "src/features/python/templates", f), "utf8");
+/** A template as a new script starts: without its card (see templates.ts). */
+const template = (f) =>
+  readFileSync(resolve(root, "src/features/python/templates", f), "utf8").replace(
+    /^(# (Modèle|Résumé|Script) : .*\n)+\n?/,
+    "",
+  );
 
 export const SCRIPTS = [
-  { name: "Rosace", code: template("rosace.py"), checks: false },
-  { name: "Courbe d'une fonction", code: template("courbe.py"), checks: false },
+  { name: "Rosace", code: template("dessins/rosace.py"), checks: false },
+  { name: "Flocon de Koch", code: template("dessins/flocon-de-koch.py"), checks: false },
+  { name: "Courbe d'une fonction", code: template("seconde/courbe.py"), checks: false },
+  {
+    name: "Ensemble de Mandelbrot",
+    code: template("maths-expertes/ensemble-de-mandelbrot.py"),
+    checks: false,
+  },
+  { name: "Planche de Galton", code: template("terminale/planche-de-galton.py"), checks: false },
   { name: "Moyenne et mention", code: readFileSync(resolve(here, "notes-demo.py"), "utf8"), checks: true },
 ];
 
