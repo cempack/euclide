@@ -4,7 +4,7 @@ import { MapPin, Paperclip, X } from "lucide-react";
 import { q } from "../../api/queries";
 import { EmptyState, Loading, useConfirm, useToast } from "../../components/ui";
 import { Panel } from "../../components/layout";
-import { ChevronDownIcon, LayersIcon, PlusIcon, TrashIcon } from "../../components/icons";
+import { ChevronDown, Layers, Plus, Trash2 } from "lucide-react";
 import { api, type CourseClass, type Sequence, type SequenceItem, type StepResource } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { tr, trn } from "../../lib/i18n";
@@ -156,7 +156,7 @@ export function Progression({
   return (
     <Panel
       title={tr("sequences.title")}
-      icon={<LayersIcon className="w-3.5 h-3.5" />}
+      icon={<Icon icon={Layers} size={14} />}
       action={
         <div className="flex items-center gap-1.5">
           <input
@@ -168,7 +168,7 @@ export function Progression({
             aria-label={tr("sequences.newPlaceholder")}
           />
           <button className="eu-btn-ghost eu-btn-sm" onClick={addSequence} disabled={!newSequence.trim()}>
-            <PlusIcon className="w-3.5 h-3.5" />
+            <Icon icon={Plus} size={14} />
             {tr("sequences.add")}
           </button>
         </div>
@@ -178,7 +178,7 @@ export function Progression({
         <Loading label={tr("common.loading")} size="small" />
       ) : sequences.length === 0 ? (
         <EmptyState
-          icon={<LayersIcon className="w-4 h-4" />}
+          icon={<Icon icon={Layers} size={16} />}
           title={tr("sequences.emptyTitle")}
           hint={tr("sequences.emptyHint")}
         />
@@ -196,7 +196,9 @@ export function Progression({
                     aria-label={seq.title}
                     className="eu-btn-quiet eu-btn-icon eu-btn-sm shrink-0"
                   >
-                    <ChevronDownIcon
+                    <Icon
+                      icon={ChevronDown}
+                      size={20}
                       className={`w-3.5 h-3.5 transition-transform duration-fast ${isCollapsed ? "-rotate-90" : ""}`}
                     />
                   </button>
@@ -212,7 +214,7 @@ export function Progression({
                       data-tip={tr("sequences.moveUp")}
                       className="eu-btn-quiet eu-btn-icon eu-btn-sm"
                     >
-                      <ChevronDownIcon className="w-3.5 h-3.5 rotate-180" />
+                      <Icon icon={ChevronDown} size={14} className="rotate-180" />
                     </button>
                     <button
                       onClick={() =>
@@ -223,7 +225,7 @@ export function Progression({
                       data-tip={tr("sequences.moveDown")}
                       className="eu-btn-quiet eu-btn-icon eu-btn-sm"
                     >
-                      <ChevronDownIcon className="w-3.5 h-3.5" />
+                      <Icon icon={ChevronDown} size={14} />
                     </button>
                     <button
                       onClick={async () => {
@@ -239,7 +241,7 @@ export function Progression({
                       data-tip={tr("common.delete")}
                       className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                     >
-                      <TrashIcon className="w-3.5 h-3.5" />
+                      <Icon icon={Trash2} size={14} />
                     </button>
                   </div>
                 </div>
@@ -319,7 +321,7 @@ export function Progression({
                               aria-label={tr("sequences.moveUp")}
                               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
                             >
-                              <ChevronDownIcon className="w-3.5 h-3.5 rotate-180" />
+                              <Icon icon={ChevronDown} size={14} className="rotate-180" />
                             </button>
                             <button
                               onClick={() =>
@@ -331,7 +333,7 @@ export function Progression({
                               aria-label={tr("sequences.moveDown")}
                               className="eu-btn-quiet eu-btn-icon eu-btn-sm"
                             >
-                              <ChevronDownIcon className="w-3.5 h-3.5" />
+                              <Icon icon={ChevronDown} size={14} />
                             </button>
                             <button
                               onClick={() => void deleteItem(item)}
@@ -339,7 +341,7 @@ export function Progression({
                               data-tip={tr("common.delete")}
                               className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                             >
-                              <TrashIcon className="w-3.5 h-3.5" />
+                              <Icon icon={Trash2} size={14} />
                             </button>
                           </div>
                         </div>
@@ -400,7 +402,7 @@ export function Progression({
                         }}
                         className="eu-row-hover w-full text-left border-t border-line text-ink-muted"
                       >
-                        <PlusIcon className="w-3.5 h-3.5 shrink-0" />
+                        <Icon icon={Plus} size={14} className="shrink-0" />
                         <span className="eu-t-meta">{tr("sequences.addStep")}</span>
                       </button>
                     )}

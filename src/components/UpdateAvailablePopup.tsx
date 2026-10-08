@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { XIcon } from "./icons";
+import { X } from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { useConfirm, useToast } from "./ui";
 import { tr } from "../lib/i18n";
 import {
@@ -92,7 +93,7 @@ export function UpdateAvailablePopup({
               aria-label={tr("updater.popupDismiss")}
               className="shrink-0 eu-btn-quiet eu-btn-icon eu-btn-sm"
             >
-              <XIcon className="w-3.5 h-3.5" />
+              <Icon icon={X} size={14} />
             </button>
           </div>
 

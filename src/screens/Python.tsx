@@ -17,7 +17,7 @@ import { Icon } from "../ui/Icon";
 import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { keysOf, useShortcut } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
-import { CodeIcon, PlayIcon, PlusIcon, TrashIcon } from "../components/icons";
+import { CodeXml, Play, Plus, Trash2 } from "lucide-react";
 
 const STARTER_CODE = tr("tools.starterCode");
 
@@ -393,7 +393,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
               aria-label={tr("python.newScript")}
               data-tip={tr("python.newScriptTitle")}
             >
-              <PlusIcon className="w-3.5 h-3.5" />
+              <Icon icon={Plus} size={14} />
             </button>
             <button
               onClick={importScript}
@@ -413,7 +413,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
               data-tip={tr("python.tempScript")}
               aria-label={tr("python.tempScript")}
             >
-              <CodeIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" />
+              <Icon icon={CodeXml} size={14} className="shrink-0 text-ink-faint" />
               <span className="eu-t-meta text-ink truncate flex-1">{openScript.name}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-warn-solid shrink-0" />
             </div>
@@ -431,7 +431,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
                   aria-current={isSel ? "page" : undefined}
                   className="eu-nav-item w-full h-7 px-2 gap-2 eu-no-drag"
                 >
-                  <CodeIcon className="eu-nav-icon w-3.5 h-3.5" />
+                  <Icon icon={CodeXml} size={14} className="eu-nav-icon" />
                   <span className="eu-t-small truncate">{d.name}</span>
                 </button>
               );
@@ -449,7 +449,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
         {openScript ? (
           <Toolbar className="h-9 py-0">
             <ToolGroup className="min-w-0 flex-1">
-              <CodeIcon className="w-3.5 h-3.5 text-ink-faint shrink-0" />
+              <Icon icon={CodeXml} size={14} className="text-ink-faint shrink-0" />
               {isEditingName ? (
                 <input
                   type="text"
@@ -504,7 +504,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
                   className="eu-btn-primary eu-btn-sm"
                   {...tip(tr("tools.execute"), keysOf("runPython"))}
                 >
-                  <PlayIcon className="w-3.5 h-3.5" />
+                  <Icon icon={Play} size={14} />
                   {tr("tools.execute")}
                 </button>
               )}
@@ -544,7 +544,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
                 aria-label={tr("common.delete")}
                 data-tip={tr("common.delete")}
               >
-                <TrashIcon className="w-3.5 h-3.5" />
+                <Icon icon={Trash2} size={14} />
               </button>
             </ToolGroup>
           </Toolbar>
@@ -574,7 +574,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
                   <p className="eu-t-section text-ink">{tr("python.emptyTitle")}</p>
                   <p className="eu-t-body text-ink-muted mt-1.5">{tr("tools.emptyEditorHint")}</p>
                   <button onClick={create} className="eu-btn-primary eu-btn-sm mt-3.5">
-                    <PlusIcon className="w-3.5 h-3.5" />
+                    <Icon icon={Plus} size={14} />
                     {tr("python.newScript")}
                   </button>
                 </div>

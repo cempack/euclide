@@ -28,7 +28,8 @@ import { TooltipLayer } from "./ui/Tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { q } from "./api/queries";
 import { Dialog } from "./ui/Dialog";
-import { DocIcon, PlusIcon } from "./components/icons";
+import { FileText, Plus } from "lucide-react";
+import { Icon } from "./ui/Icon";
 import Dashboard from "./screens/Dashboard";
 
 // Only the dashboard ships in the startup bundle. Every other screen loads on
@@ -281,7 +282,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
       className="max-w-lg eu-dialog-top overflow-hidden"
     >
       <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-line">
-        <PlusIcon className="w-4 h-4 text-ink-faint shrink-0" />
+        <Icon icon={Plus} size={16} className="text-ink-faint shrink-0" />
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -682,7 +683,7 @@ function Shell() {
       {dragging && (
         <div className="fixed inset-0 z-80 grid place-items-center bg-accent/10 pointer-events-none">
           <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
-            <DocIcon className="w-7 h-7 text-accent shrink-0" />
+            <Icon icon={FileText} size={20} className="w-7 h-7 text-accent shrink-0" />
             <div>
               <p className="eu-t-section text-ink">{tr("dragDrop.drop")}</p>
               <p className="eu-t-meta mt-0.5">{tr("dragDrop.hint")}</p>

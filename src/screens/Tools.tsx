@@ -15,15 +15,8 @@ import { scene } from "../stores/scene";
 import { keysOf } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { Maximize2 as MaximizeIcon } from "lucide-react";
-import {
-  CoffeeIcon,
-  CodeIcon,
-  LinkIcon,
-  PenIcon,
-  PlusIcon,
-  ProjectorIcon,
-  TrashIcon,
-} from "../components/icons";
+import { CodeXml, Coffee, Link, PenLine, Plus, Projector, Trash2 } from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 
 const NO_LINKS: QuickLink[] = [];
@@ -74,7 +67,7 @@ function ClassroomSection() {
         <div className="eu-row justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line text-ink-muted">
-              <CoffeeIcon className="w-4 h-4" />
+              <Icon icon={Coffee} size={16} />
             </span>
             <div className="min-w-0">
               <p className="eu-t-body font-medium text-ink">{tr("tools.keepAwake")}</p>
@@ -96,7 +89,7 @@ function ClassroomSection() {
         <div className="eu-row justify-between border-t border-line">
           <div className="flex items-center gap-3 min-w-0">
             <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line text-ink-muted">
-              <ProjectorIcon className="w-4 h-4" />
+              <Icon icon={Projector} size={16} />
             </span>
             <div className="min-w-0">
               <p className="eu-t-body font-medium text-ink">{tr("appearance.projection")}</p>
@@ -126,7 +119,7 @@ function ClassroomSection() {
               })
             }
           >
-            <PenIcon className="w-3.5 h-3.5" />
+            <Icon icon={PenLine} size={14} />
             {tr("nav.whiteboard")}
           </button>
           <button
@@ -134,7 +127,7 @@ function ClassroomSection() {
             className="eu-btn-ghost eu-btn-sm"
             onClick={() => tabs.open({ kind: "python" })}
           >
-            <CodeIcon className="w-3.5 h-3.5" />
+            <Icon icon={CodeXml} size={14} />
             Python
           </button>
         </div>
@@ -236,19 +229,19 @@ function LinksSection() {
       title={tr("tools.quickLinks")}
       action={
         <button onClick={() => setOpen(true)} className="eu-btn-ghost eu-btn-sm">
-          <PlusIcon className="w-3.5 h-3.5" /> {tr("common.add")}
+          <Icon icon={Plus} size={14} /> {tr("common.add")}
         </button>
       }
     >
       <Panel>
         {links.length === 0 ? (
           <EmptyState
-            icon={<LinkIcon className="w-4 h-4" />}
+            icon={<Icon icon={Link} size={16} />}
             title={tr("tools.noQuickLinks")}
             hint={tr("tools.noQuickLinksHint")}
             action={
               <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newLink")}
+                <Icon icon={Plus} size={14} /> {tr("common.newLink")}
               </button>
             }
           />
@@ -290,7 +283,7 @@ function LinksSection() {
                   data-tip={tr("common.delete")}
                   className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                 >
-                  <TrashIcon className="w-3.5 h-3.5" />
+                  <Icon icon={Trash2} size={14} />
                 </button>
               </div>
             ))}

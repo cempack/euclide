@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 import { api, openWith, type Opener } from "../lib/api";
-import { FolderIcon, GlobeIcon, FileIcon } from "./icons";
+import { File, Folder, Globe } from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { tr } from "../lib/i18n";
 import { reportError } from "../lib/report";
 
@@ -53,15 +54,15 @@ export function OpenWithButton({
 
   const getIcon = (opt: Opener) => {
     const iconClass = "w-3.5 h-3.5 shrink-0";
-    if (opt.is_reveal) return <FolderIcon className={iconClass} />;
+    if (opt.is_reveal) return <Icon icon={Folder} size={20} className={iconClass} />;
     const nameLower = opt.name.toLowerCase();
     if (nameLower.includes("navigateur") || nameLower.includes("browser")) {
-      return <GlobeIcon className={iconClass} />;
+      return <Icon icon={Globe} size={20} className={iconClass} />;
     }
     if (!opt.app || nameLower.includes("application") || nameLower.includes("défaut")) {
-      return <FileIcon className={iconClass} />;
+      return <Icon icon={File} size={20} className={iconClass} />;
     }
-    return <FileIcon className={iconClass} />;
+    return <Icon icon={File} size={20} className={iconClass} />;
   };
 
   return (

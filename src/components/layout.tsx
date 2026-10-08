@@ -10,7 +10,8 @@ import {
 } from "react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Ellipsis } from "lucide-react";
-import { ArrowRightIcon } from "./icons";
+import { ArrowRight } from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { tr } from "../lib/i18n";
 
 /**
@@ -47,7 +48,7 @@ export function PageHeader({
     <header className="flex flex-col">
       {onBack && (
         <button type="button" onClick={onBack} className="eu-btn-quiet eu-btn-sm self-start -ml-2.5 mb-2">
-          <ArrowRightIcon className="w-3.5 h-3.5 rotate-180" />
+          <Icon icon={ArrowRight} size={14} className="rotate-180" />
           {backLabel}
         </button>
       )}

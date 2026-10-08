@@ -11,7 +11,7 @@ import { tabs } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useToast, useConfirm, Loading } from "./ui";
-import { TrashIcon, CodeIcon, LinkIcon } from "./icons";
+import { CodeXml, Link as LinkGlyph, Trash2 } from "lucide-react";
 import { tr } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { useSetting } from "../api/hooks";
@@ -533,7 +533,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               aria-label={tr("common.delete")}
               data-tip={tr("common.delete")}
             >
-              <TrashIcon className="w-3.5 h-3.5" />
+              <Icon icon={Trash2} size={14} />
             </button>
           )}
           <button
@@ -590,7 +590,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
                 data-tip={tr("notes.code")}
                 aria-label={tr("notes.code")}
               >
-                <CodeIcon className="w-4 h-4" />
+                <Icon icon={CodeXml} size={16} />
               </button>
               <button
                 onClick={openLinkPopup}
@@ -598,7 +598,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
                 data-tip={tr("notes.link")}
                 aria-label={tr("notes.link")}
               >
-                <LinkIcon className="w-4 h-4" />
+                <Icon icon={LinkGlyph} size={16} />
               </button>
             </ToolGroup>
           )}

@@ -9,7 +9,8 @@ import { useToast, useConfirm, Loading, EmptyState } from "../components/ui";
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import { BellIcon, CheckIcon, RepeatIcon, TrashIcon, PlusIcon, SearchIcon } from "../components/icons";
+import { Bell, Check, Plus, Repeat, Search, Trash2 } from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { formatDueLabel, localYmd, localYmdToIso } from "../lib/format";
 import { useReminderActions } from "../features/reminders/useReminderActions";
 
@@ -55,7 +56,7 @@ const ReminderRow = memo(function ReminderRow({
             : "border-line-strong hover:border-ok hover:bg-ok-soft"
         }`}
       >
-        {isDone && <CheckIcon className="w-3 h-3" />}
+        {isDone && <Icon icon={Check} size={20} className="w-3 h-3" />}
       </button>
 
       <div className="flex-1 min-w-0">
@@ -75,7 +76,7 @@ const ReminderRow = memo(function ReminderRow({
             )}
             {r.repeat_rule !== "none" && (
               <span className="flex items-center gap-1">
-                <RepeatIcon className="w-3 h-3" />
+                <Icon icon={Repeat} size={20} className="w-3 h-3" />
                 {REPEAT_LABELS[r.repeat_rule]}
               </span>
             )}
@@ -99,7 +100,7 @@ const ReminderRow = memo(function ReminderRow({
         data-tip={tr("common.delete")}
         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
       >
-        <TrashIcon className="w-3.5 h-3.5" />
+        <Icon icon={Trash2} size={14} />
       </button>
     </div>
   );
@@ -230,7 +231,7 @@ export default function Reminders() {
     <>
       <PageHeader
         title={tr("nav.reminders")}
-        icon={<BellIcon className="w-5 h-5" />}
+        icon={<Icon icon={Bell} size={20} />}
         meta={
           <>
             <span>{tr("reminders.metaPending", { count: pendingCount })}</span>
@@ -241,7 +242,7 @@ export default function Reminders() {
         actions={
           doneCount > 0 ? (
             <button onClick={clearDone} className="eu-btn-quiet eu-btn-sm hover:text-danger">
-              <TrashIcon className="w-3.5 h-3.5" />
+              <Icon icon={Trash2} size={14} />
               {tr("reminders.clearDone")}
             </button>
           ) : undefined
@@ -270,7 +271,7 @@ export default function Reminders() {
             {showDetails ? tr("reminders.hideDetails") : tr("reminders.showDetails")}
           </button>
           <button onClick={addReminder} disabled={!newTitle.trim()} className="eu-btn-primary eu-btn-sm">
-            <PlusIcon className="w-3.5 h-3.5" />
+            <Icon icon={Plus} size={14} />
             {tr("dashboard.addReminderBtn")}
           </button>
         </div>
@@ -349,7 +350,11 @@ export default function Reminders() {
             onChange={(e) => setSearch(e.target.value)}
             aria-label={tr("common.search")}
           />
-          <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
+          <Icon
+            icon={Search}
+            size={14}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
+          />
         </div>
         <Segmented
           value={filter}
@@ -370,7 +375,7 @@ export default function Reminders() {
       ) : groups.length === 0 ? (
         <Panel>
           <EmptyState
-            icon={<BellIcon className="w-4 h-4" />}
+            icon={<Icon icon={Bell} size={16} />}
             title={search ? tr("reminders.noResult") : tr("reminders.emptyTitle")}
             hint={search ? tr("reminders.noResultHint") : tr("reminders.emptyHint")}
           />

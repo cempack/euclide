@@ -19,7 +19,8 @@ import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
 import { PageHeader, Panel, Section, Segmented } from "../components/layout";
 import { BackupsSection } from "../features/settings/BackupsSection";
 import { SettingRow, SettingsNav, type NavSection } from "../features/settings/SettingRow";
-import { CheckIcon, MoonIcon, PlusIcon, QrIcon, SunIcon, TrashIcon } from "../components/icons";
+import { Check, Moon, Plus, QrCode, Sun, Trash2 } from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { tabs, useTabLimit } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -123,7 +124,7 @@ function AppearanceSection() {
                   value: "light",
                   label: (
                     <span className="flex items-center gap-1.5">
-                      <SunIcon className="w-3.5 h-3.5" />
+                      <Icon icon={Sun} size={14} />
                       {tr("appearance.light")}
                     </span>
                   ),
@@ -132,7 +133,7 @@ function AppearanceSection() {
                   value: "dark",
                   label: (
                     <span className="flex items-center gap-1.5">
-                      <MoonIcon className="w-3.5 h-3.5" />
+                      <Icon icon={Moon} size={14} />
                       {tr("appearance.dark")}
                     </span>
                   ),
@@ -456,7 +457,7 @@ function PronoteSection() {
                 : "bg-panel-alt border-line text-ink-muted"
             }`}
           >
-            {status?.connected ? <CheckIcon className="w-4 h-4" /> : <QrIcon className="w-4 h-4" />}
+            {status?.connected ? <Icon icon={Check} size={16} /> : <Icon icon={QrCode} size={16} />}
           </span>
           <div className="flex-1 min-w-[24ch]">
             <p className="eu-t-body font-medium text-ink">
@@ -525,11 +526,11 @@ function PronoteSection() {
                 onChange={(e) => e.target.files?.[0] && decodeImage(e.target.files[0])}
               />
               <button onClick={() => fileRef.current?.click()} className="eu-btn-ghost justify-center py-3">
-                <QrIcon className="w-5 h-5" /> Importer l'image du QR code
+                <Icon icon={QrCode} size={20} /> Importer l'image du QR code
               </button>
               {qrJson && (
                 <p className="eu-chip w-fit">
-                  <CheckIcon className="w-3.5 h-3.5" /> QR code charge
+                  <Icon icon={Check} size={14} /> QR code charge
                 </p>
               )}
               <div>
@@ -674,7 +675,7 @@ function ScheduleSection() {
       description={tr("settings.scheduleWeek")}
       action={
         <button onClick={() => setOpen(true)} className="eu-btn-ghost eu-btn-sm">
-          <PlusIcon className="w-3.5 h-3.5" /> {tr("common.add")}
+          <Icon icon={Plus} size={14} /> {tr("common.add")}
         </button>
       }
     >
@@ -685,7 +686,7 @@ function ScheduleSection() {
             hint={tr("settings.emptyScheduleHint")}
             action={
               <button onClick={() => setOpen(true)} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.add")}
+                <Icon icon={Plus} size={14} /> {tr("common.add")}
               </button>
             }
           />
@@ -734,7 +735,7 @@ function ScheduleSection() {
                               data-tip={tr("common.delete")}
                               className="absolute top-0.5 right-0.5 w-6 h-6 grid place-items-center rounded-sm text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger-soft transition-opacity duration-fast"
                             >
-                              <TrashIcon className="w-3 h-3" />
+                              <Icon icon={Trash2} size={20} className="w-3 h-3" />
                             </button>
                           )}
                         </div>
