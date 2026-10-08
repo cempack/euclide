@@ -18,7 +18,7 @@ import { Toolbar, ToolGroup, ToolSep } from "../components/layout";
 import { keysOf, useShortcut } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { CodeXml, Play, Plus, Trash2 } from "lucide-react";
-import { NewScriptDialog, TemplateLevels } from "../features/python/Templates";
+import { NewScriptDialog, TemplateLevels } from "../features/python/TemplateGallery";
 import type { LevelId, ScriptTemplate } from "../features/python/templates";
 import { scriptIcon } from "../features/python/scriptIcon";
 
