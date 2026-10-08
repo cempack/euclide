@@ -527,7 +527,11 @@ function CommandPalette({
                   {a.keys ? (
                     <Kbd keys={a.keys} className="shrink-0 mt-0.5" />
                   ) : (
-                    a.hint && <span className="eu-t-caption shrink-0 mt-0.5">{a.hint}</span>
+                    a.hint && (
+                      <span className={`eu-t-caption shrink-0 mt-0.5 ${i === sel ? "text-ink-muted" : ""}`}>
+                        {a.hint}
+                      </span>
+                    )
                   )}
                 </button>
               </div>

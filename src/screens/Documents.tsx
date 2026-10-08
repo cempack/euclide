@@ -135,30 +135,32 @@ function ItemIcon({ it }: { it: DocItem }) {
 }
 
 /** Rename and delete, on hover or focus; they never open the document. */
+/**
+ * Rename and delete under the pointer. Not buttons: a document in the list
+ * is an option, which may hold no control; the keyboard has F2 and Suppr
+ * (each option says so through aria-keyshortcuts).
+ */
 function RowTools({ it, actions }: { it: DocItem; actions: ItemActions }) {
-  const title = itemTitle(it);
   return (
-    <span className="eu-row-actions flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        tabIndex={-1}
+    <span
+      aria-hidden="true"
+      className="eu-row-actions flex items-center gap-0.5 shrink-0"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span
         onClick={() => actions.rename(it)}
-        aria-label={`${tr("common.rename")} — ${title}`}
         {...tip(tr("common.rename"), "F2")}
-        className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+        className="eu-btn-quiet eu-btn-icon eu-btn-sm cursor-pointer"
       >
         <Icon icon={PenLine} size={14} />
-      </button>
-      <button
-        type="button"
-        tabIndex={-1}
+      </span>
+      <span
         onClick={() => actions.remove(it)}
-        aria-label={`${tr("common.delete")} — ${title}`}
         {...tip(tr("common.delete"), "Suppr")}
-        className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
+        className="eu-btn-quiet eu-btn-icon eu-btn-sm cursor-pointer hover:text-danger"
       >
         <Icon icon={Trash2} size={14} />
-      </button>
+      </span>
     </span>
   );
 }
@@ -182,6 +184,7 @@ const DocRow = memo(function DocRow({
     <div
       role="option"
       aria-selected={current}
+      aria-keyshortcuts="Enter F2 Delete"
       tabIndex={current ? 0 : -1}
       data-doc-index={index}
       onClick={() => actions.open(it)}
@@ -221,6 +224,7 @@ const DocCard = memo(function DocCard({
     <div
       role="option"
       aria-selected={current}
+      aria-keyshortcuts="Enter F2 Delete"
       tabIndex={current ? 0 : -1}
       data-doc-index={index}
       onClick={() => actions.open(it)}
@@ -584,7 +588,6 @@ export default function Documents({
                 type="button"
                 role="radio"
                 aria-checked={view === v.id}
-                aria-pressed={view === v.id}
                 aria-label={v.label}
                 {...tip(v.label)}
                 onClick={() => setView(v.id)}

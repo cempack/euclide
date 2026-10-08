@@ -546,7 +546,7 @@ function ScheduleRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`eu-row-hover w-full text-left ${status === "past" ? "opacity-55" : ""} ${
+      className={`eu-row-hover w-full text-left ${status === "past" ? "eu-row-past" : ""} ${
         isCurrent ? "bg-warn-soft hover:bg-warn-soft" : ""
       }`}
     >
