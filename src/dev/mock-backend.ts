@@ -902,13 +902,6 @@ function handle(cmd: string, args: Args): unknown {
       if (i >= 0) stepResources.splice(i, 1);
       return null;
     }
-    case "move_step_resource":
-      reorder(
-        stepResources.filter((r) => r.item_id === num(args, "itemId")),
-        num(args, "id") ?? 0,
-        num(args, "delta") ?? 0,
-      );
-      return null;
     case "set_course_class_item": {
       const cc = courseClasses.find(
         (c) => c.course_id === num(args, "courseId") && c.class_name === str(args, "className"),
@@ -1025,8 +1018,6 @@ function handle(cmd: string, args: Args): unknown {
           return copy;
         });
     }
-    case "file_path":
-      return "";
     case "list_openers":
       return [
         { name: "Application par défaut", is_reveal: false },

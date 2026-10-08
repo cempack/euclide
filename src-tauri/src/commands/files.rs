@@ -211,14 +211,6 @@ pub async fn attach_files_to_course(
     Ok(items)
 }
 
-/// Indexing now happens in the background: this only wakes the indexer.
-/// Kept for the frontend of the previous release.
-#[tauri::command]
-pub fn index_files(indexer: State<'_, Indexer>) -> i64 {
-    indexer.kick();
-    0
-}
-
 /// Index every PDF again (e.g. after the sidecar learned to read more).
 #[tauri::command]
 pub async fn reindex_documents(db: State<'_, Db>, indexer: State<'_, Indexer>) -> AppResult<i64> {
@@ -232,12 +224,6 @@ pub async fn reindex_documents(db: State<'_, Db>, indexer: State<'_, Indexer>) -
         .await?;
     indexer.kick();
     Ok(n)
-}
-
-#[tauri::command]
-pub async fn file_path(db: State<'_, Db>, id: i64) -> AppResult<String> {
-    let path = db.read(move |conn| path_of(conn, id)).await?;
-    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

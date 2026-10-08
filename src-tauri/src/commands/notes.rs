@@ -2,7 +2,7 @@
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::models::{Note, NoteSummary};
+use crate::models::Note;
 use rusqlite::{params, Connection, Row};
 use tauri::State;
 
@@ -41,39 +41,6 @@ pub fn list_all(conn: &Connection) -> AppResult<Vec<Note>> {
     ))?;
     let rows = stmt.query_map([], map_note)?;
     Ok(rows.collect::<Result<_, _>>()?)
-}
-
-/// Every note without its body (lists do not need it), with a short excerpt.
-pub fn list_summaries(conn: &Connection) -> AppResult<Vec<NoteSummary>> {
-    let mut stmt = conn.prepare_cached(
-        "SELECT id, course_id, title, substr(body, 1, 240), updated_at FROM notes ORDER BY updated_at DESC",
-    )?;
-    let rows = stmt.query_map([], |r| {
-        let head: String = r.get(3)?;
-        Ok(NoteSummary {
-            id: r.get(0)?,
-            course_id: r.get(1)?,
-            title: r.get(2)?,
-            excerpt: excerpt(&head),
-            updated_at: r.get(4)?,
-        })
-    })?;
-    Ok(rows.collect::<Result<_, _>>()?)
-}
-
-/// The first words of a Markdown body on one line, without heading or list marks.
-fn excerpt(body: &str) -> String {
-    let flat = body
-        .lines()
-        .map(|l| l.trim_start_matches(['#', '-', '*', '>', ' ']).trim())
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let mut out: String = flat.chars().take(160).collect();
-    if flat.chars().count() > 160 {
-        out.push('…');
-    }
-    out
 }
 
 pub fn save(conn: &Connection, note: &Note) -> AppResult<Note> {
@@ -117,11 +84,6 @@ pub async fn list_notes(db: State<'_, Db>, course_id: Option<i64>) -> AppResult<
 #[tauri::command]
 pub async fn all_notes(db: State<'_, Db>) -> AppResult<Vec<Note>> {
     db.read(list_all).await
-}
-
-#[tauri::command]
-pub async fn list_note_summaries(db: State<'_, Db>) -> AppResult<Vec<NoteSummary>> {
-    db.read(list_summaries).await
 }
 
 #[tauri::command]
@@ -183,22 +145,5 @@ mod tests {
             "not_found"
         );
         assert!(list_all(&conn).unwrap().is_empty());
-    }
-
-    #[test]
-    fn summaries_have_a_flat_excerpt() {
-        let conn = mem();
-        save(
-            &conn,
-            &note(
-                0,
-                "Fonctions",
-                "## Définition\n\n- La fonction carré\n> citation",
-            ),
-        )
-        .unwrap();
-        let s = list_summaries(&conn).unwrap();
-        assert_eq!(s[0].excerpt, "Définition La fonction carré citation");
-        assert_eq!(excerpt(&"a".repeat(200)).chars().count(), 161);
     }
 }
