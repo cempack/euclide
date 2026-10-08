@@ -548,7 +548,7 @@ function CommandPalette({
         ))}
         <span className="flex-1" />
         <span className="eu-t-caption flex items-center gap-1">
-          <span className="eu-kbd">↵</span>
+          <Kbd keys="enter" />
           {tr("palette.open")}
         </span>
       </div>

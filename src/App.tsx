@@ -32,6 +32,7 @@ import { Dialog } from "./ui/Dialog";
 import { FileText, Plus } from "lucide-react";
 import { Icon } from "./ui/Icon";
 import Dashboard from "./screens/Dashboard";
+import { Kbd } from "./ui/Kbd";
 
 // Only the dashboard ships in the startup bundle. Every other screen loads on
 // first use, and `prefetchScreens` warms them once the app is idle.
@@ -319,7 +320,7 @@ function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void })
         />
         <span className="flex-1" />
         <span className="eu-t-meta hidden sm:flex items-center gap-1.5">
-          <span className="eu-kbd">↵</span>
+          <Kbd keys="enter" />
           {tr("capture.save")}
         </span>
         <button type="button" onClick={onClose} className="eu-btn-quiet eu-btn-sm">

@@ -21,7 +21,8 @@ export function shortcutKeys(spec: string): string[] {
       case "ctrl":
         return isMac ? "⌃" : "Ctrl";
       case "enter":
-        return "↵";
+        // French keyboards print « Entrée » on it (and Plex has no ↵).
+        return isMac ? "↩" : "Entrée";
       case "esc":
         return "Échap";
       default:
