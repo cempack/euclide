@@ -594,9 +594,11 @@
     @apply inline-flex items-center gap-0.5 rounded border border-line bg-panel-alt p-0.5;
     height: var(--eu-control);
   }
+  /* Centred by flexbox, not by the engine: WebKitGTK puts a block glyph at
+     a button's left. */
   .eu-segment > button {
-    @apply h-full rounded-sm border border-transparent px-2.5 text-small font-medium text-ink-muted
-      transition-colors duration-fast hover:text-ink;
+    @apply h-full inline-flex items-center justify-center gap-1.5 rounded-sm border border-transparent px-2.5
+      text-small font-medium text-ink-muted transition-colors duration-fast hover:text-ink;
   }
   .eu-segment > button[aria-selected="true"],
   .eu-segment > button[aria-pressed="true"],
@@ -604,8 +606,12 @@
   .eu-segment > button.active {
     @apply bg-panel border-line text-ink shadow-raised;
   }
-  /* In a toolbar of small controls. */
+  /* In a toolbar of small controls; its options share one width, so the
+     chosen one sits in an even cell whichever it is. */
   .eu-segment-sm {
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     height: var(--eu-control-sm);
   }
   .eu-segment-sm > button {
