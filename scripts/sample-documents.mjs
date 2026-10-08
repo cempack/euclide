@@ -5,9 +5,11 @@
 //
 //   node scripts/sample-documents.mjs        (no dev server needed)
 //
-// Writes src/dev/fixtures/docs/<id>.pdf and src/dev/fixtures/thumbs/<id>.jpg
-// (page 1, 320 px wide, as the app's thumbnailer draws it).
-import { mkdirSync } from "node:fs";
+// Writes src/dev/fixtures/docs/<id>.pdf, src/dev/fixtures/thumbs/<id>.jpg
+// (page 1, 320 px wide, as the app's thumbnailer draws it) and
+// src/dev/fixtures/docs/text.json (their text, as the indexer reads it: what
+// the search finds inside them).
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -452,6 +454,7 @@ const browser = await chromium.launch(
   process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
 );
 const page = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+const text = {};
 
 for (const [id, body] of Object.entries(DOCS)) {
   await page.setViewportSize({ width: 794, height: 1123 });
@@ -465,6 +468,13 @@ for (const [id, body] of Object.entries(DOCS)) {
     printBackground: true,
     preferCSSPageSize: true,
   });
+  // The text, once printed: a box's tag stands apart from what follows it
+  // by a margin only, where a PDF reader reads a space.
+  const read = await page.evaluate(() => {
+    for (const tag of globalThis.document.querySelectorAll(".tag")) tag.append(" ");
+    return globalThis.document.body.innerText;
+  });
+  text[id] = read.replace(/\s+/g, " ").trim();
   // Page 1, 320 px wide: what the thumbnailer would keep.
   const small = await browser.newPage({
     viewport: { width: 794, height: 1123 },
@@ -496,4 +506,5 @@ for (const [id, html, w, h] of [
   await small.close();
   console.log("✓", id);
 }
+writeFileSync(resolve(docsDir, "text.json"), `${JSON.stringify(text, null, 2)}\n`);
 await browser.close();

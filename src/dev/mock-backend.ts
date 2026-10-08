@@ -12,6 +12,7 @@
  * Production builds never include this file (see `invoke` in lib/api.ts).
  */
 import samplePdf from "./fixtures/cours.pdf?url";
+import sampleText from "./fixtures/docs/text.json";
 import { serveDevFiles } from "../lib/api";
 import type {
   AppInfo,
@@ -659,6 +660,30 @@ function isoDay(d: Date): number {
   return day === 0 ? 7 : day;
 }
 
+/**
+ * About ten words around the first match, the matched word wrapped in
+ * \u0002 … \u0003 as FTS5's snippet() does (src-tauri/src/commands/search.rs).
+ */
+function excerpt(text: string, q: string): string {
+  const at = text.toLowerCase().indexOf(q);
+  if (at < 0) return "";
+  const letter = /[\p{L}\p{N}]/u;
+  let start = at;
+  while (start > 0 && letter.test(text[start - 1])) start--;
+  let end = at + q.length;
+  while (end < text.length && letter.test(text[end])) end++;
+  const before = text.slice(0, start).split(" ");
+  const after = text.slice(end).split(" ");
+  return (
+    `${before.length > 5 ? "…" : ""}${before.slice(-5).join(" ")}` +
+    `\u0002${text.slice(start, end)}\u0003` +
+    `${after.slice(0, 7).join(" ")}${after.length > 7 ? "…" : ""}`
+  );
+}
+
+/** What the indexer read in a sample document (scripts/sample-documents.mjs). */
+const docText = (f: FileItem) => (sampleText as Record<string, string>)[f.id] ?? "";
+
 function search(query: string): SearchResult[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -676,32 +701,30 @@ function search(query: string): SearchResult[] {
         file_kind: "",
       });
   }
-  for (const f of files) {
-    if (has(f.name))
-      out.push({
-        kind: "file",
-        id: f.id,
-        title: f.name,
-        subtitle: "Document",
-        snippet: "",
-        course_id: f.course_id,
-        file_kind: f.kind,
-      });
-  }
+  // Names first, then what the documents say: the backend ranks content
+  // hits below good name hits.
+  const named = files.filter((f) => has(f.name));
+  for (const f of [...named, ...files.filter((f) => !has(f.name) && has(docText(f)))])
+    out.push({
+      kind: "file",
+      id: f.id,
+      title: f.name,
+      subtitle: named.includes(f) ? "document" : "contenu",
+      snippet: named.includes(f) ? "" : excerpt(docText(f), q),
+      course_id: f.course_id,
+      file_kind: f.kind,
+    });
   for (const n of notes) {
-    if (has(n.title) || has(n.body)) {
-      const i = n.body.toLowerCase().indexOf(q);
-      const snippet = i >= 0 ? n.body.slice(Math.max(0, i - 30), i + 60) : "";
+    if (has(n.title) || has(n.body))
       out.push({
         kind: "note",
         id: n.id,
         title: n.title,
         subtitle: "Note",
-        snippet,
+        snippet: excerpt(n.body, q),
         course_id: n.course_id,
         file_kind: "",
       });
-    }
   }
   return out.slice(0, 20);
 }
