@@ -14,7 +14,7 @@
     "app:build": "tauri build",
     "app:build:usb": "tauri build --config src-tauri/tauri.usb.conf.json",
     "shots": "playwright test",
-    "shots:update": "playwright test --update-snapshots",
+    "shots:update": "playwright test --update-snapshots=all",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "eslint . --max-warnings 0 && node scripts/design-lint.mjs",
     "format": "prettier --write .",
