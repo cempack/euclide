@@ -4,7 +4,7 @@ import { q } from "../api/queries";
 import { ArrowUpCircle, Coffee } from "lucide-react";
 import type { AppInfo, ScheduleEntry } from "../lib/api";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../lib/format";
-import { tr } from "../lib/i18n";
+import { tr, trn } from "../lib/i18n";
 import { tabs, useMaxTabs, useTabsStore } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
@@ -18,11 +18,15 @@ import { useInstallUpdate } from "../stores/update";
  * every screen instead of only from the dashboard.
  */
 const NONE: ScheduleEntry[] = [];
+/** The theme item cycles: automatic, light, dark. */
+const NEXT_THEME = { auto: "light", light: "dark", dark: "auto" } as const;
+const openSettings = (section: string) =>
+  tabs.open({ kind: "settings", params: { section, sectionAt: Date.now() } });
 
 export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | null }) {
   const tabCount = useTabsStore((s) => s.tabs.length);
   const maxTabs = useMaxTabs();
-  const { resolved, pref } = useAppearance();
+  const { resolved, pref, setPref } = useAppearance();
   const classes = useQuery(q.todayClasses()).data ?? NONE;
   const pronote = useQuery(q.pronoteStatus()).data ?? null;
   const keepAwake = useQuery(q.keepAwake()).data ?? false;
@@ -64,14 +68,16 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
               : focus.entry.start_time}
         </button>
       ) : (
-        <span className="eu-status-item">{tr("status.noClass")}</span>
+        <span className="eu-status-item">
+          {classes.length > 0 ? tr("status.noMoreClass") : tr("status.noClassToday")}
+        </span>
       )}
 
       <StatusTimerChip />
 
       <button
         type="button"
-        onClick={() => tabs.open({ kind: "settings" })}
+        onClick={() => openSettings("pronote")}
         {...tip(tr("status.pronoteHint"))}
         data-tip-place="top"
         className="eu-status-item eu-status-button"
@@ -93,9 +99,12 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
 
       <span className="flex-1" />
 
-      <span className="eu-status-item eu-status-end hidden lg:flex">
-        {tabCount}
-        {maxTabs > 0 ? ` / ${maxTabs}` : ""} {tr("status.tabs")}
+      <span
+        className="eu-status-item eu-status-end hidden lg:flex"
+        {...(maxTabs > 0 ? tip(tr("status.tabLimit", { max: maxTabs })) : {})}
+        data-tip-place="top"
+      >
+        {trn("status.tabCount", tabCount)}
       </span>
       <span
         className="eu-status-item eu-status-end hidden xl:flex max-w-[19rem] selectable"
@@ -104,8 +113,24 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
       >
         <span className="truncate">{info?.data_dir}</span>
       </span>
-      <span className="eu-status-item eu-status-end hidden md:flex">{themeLabel}</span>
-      <span className="eu-status-item eu-status-end">v{info?.version ?? "…"}</span>
+      <button
+        type="button"
+        onClick={() => setPref(NEXT_THEME[pref])}
+        {...tip(tr("status.themeHint"))}
+        data-tip-place="top"
+        className="eu-status-item eu-status-end eu-status-button hidden md:flex"
+      >
+        {themeLabel}
+      </button>
+      <button
+        type="button"
+        onClick={() => openSettings("a-propos")}
+        {...tip(tr("status.aboutHint"))}
+        data-tip-place="top"
+        className="eu-status-item eu-status-end eu-status-button"
+      >
+        v{info?.version ?? "…"}
+      </button>
     </footer>
   );
 });

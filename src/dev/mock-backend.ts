@@ -5,7 +5,9 @@
  * The data is a realistic week of a maths/NSI teacher, built relative to the
  * current time so « aujourd'hui », « demain » and « en retard » always mean
  * something. Writes change the in-memory store so screens can be exercised.
- * Add `?empty` to the URL to start from an empty library instead.
+ * Add `?empty` to the URL to start from an empty library instead, or
+ * `?sparse` for a teacher's first days: one class today, already over, and
+ * no reminders or links yet.
  *
  * Production builds never include this file (see `invoke` in lib/api.ts).
  */
@@ -33,7 +35,9 @@ import type {
 type Args = Record<string, unknown> | undefined;
 
 const now = new Date();
-const empty = typeof location !== "undefined" && new URLSearchParams(location.search).has("empty");
+const flags = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+const empty = flags.has("empty");
+const sparse = flags.has("sparse");
 
 function addDays(days: number, hours?: number, minutes = 0): Date {
   const d = new Date(now);
@@ -522,6 +526,16 @@ if (empty) {
   pronote.connected = false;
   pronote.account_name = null;
   pronote.last_sync = null;
+}
+
+if (sparse) {
+  reminders.length = 0;
+  links.length = 0;
+  const today = now.getDay() === 0 ? 7 : now.getDay();
+  const end = Math.max(1, now.getHours() - 1);
+  const hour = (h: number) => `${String(h).padStart(2, "0")}:00`;
+  for (let i = schedule.length - 1; i >= 0; i--) if (schedule[i].day_of_week === today) schedule.splice(i, 1);
+  schedule.push(sched(99, today, hour(Math.max(0, end - 2)), hour(end), "MATHÉMATIQUES", "207"));
 }
 
 // ---------------------------------------------------------------------------

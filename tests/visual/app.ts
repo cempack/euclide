@@ -45,6 +45,15 @@ export async function nav(page: Page, label: string) {
 
 export const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }> = [
   { name: "dashboard", go: async () => {} },
+  {
+    // A teacher's first days: one class, already over; no reminders or links yet.
+    name: "dashboard-sparse",
+    go: async (p) => {
+      await p.goto("/?sparse");
+      await p.waitForLoadState("networkidle");
+      await settle(p);
+    },
+  },
   { name: "courses", go: (p) => nav(p, "Cours") },
   {
     name: "course-detail",

@@ -33,6 +33,9 @@ export interface TabParams {
   /** Python: a script to open (its file name), and when it was asked for. */
   script?: string;
   scriptAt?: number;
+  /** Settings: the section to show, and when it was asked for. */
+  section?: string;
+  sectionAt?: number;
 }
 
 export interface Tab {
