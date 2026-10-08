@@ -18,24 +18,25 @@ import { Kbd } from "../ui/Kbd";
 import { keysOf } from "../lib/keymap";
 
 import {
-  BellIcon,
-  BookIcon,
-  ClockIcon,
-  CoffeeIcon,
-  CodeIcon,
-  DocIcon,
-  GearIcon,
-  HelpIcon,
-  HomeIcon,
-  LinkIcon,
-  NoteIcon,
-  PenIcon,
-  PlusIcon,
-  ProjectorIcon,
-  SearchIcon,
-  SparkleIcon,
-  ToolIcon,
-} from "./icons";
+  Bell,
+  BookOpen,
+  CircleHelp,
+  Clock,
+  CodeXml,
+  Coffee,
+  FileText,
+  House,
+  Link,
+  NotebookPen,
+  PenLine,
+  Plus,
+  Projector,
+  Search as SearchGlyph,
+  Settings,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
+import { Icon } from "../ui/Icon";
 
 const NO_LINKS: QuickLink[] = [];
 const NO_RESULTS: SearchResult[] = [];
@@ -156,7 +157,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.dashboard"),
         aliases: cmdAliases("dashboard"),
-        icon: <HomeIcon className="w-4 h-4" />,
+        icon: <Icon icon={House} size={16} />,
         run: go("dashboard"),
       },
       {
@@ -164,7 +165,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.courses"),
         aliases: cmdAliases("courses"),
-        icon: <BookIcon className="w-4 h-4" />,
+        icon: <Icon icon={BookOpen} size={16} />,
         run: go("courses"),
       },
       {
@@ -172,7 +173,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.documents"),
         aliases: cmdAliases("documents"),
-        icon: <DocIcon className="w-4 h-4" />,
+        icon: <Icon icon={FileText} size={16} />,
         run: go("documents"),
       },
       {
@@ -180,7 +181,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.tools"),
         aliases: cmdAliases("tools"),
-        icon: <ToolIcon className="w-4 h-4" />,
+        icon: <Icon icon={Wrench} size={16} />,
         run: go("tools"),
       },
       {
@@ -188,7 +189,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.python"),
         aliases: cmdAliases("python"),
-        icon: <CodeIcon className="w-4 h-4" />,
+        icon: <Icon icon={CodeXml} size={16} />,
         run: go("python"),
       },
       {
@@ -196,7 +197,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.reminders"),
         aliases: cmdAliases("reminders"),
-        icon: <BellIcon className="w-4 h-4" />,
+        icon: <Icon icon={Bell} size={16} />,
         run: go("reminders"),
       },
       {
@@ -205,7 +206,7 @@ function CommandPalette({
         label: tr("nav.whiteboard"),
         hint: tr("palette.new"),
         aliases: cmdAliases("whiteboard"),
-        icon: <PenIcon className="w-4 h-4" />,
+        icon: <Icon icon={PenLine} size={16} />,
         run: go("whiteboard", tr("app.tabWhiteboard"), { isNew: true }),
       },
       {
@@ -214,7 +215,7 @@ function CommandPalette({
         label: tr("common.newNote"),
         hint: tr("palette.new"),
         aliases: cmdAliases("note"),
-        icon: <NoteIcon className="w-4 h-4" />,
+        icon: <Icon icon={NotebookPen} size={16} />,
         keys: keysOf("newNote"),
         run: go("note", tr("common.newNote"), { isNew: true }),
       },
@@ -223,7 +224,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.recap"),
         aliases: cmdAliases("recap"),
-        icon: <SparkleIcon className="w-4 h-4" />,
+        icon: <Icon icon={Sparkles} size={16} />,
         run: go("recap", tr("nav.recap")),
       },
       {
@@ -231,7 +232,7 @@ function CommandPalette({
         group: G,
         label: tr("nav.settings"),
         aliases: cmdAliases("settings"),
-        icon: <GearIcon className="w-4 h-4" />,
+        icon: <Icon icon={Settings} size={16} />,
         keys: keysOf("settings"),
         run: go("settings"),
       },
@@ -240,7 +241,7 @@ function CommandPalette({
         group: G,
         label: tr("app.shortcutsTitle"),
         aliases: cmdAliases("help"),
-        icon: <HelpIcon className="w-4 h-4" />,
+        icon: <Icon icon={CircleHelp} size={16} />,
         run: () => {
           onHelp();
           onClose();
@@ -252,7 +253,7 @@ function CommandPalette({
         label: tr("tools.keepAwake"),
         hint: keepAwake == null ? undefined : keepAwake ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"),
         aliases: cmdAliases("keepAwake"),
-        icon: <CoffeeIcon className="w-4 h-4" />,
+        icon: <Icon icon={Coffee} size={16} />,
         run: () => {
           void (async () => {
             try {
@@ -275,7 +276,7 @@ function CommandPalette({
         label: tr("appearance.projection"),
         hint: projection ? tr("common.active") : tr("common.enable"),
         aliases: cmdAliases("projection"),
-        icon: <ProjectorIcon className="w-4 h-4" />,
+        icon: <Icon icon={Projector} size={16} />,
         run: () => {
           toggleProjection();
           onClose();
@@ -286,7 +287,7 @@ function CommandPalette({
         group: G,
         label: tr("capture.title"),
         aliases: cmdAliases("capture"),
-        icon: <PlusIcon className="w-4 h-4" />,
+        icon: <Icon icon={Plus} size={16} />,
         keys: keysOf("capture"),
         run: () => {
           onClose();
@@ -300,7 +301,7 @@ function CommandPalette({
       group: G,
       label: tr("scene.open"),
       aliases: [...cmdAliases("timer"), "horloge", "plein écran", "projecteur"],
-      icon: <ClockIcon className="w-4 h-4" />,
+      icon: <Icon icon={Clock} size={16} />,
       keys: keysOf("scene"),
       run: () => {
         scene.open();
@@ -314,7 +315,7 @@ function CommandPalette({
         group: G,
         label: `${timerTitle} · ${tr("tools.timerMinutes", { count: minutes })}`,
         aliases: [...cmdAliases("timer"), String(minutes), `${minutes}min`],
-        icon: <ClockIcon className="w-4 h-4" />,
+        icon: <Icon icon={Clock} size={16} />,
         run: startTimer(minutes),
       });
     }
@@ -325,7 +326,7 @@ function CommandPalette({
       group: linkGroup,
       label: tr("palette.manageLinks"),
       aliases: cmdAliases("links"),
-      icon: <LinkIcon className="w-4 h-4" />,
+      icon: <Icon icon={Link} size={16} />,
       run: go("tools"),
     });
     for (const link of links) {
@@ -335,7 +336,7 @@ function CommandPalette({
         label: link.label,
         hint: link.url,
         aliases: [...cmdAliases("links"), link.url],
-        icon: <LinkIcon className="w-4 h-4" />,
+        icon: <Icon icon={Link} size={16} />,
         run: () => {
           api.openUrl(link.url).catch((err) => {
             reportError("palette.openUrl", err);
@@ -357,7 +358,7 @@ function CommandPalette({
           group: tr("palette.groupCourses"),
           label: r.title,
           hint: r.subtitle,
-          icon: <BookIcon className="w-4 h-4" />,
+          icon: <Icon icon={BookOpen} size={16} />,
           run: () => {
             tabs.open({ kind: "course", title: r.title, params: { courseId: r.id } });
             onClose();
@@ -369,7 +370,7 @@ function CommandPalette({
           group: tr("palette.groupDocs"),
           label: r.title || tr("notes.newTitle"),
           hint: tr("documents.noteKind"),
-          icon: <NoteIcon className="w-4 h-4" />,
+          icon: <Icon icon={NotebookPen} size={16} />,
           run: () => {
             tabs.open({
               kind: "note",
@@ -385,7 +386,7 @@ function CommandPalette({
         label: r.title,
         hint: r.subtitle,
         snippet: r.snippet || undefined,
-        icon: <DocIcon className="w-4 h-4" />,
+        icon: <Icon icon={FileText} size={16} />,
         run: () => {
           openFile({ id: r.id, name: r.title, kind: r.file_kind ?? "file" });
           onClose();
@@ -402,7 +403,7 @@ function CommandPalette({
         group: tr("palette.groupRecent"),
         label: f.name,
         hint: tr("palette.recentHint"),
-        icon: <DocIcon className="w-4 h-4" />,
+        icon: <Icon icon={FileText} size={16} />,
         run: () => {
           openFile({ ...f, courseId: f.course_id });
           onClose();
@@ -479,7 +480,7 @@ function CommandPalette({
     >
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line">
         {scope === "all" ? (
-          <SearchIcon className="w-4 h-4 text-ink-faint shrink-0" />
+          <Icon icon={SearchGlyph} size={16} className="text-ink-faint shrink-0" />
         ) : (
           <span className="font-mono text-body font-semibold text-accent shrink-0 w-4 text-center">
             {query.charAt(0)}

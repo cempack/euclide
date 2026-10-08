@@ -3,7 +3,7 @@ import type { Course, CourseClass, ScheduleEntry, Sequence, SequenceItem } from 
 import { courseVisual } from "../../lib/color";
 import { classProgress, humanMinutes, minutesRemaining, minutesUntil } from "../../lib/format";
 import { tr } from "../../lib/i18n";
-import { BookIcon, LayersIcon, PenIcon, PlayIcon } from "../../components/icons";
+import { BookOpen, Layers, PenLine, Play as PlayGlyph } from "lucide-react";
 import { COURSE_ICONS } from "../../components/ui";
 import { Icon } from "../../ui/Icon";
 import { MenuButton } from "../../ui/Menu";
@@ -57,7 +57,7 @@ export function NowCard({
   const remaining = state === "current" ? minutesRemaining(entry, now) : null;
   const until = state === "next" ? minutesUntil(entry.start_time, now) : null;
   const progress = state === "current" ? classProgress(entry, now) : 0;
-  const CourseGlyph = COURSE_ICONS.find((i) => i.key === (course?.emoji || "book"))?.Icon ?? BookIcon;
+  const CourseGlyph = COURSE_ICONS.find((i) => i.key === (course?.emoji || "book"))?.Icon ?? BookOpen;
   const group = groupOf(entry.subject);
 
   const step = course && courseClass ? currentStep(steps, courseClass) : undefined;
@@ -81,12 +81,12 @@ export function NowCard({
         className="eu-btn-primary eu-btn-sm"
         items={courses.map((c) => ({ label: c.name, onSelect: () => actions.attachClass(c, group) }))}
       >
-        <LayersIcon className="w-3.5 h-3.5" />
+        <Icon icon={Layers} size={14} />
         {tr("dashboard.linkCourse")}
       </MenuButton>
     ) : (
       <button className="eu-btn-ghost eu-btn-sm" onClick={actions.openContent}>
-        <LayersIcon className="w-3.5 h-3.5" />
+        <Icon icon={Layers} size={14} />
         {tr("dashboard.linkCourse")}
       </button>
     );
@@ -111,14 +111,14 @@ export function NowCard({
   } else if (resumeFile) {
     primary = (
       <button className="eu-btn-primary eu-btn-sm" onClick={() => actions.resumeFile(resumeFile)}>
-        <PlayIcon className="w-3.5 h-3.5" />
+        <Icon icon={PlayGlyph} size={14} />
         <span className="truncate max-w-[26ch]">{tr("dashboard.resumeFile", { name: resumeFile.name })}</span>
       </button>
     );
   } else {
     primary = (
       <button className="eu-btn-ghost eu-btn-sm" onClick={() => actions.openCourse(course)}>
-        <LayersIcon className="w-3.5 h-3.5" />
+        <Icon icon={Layers} size={14} />
         {step ? tr("lesson.prepare") : tr("lesson.prepareProgression")}
       </button>
     );
@@ -208,12 +208,12 @@ export function NowCard({
           )}
           {course && (
             <button className="eu-btn-ghost eu-btn-sm" onClick={actions.openContent}>
-              <BookIcon className="w-3.5 h-3.5" />
+              <Icon icon={BookOpen} size={14} />
               {tr("dashboard.openContent")}
             </button>
           )}
           <button className="eu-btn-ghost eu-btn-sm" onClick={actions.openBoard}>
-            <PenIcon className="w-3.5 h-3.5" />
+            <Icon icon={PenLine} size={14} />
             {tr("nav.whiteboard")}
           </button>
         </div>

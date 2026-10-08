@@ -4,20 +4,21 @@ import { q } from "../api/queries";
 import type { RecapData } from "../lib/api";
 import { get, tr, trn } from "../lib/i18n";
 import {
-  BookIcon,
-  ClockIcon,
-  DocIcon,
-  FileIcon,
-  GearIcon,
-  HomeIcon,
-  PenIcon,
-  PlayIcon,
-  CheckIcon,
-  SparkleIcon,
-  ToolIcon,
-  CodeIcon,
-  BellIcon,
-} from "../components/icons";
+  Bell,
+  BookOpen,
+  Check,
+  Clock,
+  CodeXml,
+  File,
+  FileText,
+  House,
+  PenLine,
+  Play,
+  Settings,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
+import { Icon } from "../ui/Icon";
 import { EmptyState, Loading } from "../components/ui";
 import { MetaDot, PageHeader, Panel, Segmented, StatTile } from "../components/layout";
 import { humanMinutes } from "../lib/format";
@@ -76,22 +77,22 @@ export default function Recap() {
   const stats = data
     ? [
         {
-          icon: <FileIcon className="w-5 h-5" />,
+          icon: <Icon icon={File} size={20} />,
           value: data.files_opened,
           label: tr("recap.stats.filesOpened"),
         },
         {
-          icon: <PenIcon className="w-5 h-5" />,
+          icon: <Icon icon={PenLine} size={20} />,
           value: data.notes_written,
           label: tr("recap.stats.notesWritten"),
         },
         {
-          icon: <PlayIcon className="w-5 h-5" />,
+          icon: <Icon icon={Play} size={20} />,
           value: data.demos_run,
           label: tr("recap.stats.demosRun"),
         },
         {
-          icon: <CheckIcon className="w-5 h-5" />,
+          icon: <Icon icon={Check} size={20} />,
           value: data.reminders_done,
           label: tr("recap.stats.remindersDone"),
         },
@@ -102,26 +103,26 @@ export default function Recap() {
 
   // Where the time went, by screen (tab kinds, plus « app » for the rest).
   const AREA_ICONS: Record<string, React.ReactNode> = {
-    dashboard: <HomeIcon className="w-4 h-4" />,
-    courses: <BookIcon className="w-4 h-4" />,
-    course: <BookIcon className="w-4 h-4" />,
-    "class-content": <BookIcon className="w-4 h-4" />,
-    documents: <DocIcon className="w-4 h-4" />,
-    tools: <ToolIcon className="w-4 h-4" />,
-    recap: <SparkleIcon className="w-4 h-4" />,
-    python: <CodeIcon className="w-4 h-4" />,
-    whiteboard: <PenIcon className="w-4 h-4" />,
-    pdf: <DocIcon className="w-4 h-4" />,
-    note: <PenIcon className="w-4 h-4" />,
-    reminders: <BellIcon className="w-4 h-4" />,
-    settings: <GearIcon className="w-4 h-4" />,
+    dashboard: <Icon icon={House} size={16} />,
+    courses: <Icon icon={BookOpen} size={16} />,
+    course: <Icon icon={BookOpen} size={16} />,
+    "class-content": <Icon icon={BookOpen} size={16} />,
+    documents: <Icon icon={FileText} size={16} />,
+    tools: <Icon icon={Wrench} size={16} />,
+    recap: <Icon icon={Sparkles} size={16} />,
+    python: <Icon icon={CodeXml} size={16} />,
+    whiteboard: <Icon icon={PenLine} size={16} />,
+    pdf: <Icon icon={FileText} size={16} />,
+    note: <Icon icon={PenLine} size={16} />,
+    reminders: <Icon icon={Bell} size={16} />,
+    settings: <Icon icon={Settings} size={16} />,
   };
   const timeByArea = (data?.time_by_area || []).map((a) => ({
     key: a.name,
     label:
       a.name in AREA_ICONS || a.name === "app" ? (get(`recap.areas.${a.name}`, a.name) as string) : a.name,
     minutes: a.count,
-    icon: AREA_ICONS[a.name] ?? <ClockIcon className="w-4 h-4" />,
+    icon: AREA_ICONS[a.name] ?? <Icon icon={Clock} size={16} />,
   }));
   const totalAreaMinutes =
     timeByArea.reduce((sum: number, a: { minutes: number }) => sum + a.minutes, 0) || 1;
@@ -159,7 +160,7 @@ export default function Recap() {
     <>
       <PageHeader
         title={tr("nav.recap")}
-        icon={<SparkleIcon className="w-5 h-5" />}
+        icon={<Icon icon={Sparkles} size={20} />}
         meta={
           <>
             <span>{PERIOD_LABELS[period]}</span>
@@ -191,7 +192,7 @@ export default function Recap() {
           <div className="eu-panel eu-recap-stats">
             <div className="eu-recap-hero">
               <span className="eu-t-label flex items-center gap-1.5">
-                <ClockIcon className="w-3.5 h-3.5" />
+                <Icon icon={Clock} size={14} />
                 {tr("recap.activityTime")}
               </span>
               <span className="eu-recap-time">{humanMinutes(totalMin)}</span>
@@ -220,7 +221,7 @@ export default function Recap() {
             rows={(data?.top_courses || []).map((c) => ({
               key: c.name,
               label: c.name,
-              icon: <BookIcon className="w-4 h-4" />,
+              icon: <Icon icon={BookOpen} size={16} />,
               value: c.count,
               text: humanMinutes(c.count),
             }))}
@@ -232,7 +233,7 @@ export default function Recap() {
             rows={(data?.top_documents || []).map((d) => ({
               key: d.name,
               label: d.name,
-              icon: <DocIcon className="w-4 h-4" />,
+              icon: <Icon icon={FileText} size={16} />,
               value: d.count,
               text: trn("recap.opens", d.count),
             }))}
@@ -244,14 +245,14 @@ export default function Recap() {
             rows={(data?.top_tools || []).map((tool) => ({
               key: tool.name,
               label: tool.name,
-              icon: <ToolIcon className="w-4 h-4" />,
+              icon: <Icon icon={Wrench} size={16} />,
               value: tool.count,
               text: trn("recap.uses", tool.count),
             }))}
           />
 
           {totalMin > 0 && highlights.length > 0 && (
-            <Panel title={tr("recap.highlights")} icon={<SparkleIcon className="w-4 h-4" />}>
+            <Panel title={tr("recap.highlights")} icon={<Icon icon={Sparkles} size={16} />}>
               <ul className="eu-divide">
                 {highlights.map((h, i) => (
                   <li key={i} className="eu-row eu-t-body text-ink">
@@ -265,7 +266,7 @@ export default function Recap() {
           {(!data || totalMin === 0) && (
             <Panel>
               <EmptyState
-                icon={<ClockIcon className="w-4 h-4" />}
+                icon={<Icon icon={Clock} size={16} />}
                 title={tr("recap.noDataTitle")}
                 hint={tr("recap.noData")}
               />

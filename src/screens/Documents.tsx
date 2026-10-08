@@ -18,15 +18,8 @@ import { q } from "../api/queries";
 import { Icon } from "../ui/Icon";
 import { Highlight } from "../ui/Highlight";
 import { tip } from "../ui/Tooltip";
-import {
-  DocIcon,
-  FileKindIcon,
-  NoteIcon,
-  PenIcon,
-  PlusIcon,
-  SearchIcon,
-  TrashIcon,
-} from "../components/icons";
+import { FileText, NotebookPen, PenLine, Plus, Search, Trash2 } from "lucide-react";
+import { FileKindIcon } from "../ui/FileKindIcon";
 
 /** Stable empty lists while a query loads, so memos hold. */
 const NO_FILES: FileItem[] = [];
@@ -137,7 +130,7 @@ function ItemIcon({ it }: { it: DocItem }) {
   return it.t === "file" ? (
     <FileKindIcon kind={it.f.kind} className="w-4 h-4" />
   ) : (
-    <NoteIcon className="w-4 h-4" />
+    <Icon icon={NotebookPen} size={16} />
   );
 }
 
@@ -154,7 +147,7 @@ function RowTools({ it, actions }: { it: DocItem; actions: ItemActions }) {
         {...tip(tr("common.rename"), "F2")}
         className="eu-btn-quiet eu-btn-icon eu-btn-sm"
       >
-        <PenIcon className="w-3.5 h-3.5" />
+        <Icon icon={PenLine} size={14} />
       </button>
       <button
         type="button"
@@ -164,7 +157,7 @@ function RowTools({ it, actions }: { it: DocItem; actions: ItemActions }) {
         {...tip(tr("common.delete"), "Suppr")}
         className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
       >
-        <TrashIcon className="w-3.5 h-3.5" />
+        <Icon icon={Trash2} size={14} />
       </button>
     </span>
   );
@@ -253,7 +246,7 @@ const DocCard = memo(function DocCard({
             {it.t === "file" ? (
               <FileKindIcon kind={it.f.kind} className="w-7 h-7" />
             ) : (
-              <NoteIcon className="w-7 h-7" />
+              <Icon icon={NotebookPen} size={20} className="w-7 h-7" />
             )}
           </span>
         )}
@@ -537,10 +530,10 @@ export default function Documents({
               }
               className="eu-btn-ghost eu-btn-sm"
             >
-              <NoteIcon className="w-3.5 h-3.5" /> {tr("common.newNote")}
+              <Icon icon={NotebookPen} size={14} /> {tr("common.newNote")}
             </button>
             <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
-              <PlusIcon className="w-3.5 h-3.5" /> {tr("common.importFiles")}
+              <Icon icon={Plus} size={14} /> {tr("common.importFiles")}
             </button>
           </>
         }
@@ -562,7 +555,11 @@ export default function Documents({
               }}
               aria-label={tr("common.search")}
             />
-            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
+            <Icon
+              icon={Search}
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
+            />
             {(search.trim() || filter.kind !== "all") && (
               <button
                 onClick={() => {
@@ -655,7 +652,7 @@ export default function Documents({
                 >
                   <span className="flex items-center gap-2.5 min-w-0">
                     {h.kind === "note" ? (
-                      <NoteIcon className="w-4 h-4 shrink-0" />
+                      <Icon icon={NotebookPen} size={16} className="shrink-0" />
                     ) : (
                       <FileKindIcon kind={h.file_kind} className="w-4 h-4 shrink-0" />
                     )}
@@ -675,7 +672,7 @@ export default function Documents({
       {count === 0 ? (
         <Panel>
           <EmptyState
-            icon={<DocIcon className="w-4 h-4" />}
+            icon={<Icon icon={FileText} size={16} />}
             title={
               search.trim() || filter.kind !== "all" ? tr("documents.noResult") : tr("documents.nothingHere")
             }
@@ -686,7 +683,7 @@ export default function Documents({
             }
             action={
               <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.importFiles")}
+                <Icon icon={Plus} size={14} /> {tr("common.importFiles")}
               </button>
             }
           />

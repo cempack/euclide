@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Code2, Link2, NotebookPen, Plus, Search } from "lucide-react";
 import { q } from "../../api/queries";
 import { Segmented } from "../../components/layout";
-import { FileKindIcon } from "../../components/icons";
+import { FileKindIcon } from "../../ui/FileKindIcon";
 import { Modal, useToast } from "../../components/ui";
 import { api, type ResourceKind, type SequenceItem, type StepResource } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";

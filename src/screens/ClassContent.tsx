@@ -6,7 +6,7 @@ import { EmptyState, Loading, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel } from "../components/layout";
 import { tr, trn } from "../lib/i18n";
 import { logged } from "../lib/report";
-import { BookIcon, DocIcon, RefreshIcon } from "../components/icons";
+import { BookOpen, FileText, RefreshCw } from "lucide-react";
 import { Copy } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { matiereMatches } from "../features/classroom/lesson";
@@ -144,7 +144,7 @@ export default function ClassContent({
           if (selfId) tabs.close(selfId);
         }}
         backLabel={course?.name || tr("classContent.back")}
-        icon={<BookIcon className="w-5 h-5" />}
+        icon={<Icon icon={BookOpen} size={20} />}
         title={tr("classContent.title", { class: className })}
         meta={
           <>
@@ -173,7 +173,11 @@ export default function ClassContent({
             className="eu-btn-ghost eu-btn-sm"
             disabled={loading || isRefreshing}
           >
-            <RefreshIcon className={`w-3.5 h-3.5 ${loading || isRefreshing ? "animate-spin" : ""}`} />
+            <Icon
+              icon={RefreshCw}
+              size={20}
+              className={`w-3.5 h-3.5 ${loading || isRefreshing ? "animate-spin" : ""}`}
+            />
             {loading || isRefreshing ? tr("classContent.refreshing") : tr("classContent.refresh")}
           </button>
         }
@@ -202,12 +206,12 @@ export default function ClassContent({
       ) : contents.length === 0 && !error ? (
         <Panel>
           <EmptyState
-            icon={<BookIcon className="w-4 h-4" />}
+            icon={<Icon icon={BookOpen} size={16} />}
             title={tr("classContent.noContent")}
             hint={tr("classContent.noContentHint", { class: className, matiere: effectiveMatiere })}
             action={
               <button onClick={refreshContents} className="eu-btn-ghost eu-btn-sm">
-                <RefreshIcon className="w-3.5 h-3.5" />
+                <Icon icon={RefreshCw} size={14} />
                 {tr("classContent.refresh")}
               </button>
             }
@@ -255,12 +259,12 @@ export default function ClassContent({
                                   onClick={() => api.openUrl(d.url!).catch(logged("classContent.openUrl"))}
                                   data-tip={tr("classContent.openInBrowser")}
                                 >
-                                  <DocIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" />
+                                  <Icon icon={FileText} size={14} className="shrink-0 text-ink-faint" />
                                   <span className="truncate">{d.name}</span>
                                 </button>
                               ) : (
                                 <span className="eu-resource-open">
-                                  <DocIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" />
+                                  <Icon icon={FileText} size={14} className="shrink-0 text-ink-faint" />
                                   <span className="truncate">{d.name}</span>
                                 </span>
                               )}

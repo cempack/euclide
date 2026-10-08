@@ -13,15 +13,9 @@ import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { Progression } from "../features/classroom/Progression";
 import { useAppearance } from "../lib/theme";
-import {
-  BookIcon,
-  FileIcon,
-  FileKindIcon,
-  LayersIcon,
-  PenIcon,
-  PlusIcon,
-  TrashIcon,
-} from "../components/icons";
+import { BookOpen, File, Layers, PenLine, Plus, Trash2 } from "lucide-react";
+import { Icon } from "../ui/Icon";
+import { FileKindIcon } from "../ui/FileKindIcon";
 
 // TTL cache for pronoteClasses (avoids sidecar + login on every open)
 // on every single course tab open; the list changes rarely).
@@ -216,7 +210,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   }
 
   const visual = courseVisual(course.color, resolved === "dark");
-  const CourseIcon = COURSE_ICONS.find((i) => i.key === (course.emoji || "book"))?.Icon ?? BookIcon;
+  const CourseIcon = COURSE_ICONS.find((i) => i.key === (course.emoji || "book"))?.Icon ?? BookOpen;
 
   return (
     <>
@@ -280,7 +274,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
               data-tip={tr("courseDetail.deleteCourse", { name: course.name })}
               className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
             >
-              <TrashIcon className="w-4 h-4" />
+              <Icon icon={Trash2} size={16} />
             </button>
           </>
         }
@@ -310,10 +304,10 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       {section === "files" && (
         <Panel
           title={tr("courseDetail.lockerTitle")}
-          icon={<FileIcon className="w-3.5 h-3.5" />}
+          icon={<Icon icon={File} size={14} />}
           action={
             <button onClick={openAttachModal} className="eu-btn-quiet eu-btn-sm">
-              <PlusIcon className="w-3.5 h-3.5" /> {tr("courseDetail.importToLocker")}
+              <Icon icon={Plus} size={14} /> {tr("courseDetail.importToLocker")}
             </button>
           }
         >
@@ -332,7 +326,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       {section === "notes" && (
         <Panel
           title={tr("courseDetail.courseNotesHeader")}
-          icon={<PenIcon className="w-3.5 h-3.5" />}
+          icon={<Icon icon={PenLine} size={14} />}
           action={
             <button
               onClick={() =>
@@ -344,13 +338,13 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
               }
               className="eu-btn-quiet eu-btn-sm"
             >
-              <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newNote")}
+              <Icon icon={Plus} size={14} /> {tr("common.newNote")}
             </button>
           }
         >
           {notes.length === 0 ? (
             <EmptyState
-              icon={<PenIcon className="w-4 h-4" />}
+              icon={<Icon icon={PenLine} size={16} />}
               title={tr("courseDetail.noNotesTitle")}
               hint={tr("courseDetail.noNotesHint")}
               action={
@@ -364,7 +358,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                   }
                   className="eu-btn-primary eu-btn-sm"
                 >
-                  <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newNote")}
+                  <Icon icon={Plus} size={14} /> {tr("common.newNote")}
                 </button>
               }
             />
@@ -378,7 +372,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                   }
                   className="eu-row-hover w-full text-left"
                 >
-                  <PenIcon className="w-4 h-4 text-ink-faint shrink-0" />
+                  <Icon icon={PenLine} size={16} className="text-ink-faint shrink-0" />
                   <span className="eu-t-body text-ink truncate flex-1">
                     {n.title || tr("courseDetail.noTitle")}
                   </span>
@@ -392,7 +386,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
 
       {/* Classes attachées + système de progression + notes prof par classe */}
       {section === "classes" && (
-        <Panel title={tr("courseDetail.attachedClassesHeader")} icon={<BookIcon className="w-3.5 h-3.5" />}>
+        <Panel title={tr("courseDetail.attachedClassesHeader")} icon={<Icon icon={BookOpen} size={14} />}>
           <div className="eu-panel-pad flex flex-col gap-4">
             <div className="flex gap-2">
               {availablePronoteClasses.length > 0 ? (
@@ -430,14 +424,14 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                 onClick={attachClass}
                 disabled={availablePronoteClasses.length > 0 ? !selectedPronoteClass : !newClassName.trim()}
               >
-                <PlusIcon className="w-3.5 h-3.5" />
+                <Icon icon={Plus} size={14} />
                 {tr("courseDetail.attach")}
               </button>
             </div>
 
             {courseClasses.length === 0 ? (
               <EmptyState
-                icon={<BookIcon className="w-4 h-4" />}
+                icon={<Icon icon={BookOpen} size={16} />}
                 title={tr("courseDetail.noClassesAttachedTitle")}
                 hint={tr("courseDetail.noClassesAttachedHint")}
               />
@@ -534,12 +528,12 @@ function FilesPane({
   if (files.length === 0) {
     return (
       <EmptyState
-        icon={<FileIcon className="w-4 h-4" />}
+        icon={<Icon icon={File} size={16} />}
         title={tr("courseDetail.noFilesTitle")}
         hint={tr("courseDetail.noFilesHint")}
         action={
           <button onClick={onAttach} className="eu-btn-primary eu-btn-sm">
-            <PlusIcon className="w-3.5 h-3.5" />
+            <Icon icon={Plus} size={14} />
             {tr("courseDetail.importToLocker")}
           </button>
         }
@@ -587,7 +581,7 @@ function FilesPane({
             data-tip={tr("common.delete")}
             className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
           >
-            <TrashIcon className="w-3.5 h-3.5" />
+            <Icon icon={Trash2} size={14} />
           </button>
         </div>
       ))}
@@ -675,14 +669,14 @@ function ClassCard({
           data-tip={tr("courseDetail.detachTitle")}
           className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger shrink-0"
         >
-          <TrashIcon className="w-3.5 h-3.5" />
+          <Icon icon={Trash2} size={14} />
         </button>
       </div>
 
       {/* Progression: which step of the course, and which document. */}
       {cc.last_item_title && (
         <div className="flex items-center gap-2 min-w-0">
-          <LayersIcon className="w-3.5 h-3.5 text-ink-faint shrink-0" />
+          <Icon icon={Layers} size={14} className="text-ink-faint shrink-0" />
           <span className="eu-t-meta truncate">
             {cc.last_sequence_title ? `${cc.last_sequence_title} — ` : ""}
             <span className="text-ink">{cc.last_item_title}</span>
@@ -741,7 +735,7 @@ function ClassCard({
           className="eu-btn-ghost eu-btn-sm w-full"
           data-tip={tr("courseDetail.showPronoteContentsTitle")}
         >
-          <BookIcon className="w-3.5 h-3.5" />
+          <Icon icon={BookOpen} size={14} />
           {tr("courseDetail.showPronoteContents")}
         </button>
       )}

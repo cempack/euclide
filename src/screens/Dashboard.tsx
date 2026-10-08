@@ -22,19 +22,20 @@ import { useAppearance } from "../lib/theme";
 import { EmptyState, useToast } from "../components/ui";
 import { MetaDot, PageHeader, Panel, StatStrip, StatTile } from "../components/layout";
 import {
-  BellIcon,
-  BookIcon,
-  CalendarIcon,
-  ChevronRightIcon,
-  ClockIcon,
-  DescriptionIcon,
-  FileKindIcon,
-  LinkIcon,
-  NoteIcon,
-  PenIcon,
-  PlusIcon,
-  TrashIcon,
-} from "../components/icons";
+  Bell,
+  BookOpen,
+  Calendar,
+  ChevronRight,
+  Clock,
+  Link,
+  NotebookPen,
+  PenLine,
+  Plus,
+  ScrollText,
+  Trash2,
+} from "lucide-react";
+import { Icon } from "../ui/Icon";
+import { FileKindIcon } from "../ui/FileKindIcon";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
@@ -247,7 +248,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                 })
               }
             >
-              <NoteIcon className="w-3.5 h-3.5" />
+              <Icon icon={NotebookPen} size={14} />
               {tr("dashboard.newNote")}
             </button>
             <button
@@ -260,11 +261,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                 })
               }
             >
-              <PenIcon className="w-3.5 h-3.5" />
+              <Icon icon={PenLine} size={14} />
               {tr("dashboard.newBoard")}
             </button>
             <button className="eu-btn-primary eu-btn-sm" onClick={importDocs}>
-              <PlusIcon className="w-3.5 h-3.5" />
+              <Icon icon={Plus} size={14} />
               {tr("common.importFiles")}
             </button>
           </>
@@ -290,17 +291,17 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         <div className="flex flex-col gap-4 min-w-0">
           <Panel
             title={tr("dashboard.todayTitle")}
-            icon={<CalendarIcon className="w-3.5 h-3.5" />}
+            icon={<Icon icon={Calendar} size={14} />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "settings" })}>
                 {tr("dashboard.schedule")}
-                <ChevronRightIcon className="w-3 h-3" />
+                <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
               </button>
             }
           >
             {classes.length === 0 ? (
               <EmptyState
-                icon={<CalendarIcon className="w-4 h-4" />}
+                icon={<Icon icon={Calendar} size={16} />}
                 title={tr("dashboard.noClassTitle")}
                 hint={tr("dashboard.noClassesToday")}
                 action={
@@ -326,11 +327,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
           <Panel
             title={tr("dashboard.quickLinks")}
-            icon={<LinkIcon className="w-3.5 h-3.5" />}
+            icon={<Icon icon={Link} size={14} />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
                 {tr("common.manage")}
-                <ChevronRightIcon className="w-3 h-3" />
+                <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
               </button>
             }
           >
@@ -371,14 +372,14 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         <div className="flex flex-col gap-4 min-w-0">
           <Panel
             title={tr("nav.reminders")}
-            icon={<BellIcon className="w-3.5 h-3.5" />}
+            icon={<Icon icon={Bell} size={14} />}
             action={
               <button
                 className="eu-btn-quiet eu-btn-sm"
                 onClick={() => tabs.open({ kind: "reminders" })}
                 aria-label={tr("common.add")}
               >
-                <PlusIcon className="w-3.5 h-3.5" />
+                <Icon icon={Plus} size={14} />
               </button>
             }
           >
@@ -435,7 +436,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                         data-tip={tr("common.delete")}
                         className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
                       >
-                        <TrashIcon className="w-3.5 h-3.5" />
+                        <Icon icon={Trash2} size={14} />
                       </button>
                     </div>
                   );
@@ -446,11 +447,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
           <Panel
             title={tr("dashboard.resumeTitle")}
-            icon={<ClockIcon className="w-3.5 h-3.5" />}
+            icon={<Icon icon={Clock} size={14} />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "documents" })}>
                 {tr("nav.documents")}
-                <ChevronRightIcon className="w-3 h-3" />
+                <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
               </button>
             }
           >
@@ -487,25 +488,25 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
 
       <StatStrip>
         <StatTile
-          icon={<BookIcon className="w-4 h-4" />}
+          icon={<Icon icon={BookOpen} size={16} />}
           value={courses.length}
           label={tr("nav.courses")}
           onClick={() => tabs.open({ kind: "courses" })}
         />
         <StatTile
-          icon={<DescriptionIcon className="w-4 h-4" />}
+          icon={<Icon icon={ScrollText} size={16} />}
           value={docCount}
           label={tr("nav.documents")}
           onClick={() => tabs.open({ kind: "documents" })}
         />
         <StatTile
-          icon={<NoteIcon className="w-4 h-4" />}
+          icon={<Icon icon={NotebookPen} size={16} />}
           value={noteCount}
           label={tr("nav.notes")}
           onClick={() => tabs.open({ kind: "documents", params: { filter: "note" } })}
         />
         <StatTile
-          icon={<ClockIcon className="w-4 h-4" />}
+          icon={<Icon icon={Clock} size={16} />}
           value={
             <span className="flex items-baseline gap-0.5">
               {Math.floor((recap?.active_minutes ?? 0) / 60)}

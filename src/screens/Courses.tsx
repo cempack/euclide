@@ -10,7 +10,8 @@ import { COURSE_COLORS, COURSE_ICONS, EmptyState, Loading, Modal, useToast } fro
 import { Field, MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
-import { ChevronRightIcon, BookIcon, PenIcon, PlusIcon } from "../components/icons";
+import { BookOpen, ChevronRight, PenLine, Plus } from "lucide-react";
+import { Icon } from "../ui/Icon";
 
 const NO_COURSES: Course[] = [];
 
@@ -31,7 +32,7 @@ const CourseCard = memo(function CourseCard({
 }) {
   const IconComp = useMemo(() => {
     const found = COURSE_ICONS.find((i) => i.key === (c.emoji || "book"));
-    return found ? found.Icon : BookIcon;
+    return found ? found.Icon : BookOpen;
   }, [c.emoji]);
   const visual = useMemo(() => courseVisual(c.color, dark), [c.color, dark]);
 
@@ -61,11 +62,13 @@ const CourseCard = memo(function CourseCard({
         data-tip={tr("courses.editCourse")}
         className="absolute top-2 right-2 eu-btn-quiet eu-btn-icon eu-btn-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-fast"
       >
-        <PenIcon className="w-3.5 h-3.5" />
+        <Icon icon={PenLine} size={14} />
       </button>
-      <ChevronRightIcon
+      <Icon
+        icon={ChevronRight}
+        size={16}
         aria-hidden
-        className="absolute bottom-3 right-2.5 w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
+        className="absolute bottom-3 right-2.5 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
       />
     </div>
   );
@@ -104,7 +107,7 @@ function CourseForm({
   submitLabel: string;
 }) {
   const preview = courseVisual(color, dark);
-  const PreviewIcon = COURSE_ICONS.find((i) => i.key === iconKey)?.Icon ?? BookIcon;
+  const PreviewIcon = COURSE_ICONS.find((i) => i.key === iconKey)?.Icon ?? BookOpen;
 
   return (
     <div className="flex flex-col gap-4">
@@ -288,7 +291,7 @@ export default function Courses() {
         }
         actions={
           <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
-            <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newCourse")}
+            <Icon icon={Plus} size={14} /> {tr("common.newCourse")}
           </button>
         }
       />
@@ -300,12 +303,12 @@ export default function Courses() {
       ) : courses.length === 0 ? (
         <Panel>
           <EmptyState
-            icon={<BookIcon className="w-4 h-4" />}
+            icon={<Icon icon={BookOpen} size={16} />}
             title={tr("courses.emptyTitle")}
             hint={tr("courses.emptyHint")}
             action={
               <button onClick={openCreate} className="eu-btn-primary eu-btn-sm">
-                <PlusIcon className="w-3.5 h-3.5" /> {tr("common.newCourse")}
+                <Icon icon={Plus} size={14} /> {tr("common.newCourse")}
               </button>
             }
           />
