@@ -120,6 +120,14 @@ impl Runner {
         }
     }
 
+    /// Stop the warm process, the runner staying open: Python's folder is
+    /// about to be swapped (`Sidecar::outdated`).
+    pub fn cool(&self) {
+        if let Some(mut w) = lock(&self.warm).take() {
+            let _ = w.proc.child.start_kill();
+        }
+    }
+
     fn reap_warm(&self) {
         let mut warm = lock(&self.warm);
         if warm.as_ref().is_some_and(|w| w.since.elapsed() > WARM_IDLE) {

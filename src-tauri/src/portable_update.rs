@@ -19,6 +19,11 @@
 //!    (the archive is unpacked on the key itself, so this is a rename). The
 //!    next launch of the new version swaps the folders before Python starts:
 //!    the sidecar is replaced whole or not at all, never file by file.
+//!
+//! Should a launch still find a sidecar of another version (a swap held off
+//! by an antivirus, an update by Euclide 0.1 that copied files one by one),
+//! [`repair_sidecar`] puts this version's back: the staged one if any, else
+//! the one in this version's own signed archive, downloaded again.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::Cursor;
@@ -606,6 +611,22 @@ fn stage_sidecar(staging: &Path, dest: &Path, version: &str) -> Result<bool, Str
     Ok(true)
 }
 
+/// A rename that an antivirus scanning freshly written files, or the search
+/// indexer, can refuse for a moment: tried again for about three seconds.
+fn rename_patiently(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut tries = 0;
+    loop {
+        match std::fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(e) if tries >= 10 => return Err(e),
+            Err(_) => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+        }
+    }
+}
+
 /// At launch, before Python can start: swap in the sidecar staged by the
 /// update to `version`. A staged folder for another version (its exe never
 /// made it) or without its marker (copy interrupted) is dropped. Returns the
@@ -623,19 +644,115 @@ pub fn apply_staged_sidecar(dir: &Path, version: &str) -> Option<PathBuf> {
     let current = dir.join(SIDECAR_DIR);
     let old = dir.join(format!("{SIDECAR_OLD_PREFIX}{}", unique_stamp()));
     if current.exists() {
-        if let Err(e) = std::fs::rename(&current, &old) {
-            // Still in use (an antivirus scan, a stray process): next launch.
+        if let Err(e) = rename_patiently(&current, &old) {
+            // Still in use (an Explorer window on it, a stray process): the
+            // first call to Python tries again (`repair_sidecar`).
             crate::applog::warn(format!("[update] sidecar swap postponed: {e}"));
             return None;
         }
     }
-    if let Err(e) = std::fs::rename(&next, &current) {
+    if let Err(e) = rename_patiently(&next, &current) {
         let _ = std::fs::rename(&old, &current);
         crate::applog::warn(format!("[update] sidecar swap failed: {e}"));
         return None;
     }
     let _ = std::fs::remove_file(current.join(STAGED_MARKER));
     Some(old)
+}
+
+/// Where this version's own release keeps its `latest.json`, from the
+/// updater's endpoint (`…/releases/latest/download/latest.json`).
+fn release_manifest_url(endpoint: &str, version: &str) -> Option<String> {
+    let (repo, _) = endpoint.split_once("/releases/latest/download/")?;
+    Some(format!("{repo}/releases/download/v{version}/latest.json"))
+}
+
+/// The signed USB archive a `latest.json` points Windows portable copies at.
+fn portable_asset(manifest: &serde_json::Value) -> Option<(String, String)> {
+    let entry = &manifest["platforms"]["windows-x86_64"];
+    let url = entry["url"]
+        .as_str()
+        .filter(|u| u.starts_with("https://"))?;
+    let signature = entry["signature"].as_str().filter(|s| !s.is_empty())?;
+    Some((url.to_string(), signature.to_string()))
+}
+
+fn updater_endpoint() -> Result<String, String> {
+    let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json"))
+        .map_err(|e| format!("tauri.conf.json: {e}"))?;
+    conf["plugins"]["updater"]["endpoints"][0]
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| "Adresse des mises à jour absente de tauri.conf.json".into())
+}
+
+/// Whether [`repair_sidecar`] can do anything here: Windows USB copies only
+/// (installed copies and the other systems ship Python inside the app).
+pub fn can_repair_sidecar() -> bool {
+    is_windows_portable()
+}
+
+/// Put this version's sidecar back in place: the one an update staged, if
+/// its swap was held off; else the one in this version's own archive,
+/// downloaded again and checked like an update. Python must be stopped.
+pub async fn repair_sidecar(app: &AppHandle) -> Result<(), String> {
+    let version = app.package_info().version.to_string();
+    let dest = crate::paths::exe_dir();
+    let staged = {
+        let (dest, version) = (dest.clone(), version.clone());
+        tauri::async_runtime::spawn_blocking(move || apply_staged_sidecar(&dest, &version))
+            .await
+            .map_err(|e| e.to_string())?
+    };
+    if let Some(old) = staged {
+        let _ = std::fs::remove_dir_all(old);
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        Err("Rien à réparer ici : Python fait partie de l'application.".into())
+    }
+    #[cfg(windows)]
+    {
+        if !can_repair_sidecar() {
+            return Err("Cette copie n'est pas la version portable Windows.".into());
+        }
+        let manifest_url = release_manifest_url(&updater_endpoint()?, &version)
+            .ok_or("Adresse des mises à jour inattendue")?;
+        let body = http_client()?
+            .get(&manifest_url)
+            .send()
+            .await
+            .and_then(|r| r.error_for_status())
+            .map_err(|e| format!("latest.json de la version {version} : {e}"))?
+            .bytes()
+            .await
+            .map_err(|e| format!("latest.json de la version {version} : {e}"))?;
+        let manifest: serde_json::Value = serde_json::from_slice(&body)
+            .map_err(|e| format!("latest.json de la version {version} : {e}"))?;
+        let (url, signature) = portable_asset(&manifest)
+            .ok_or("Archive portable introuvable dans latest.json (windows-x86_64).")?;
+        let bytes = download_update(&url, None).await?;
+        tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+            verify_update_signature(&bytes, &signature, &updater_pubkey()?)?;
+            let staging = dest.join(STAGING_DIR);
+            let _ = std::fs::remove_dir_all(&staging);
+            std::fs::create_dir_all(&staging)
+                .map_err(|e| format!("Dossier temporaire de mise à jour: {e}"))?;
+            let staged = extract_allowed_overlay(&bytes, &staging)
+                .and_then(|_| stage_sidecar(&staging, &dest, &version));
+            let _ = std::fs::remove_dir_all(&staging);
+            if !staged? {
+                return Err("L'archive ne contient pas le module Python.".into());
+            }
+            let old = apply_staged_sidecar(&dest, &version)
+                .ok_or("Le module Python est encore utilisé : rouvrez Euclide.")?;
+            let _ = std::fs::remove_dir_all(old);
+            Ok(())
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
 }
 
 /// What an interrupted update left: its unpacked archive.
@@ -707,7 +824,7 @@ async fn apply_windows_portable_update_inner(
         return Err("L'URL de mise à jour doit être en HTTPS.".into());
     }
 
-    let bytes = download_update(&url, &on_event).await?;
+    let bytes = download_update(&url, Some(&on_event)).await?;
     // Hashing and unpacking ~100 MB: off the async runtime.
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -763,20 +880,30 @@ fn install_portable(
 }
 
 #[cfg(windows)]
-async fn download_update(
-    url: &str,
-    on_event: &Channel<PortableDownloadEvent>,
-) -> Result<Vec<u8>, String> {
-    use futures_util::StreamExt;
-
-    let client = reqwest::Client::builder()
+fn http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
         .user_agent(concat!("Euclide/", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(600))
         .redirect(reqwest::redirect::Policy::limited(10))
         .build()
-        .map_err(|e| format!("HTTP: {e}"))?;
+        .map_err(|e| format!("HTTP: {e}"))
+}
 
-    let response = client
+/// The archive, whole in memory; its progress on `on_event` when someone
+/// watches (an update the teacher asked for, not a repair).
+#[cfg(windows)]
+async fn download_update(
+    url: &str,
+    on_event: Option<&Channel<PortableDownloadEvent>>,
+) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
+
+    let send = |event: PortableDownloadEvent| {
+        if let Some(channel) = on_event {
+            let _ = channel.send(event);
+        }
+    };
+    let response = http_client()?
         .get(url)
         .header(reqwest::header::ACCEPT, "application/octet-stream")
         .send()
@@ -796,7 +923,7 @@ async fn download_update(
             return Err("Archive de mise à jour trop volumineuse.".into());
         }
     }
-    let _ = on_event.send(PortableDownloadEvent::Started { content_length });
+    send(PortableDownloadEvent::Started { content_length });
 
     // Thousands of chunks: report at most ten times a second.
     let mut unreported = 0usize;
@@ -810,7 +937,7 @@ async fn download_update(
         }
         unreported += chunk.len();
         if last_report.elapsed() >= std::time::Duration::from_millis(100) {
-            let _ = on_event.send(PortableDownloadEvent::Progress {
+            send(PortableDownloadEvent::Progress {
                 chunk_length: unreported,
             });
             unreported = 0;
@@ -819,11 +946,11 @@ async fn download_update(
         buffer.extend_from_slice(&chunk);
     }
     if unreported > 0 {
-        let _ = on_event.send(PortableDownloadEvent::Progress {
+        send(PortableDownloadEvent::Progress {
             chunk_length: unreported,
         });
     }
-    let _ = on_event.send(PortableDownloadEvent::Finished);
+    send(PortableDownloadEvent::Finished);
     Ok(buffer)
 }
 
@@ -1218,6 +1345,51 @@ mod tests {
         assert!(dest.join("euclide-sidecar").is_dir());
         assert!(!dest.join(SIDECAR_NEXT).exists());
         let _ = std::fs::remove_dir_all(&dest);
+    }
+
+    #[test]
+    fn a_repair_reads_this_versions_own_release() {
+        assert_eq!(
+            release_manifest_url(
+                "https://github.com/cempack/euclide/releases/latest/download/latest.json",
+                "0.4.0"
+            )
+            .as_deref(),
+            Some("https://github.com/cempack/euclide/releases/download/v0.4.0/latest.json")
+        );
+        assert_eq!(
+            release_manifest_url("https://example.org/latest.json", "0.4.0"),
+            None
+        );
+        let endpoint = updater_endpoint().expect("tauri.conf.json has an endpoint");
+        assert!(release_manifest_url(&endpoint, "0.4.0").is_some());
+    }
+
+    #[test]
+    fn the_usb_archive_is_found_in_a_published_manifest() {
+        // The shape of 0.3.0's latest.json, as publish.yml rewrites it.
+        let manifest = serde_json::json!({
+            "version": "0.3.0",
+            "platforms": {
+                "windows-x86_64": {
+                    "signature": "c2ln",
+                    "url": "https://github.com/cempack/euclide/releases/download/v0.3.0/Euclide-windows-portable.zip"
+                },
+                "windows-x86_64-nsis": {
+                    "signature": "bnNpcw==",
+                    "url": "https://github.com/cempack/euclide/releases/download/v0.3.0/Euclide_0.3.0_x64-setup.exe"
+                }
+            }
+        });
+        let (url, signature) = portable_asset(&manifest).expect("portable entry");
+        assert!(url.ends_with("/v0.3.0/Euclide-windows-portable.zip"));
+        assert_eq!(signature, "c2ln");
+        let plain_http = serde_json::json!({ "platforms": { "windows-x86_64": { "signature": "s", "url": "http://x/a.zip" } } });
+        assert_eq!(portable_asset(&plain_http), None);
+        assert_eq!(
+            portable_asset(&serde_json::json!({ "platforms": {} })),
+            None
+        );
     }
 
     #[test]
