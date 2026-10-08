@@ -70,15 +70,19 @@ export const q = {
       retry: 1,
     }),
   /** A class's lesson contents from Pronote (sidecar): kept 10 minutes, one retry. */
-  pronoteContents: (subject: string, className: string) =>
+  /** A class's cahier de textes over a period: four weeks, three months or the year. */
+  pronoteContents: (subject: string, className: string, since: "month" | "term" | "year" = "month") =>
     queryOptions({
-      queryKey: ["pronote", "contents", subject, className],
+      queryKey: ["pronote", "contents", subject, className, since],
       queryFn: async () => {
-        const res = await api.pronoteContents(subject, className);
+        const days = since === "month" ? 28 : since === "term" ? 92 : null;
+        const from =
+          days == null ? null : new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+        const res = await api.pronoteContents(subject, className, from);
         if (!res?.ok) throw new Error(res?.error || "Erreur Pronote");
         const items: PronoteContent[] = Array.isArray(res.contents) ? res.contents : [];
-        // Newest first (the sidecar already sorts; cheap to be sure), the 30 most recent.
-        return [...items].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 30);
+        // Newest first (the sidecar already sorts; cheap to be sure).
+        return [...items].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
       },
       staleTime: 10 * 60_000,
       retry: 1,
