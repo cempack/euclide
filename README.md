@@ -74,4 +74,16 @@ version. Daily copies go to `Euclide-Sauvegardes/` beside it.
 
 Every push to `main` publishes a release (`.github/workflows/publish.yml`):
 work happens on other branches, and `preview.yml` builds test versions by
-hand.
+hand. A push publishes the next patch version; for a minor one, set the
+version (`python3 scripts/set-release-version.py --set 0.4.0`), commit, and
+push a `v0.4.0` tag.
+
+What changed goes in `CHANGELOG.md`, with pictures from `scripts/changelog/`,
+on the sample data (`npm run dev` running):
+
+```sh
+node scripts/changelog/run-events.mjs                # real Python output to replay
+node scripts/changelog/capture.mjs shots             # the screens, at 2×
+node scripts/changelog/recap.mjs shots recap.png     # the one-page recap
+node scripts/changelog/release-notes.mjs 0.4.0 | gh release edit v0.4.0 --notes-file -
+```
