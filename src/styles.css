@@ -1192,6 +1192,112 @@
   .eu-template-card-remove:focus-visible {
     @apply opacity-100;
   }
+  /* The Python output (python/OutputPanel.tsx): a desk in the app's theme
+     under the editor, tabs underlined in the accent, the run's state as a
+     coloured dot; drawings sit on paper in both themes. */
+  .eu-output {
+    @apply h-full min-h-0 flex flex-col bg-panel-alt text-ink;
+  }
+  .eu-output-bar {
+    @apply shrink-0 flex items-center gap-2 pl-1.5 pr-2 border-b border-line;
+    height: var(--eu-control);
+  }
+  .eu-output-tabs {
+    @apply flex items-stretch self-stretch gap-0.5;
+  }
+  .eu-output-tab {
+    @apply inline-flex items-center gap-1.5 px-2.5 text-small font-medium text-ink-muted border-b-2
+      border-transparent transition-colors duration-fast hover:text-ink;
+    margin-bottom: -1px;
+  }
+  .eu-output-tab[aria-selected="true"] {
+    @apply text-ink border-accent;
+  }
+  .eu-output-status {
+    @apply inline-flex items-center gap-1.5 font-mono text-caption text-ink-muted whitespace-nowrap;
+  }
+  .eu-output-status-dot {
+    @apply w-1.5 h-1.5 rounded-full bg-line-strong;
+  }
+  .eu-output-status[data-tone="run"] .eu-output-status-dot {
+    @apply bg-accent;
+    animation: eu-pulse 1.2s ease-in-out infinite;
+  }
+  .eu-output-status[data-tone="ask"] {
+    @apply text-warn;
+  }
+  .eu-output-status[data-tone="ask"] .eu-output-status-dot {
+    @apply bg-warn-solid;
+  }
+  .eu-output-status[data-tone="ok"] {
+    @apply text-ok;
+  }
+  .eu-output-status[data-tone="ok"] .eu-output-status-dot {
+    @apply bg-ok-solid;
+  }
+  .eu-output-status[data-tone="fail"] {
+    @apply text-danger;
+  }
+  .eu-output-status[data-tone="fail"] .eu-output-status-dot {
+    @apply bg-danger-solid;
+  }
+  .eu-console {
+    @apply h-full overflow-auto px-3 py-2.5 font-mono text-code text-ink;
+  }
+  .eu-console [data-kind="err"] {
+    @apply text-danger;
+  }
+  .eu-console [data-kind="echo"] {
+    @apply text-accent;
+  }
+  .eu-console-hint {
+    @apply font-sans text-small text-ink-muted flex flex-col gap-2 py-0.5;
+  }
+  .eu-console-ask {
+    @apply flex items-center gap-2 mt-1.5;
+  }
+  .eu-drawings {
+    @apply h-full overflow-x-auto overflow-y-hidden p-3 flex gap-3 bg-chrome;
+  }
+  .eu-sheet {
+    @apply rounded-md border border-line bg-paper shadow-raised overflow-hidden;
+  }
+  .eu-checks-summary {
+    @apply flex items-center gap-3 px-3.5 pt-3 pb-1.5;
+  }
+  .eu-checks-meter {
+    @apply flex-1 max-w-48 h-1.5 rounded-full bg-line overflow-hidden;
+  }
+  .eu-checks-meter > span {
+    @apply block h-full rounded-full bg-ok-solid;
+  }
+  .eu-check {
+    @apply flex items-start gap-2.5 px-2 py-1.5 rounded;
+  }
+  .eu-check-mark {
+    @apply mt-px w-5 h-5 shrink-0 grid place-items-center rounded-full bg-danger-soft text-danger;
+  }
+  .eu-check[data-ok] .eu-check-mark {
+    @apply bg-ok-soft text-ok;
+  }
+  /* The bar between the editor and its output: a hairline whose handle is
+     wider than it shows; it turns accent to say it moves (pointer or arrows). */
+  .eu-split {
+    @apply relative shrink-0 h-px bg-line z-1 cursor-row-resize outline-none transition-colors duration-fast;
+  }
+  .eu-split::before {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
+  }
+  .eu-split:hover,
+  .eu-split:focus-visible,
+  .eu-split[data-dragging] {
+    @apply bg-accent;
+  }
+  .eu-split:focus-visible {
+    box-shadow: 0 0 0 1px var(--color-accent);
+  }
   /* Toolbar groups that did not fit, stacked in the « … » popover. */
   .eu-toolbar-more {
     @apply flex flex-col items-start gap-1.5 p-2 min-w-0;

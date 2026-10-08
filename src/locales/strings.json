@@ -112,7 +112,7 @@
     "toastScriptError": "Erreur script",
     "toastScriptRunError": "Exécution impossible",
     "toastScriptSaveError": "Impossible d'enregistrer le script",
-    "confirmDeleteScript": "Supprimer \"{name}\" ?",
+    "confirmDeleteScript": "Supprimer « {name} » ?",
     "saveBtn": "Enregistrer",
     "execute": "Exécuter",
     "noOutput": "(aucune sortie)",
@@ -120,7 +120,7 @@
     "scripts": "SCRIPTS",
     "output": "SORTIE",
     "clearOutput": "effacer",
-    "runHint": "Exécutez le script ({keys}) : ce qu'il affiche apparaît ici.",
+    "runHint": "Exécutez le script avec {keys} : ce qu’il affiche apparaît ici.",
     "scriptsCount": {
       "one": "{count} script",
       "other": "{count} scripts"
@@ -846,7 +846,16 @@
     "templateNameTaken": "Un modèle intégré porte déjà ce nom.",
     "templateSaved": "Modèle « {name} » enregistré",
     "templateDeleted": "Modèle « {name} » supprimé",
-    "templateDelete": "Supprimer le modèle « {name} »"
+    "templateDelete": "Supprimer le modèle « {name} »",
+    "output": "Sortie du script",
+    "clearConsole": "Effacer la console",
+    "checkHint": "{keys} lance aussi les vérifications du script.",
+    "allPassed": "Toutes les vérifications sont réussies.",
+    "checksPassed": {
+      "one": "{count} vérification réussie sur {total}",
+      "other": "{count} vérifications réussies sur {total}"
+    },
+    "deleteScriptBody": "Le script est supprimé de la clé, avec ses vérifications s’il en a."
   },
   "colors": {
     "black": "Noir",
