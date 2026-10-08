@@ -600,6 +600,7 @@
   }
   .eu-segment > button[aria-selected="true"],
   .eu-segment > button[aria-pressed="true"],
+  .eu-segment > button[aria-checked="true"],
   .eu-segment > button.active {
     @apply bg-panel border-line text-ink shadow-raised;
   }
@@ -813,8 +814,13 @@
   .eu-tabs::-webkit-scrollbar {
     display: none;
   }
+  /* The tabs proper: they shrink evenly to their minimum, then the strip scrolls. */
+  .eu-tabs-list {
+    @apply flex items-stretch min-w-0;
+    flex: 0 1 auto;
+  }
   .eu-tab {
-    @apply relative flex items-center min-w-30 max-w-50 grow-0 shrink basis-50 border-x border-transparent
+    @apply relative flex items-center w-50 min-w-30 max-w-50 grow-0 shrink basis-50 border-x border-transparent
       text-ink-muted transition-colors duration-fast;
   }
   .eu-tab + .eu-tab:not([data-active]):not(:has(+ [data-active]))::after,
@@ -832,7 +838,7 @@
     @apply bg-canvas;
   }
   .eu-tab[data-pinned] {
-    @apply min-w-0 basis-auto shrink-0 grow-0;
+    @apply w-auto min-w-0 basis-auto shrink-0 grow-0;
   }
   /* Documents: PDF.js pages on the stage, as sheets of paper. */
   .eu-pdf {
@@ -1900,6 +1906,13 @@ input[type="radio"] {
   max-width: 100%;
   max-height: 250mm;
   margin: 0 auto;
+}
+
+/* A class already over: dimmed by colour, which keeps it readable (an
+   opacity took the text below 4.5:1). */
+.eu-row-past,
+.eu-row-past * {
+  color: var(--color-ink-faint);
 }
 
 /* The resource picker: a search field, then the library by group. */

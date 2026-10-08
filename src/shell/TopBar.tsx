@@ -159,108 +159,113 @@ export const TopBar = memo(function TopBar({
 
   return (
     <div ref={barRef} className="eu-tabstrip">
-      <div ref={stripRef} role="tablist" aria-label={tr("app.openTabs")} className="eu-tabs">
-        {list.map((tab, index) => {
-          const active = tab.id === activeId;
-          const dirty = !!dirtyMap[tab.id];
-          const pinned = !!tab.pinned;
-          return (
-            <div
-              key={tab.id}
-              className="eu-tab group"
-              data-active={active || undefined}
-              data-pinned={pinned || undefined}
-              data-drop-before={
-                (dropAt && dropAt.before === index && dropAt.from !== index && dropAt.from !== index - 1) ||
-                undefined
-              }
-              data-drop-after={
-                (dropAt &&
-                  index === list.length - 1 &&
-                  dropAt.before === list.length &&
-                  dropAt.from !== index) ||
-                undefined
-              }
-              data-dragging={(dropAt && dropAt.from === index) || undefined}
-              onPointerDown={(e) => {
-                if (e.button !== 0 || (e.target as HTMLElement).closest(".eu-tab-close")) return;
-                const strip = stripRef.current;
-                if (!strip) return;
-                const mids = Array.from(strip.querySelectorAll(":scope > .eu-tab"), (el) => {
-                  const r = el.getBoundingClientRect();
-                  return r.left + r.width / 2;
-                });
-                drag.current = { from: index, x: e.clientX, started: false, mids };
-              }}
-              onPointerMove={(e) => {
-                const d = drag.current;
-                if (!d) return;
-                if (!d.started) {
-                  if (Math.abs(e.clientX - d.x) < 6) return;
-                  d.started = true;
-                  e.currentTarget.setPointerCapture(e.pointerId);
+      <div ref={stripRef} className="eu-tabs">
+        <div role="tablist" aria-label={tr("app.openTabs")} className="eu-tabs-list">
+          {list.map((tab, index) => {
+            const active = tab.id === activeId;
+            const dirty = !!dirtyMap[tab.id];
+            const pinned = !!tab.pinned;
+            return (
+              <div
+                key={tab.id}
+                className="eu-tab group"
+                data-active={active || undefined}
+                data-pinned={pinned || undefined}
+                data-drop-before={
+                  (dropAt && dropAt.before === index && dropAt.from !== index && dropAt.from !== index - 1) ||
+                  undefined
                 }
-                setDropAt({ from: d.from, before: beforeIndex(d.mids, e.clientX) });
-              }}
-              onPointerUp={(e) => {
-                const d = drag.current;
-                drag.current = null;
-                if (!d?.started) return;
-                setDropAt(null);
-                const before = beforeIndex(d.mids, e.clientX);
-                tabs.move(d.from, before > d.from ? before - 1 : before);
-              }}
-              onPointerCancel={() => {
-                drag.current = null;
-                setDropAt(null);
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                const open = () => setMenu({ id: tab.id, x: e.clientX, y: e.clientY });
-                // Linux fires this while the button is still down, and its
-                // release would dismiss a menu opened now; Windows fires it
-                // on release.
-                if (e.buttons & 2)
-                  window.addEventListener("pointerup", () => setTimeout(open), { once: true });
-                else open();
-              }}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-label={pinned ? tab.title : undefined}
-                onClick={() => tabs.setActive(tab.id)}
-                onAuxClick={(e) => {
-                  // Middle click closes, as in a browser.
-                  if (e.button === 1 && list.length > 1) {
-                    e.preventDefault();
-                    onCloseTab(tab.id);
-                  }
+                data-drop-after={
+                  (dropAt &&
+                    index === list.length - 1 &&
+                    dropAt.before === list.length &&
+                    dropAt.from !== index) ||
+                  undefined
+                }
+                data-dragging={(dropAt && dropAt.from === index) || undefined}
+                onPointerDown={(e) => {
+                  if (e.button !== 0 || (e.target as HTMLElement).closest(".eu-tab-close")) return;
+                  const strip = stripRef.current;
+                  if (!strip) return;
+                  const mids = Array.from(strip.querySelectorAll(".eu-tab"), (el) => {
+                    const r = el.getBoundingClientRect();
+                    return r.left + r.width / 2;
+                  });
+                  drag.current = { from: index, x: e.clientX, started: false, mids };
                 }}
-                onDoubleClick={() => tabs.togglePin(tab.id)}
-                {...tip(pinned ? `${tab.title} · ${tr("app.pinned")}` : tab.title)}
-                className="eu-tab-main"
+                onPointerMove={(e) => {
+                  const d = drag.current;
+                  if (!d) return;
+                  if (!d.started) {
+                    if (Math.abs(e.clientX - d.x) < 6) return;
+                    d.started = true;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  }
+                  setDropAt({ from: d.from, before: beforeIndex(d.mids, e.clientX) });
+                }}
+                onPointerUp={(e) => {
+                  const d = drag.current;
+                  drag.current = null;
+                  if (!d?.started) return;
+                  setDropAt(null);
+                  const before = beforeIndex(d.mids, e.clientX);
+                  tabs.move(d.from, before > d.from ? before - 1 : before);
+                }}
+                onPointerCancel={() => {
+                  drag.current = null;
+                  setDropAt(null);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  const open = () => setMenu({ id: tab.id, x: e.clientX, y: e.clientY });
+                  // Linux fires this while the button is still down, and its
+                  // release would dismiss a menu opened now; Windows fires it
+                  // on release.
+                  if (e.buttons & 2)
+                    window.addEventListener("pointerup", () => setTimeout(open), { once: true });
+                  else open();
+                }}
               >
-                <TabIcon tab={tab} courseIcons={courseIcons} />
-                {!pinned && <span className="eu-tab-title">{tab.title}</span>}
-                {pinned && !dirty && <Icon icon={Pin} size={14} className="eu-tab-pin" />}
-                {dirty && <span className="eu-tab-dirty" aria-label={tr("app.unsaved")} />}
-              </button>
-              {!pinned && list.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => onCloseTab(tab.id)}
-                  aria-label={`${closeLabel} — ${tab.title}`}
-                  {...tip(closeLabel, keysOf("closeTab"))}
-                  className="eu-tab-close"
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={pinned ? tab.title : undefined}
+                  onClick={() => tabs.setActive(tab.id)}
+                  onAuxClick={(e) => {
+                    // Middle click closes, as in a browser.
+                    if (e.button === 1 && list.length > 1) {
+                      e.preventDefault();
+                      onCloseTab(tab.id);
+                    }
+                  }}
+                  onDoubleClick={() => tabs.togglePin(tab.id)}
+                  {...tip(pinned ? `${tab.title} · ${tr("app.pinned")}` : tab.title)}
+                  className="eu-tab-main"
                 >
-                  <Icon icon={X} size={14} />
+                  <TabIcon tab={tab} courseIcons={courseIcons} />
+                  {!pinned && <span className="eu-tab-title">{tab.title}</span>}
+                  {pinned && !dirty && <Icon icon={Pin} size={14} className="eu-tab-pin" />}
+                  {dirty && <span className="eu-tab-dirty" aria-label={tr("app.unsaved")} />}
                 </button>
-              )}
-            </div>
-          );
-        })}
+                {!pinned && list.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onCloseTab(tab.id)}
+                    // For the pointer only: a tab list holds tabs, and the
+                    // keyboard closes the current one with Ctrl+W.
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    {...tip(closeLabel, keysOf("closeTab"))}
+                    className="eu-tab-close"
+                  >
+                    <Icon icon={X} size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
         {/* Sticks to the strip's end when the tabs scroll. */}
         <span className="eu-tab-new-slot">
           <button
