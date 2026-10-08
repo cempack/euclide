@@ -1024,6 +1024,7 @@ dependencies = [
  "minisign-verify",
  "reqwest",
  "rfd",
+ "ring",
  "rusqlite",
  "serde",
  "serde_json",
