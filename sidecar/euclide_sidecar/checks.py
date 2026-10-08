@@ -72,9 +72,9 @@ class _Collect(doctest.DocTestRunner):
         self.problems = []
 
     def report_failure(self, out, test, example, got):
-        self.problems.append(
-            f"{example.source.strip()} : attendu {example.want.strip()!r}, obtenu {got.strip()!r}"
-        )
+        # Both are already Python's own notation (12.0, 'Passable', [1, 2]).
+        want = example.want.strip() or "rien"
+        self.problems.append(f"{example.source.strip()} : attendu {want}, obtenu {got.strip() or 'rien'}")
 
     def report_unexpected_exception(self, out, test, example, exc_info):
         exc = exc_info[1]
