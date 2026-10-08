@@ -3,7 +3,9 @@ name: "check"
 # Lint, typecheck, test and build every branch and pull request. Never
 # publishes anything.
 on:
+  # Branches only: a release tag points at a commit main already checked.
   push:
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 
