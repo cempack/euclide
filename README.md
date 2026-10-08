@@ -83,8 +83,12 @@ What changed goes in `CHANGELOG.md`, with pictures from `scripts/changelog/`,
 on the sample data (`npm run dev` running):
 
 ```sh
+node scripts/sample-documents.mjs                    # the sample data's documents and previews
 node scripts/changelog/run-events.mjs                # real Python output to replay
-node scripts/changelog/capture.mjs shots             # the screens, at 2×
-node scripts/changelog/recap.mjs shots recap.png     # the one-page recap
+node scripts/changelog/capture.mjs                   # the screens, at 2×
+node scripts/changelog/recap.mjs                     # the keynote: slides, overview, PDF
 node scripts/changelog/release-notes.mjs 0.4.0 | gh release edit v0.4.0 --notes-file -
 ```
+
+Both write to `scripts/changelog/shots/` (not committed); the pictures the
+changelog shows are copied to `docs/changelog/<version>/`.

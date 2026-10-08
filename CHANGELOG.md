@@ -9,12 +9,16 @@ Ce qui change d'une version d'Euclide à l'autre.
 ### En classe
 
 - **Des séances prêtes.** Chaque étape d'une progression garde ce qu'il lui faut : documents, notes, tableaux, scripts Python, liens. Sur le tableau de bord, « Ouvrir la séance » ouvre tout d'un coup, et « Séance faite » fait passer la classe à l'étape suivante.
-- **L'horloge de classe.** Horloge et minuteur plein écran pour le vidéoprojecteur (Ctrl+Maj+H), avec un anneau qui se vide et une sonnerie de fin. L'écran reste allumé pendant les cours.
+- **L'horloge de classe.** Horloge et minuteur plein écran pour le vidéoprojecteur (Ctrl+Maj+H) : un chiffre de 1 à 9 lance un minuteur d'autant de minutes, Espace le met en pause, + et − ajoutent ou retirent une minute. L'anneau se vide, le cours en cours s'affiche, un carillon discret sonne la fin. L'écran reste allumé pendant les cours.
 - **Le cahier de textes Pronote, rangé par semaine**, sur 4 semaines, 3 mois ou l'année. Son texte se sélectionne et se copie.
 
 <p>
   <img src="docs/changelog/0.4.0/tableau-de-bord.jpg" alt="Le tableau de bord, un cours en cours" width="49%">
   <img src="docs/changelog/0.4.0/seance.jpg" alt="Une progression, ses étapes et ce qu'elles ouvrent" width="49%">
+</p>
+<p>
+  <img src="docs/changelog/0.4.0/minuteur.jpg" alt="Le minuteur au vidéoprojecteur : 3 min 12 s restantes" width="49%">
+  <img src="docs/changelog/0.4.0/cahier-de-textes.jpg" alt="Le cahier de textes Pronote, par semaine" width="49%">
 </p>
 
 ### Tableau blanc
@@ -29,18 +33,18 @@ Ce qui change d'une version d'Euclide à l'autre.
 ### Python
 
 - Chaque script tourne dans son propre processus : `input()` pose sa question dans la console, le bouton Stop arrête tout, une limite de temps coupe les boucles sans fin.
-- **La tortue et matplotlib** dessinent directement dans Euclide, sans rien installer. Un dessin s'enregistre dans la bibliothèque.
+- **turtle et matplotlib** dessinent directement dans Euclide, sans rien installer : le dessin s'affiche dès qu'il arrive, et s'enregistre dans la bibliothèque.
 - **« Vérifier » corrige un exercice.** Les exemples (`>>>`) écrits sous une fonction ou une classe, ou un fichier `nom.checks.py`, deviennent des vérifications : réussies, ou l'attendu face à l'obtenu.
-- **14 modèles de scripts** pour démarrer : saisie, tableau de valeurs, courbe, suite et seuil, dichotomie, lancers de dé, polygones et rosace à la tortue, fonction à compléter, tri par insertion, récursivité, pile, dictionnaire. Et ceux qu'on se fait.
+- **143 modèles de scripts**, rangés par niveau et par thème : premiers pas, Seconde (nombres, géométrie, fonctions, statistiques, échantillonnage), Première et Terminale (listes, suites, dérivation, exponentielle, intégration, combinatoire, lois de probabilité), Maths expertes (arithmétique, chiffrement, complexes, matrices et graphes), NSI Première et Terminale (données, tables, algorithmes, objets, arbres, graphes), dessins et graphiques. Une recherche les trouve tous ; chacun fonctionne tel quel et passe « Vérifier ». Et ceux qu'on se fait.
 - Un nouvel éditeur : coloration, complétion, recherche. Ctrl+Entrée exécute, Ctrl+Maj+Entrée vérifie.
 
 <p>
-  <img src="docs/changelog/0.4.0/python-tortue.jpg" alt="Une rosace tracée à la tortue" width="49%">
+  <img src="docs/changelog/0.4.0/python-modeles.jpg" alt="Les modèles de scripts, Terminale" width="49%">
   <img src="docs/changelog/0.4.0/python-verifier.jpg" alt="« Vérifier » : deux réussites, un échec" width="49%">
 </p>
 <p>
-  <img src="docs/changelog/0.4.0/python-courbe.jpg" alt="Une courbe tracée avec matplotlib" width="49%">
-  <img src="docs/changelog/0.4.0/python-modeles.jpg" alt="Les modèles de scripts" width="49%">
+  <img src="docs/changelog/0.4.0/python-koch.jpg" alt="Le flocon de Koch tracé avec turtle" width="49%">
+  <img src="docs/changelog/0.4.0/python-mandelbrot.jpg" alt="L'ensemble de Mandelbrot tracé avec matplotlib" width="49%">
 </p>
 
 ### Notes
@@ -58,16 +62,17 @@ Ce qui change d'une version d'Euclide à l'autre.
 ### Documents et recherche
 
 - Les PDF s'ouvrent dans Euclide avec leurs annotations et leurs versions, et une modification non enregistrée n'est plus perdue.
-- Aperçus en grille, recherche dans le texte des documents, et tout au clavier (↑ ↓ Entrée F2 Suppr).
+- **Les aperçus** : en grille, chaque document montre sa première page. Recherche dans le texte des documents, et tout au clavier (↑ ↓ Entrée F2 Suppr).
 - La palette (Ctrl+K) propose d'abord les documents récents, et cherche aussi dans leur contenu.
 
 <p>
-  <img src="docs/changelog/0.4.0/documents.jpg" alt="Les documents" width="49%">
-  <img src="docs/changelog/0.4.0/palette.jpg" alt="La palette de recherche" width="49%">
+  <img src="docs/changelog/0.4.0/documents.jpg" alt="Les documents en grille, avec leurs aperçus" width="49%">
+  <img src="docs/changelog/0.4.0/pdf.jpg" alt="Un PDF ouvert dans Euclide, prêt à annoter" width="49%">
 </p>
 
 ### Interface
 
+- **Un nouveau logo** : deux cercles tracés au compas, et le point où ils se coupent, la première construction des Éléments d'Euclide.
 - **Un nouveau design** : les mêmes couleurs, en plus lisible. La sélection en « papier relevé », une seule famille d'icônes, des infobulles partout et un thème sombre soigné.
 - Le tableau de bord se recompose autour du cours en cours, de la journée, des rappels et des documents à reprendre.
 - Onglets qu'on glisse, épingle et ferme par lots ; un menu les liste quand ils débordent.
