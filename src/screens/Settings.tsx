@@ -18,6 +18,7 @@ import { BackupsSection } from "../features/settings/BackupsSection";
 import { SettingRow, SettingsNav, type NavSection } from "../features/settings/SettingRow";
 import { Check, Moon, Plus, QrCode, Sun, Trash2 } from "lucide-react";
 import { Icon } from "../ui/Icon";
+import { Logo } from "../ui/Logo";
 import { tabs, useTabLimit } from "../stores/tabs";
 import { useAppearance } from "../lib/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -975,13 +976,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
     <Section title={tr("about.title")} id="a-propos">
       <Panel pad>
         <div className="flex items-center gap-3.5">
-          <img
-            src="/logo-128.png"
-            alt=""
-            width={44}
-            height={44}
-            className="w-11 h-11 rounded object-contain"
-          />
+          <Logo size={44} className="shrink-0" />
           <div className="min-w-0">
             <p className="eu-t-body font-medium text-ink">
               {tr("appName")} {info && <span className="text-ink-muted font-normal">v{info.version}</span>}
