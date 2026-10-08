@@ -1,24 +1,34 @@
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import {
-  CalendarDays,
+  ArchiveRestore,
+  ArrowUpDown,
+  CalendarRange,
   ChartSpline,
   CircleStop,
+  Clock3,
   Contrast,
+  DatabaseBackup,
   Download,
+  FileCheck2,
   FileText,
   Gauge,
   Grid3x3,
   History,
+  ImageDown,
   Keyboard,
   LayoutTemplate,
+  ListChecks,
+  ListCollapse,
   Magnet,
   MessageSquareText,
   MonitorPlay,
-  MoonStar,
+  PencilLine,
   Pin,
-  Search,
+  Power,
+  Presentation,
   Settings2,
   ShieldCheck,
+  TextSelect,
   Timer,
   Undo2,
   Zap,
@@ -403,8 +413,8 @@ function ClassTimer() {
         <Eyebrow>En classe</Eyebrow>
         <h2 className="k-title">Le minuteur, en grand.</h2>
         <p className="k-sub">
-          Plein écran au vidéoprojecteur : l'anneau se vide, le cours en cours s'affiche, un carillon discret
-          sonne la fin.
+          Plein écran au vidéoprojecteur&nbsp;: l'anneau se vide, le cours en cours s'affiche, un carillon
+          discret sonne la fin.
         </p>
       </Text>
       <div className="k-keyrows" style={{ left: 112, top: 690 }}>
@@ -440,8 +450,8 @@ function Lesson() {
         <Eyebrow>Tableau de bord</Eyebrow>
         <h2 className="k-title">La séance démarre en un clic.</h2>
         <p className="k-sub wide">
-          Chaque étape de la progression garde ses documents, ses notes, son tableau et ses scripts. « Ouvrir
-          la séance » ouvre tout ; « Séance faite » passe à la suite.
+          Chaque étape de la progression garde ses documents, ses notes, son tableau et ses scripts.
+          «&nbsp;Ouvrir la séance&nbsp;» ouvre tout&nbsp;; «&nbsp;Séance faite&nbsp;» passe à la suite.
         </p>
       </Text>
       <Shot
@@ -461,6 +471,31 @@ function Lesson() {
   );
 }
 
+function ClassBook() {
+  return (
+    <Slide name="cahier-de-textes">
+      <Text box={{ left: 112, top: 140, width: 640 }}>
+        <Eyebrow>Pronote</Eyebrow>
+        <h2 className="k-title">Le cahier de textes, semaine par semaine.</h2>
+        <p className="k-sub">
+          Chaque séance avec son contenu, le travail donné et ses pièces jointes, rangée dans sa semaine.
+        </p>
+      </Text>
+      <div className="k-points" style={{ left: 112, top: 720, width: 640 }}>
+        <Point icon={CalendarRange} title="Sur 4 semaines, 3 mois ou l'année" />
+        <Point icon={TextSelect} title="Le texte se sélectionne et se copie" />
+        <Point icon={Zap} title="L'emploi du temps en une requête, au lieu de sept" />
+      </div>
+      <Shot
+        src="cahier-de-textes"
+        box={{ left: 800, width: 1120, top: 214 }}
+        crop={[620, 120, 2080, 1610]}
+        bleed="right bottom"
+      />
+    </Slide>
+  );
+}
+
 function Templates() {
   const counts = templateCounts();
   return (
@@ -473,8 +508,8 @@ function Templates() {
           Tout le programme.
         </h2>
         <p className="k-sub">
-          De la Seconde à la Terminale, en Maths expertes et en NSI, rangés par niveau et par thème : prêts à
-          projeter, prêts à modifier.
+          De la Seconde à la Terminale, en Maths expertes et en NSI, rangés par niveau et par thème&nbsp;:
+          prêts à projeter, prêts à modifier.
         </p>
       </Text>
       <div className="k-counts" style={{ left: 112, top: 640, width: 700 }}>
@@ -495,6 +530,82 @@ function Templates() {
   );
 }
 
+/** The names the wall lights up: the classics one looks for first. */
+const CLASSICS = new Set([
+  "Suite de Syracuse",
+  "π par Monte-Carlo",
+  "Méthode de Newton",
+  "Algorithme de Briggs",
+  "Planche de Galton",
+  "Surréservation",
+  "Euclide et Bézout",
+  "Chiffrement de Hill",
+  "RSA en petit",
+  "PageRank",
+  "Ensemble de Mandelbrot",
+  "k plus proches voisins",
+  "Recherche dichotomique",
+  "Tours de Hanoï",
+  "Tri fusion",
+  "Flocon de Koch",
+]);
+
+/** Every template by name, level after level: the catalogue as a wall. */
+function TemplateWall() {
+  const levels = LEVELS.filter((l) => l.id !== "mine");
+  return (
+    <Slide name="mur-des-modeles" stage>
+      <Text box={{ left: 160, top: 96, width: 1600 }} align="center">
+        <Eyebrow>Python</Eyebrow>
+        <h2 className="k-title">
+          Du premier <code>print()</code> au chiffrement RSA.
+        </h2>
+      </Text>
+      <p className="k-names">
+        {levels.map((level) => (
+          <Fragment key={level.id}>
+            <span className="k-names-level">{level.label}</span>{" "}
+            {BUILT_IN.filter((t) => t.level === level.id && t.id !== "bases/script-vide").map((t) => (
+              <Fragment key={t.id}>
+                <span className={`k-name ${CLASSICS.has(t.name) ? "classic" : ""}`}>{t.name}</span>{" "}
+              </Fragment>
+            ))}
+          </Fragment>
+        ))}
+      </p>
+    </Slide>
+  );
+}
+
+function PythonEditor() {
+  return (
+    <Slide name="python-editeur">
+      <Text box={{ left: 112, top: 140, width: 640 }}>
+        <Eyebrow>Python</Eyebrow>
+        <h2 className="k-title">Écrire. Exécuter. Voir.</h2>
+        <p className="k-sub">
+          Un véritable éditeur, qui colore, complète et cherche. Le résultat s'affiche juste en dessous&nbsp;:
+          console, dessin ou graphique.
+        </p>
+        <Keys keys={[["Ctrl", "Entrée"]]} />
+      </Text>
+      <div className="k-points" style={{ left: 112, top: 690, width: 640 }}>
+        <Point icon={Keyboard} title="input() pose ses questions dans la console" />
+        <Point icon={CircleStop} title="Stop arrête le script, à tout moment" />
+        <Point icon={Timer} title="Une limite de temps coupe les boucles sans fin" />
+        <Point icon={ImageDown} title="Le dessin s'enregistre dans la bibliothèque" />
+      </div>
+      <Shot
+        src="python-courbe"
+        box={{ left: 820, width: 1100, top: 183 }}
+        crop={[870, 80, 2010, 1640]}
+        bleed="right bottom"
+        className="k-on-dark"
+      />
+    </Slide>
+  );
+}
+
 function PythonDraws() {
   return (
     <Slide name="python-dessine" stage>
@@ -502,7 +613,7 @@ function PythonDraws() {
         <Eyebrow>Python</Eyebrow>
         <h2 className="k-title">Python dessine. Et trace.</h2>
         <p className="k-sub center">
-          turtle et matplotlib sont intégrés : les figures s'affichent dans Euclide, sans rien installer.
+          turtle et matplotlib sont intégrés&nbsp;: les figures s'affichent dans Euclide, sans rien installer.
         </p>
       </Text>
       <figure className="k-sheet" style={{ left: 112, top: 470 }}>
@@ -549,21 +660,42 @@ function Checks() {
         <Eyebrow>Exercices</Eyebrow>
         <h2 className="k-title">Corrigé en un clic.</h2>
         <p className="k-sub">
-          « Vérifier » rejoue les exemples écrits sous chaque fonction : ce qui est juste, et sinon l'attendu
-          face à l'obtenu.
+          «&nbsp;Vérifier&nbsp;» rejoue les exemples écrits sous chaque fonction&nbsp;: ce qui est juste, et
+          sinon l'attendu face à l'obtenu.
         </p>
         <Keys keys={[["Ctrl", "Maj", "Entrée"]]} />
       </Text>
       <div className="k-points" style={{ left: 112, top: 700, width: 640 }}>
-        <Point icon={Keyboard} title="input() pose ses questions" />
-        <Point icon={CircleStop} title="Arrêter à tout moment" />
-        <Point icon={Timer} title="Plus de boucle sans fin" />
+        <Point icon={ListChecks} title="Les exemples >>> deviennent des tests" />
+        <Point icon={FileCheck2} title="Ou un fichier à part, nom.checks.py" />
+        <Point icon={PencilLine} title="Des exercices prêts, à compléter" />
       </div>
       <Shot
         src="python-verifier"
         box={{ left: 820, width: 1100, top: 190 }}
         crop={[884, 80, 1996, 1200]}
         bleed="right"
+      />
+    </Slide>
+  );
+}
+
+function Notes() {
+  return (
+    <Slide name="notes">
+      <Text box={{ left: 112, top: 104, width: 1696 }}>
+        <Eyebrow>Notes</Eyebrow>
+        <h2 className="k-title">Les maths s'écrivent comme au tableau.</h2>
+        <p className="k-sub full">
+          Le texte et les formules LaTeX d'un côté, le rendu de l'autre, au fil de la frappe. Une formule
+          seule sur sa ligne se centre d'elle-même.
+        </p>
+      </Text>
+      <Shot
+        src="note"
+        box={{ left: 112, width: 1696, top: 400 }}
+        crop={[464, 80, 2416, 1260]}
+        bleed="bottom"
       />
     </Slide>
   );
@@ -576,11 +708,12 @@ function SlidesFromNotes() {
         <Eyebrow>Notes</Eyebrow>
         <h2 className="k-title">Vos notes deviennent un diaporama.</h2>
         <p className="k-sub">
-          F5, et le cours passe en grand : titres, formules et code s'ajustent à l'écran.
+          F5, et le cours passe en grand&nbsp;: titres, formules et code s'ajustent à l'écran.
         </p>
         <Keys keys={[["F5"], ["←"], ["→"], ["B"]]} />
       </Text>
-      <div className="k-points" style={{ left: 112, top: 760, width: 560 }}>
+      <div className="k-points" style={{ left: 112, top: 720, width: 560 }}>
+        <Point icon={Presentation} title="Les télécommandes de présentation aussi" />
         <Point icon={LayoutTemplate} title="Modèles de cours, d'exercices, d'évaluation" />
         <Point icon={FileText} title="Export en vrai PDF, format A4" />
       </div>
@@ -617,6 +750,52 @@ function Documents() {
   );
 }
 
+function Search() {
+  return (
+    <Slide name="recherche" stage>
+      <Text box={{ left: 160, top: 104, width: 1600 }} align="center">
+        <Eyebrow>Recherche</Eyebrow>
+        <h2 className="k-title">Ctrl K. Et tout est là.</h2>
+        <p className="k-sub center">
+          Un cours, un document, une note&nbsp;: quelques lettres suffisent. Même à l'intérieur des PDF.
+        </p>
+      </Text>
+      <Shot
+        src="part-recherche"
+        size={[1152, 572]}
+        box={{ left: 384, width: 1152, top: 430 }}
+        crop={[0, 0, 1152, 572]}
+      />
+    </Slide>
+  );
+}
+
+function Backups() {
+  return (
+    <Slide name="sauvegardes">
+      <Text box={{ left: 112, top: 140, width: 620 }}>
+        <Eyebrow>Vos données</Eyebrow>
+        <h2 className="k-title">Vos cours, à l'abri.</h2>
+        <p className="k-sub">
+          Chaque jour, une copie complète de vos données sur la clé. Et une autre ailleurs, si vous le
+          voulez&nbsp;: une clé peut se perdre.
+        </p>
+      </Text>
+      <div className="k-points" style={{ left: 112, top: 640, width: 620 }}>
+        <Point icon={ShieldCheck} title="Les données vérifiées à chaque démarrage" />
+        <Point icon={History} title="Les 7 derniers jours, puis une copie par semaine" />
+        <Point icon={ArchiveRestore} title="Revenir à un jour choisi, sans rien effacer" />
+      </div>
+      <Shot
+        src="sauvegardes"
+        size={[2240, 1720]}
+        box={{ left: 780, width: 1100, top: 190 }}
+        crop={[500, 180, 1700, 1130]}
+      />
+    </Slide>
+  );
+}
+
 function NewLook() {
   return (
     <Slide name="nouveau-visage">
@@ -646,9 +825,39 @@ function NewMark() {
         <Eyebrow>Identité</Eyebrow>
         <h2 className="k-title">Un nouveau logo.</h2>
         <p className="k-sub center">
-          Deux cercles tracés au compas, et le point où ils se coupent : la toute première construction des
-          Éléments d'Euclide.
+          Deux cercles tracés au compas, et le point où ils se coupent&nbsp;: la toute première construction
+          des Éléments d'Euclide.
         </p>
+      </div>
+    </Slide>
+  );
+}
+
+/** The release in numbers, each one counted or checked in the code. */
+function Figures() {
+  const themes = LEVELS.filter((l) => l.id !== "mine").reduce((n, l) => n + l.themes.length, 0);
+  const figures: [number, string][] = [
+    [BUILT_IN.length, "modèles Python, tous testés"],
+    [themes, "thèmes, rangés niveau par niveau"],
+    [4, "instruments de géométrie, à leur vraie taille"],
+    [5, "fonds de feuille, du Seyès au repère"],
+    [5, "modèles de notes, du cours à l'évaluation"],
+    [9, "minuteurs, chacun sur sa touche"],
+    [1, "requête à Pronote pour toute la semaine, au lieu de 7"],
+    [0, "logiciel à installer pour dessiner en Python"],
+  ];
+  return (
+    <Slide name="en-chiffres">
+      <Text box={{ left: 160, top: 110, width: 1600 }} align="center">
+        <h2 className="k-title">Euclide 0.4, en chiffres.</h2>
+      </Text>
+      <div className="k-figures">
+        {figures.map(([n, label]) => (
+          <div key={label}>
+            <span className="k-figure-n">{n}</span>
+            <span className="k-figure-label">{label}</span>
+          </div>
+        ))}
       </div>
     </Slide>
   );
@@ -657,19 +866,19 @@ function NewMark() {
 function AndMore() {
   const items: [LucideIcon, string][] = [
     [Pin, "Onglets qu'on glisse et qu'on épingle"],
-    [Search, "La palette Ctrl K cherche dans les documents"],
+    [ListCollapse, "Un menu pour les onglets qui débordent"],
     [Keyboard, "Raccourcis pensés pour le clavier français"],
-    [Undo2, "Rappels qui s'annulent d'un clic"],
-    [CalendarDays, "Cahier de textes Pronote rangé par semaine"],
-    [Zap, "L'emploi du temps Pronote en une requête"],
+    [ArrowUpDown, "Les documents au clavier\u00a0: ↑ ↓ Entrée F2 Suppr"],
+    [Undo2, "Rappels\u00a0: modifier sur place, annuler d'un clic"],
+    [History, "Les versions des PDF annotés"],
+    [Clock3, "La palette propose d'abord les documents récents"],
     [ShieldCheck, "Rien n'est perdu à la fermeture"],
     [MonitorPlay, "L'écran reste allumé pendant les cours"],
+    [Power, "Sous Windows, Python s'arrête avec Euclide"],
+    [DatabaseBackup, "Une copie de la base avant chaque mise à niveau"],
     [Contrast, "Contrastes conformes WCAG AA"],
-    [History, "Les versions des PDF annotés"],
-    [LayoutTemplate, "Toute note peut devenir un modèle"],
-    [Settings2, "Réglages rangés par sections"],
-    [MoonStar, "Un thème sombre soigné"],
     [MessageSquareText, "Des infobulles partout"],
+    [Settings2, "Réglages rangés par sections"],
     [Gauge, "Chaque écran se charge à sa première ouverture"],
   ];
   return (
@@ -698,7 +907,7 @@ function Closing() {
           Euclide <span>0.4</span>
         </h1>
         <p className="k-cover-sub">
-          Disponible maintenant : la mise à jour s'annonce dans la barre d'état d'Euclide.
+          Disponible maintenant&nbsp;: la mise à jour s'annonce dans la barre d'état d'Euclide.
         </p>
       </div>
     </Slide>
@@ -714,13 +923,20 @@ export default function Recap() {
       <Whiteboard />
       <ClassTimer />
       <Lesson />
+      <ClassBook />
       <Templates />
+      <TemplateWall />
+      <PythonEditor />
       <PythonDraws />
       <Checks />
+      <Notes />
       <SlidesFromNotes />
       <Documents />
+      <Search />
+      <Backups />
       <NewLook />
       <NewMark />
+      <Figures />
       <AndMore />
       <Closing />
     </main>
