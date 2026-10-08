@@ -65,16 +65,6 @@ pub struct Note {
     pub updated_at: String,
 }
 
-/// A note in a list: no body, just the start of it.
-#[derive(Debug, Serialize)]
-pub struct NoteSummary {
-    pub id: i64,
-    pub course_id: Option<i64>,
-    pub title: String,
-    pub excerpt: String,
-    pub updated_at: String,
-}
-
 #[derive(Debug, Serialize)]
 pub struct FileItem {
     pub id: i64,

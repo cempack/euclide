@@ -143,7 +143,7 @@ function fallback<T>(cmd: string, args?: Record<string, unknown>): T {
     } as unknown as T;
   }
   if (cmd === "read_board") return "{}" as unknown as T;
-  if (cmd === "file_path" || cmd === "choose_data_dir") return "" as unknown as T;
+  if (cmd === "choose_data_dir") return "" as unknown as T;
   return null as unknown as T;
 }
 
@@ -412,8 +412,6 @@ export const api = {
       refName: ref.name ?? null,
     }),
   removeStepResource: (id: number) => invoke<void>("remove_step_resource", { id }),
-  moveStepResource: (itemId: number, id: number, delta: number) =>
-    invoke<void>("move_step_resource", { itemId, id, delta }),
   deleteSequenceItem: (id: number) => invoke<void>("delete_sequence_item", { id }),
   moveSequenceItem: (sequenceId: number, id: number, delta: number) =>
     invoke<void>("move_sequence_item", { sequenceId, id, delta }),
@@ -439,7 +437,6 @@ export const api = {
   openFile: (id: number) => invoke<void>("open_file", { id }),
   revealFile: (id: number) => invoke<void>("reveal_file", { id }),
   listOpeners: (id: number) => invoke<Opener[]>("list_openers", { id }),
-  filePath: (id: number) => invoke<string>("file_path", { id }),
   /** Copy library documents into a course locker. */
   attachFilesToCourse: (courseId: number, fileIds: number[]) =>
     invoke<FileItem[]>("attach_files_to_course", { courseId, fileIds }),

@@ -384,27 +384,6 @@ pub async fn remove_step_resource(db: State<'_, Db>, id: i64) -> AppResult<()> {
     .await
 }
 
-/// Move a resource earlier (-1) or later (+1) in its step.
-#[tauri::command]
-pub async fn move_step_resource(
-    db: State<'_, Db>,
-    item_id: i64,
-    id: i64,
-    delta: i64,
-) -> AppResult<()> {
-    db.write(move |conn| {
-        reorder(
-            conn,
-            "sequence_item_resources",
-            "item_id",
-            item_id,
-            id,
-            delta,
-        )
-    })
-    .await
-}
-
 #[tauri::command]
 pub async fn delete_sequence_item(db: State<'_, Db>, id: i64) -> AppResult<()> {
     db.write(move |conn| {
