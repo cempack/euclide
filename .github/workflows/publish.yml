@@ -450,7 +450,7 @@ jobs:
           cd /tmp/euclide-updater
           gh release download "$TAG" --pattern 'Euclide-windows-portable.zip' --repo "$REPO"
           gh release download "$TAG" --pattern 'latest.json' --repo "$REPO"
-          gh release download "$TAG" --pattern '*amd64.AppImage.tar.gz.sig' --repo "$REPO" || true
+          gh release download "$TAG" --pattern '*_amd64.AppImage.sig' --repo "$REPO" || true
           test -f Euclide-windows-portable.zip
           test -f latest.json
           npx --yes @tauri-apps/cli@2 signer sign Euclide-windows-portable.zip
@@ -469,14 +469,19 @@ jobs:
               platforms["windows-x86_64-nsis"] = win
           portable_url = f"https://github.com/{repo}/releases/download/{tag}/Euclide-windows-portable.zip"
           platforms["windows-x86_64"] = {"signature": sig, "url": portable_url}
-          linux_sigs = sorted(pathlib.Path(".").glob("*amd64.AppImage.tar.gz.sig"))
+          # The AppImage is patched and uploaded again after tauri-action listed
+          # it: a new asset (the listed one is gone) and a new signature. Point
+          # the Linux entries at it by name, with its own signature.
+          linux_sigs = sorted(pathlib.Path(".").glob("*_amd64.AppImage.sig"))
           if linux_sigs:
               linux_sig = linux_sigs[0].read_text().strip()
+              image = linux_sigs[0].name[: -len(".sig")]
               if linux_sig:
-                  linux = platforms.get("linux-x86_64") or {}
-                  linux["signature"] = linux_sig
-                  platforms["linux-x86_64"] = linux
-                  print("linux-x86_64 signature refreshed from", linux_sigs[0].name)
+                  entry = {"signature": linux_sig, "url": f"https://github.com/{repo}/releases/download/{tag}/{image}"}
+                  for key in ("linux-x86_64", "linux-x86_64-appimage"):
+                      if key in platforms:
+                          platforms[key] = dict(entry)
+                  print("linux-x86_64 ->", entry["url"])
           pathlib.Path("latest.json").write_text(json.dumps(data, indent=2) + "\n")
           print("windows-x86_64 ->", portable_url)
           print("windows-x86_64-nsis ->", (platforms.get("windows-x86_64-nsis") or {}).get("url"))
