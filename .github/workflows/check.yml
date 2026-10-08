@@ -64,6 +64,12 @@ jobs:
       # Windows-only code (portable updater, keep-awake) only compiles here.
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      # Advisories, licences and sources of the dependencies (deny.toml).
+      - name: cargo deny
+        if: runner.os == 'Linux'
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
 
   sidecar:
     runs-on: ubuntu-latest
