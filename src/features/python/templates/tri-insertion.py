@@ -4,9 +4,9 @@
 def tri_insertion(t):
     """Trie la liste t dans l'ordre croissant, en place.
 
-    >>> l = [5, 2, 9, 1, 5]
-    >>> tri_insertion(l)
-    >>> l
+    >>> notes = [5, 2, 9, 1, 5]
+    >>> tri_insertion(notes)
+    >>> notes
     [1, 2, 5, 5, 9]
     """
     for i in range(1, len(t)):
@@ -18,6 +18,6 @@ def tri_insertion(t):
         t[j + 1] = cle
 
 
-l = [31, 4, 15, 9, 26, 5]
-tri_insertion(l)
-print(l)
+liste = [31, 4, 15, 9, 26, 5]
+tri_insertion(liste)
+print(liste)

@@ -5,3 +5,8 @@ extend-exclude = ["public", "node_modules", "src-tauri/target"]
 
 [lint]
 select = ["E4", "E7", "E9", "F", "B"]
+
+# Script templates (src/features/python/templates) are written as a class
+# writes them: `from turtle import *` is how the turtle is taught.
+[lint.per-file-ignores]
+"src/features/python/templates/*.py" = ["F403", "F405"]
