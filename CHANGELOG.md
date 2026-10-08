@@ -4,7 +4,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 ## 0.4.1
 
-- Le module Python d'Euclide passe de 5 660 fichiers à 872 : une mise à jour s'installe bien plus vite sur une clé USB, et la première ouverture qui suit aussi. Les fichiers retirés aidaient la complétion pour des bibliothèques qu'un script de cours ne peut pas importer ; la complétion ne change pas.
+- Le module Python d'Euclide passe d'environ 5 700 fichiers à moins de 900 : une mise à jour s'installe bien plus vite sur une clé USB, et la première ouverture qui suit aussi. Les fichiers retirés aidaient la complétion pour des bibliothèques qu'un script de cours ne peut pas importer ; la complétion ne change pas.
 - Une mise à jour qui garde le même module Python ne le réécrit plus sur la clé : seul le programme change.
 - L'en-tête de la barre latérale ne garde que le nom d'Euclide.
 
