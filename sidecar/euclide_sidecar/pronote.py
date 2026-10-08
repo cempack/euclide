@@ -392,6 +392,7 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
     today = dt.date.today()
 
     # Determine week range
+    d0 = None
     if date_debut:
         try:
             s = str(date_debut).strip()
@@ -400,53 +401,56 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
             else:
                 core = s.split()[0] if " " in s else s
                 d0 = dt.datetime.strptime(core, "%d/%m/%Y").date()
-            first_w = client.get_week(d0)
         except Exception:  # noqa: BLE001
-            first_w = client.get_week(today - dt.timedelta(days=days_back))
-    else:
-        first_w = client.get_week(today - dt.timedelta(days=days_back))
-
-    last_w = client.get_week(today + dt.timedelta(days=28))
-
-    first_w = max(0, first_w)
-    last_w = max(0, last_w)
+            d0 = None
+    full_first = max(0, client.get_week(today - dt.timedelta(days=days_back)))
+    first_w = max(0, client.get_week(d0)) if d0 else full_first
+    last_w = max(0, client.get_week(today + dt.timedelta(days=28)))
     if first_w > last_w:
         first_w = last_w
 
     items = []
     seen = set()
 
-    # Try querying the entire range in a single request first (extremely fast!)
-    lst = None
-    try:
-        data = {"domaine": {"_T": 8, "V": f"[{first_w}..{last_w}]"}}
-        if classe:
-            data["ressource"] = classe
-            data["classe"] = classe
-            data["estCours"] = True
-            data["avecCoursAnnules"] = True
-        resp = client.post("PageCahierDeTexte", 89, data)
-        lst = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", [])
-    except Exception:  # noqa: BLE001
+    def fetch(first, last):
+        """The range in one request (fast), else week by week."""
         lst = None
+        try:
+            data = {"domaine": {"_T": 8, "V": f"[{first}..{last}]"}}
+            if classe:
+                data["ressource"] = classe
+                data["classe"] = classe
+                data["estCours"] = True
+                data["avecCoursAnnules"] = True
+            resp = client.post("PageCahierDeTexte", 89, data)
+            lst = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", [])
+        except Exception:  # noqa: BLE001
+            lst = None
+        if not lst:
+            lst = []
+            for w in range(first, last + 1):
+                try:
+                    data = {"domaine": {"_T": 8, "V": f"[{w}..{w}]"}}
+                    if classe:
+                        data["ressource"] = classe
+                        data["classe"] = classe
+                        data["estCours"] = True
+                        data["avecCoursAnnules"] = True
+                    resp = client.post("PageCahierDeTexte", 89, data)
+                    sub_lst = (
+                        resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", [])
+                    )
+                    if sub_lst:
+                        lst.extend(sub_lst)
+                except Exception:  # noqa: BLE001
+                    continue
+        return lst
 
-    # Fallback to week-by-week loop if range query failed or returned nothing
-    if not lst:
-        lst = []
-        for w in range(first_w, last_w + 1):
-            try:
-                data = {"domaine": {"_T": 8, "V": f"[{w}..{w}]"}}
-                if classe:
-                    data["ressource"] = classe
-                    data["classe"] = classe
-                    data["estCours"] = True
-                    data["avecCoursAnnules"] = True
-                resp = client.post("PageCahierDeTexte", 89, data)
-                sub_lst = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", [])
-                if sub_lst:
-                    lst.extend(sub_lst)
-            except Exception:  # noqa: BLE001
-                continue
+    lst = fetch(first_w, last_w)
+    # Some servers number weeks so that a range starting mid-year comes back
+    # empty: then fetch the whole range and keep the period by date below.
+    if not lst and d0 and first_w > full_first:
+        lst = fetch(full_first, last_w)
 
     for e in lst:
         conts = (e.get("listeContenus") or {}).get("V") or []
@@ -479,6 +483,14 @@ def _lesson_contents(client, days_back: int = 365, classe: dict | None = None, d
                 end_time = dtm2.strftime("%H:%M")
         except Exception:  # noqa: BLE001
             pass
+
+        # The period asked for, whatever range the server sent back.
+        if d0 and date_str:
+            try:
+                if dt.datetime.strptime(date_str.split()[0], "%d/%m/%Y").date() < d0:
+                    continue
+            except ValueError:
+                pass
 
         lesson_n = ((e.get("cours") or {}).get("V") or {}).get("N") or ""
         key = (date_str, subject, title)
