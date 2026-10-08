@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
-import { Coffee } from "lucide-react";
+import { ArrowUpCircle, Coffee } from "lucide-react";
 import type { AppInfo, ScheduleEntry } from "../lib/api";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../lib/format";
 import { tr } from "../lib/i18n";
@@ -10,6 +10,7 @@ import { useAppearance } from "../lib/theme";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
 import { StatusTimerChip } from "./Timer";
+import { useInstallUpdate } from "../stores/update";
 
 /**
  * The window's status line, across its whole width: the class in progress,
@@ -88,6 +89,8 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
         </span>
       )}
 
+      <UpdateItem />
+
       <span className="flex-1" />
 
       <span className="eu-status-item eu-status-end hidden lg:flex">
@@ -106,3 +109,41 @@ export const StatusBar = memo(function StatusBar({ info }: { info: AppInfo | nul
     </footer>
   );
 });
+
+/**
+ * A newer Euclide: one discreet item instead of a card over the screen,
+ * which may be on the projector. A click installs it (after asking).
+ */
+function UpdateItem() {
+  const { update, phase, percent, error, install } = useInstallUpdate();
+  if (!update) return null;
+  const label =
+    phase === "installing"
+      ? tr("updater.statusInstalling", { percent })
+      : phase === "installed"
+        ? tr("updater.statusInstalled")
+        : phase === "error"
+          ? tr("updater.statusError")
+          : tr("updater.statusAvailable", { version: update.version });
+  const hint =
+    phase === "installed"
+      ? tr("updater.statusInstalledTip")
+      : phase === "error"
+        ? error
+        : tr("updater.statusAvailableTip");
+  return (
+    <button
+      type="button"
+      onClick={() => void install()}
+      disabled={phase === "installing" || phase === "installed"}
+      {...tip(hint)}
+      data-tip-place="top"
+      className={`eu-status-item eu-status-button tabular-nums ${
+        phase === "error" ? "text-danger" : phase === "installed" ? "text-ok" : "text-accent"
+      }`}
+    >
+      <Icon icon={ArrowUpCircle} size={14} />
+      {label}
+    </button>
+  );
+}

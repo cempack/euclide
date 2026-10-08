@@ -1,17 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
 import { tr } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import {
   checkForAppUpdate,
-  dismissAvailableUpdate,
-  installErrorMessage,
-  installPendingUpdate,
   isIncompleteUpdateManifest,
   isNoPublishedUpdate,
   updaterSupported,
-  type AppUpdateInfo,
 } from "../lib/updater";
 import { DAY_LABELS, isoDayOfWeek } from "../lib/format";
 
@@ -26,6 +22,7 @@ import { useAppearance } from "../lib/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { useSetting } from "../api/hooks";
+import { setAvailableUpdate, useInstallUpdate } from "../stores/update";
 import { remoteFaviconsEnabled } from "../components/Favicon";
 
 const NO_ENTRIES: ScheduleEntry[] = [];
@@ -904,95 +901,42 @@ function webviewName(): string {
 
 function AboutSection({ info }: { info: AppInfo | null }) {
   const toast = useToast();
-  const confirmDlg = useConfirm();
-  const [status, setStatus] = useState<
-    "idle" | "checking" | "upToDate" | "publishing" | "available" | "installing" | "installed" | "error"
-  >(() => (isTauri() && updaterSupported() ? "checking" : "idle"));
-  const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
-  const [error, setError] = useState("");
-  const [percent, setPercent] = useState<number | null>(null);
-
-  const runCheck = (quiet: boolean) => {
-    if (!updaterSupported()) return;
-    setStatus("checking");
-    setError("");
-    void check(quiet);
+  // The installation is shared with the status bar (stores/update.ts).
+  const { update, phase, percent, error: installError, install } = useInstallUpdate();
+  const queryClient = useQueryClient();
+  /** Asks the update server; a found version goes to the shared store. */
+  const ask = (force: boolean) => async () => {
+    const next = await checkForAppUpdate(force);
+    if (next) setAvailableUpdate(next);
+    return next;
   };
-
-  /** The answer to a check; the screen opens already « checking ». */
-  const check = async (quiet: boolean) => {
-    if (!updaterSupported()) return;
-    try {
-      const next = await checkForAppUpdate(!quiet);
-      if (next) {
-        setUpdate(next);
-        setStatus("available");
-        window.dispatchEvent(new CustomEvent("eu:update-available", { detail: next }));
-      } else {
-        setUpdate(null);
-        setStatus("upToDate");
-      }
-    } catch (err) {
-      if (isIncompleteUpdateManifest(err)) {
-        setUpdate(null);
-        setStatus("publishing");
-        return;
-      }
-      if (isNoPublishedUpdate(err)) {
-        setUpdate(null);
-        setStatus("upToDate");
-        return;
-      }
-      setStatus("error");
-      setError(err instanceof Error ? err.message : String(err));
-      if (!quiet) toast(tr("updater.error"), "error");
-    }
-  };
-
-  useEffect(() => {
-    if (!isTauri()) return;
-    void check(true);
-    const onAvailable = (e: Event) => {
-      const detail = (e as CustomEvent<AppUpdateInfo>).detail;
-      if (!detail?.version) return;
-      setUpdate(detail);
-      setStatus("available");
-    };
-    window.addEventListener("eu:update-available", onAvailable);
-    return () => window.removeEventListener("eu:update-available", onAvailable);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one quiet check on mount
-  }, []);
-
-  const install = async () => {
-    if (!update) return;
-    // The app has its own confirmation dialog; the native window.confirm()
-    // that used to be here looked foreign inside the Tauri window.
-    const ok = await confirmDlg.ask({
-      title: tr("updater.install"),
-      message: tr("updater.confirmInstall", {
-        version: update.version,
-      }),
-      confirmLabel: tr("updater.install"),
-    });
-    if (!ok) return;
-    setStatus("installing");
-    setPercent(0);
-    try {
-      await installPendingUpdate(({ downloaded, contentLength }) => {
-        if (contentLength && contentLength > 0) {
-          setPercent(Math.min(100, Math.round((downloaded / contentLength) * 100)));
-        }
-      });
-      dismissAvailableUpdate(update.version);
-      setStatus("installed");
-      toast(tr("updater.installed"), "success");
-    } catch (err) {
-      setStatus("error");
-      const msg = installErrorMessage(err) || tr("updater.installFailed");
-      setError(msg);
-      toast(msg, "error");
-    }
-  };
+  const updateQ = useQuery({
+    queryKey: ["updates"],
+    queryFn: ask(false),
+    enabled: isTauri() && updaterSupported(),
+    staleTime: 5 * 60_000,
+  });
+  const runCheck = () =>
+    void queryClient
+      .fetchQuery({ queryKey: ["updates"], queryFn: ask(true), staleTime: 0 })
+      .catch(() => toast(tr("updater.error"), "error"));
+  const checkError = updateQ.error;
+  const check: "idle" | "checking" | "upToDate" | "publishing" | "error" = !isTauri()
+    ? "idle"
+    : updateQ.isFetching
+      ? "checking"
+      : checkError
+        ? isIncompleteUpdateManifest(checkError)
+          ? "publishing"
+          : isNoPublishedUpdate(checkError)
+            ? "upToDate"
+            : "error"
+        : updateQ.data === null
+          ? "upToDate"
+          : "idle";
+  const status = check === "checking" ? "checking" : update ? phase : check;
+  const error =
+    phase === "error" && update ? installError : checkError instanceof Error ? checkError.message : "";
 
   const statusLine =
     status === "checking"
@@ -1007,9 +951,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
                 current: update.currentVersion,
               })
             : status === "installing"
-              ? tr("updater.installing", {
-                  percent: percent ?? 0,
-                })
+              ? tr("updater.installing", { percent })
               : status === "installed"
                 ? tr("updater.installed")
                 : status === "error"
@@ -1040,7 +982,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void runCheck(false)}
+                onClick={runCheck}
                 disabled={status === "checking" || status === "installing"}
                 className="eu-btn-ghost eu-btn-sm"
               >
@@ -1067,7 +1009,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
             )}
             {status === "installing" && (
               <div className="eu-gauge">
-                <i style={{ width: `${percent ?? 0}%` }} />
+                <i style={{ width: `${percent}%` }} />
               </div>
             )}
             <p className="eu-t-meta leading-snug">

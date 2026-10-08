@@ -16,29 +16,11 @@ export type UpdateDownloadProgress = {
   contentLength: number | null;
 };
 
-const DISMISS_KEY = "euclide.updateDismissed";
 const WINDOWS_PORTABLE_TARGET = "windows-x86_64";
 
 let pending: Update | null = null;
 let inflight: Promise<AppUpdateInfo | null> | null = null;
 let portableWindows: boolean | null = null;
-
-export function wasUpdateDismissed(version: string): boolean {
-  try {
-    return sessionStorage.getItem(DISMISS_KEY) === version;
-  } catch {
-    // Storage blocked: offer the update again.
-    return false;
-  }
-}
-
-export function dismissAvailableUpdate(version: string): void {
-  try {
-    sessionStorage.setItem(DISMISS_KEY, version);
-  } catch {
-    /* private mode / storage blocked */
-  }
-}
 
 export function updaterSupported(): boolean {
   return isTauri();

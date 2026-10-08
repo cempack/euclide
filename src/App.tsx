@@ -3,7 +3,8 @@ import { api, type AppInfo, isTauri } from "./lib/api";
 import { tr } from "./lib/i18n";
 import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
-import { checkForAppUpdate, wasUpdateDismissed, type AppUpdateInfo } from "./lib/updater";
+import { checkForAppUpdate } from "./lib/updater";
+import { setAvailableUpdate } from "./stores/update";
 import { takeBootUpdate } from "./lib/boot";
 import { errorMessage } from "./lib/errors";
 import { logged, reportError } from "./lib/report";
@@ -15,7 +16,6 @@ import { tabs, useActiveTab, useTabsStore, useTabList, type Tab, type TabKind } 
 import { editors } from "./stores/editors";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading } from "./components/ui";
 import { Segmented } from "./components/layout";
-import { UpdateAvailablePopup } from "./components/UpdateAvailablePopup";
 import { Sidebar, ProjectionRail } from "./shell/Sidebar";
 import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
@@ -340,7 +340,6 @@ function Shell() {
 
   useEffect(prefetchScreens, []);
   const [dragging, setDragging] = useState(false);
-  const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -379,7 +378,6 @@ function Shell() {
   const closePalette = useCallback(() => setPalette(false), []);
   const closeCapture = useCallback(() => setCaptureOpen(false), []);
   const closeHelp = useCallback(() => setHelp(false), []);
-  const dismissUpdate = useCallback(() => setAvailableUpdate(null), []);
 
   const requestClose = useCallback(
     async (id: string) => {
@@ -486,19 +484,8 @@ function Shell() {
   // First launch after an update: say so, once.
   useEffect(() => {
     const updated = takeBootUpdate();
-    if (updated) toast(`Euclide a été mis à jour vers la version ${updated.to}.`, "success");
+    if (updated) toast(tr("updater.updatedTo", { version: updated.to }), "success");
   }, [toast]);
-
-  useEffect(() => {
-    const onAvailable = (e: Event) => {
-      const detail = (e as CustomEvent<AppUpdateInfo>).detail;
-      if (!detail?.version) return;
-      if (wasUpdateDismissed(detail.version)) return;
-      setAvailableUpdate(detail);
-    };
-    window.addEventListener("eu:update-available", onAvailable);
-    return () => window.removeEventListener("eu:update-available", onAvailable);
-  }, []);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -506,9 +493,8 @@ function Shell() {
     const timer = window.setTimeout(async () => {
       try {
         const update = await checkForAppUpdate();
-        if (cancelled || !update) return;
-        if (wasUpdateDismissed(update.version)) return;
-        window.dispatchEvent(new CustomEvent("eu:update-available", { detail: update }));
+        // Offered in the status bar, never over the screen (it may be projected).
+        if (!cancelled && update) setAvailableUpdate(update);
       } catch {
         // Draft-only GitHub releases, offline, etc. Stay quiet.
       }
@@ -679,7 +665,6 @@ function Shell() {
           <ClassroomScene onClose={scene.close} />
         </Suspense>
       )}
-      <UpdateAvailablePopup update={availableUpdate} onDismiss={dismissUpdate} />
       {dragging && (
         <div className="fixed inset-0 z-80 grid place-items-center bg-accent/10 pointer-events-none">
           <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
