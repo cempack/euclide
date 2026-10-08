@@ -528,6 +528,19 @@ if (empty) {
   pronote.last_sync = null;
 }
 
+/**
+ * Real runs, recorded by scripts/changelog/run-events.mjs for screenshots:
+ * their scripts join the list, and running one replays its events.
+ */
+const recorded = (
+  globalThis as {
+    __euRecordedRuns?: { scripts: { name: string; code: string }[]; events: Record<string, unknown[]> };
+  }
+).__euRecordedRuns;
+if (recorded)
+  for (const r of recorded.scripts)
+    pythonDemos.unshift({ name: r.name, code: r.code, path: `/mock/python/${r.name}.py` });
+
 if (sparse) {
   reminders.length = 0;
   links.length = 0;
@@ -1190,6 +1203,17 @@ function mockRun(args?: Record<string, unknown>): number {
   const send = args?.onEvent as (events: Ev[]) => void;
   const code = String(args?.code ?? "");
   const id = ++mockRunId;
+  const real = recorded?.events[String(args?.name ?? "")];
+  if (real) {
+    // What the real runner printed and drew for this script, in order.
+    void (async () => {
+      for (const event of real) {
+        await new Promise((r) => setTimeout(r, 20));
+        send([event as Ev]);
+      }
+    })();
+    return id;
+  }
   void (async () => {
     for (const line of code.split("\n")) {
       const asked = /input\(\s*["'](.*?)["']/.exec(line);
