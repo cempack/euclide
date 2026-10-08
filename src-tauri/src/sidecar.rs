@@ -363,12 +363,14 @@ impl Launch {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
-        cmd.spawn().map_err(|e| {
+        let child = cmd.spawn().map_err(|e| {
             format!(
                 "Impossible de démarrer Python ({}) : {e}",
                 self.program.display()
             )
-        })
+        })?;
+        crate::jobobject::adopt(&child);
+        Ok(child)
     }
 }
 
