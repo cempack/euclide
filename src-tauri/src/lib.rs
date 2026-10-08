@@ -110,6 +110,15 @@ pub fn run() {
             app.manage(sidecar::Sidecar::new(app.handle().clone()));
             app.manage(runner::Runner::default());
             sidecar::start_reaper(app.handle().clone());
+            // After an update, Python answers once in the background: a module
+            // left from the previous version is put right before it is needed.
+            if updated_from.is_some() {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    let _ = sidecar::call(&handle, "hello", &serde_json::json!({})).await;
+                });
+            }
             runner::start_reaper(app.handle().clone());
             jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());

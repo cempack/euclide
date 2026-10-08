@@ -19,6 +19,12 @@ const useUpdateStore = create<UpdateState>()(() => ({
   error: "",
 }));
 
+/** Installing or installed: no new check may drop the update in hand. */
+export function updateInProgress(): boolean {
+  const { phase } = useUpdateStore.getState();
+  return phase === "installing" || phase === "installed";
+}
+
 /** A newer version was found (at startup, or by « Vérifier » in Réglages). */
 export function setAvailableUpdate(update: AppUpdateInfo | null) {
   const s = useUpdateStore.getState();

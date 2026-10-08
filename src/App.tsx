@@ -5,7 +5,7 @@ import { tr } from "./lib/i18n";
 import { minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate } from "./lib/updater";
-import { setAvailableUpdate } from "./stores/update";
+import { setAvailableUpdate, updateInProgress } from "./stores/update";
 import { takeBootUpdate } from "./lib/boot";
 import { errorMessage } from "./lib/errors";
 import { logged, reportError } from "./lib/report";
@@ -490,21 +490,27 @@ function Shell() {
     if (updated) toast(tr("updater.updatedTo", { version: updated.to }), "success");
   }, [toast]);
 
+  // Shortly after launch, then every few hours: Euclide may stay open for
+  // days on a classroom PC.
   useEffect(() => {
     if (!isTauri()) return;
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
+    const check = async (force: boolean) => {
+      if (updateInProgress()) return;
       try {
-        const update = await checkForAppUpdate();
+        const update = await checkForAppUpdate(force);
         // Offered in the status bar, never over the screen (it may be projected).
         if (!cancelled && update) setAvailableUpdate(update);
       } catch {
         // Draft-only GitHub releases, offline, etc. Stay quiet.
       }
-    }, 4000);
+    };
+    const first = window.setTimeout(() => void check(false), 4000);
+    const again = window.setInterval(() => void check(true), 6 * 60 * 60 * 1000);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      window.clearTimeout(first);
+      window.clearInterval(again);
     };
   }, []);
 

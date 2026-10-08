@@ -32,6 +32,10 @@ const OUTDATED: &str =
     "Le module Python d'Euclide ne correspond pas à cette version. Fermez Euclide et rouvrez-le ; \
      si le message revient, réinstallez Euclide.";
 
+const REPAIRING: &str =
+    "Le module Python d'Euclide ne correspond pas à cette version : Euclide le remplace \
+     (une minute s'il faut le télécharger). Réessayez ensuite.";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lane {
     Pronote,
@@ -108,6 +112,8 @@ pub struct Sidecar {
     lanes: [Slot; 3],
     /// Set when Euclide quits or updates: no restart after that.
     closed: AtomicBool,
+    /// This version's sidecar is being put back (`outdated`).
+    repairing: AtomicBool,
     handle: AppHandle,
 }
 
@@ -116,6 +122,7 @@ impl Sidecar {
         Self {
             lanes: Default::default(),
             closed: AtomicBool::new(false),
+            repairing: AtomicBool::new(false),
             handle,
         }
     }
@@ -157,9 +164,39 @@ impl Sidecar {
                 "[sidecar] {} : protocole {protocol:?}, attendu {PROTOCOL}",
                 lane.name()
             ));
-            return Err(OUTDATED.into());
+            return Err(self.outdated());
         }
         Ok((pipes, child))
+    }
+
+    /// A sidecar of another version answered: an update whose swap was held
+    /// off, or files copied one by one by Euclide 0.1's updater. On a Windows
+    /// USB copy, put this version's back in the background, one repair at a
+    /// time (`portable_update::repair_sidecar`); the next call starts it.
+    fn outdated(&self) -> String {
+        if !crate::portable_update::can_repair_sidecar() {
+            return OUTDATED.into();
+        }
+        if !self.repairing.swap(true, Ordering::SeqCst) {
+            let app = self.handle.clone();
+            tauri::async_runtime::spawn(async move {
+                // Every process run from the folder must let go of it.
+                if let Some(sidecar) = app.try_state::<Sidecar>() {
+                    sidecar.lanes.iter().for_each(Slot::kill);
+                }
+                if let Some(runner) = app.try_state::<crate::runner::Runner>() {
+                    runner.cool();
+                }
+                match crate::portable_update::repair_sidecar(&app).await {
+                    Ok(()) => crate::applog::warn("[sidecar] module Python remis en place"),
+                    Err(e) => crate::applog::warn(format!("[sidecar] réparation : {e}")),
+                }
+                if let Some(sidecar) = app.try_state::<Sidecar>() {
+                    sidecar.repairing.store(false, Ordering::SeqCst);
+                }
+            });
+        }
+        REPAIRING.into()
     }
 
     /// One request on the command's lane; the handler's result, or its
