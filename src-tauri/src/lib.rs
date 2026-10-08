@@ -5,6 +5,7 @@ mod db;
 mod error;
 mod exit;
 mod fsx;
+mod jobobject;
 mod jobs;
 mod keepawake;
 mod linux_env;
