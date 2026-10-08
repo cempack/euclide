@@ -152,6 +152,27 @@ export const TopBar = memo(function TopBar({
     return map;
   }, [courses]);
 
+  /**
+   * The keyboard in the strip, as in any tab list: ← → and Home / End go to
+   * a tab and show it; Shift+F10 or the menu key opens its menu.
+   */
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const go = (i: number) => {
+      const to = (i + list.length) % list.length;
+      tabs.setActive(list[to].id);
+      stripRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[to]?.focus();
+    };
+    if (e.key === "ArrowRight") go(index + 1);
+    else if (e.key === "ArrowLeft") go(index - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(list.length - 1);
+    else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+      const r = e.currentTarget.getBoundingClientRect();
+      setMenu({ id: list[index].id, x: r.left, y: r.bottom });
+    } else return;
+    e.preventDefault();
+  };
+
   const atLimit = maxTabs > 0 && list.length >= maxTabs;
   const closeLabel = tr("common.close");
   const newTabLabel = tr("app.newTab");
@@ -231,6 +252,9 @@ export const TopBar = memo(function TopBar({
                   role="tab"
                   aria-selected={active}
                   aria-label={pinned ? tab.title : undefined}
+                  // One stop in the Tab order: the current tab; arrows move along the strip.
+                  tabIndex={active ? 0 : -1}
+                  onKeyDown={(e) => onTabKey(e, index)}
                   onClick={() => tabs.setActive(tab.id)}
                   onAuxClick={(e) => {
                     // Middle click closes, as in a browser.

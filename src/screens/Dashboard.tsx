@@ -506,7 +506,11 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             </span>
           }
           label={tr("dashboard.activeToday")}
-          hint={`${tr("nav.recap")} →`}
+          hint={
+            <>
+              {tr("nav.recap")} <span aria-hidden>→</span>
+            </>
+          }
           onClick={() => tabs.open({ kind: "recap", title: tr("nav.recap") })}
         />
       </StatStrip>
