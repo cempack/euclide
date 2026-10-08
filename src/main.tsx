@@ -45,12 +45,15 @@ startThumbnailer();
 // Development only: ?gallery shows the UI kit (dev/Gallery.tsx) instead of
 // the app. Production builds drop the branch and its chunk.
 // ?pdf shows the PDF view on a sample document (or ?pdf=<url>).
+// ?recap lays out the release recap (dev/Recap.tsx) for scripts/changelog.
 const devPage = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
 const Gallery = devPage?.has("gallery")
   ? React.lazy(() => import("./dev/GalleryRoot"))
   : devPage?.has("pdf")
     ? React.lazy(() => import("./dev/PdfSpike"))
-    : null;
+    : devPage?.has("recap")
+      ? React.lazy(() => import("./dev/Recap"))
+      : null;
 const showGallery = Gallery !== null;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
