@@ -65,12 +65,19 @@ export default function Python({ request }: { request?: { script: string; at: nu
   const height = outputHeight ?? (Number(savedHeight) || 220);
   const splitRef = useRef<HTMLDivElement>(null);
 
-  // A drawing arrives while the console is still empty: show it.
+  // A drawing arrives: show it, as Python opens its window (the console's
+  // text waits under its tab, marked). A question brings the console back.
   const hasDrawing = runner.turtle.length > 0 || runner.plots.length > 0;
   const [drawingSeen, setDrawingSeen] = useState(hasDrawing);
   if (hasDrawing !== drawingSeen) {
     setDrawingSeen(hasDrawing);
-    if (hasDrawing && tab === "console" && runner.lines.length === 0) setTab("drawing");
+    if (hasDrawing && tab === "console") setTab("drawing");
+  }
+  const asking = runner.status.state === "input";
+  const [askingSeen, setAskingSeen] = useState(asking);
+  if (asking !== askingSeen) {
+    setAskingSeen(asking);
+    if (asking && tab !== "console") setTab("console");
   }
 
   // Have Python started before the first run (it takes a moment on a slow PC).

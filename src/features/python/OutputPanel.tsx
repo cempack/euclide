@@ -47,7 +47,13 @@ export function OutputPanel({
   const hasDrawing = turtle.length > 0 || plots.length > 0;
   const passed = checks?.filter((c) => c.ok).length ?? 0;
   const tabs: { id: OutputTab; label: string; badge?: ReactNode }[] = [
-    { id: "console", label: tr("python.console") },
+    {
+      id: "console",
+      label: tr("python.console"),
+      // Text printed while another tab is shown: a dot says it is there.
+      badge:
+        tab !== "console" && lines.length > 0 ? <span className="eu-output-dot" aria-hidden /> : undefined,
+    },
     ...(hasDrawing ? [{ id: "drawing" as const, label: tr("python.drawing") }] : []),
     ...(checks
       ? [
