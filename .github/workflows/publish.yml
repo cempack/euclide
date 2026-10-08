@@ -186,9 +186,9 @@ jobs:
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf lld pkg-config
+        uses: ./.github/actions/linux-deps
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf lld pkg-config
 
       - name: setup node
         uses: actions/setup-node@v6
@@ -388,7 +388,14 @@ jobs:
             echo "Keep euclide.exe and the euclide-sidecar/ folder together. Do not delete the sidecar." >> Euclide-portable/README.txt
             echo "Data folder (Euclide-Data) is created next to the exe (USB / flash drive)." >> Euclide-portable/README.txt
             echo "In-app updates overlay new program files in THIS folder only. Euclide-Data and other files are never deleted." >> Euclide-portable/README.txt
-            powershell -Command "Compress-Archive -Path 'Euclide-portable/*' -DestinationPath 'dist-portable/Euclide-windows-portable.zip' -Force"
+            # 7-Zip (on the runner) does in seconds what Compress-Archive took
+            # two minutes for. Deflate, as every Euclide since 0.1 unpacks it.
+            7z a -tzip -mm=Deflate -mx=5 dist-portable/Euclide-windows-portable.zip "./Euclide-portable/*" >/dev/null
+            # The updater wants euclide.exe and euclide-sidecar/ at the root.
+            7z l -ba dist-portable/Euclide-windows-portable.zip | tr -d '\r' > zip-list.txt
+            grep -Eq '[[:space:]]euclide\.exe$' zip-list.txt
+            grep -Eq '[[:space:]]euclide-sidecar[\\/]euclide-sidecar\.exe$' zip-list.txt
+            rm zip-list.txt
           fi
         shell: bash
 

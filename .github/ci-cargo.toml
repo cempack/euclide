@@ -1,0 +1,10 @@
+# Cargo settings for CI builds only (`cargo … --config ../.github/ci-cargo.toml`).
+# Nothing in CI reads debug info or runs long enough for optimized
+# dependencies to matter (Cargo.toml optimizes them so the app runs at a
+# realistic speed in development): without both, a cold build of the tests
+# takes a fifth of the time and its cache less than half the space.
+[profile.dev]
+debug = 0
+
+[profile.dev.package."*"]
+opt-level = 0
