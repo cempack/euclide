@@ -728,6 +728,12 @@
   .eu-sidebar[data-rail] .eu-sidebar-nav {
     @apply items-center;
   }
+  /* The rail's icons are centred: no side padding, and never a sideways
+     scrollbar (a short window still scrolls it up and down). */
+  .eu-sidebar[data-rail] .eu-sidebar-body {
+    @apply px-0 overflow-x-hidden;
+    scrollbar-width: thin;
+  }
   .eu-sidebar[data-rail] .eu-nav-item {
     @apply justify-center px-0;
     width: calc(var(--eu-control) + 0.5rem);
