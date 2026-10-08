@@ -1002,6 +1002,16 @@
     "clearTitle": "Effacer tout le tableau ?",
     "clearMessage": "Tout ce qui est dessiné disparaît ; Ctrl+Z le fait revenir.",
     "eraserHint": "Touchez un trait, une figure ou un texte pour l'effacer.",
-    "handHint": "Glissez pour déplacer la feuille ; Ctrl + molette pour zoomer. Espace donne la main avec n'importe quel outil."
+    "handHint": "Glissez pour déplacer la feuille ; Ctrl + molette pour zoomer. Espace donne la main avec n'importe quel outil.",
+    "colorBlack": "Noir",
+    "colorBlue": "Bleu",
+    "colorRed": "Rouge",
+    "colorGreen": "Vert",
+    "colorPurple": "Violet",
+    "colorOrange": "Orange",
+    "colorYellow": "Jaune",
+    "colorLightGreen": "Vert clair",
+    "colorPink": "Rose",
+    "colorLightBlue": "Bleu clair"
   }
 }

@@ -604,6 +604,13 @@
   .eu-segment > button.active {
     @apply bg-panel border-line text-ink shadow-raised;
   }
+  /* In a toolbar of small controls. */
+  .eu-segment-sm {
+    height: var(--eu-control-sm);
+  }
+  .eu-segment-sm > button {
+    @apply px-2;
+  }
   .eu-segment-fill {
     @apply w-full;
   }
@@ -1787,26 +1794,39 @@ input[type="radio"] {
   pointer-events: none;
 }
 .eu-board-instrument {
-  fill: rgb(214 228 245 / 0.55);
-  stroke: rgb(40 60 90 / 0.55);
+  fill: rgb(218 231 247 / 0.62);
+  stroke: rgb(48 74 112 / 0.55);
   pointer-events: none;
 }
 .eu-board-ticks {
-  stroke: rgb(30 40 60 / 0.75);
+  stroke: rgb(28 38 58 / 0.8);
   fill: none;
 }
+.eu-board-guide {
+  stroke: rgb(28 38 58 / 0.3);
+}
 .eu-board-tick-label,
-.eu-board-reading {
+.eu-board-readout {
   fill: rgb(20 28 44);
-  font-family: var(--font-mono);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
   user-select: none;
 }
-.eu-board-tick-inner {
+.eu-board-tick-label {
+  font-weight: 500;
+}
+.eu-board-tick-inner,
+.eu-board-tick-unit {
   fill: rgb(20 28 44 / 0.55);
 }
-.eu-board-reading {
+/* A value read off an instrument, haloed in paper so it stays legible over lines. */
+.eu-board-readout {
+  font-family: var(--font-mono);
   font-weight: 600;
+  stroke: #fff;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 .eu-board-needle {
   stroke: rgb(214 60 70);
@@ -1815,42 +1835,96 @@ input[type="radio"] {
   fill: rgb(214 60 70);
 }
 .eu-board-leg {
-  stroke: rgb(70 80 100 / 0.8);
+  fill: rgb(132 142 160);
+  stroke: rgb(70 80 98);
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.eu-board-hinge {
+  fill: rgb(78 88 106);
+  pointer-events: none;
+}
+.eu-board-steel {
+  stroke: rgb(70 80 98);
   stroke-linecap: round;
   pointer-events: none;
 }
-.eu-board-handle {
+.eu-board-lead {
+  stroke: rgb(20 28 44 / 0.5);
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+/* Grips: a knob to move or turn, a ring where the point under it matters
+   (needle, centre), red for the pencil and the protractor's needle. Their
+   touch area is wider than what shows. */
+.eu-board-grip-knob {
   fill: #fff;
   stroke: rgb(15 79 168);
-  stroke-width: 0.15rem;
+  stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgb(20 28 44 / 0.18));
+}
+.eu-board-grip:hover .eu-board-grip-knob {
+  fill: rgb(234 240 251);
+}
+.eu-board-grip-glyph {
+  fill: none;
+  stroke: rgb(15 79 168);
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.eu-board-grip-ring .eu-board-grip-knob,
+.eu-board-grip-pencil .eu-board-grip-knob {
+  fill: rgb(255 255 255 / 0.2);
+  stroke-width: 2px;
+  filter: none;
+}
+.eu-board-grip-pencil .eu-board-grip-knob {
+  stroke: rgb(214 60 70);
+}
+.eu-board-grip-ring:hover .eu-board-grip-knob {
+  fill: rgb(15 79 168 / 0.12);
+}
+.eu-board-grip-pencil:hover .eu-board-grip-knob {
+  fill: rgb(214 60 70 / 0.12);
+}
+.eu-board-grip-hit {
+  fill: transparent;
   pointer-events: all;
   cursor: grab;
 }
-.eu-board-handle:active {
+.eu-board-grip-hit:active {
   cursor: grabbing;
-  fill: rgb(234 240 251);
 }
-.eu-board-handle-rotate,
-.eu-board-handle-draw {
-  fill: rgb(234 240 251);
+.eu-board-close-knob {
+  fill: rgb(255 255 255 / 0.92);
+  stroke: rgb(48 74 112 / 0.35);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
-.eu-board-handle-pencil,
-.eu-board-handle-reading {
+.eu-board-close-x {
+  stroke: rgb(48 74 112 / 0.75);
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.eu-board-close:hover .eu-board-close-knob {
   fill: rgb(253 238 238);
+  stroke: rgb(214 60 70 / 0.6);
+}
+.eu-board-close:hover .eu-board-close-x {
   stroke: rgb(214 60 70);
 }
-.eu-board-close {
+.eu-board-close-hit {
+  fill: transparent;
   pointer-events: all;
   cursor: pointer;
-}
-.eu-board-close circle {
-  fill: rgb(255 255 255 / 0.9);
-  stroke: rgb(40 60 90 / 0.5);
-  vector-effect: non-scaling-stroke;
-}
-.eu-board-close path {
-  stroke: rgb(40 60 90);
 }
 .eu-board-palette {
   position: absolute;
@@ -1861,7 +1935,8 @@ input[type="radio"] {
   padding: 0.25rem;
   border: 1px solid var(--color-line);
   border-radius: 8px;
-  background: var(--color-panel);
+  /* Chrome, as the sidebar: the tool in hand shows as raised paper on it. */
+  background: var(--color-chrome);
   box-shadow: var(--eu-shadow-pop);
   max-height: calc(100% - 1.5rem);
   overflow-y: auto;
@@ -1876,14 +1951,59 @@ input[type="radio"] {
   padding-top: 0.25rem;
   border-top: 1px solid var(--color-line);
 }
+/* An instrument out on the board: a dot beside its glyph. The raised look
+   belongs to the one tool in hand. */
+.eu-board-out {
+  position: relative;
+}
+.eu-board-out[aria-pressed="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.eu-board-out[aria-pressed="true"]:hover {
+  background: var(--color-hover);
+}
+.eu-board-out[aria-pressed="true"] svg {
+  color: inherit;
+}
+.eu-board-out[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+/* Ink swatches: a faint inner edge defines a light colour on paper and a
+   dark one on dark chrome without dulling either; the chosen one is ringed,
+   within the room the gap between swatches leaves it. */
 .eu-board-swatch {
   width: 1.25rem;
   height: 1.25rem;
+  flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid var(--color-line-strong);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.16);
+  transition: transform var(--transition-duration-fast) var(--ease-out);
 }
-.eu-board-swatch[aria-pressed="true"] {
+[data-theme="dark"] .eu-board-swatch {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
+}
+.eu-board-swatch:hover {
+  transform: scale(1.1);
+}
+.eu-board-swatch[aria-pressed="true"],
+[data-theme="dark"] .eu-board-swatch[aria-pressed="true"] {
   box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.16),
+    0 0 0 2px var(--color-panel),
+    0 0 0 3.5px var(--color-ink);
+}
+[data-theme="dark"] .eu-board-swatch[aria-pressed="true"] {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.24),
     0 0 0 2px var(--color-panel),
     0 0 0 3.5px var(--color-ink);
 }
