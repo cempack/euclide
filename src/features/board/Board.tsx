@@ -1118,7 +1118,7 @@ export default function Board({
                 <button
                   key={t.tool}
                   type="button"
-                  className="eu-btn-toggle eu-btn-icon"
+                  className="eu-btn-quiet eu-btn-icon eu-btn-toggle"
                   aria-pressed={tool === t.tool}
                   aria-label={tr(t.label)}
                   data-tip={tr(t.label)}
@@ -1139,7 +1139,7 @@ export default function Board({
               <button
                 key={ins.kind}
                 type="button"
-                className="eu-btn-toggle eu-btn-icon eu-board-out"
+                className="eu-btn-quiet eu-btn-icon eu-btn-toggle eu-board-out"
                 aria-pressed={instruments.some((i) => i.kind === ins.kind)}
                 aria-label={tr(ins.label)}
                 data-tip={tr(ins.label)}
