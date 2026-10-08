@@ -1,0 +1,46 @@
+name: "Ubuntu packages"
+description: >
+  Install the Ubuntu packages Euclide builds against, from the .deb files a
+  previous run kept when they are still the current versions: they are
+  downloaded once, not on every run (a mirror once took 8 minutes to send
+  them). Installed by apt and dpkg as usual, so nothing differs but the
+  download.
+
+inputs:
+  packages:
+    description: "The packages, separated by spaces"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # The files apt would fetch, versions included: any update changes the key.
+    - name: Resolve the packages
+      id: plan
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        files=$(apt-get install --print-uris -qq -y ${{ inputs.packages }} | cut -d"'" -f2 | sort)
+        hash=$(printf '%s' "$files" | sha256sum | cut -c1-16)
+        echo "key=apt-$(lsb_release -rs)-${{ runner.arch }}-$hash" >> "$GITHUB_OUTPUT"
+        echo "prefix=apt-$(lsb_release -rs)-${{ runner.arch }}-" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v4
+      with:
+        path: ~/apt-archives
+        key: ${{ steps.plan.outputs.key }}
+        restore-keys: ${{ steps.plan.outputs.prefix }}
+
+    - name: Install
+      shell: bash
+      run: |
+        mkdir -p ~/apt-archives/partial
+        sudo apt-get install -y \
+          -o Dir::Cache::Archives="$HOME/apt-archives" \
+          -o APT::Keep-Downloaded-Packages=true \
+          ${{ inputs.packages }}
+        # Versions the archive no longer serves go: the cache keeps the current set.
+        sudo apt-get autoclean -qq -o Dir::Cache::Archives="$HOME/apt-archives"
+        # Back to the runner's user, for the cache to save them after the job.
+        sudo rm -f ~/apt-archives/lock
+        sudo chown -R "$(id -u):$(id -g)" ~/apt-archives

@@ -37,9 +37,9 @@ jobs:
 
       - name: install dependencies (ubuntu only)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf lld pkg-config
+        uses: ./.github/actions/linux-deps
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf lld pkg-config
 
       - uses: actions/setup-node@v6
         with:
@@ -118,7 +118,7 @@ jobs:
             cp -r sidecar/dist/euclide-sidecar Euclide-portable/
             : > Euclide-portable/euclide.portable
             echo "Build de test Euclide (${GITHUB_REF_NAME}@${GITHUB_SHA::7}). Ne pas utiliser sur la clé de production sans sauvegarde." > Euclide-portable/LISEZMOI.txt
-            powershell -Command "Compress-Archive -Path 'Euclide-portable/*' -DestinationPath 'preview/Euclide-windows-preview.zip' -Force"
+            7z a -tzip -mm=Deflate -mx=5 preview/Euclide-windows-preview.zip "./Euclide-portable/*" >/dev/null
           else
             cp src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage preview/Euclide-linux-preview.AppImage
           fi

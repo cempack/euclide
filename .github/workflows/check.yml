@@ -30,7 +30,11 @@ jobs:
       - run: npm test
       - run: npx vite build
 
-  rust:
+  # Lints and tests side by side: clippy builds the dependencies' metadata
+  # and the tests their code, so one after the other took twice as long
+  # whenever the cache missed (up to 17 minutes on Windows).
+  rust-lint:
+    name: rust lint (${{ matrix.platform }})
     strategy:
       fail-fast: false
       matrix:
@@ -44,32 +48,61 @@ jobs:
         working-directory: src-tauri
     steps:
       - uses: actions/checkout@v6
-      - name: install dependencies (ubuntu only)
-        if: runner.os == 'Linux'
-        working-directory: .
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-deps
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri -> target"
-          shared-key: check-${{ matrix.platform }}
+          shared-key: lint-${{ matrix.platform }}
+          # A change to the CI build settings starts a fresh cache.
+          key: ${{ hashFiles('.github/ci-cargo.toml') }}
           cache-on-failure: true
       - name: fmt
         if: runner.os == 'Linux'
         run: cargo fmt --check
       # Windows-only code (portable updater, keep-awake) only compiles here.
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      # CI build settings (no debug info, plain dependencies): .github/ci-cargo.toml.
+      - run: cargo clippy --all-targets --config ../.github/ci-cargo.toml -- -D warnings
       # Advisories, licences and sources of the dependencies (deny.toml).
       - name: cargo deny
         if: runner.os == 'Linux'
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: src-tauri/Cargo.toml
+
+  rust-test:
+    name: rust test (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ["ubuntu-22.04", "windows-latest"]
+    runs-on: ${{ matrix.platform }}
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v6
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-deps
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: test-${{ matrix.platform }}
+          # A change to the CI build settings starts a fresh cache.
+          key: ${{ hashFiles('.github/ci-cargo.toml') }}
+          cache-on-failure: true
+      - run: cargo test --config ../.github/ci-cargo.toml
 
   sidecar:
     runs-on: ubuntu-latest
