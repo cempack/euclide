@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { changed } from "../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { api, type QuickLink } from "../lib/api";
@@ -220,7 +221,7 @@ function LinksSection() {
     setUrl("");
     setOpen(false);
     toast(tr("tools.toastLinkAdded"), "success");
-    window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
+    changed("links");
     refresh();
   };
 
@@ -276,7 +277,7 @@ function LinksSection() {
                     });
                     if (!ok) return;
                     await api.deleteLink(l.id);
-                    window.dispatchEvent(new CustomEvent("eu:quicklinks-changed"));
+                    changed("links");
                     refresh();
                   }}
                   aria-label={`${tr("common.delete")} — ${l.label}`}

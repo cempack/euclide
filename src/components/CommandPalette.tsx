@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { changed } from "../api/client";
 import { Dialog } from "../ui/Dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
@@ -87,10 +88,13 @@ function CommandPalette({
   open,
   onClose,
   onHelp,
+  onCapture,
 }: {
   open: boolean;
   onClose: () => void;
   onHelp: () => void;
+  /** Opens quick capture (the palette closes first). */
+  onCapture: () => void;
 }) {
   const toast = useToast();
   const { projection, toggleProjection } = useAppearance();
@@ -260,7 +264,7 @@ function CommandPalette({
               const current = keepAwake ?? (await api.keepAwakeStatus());
               const next = await api.setKeepAwake(!current);
               setKeepAwake(next);
-              window.dispatchEvent(new CustomEvent("eu:keepawake-changed"));
+              changed("keepAwake");
               toast(next ? tr("tools.keepAwakeOn") : tr("tools.keepAwakeOff"), next ? "success" : "info");
             } catch (err) {
               reportError("palette.keepAwake", err);
@@ -291,7 +295,7 @@ function CommandPalette({
         keys: keysOf("capture"),
         run: () => {
           onClose();
-          window.dispatchEvent(new CustomEvent("eu:capture-open"));
+          onCapture();
         },
       },
     ];

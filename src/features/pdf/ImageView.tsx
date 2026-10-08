@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { changed } from "../../api/client";
 import { Eraser, ImageDown, Minus, PenLine, Plus, Trash2, Undo2 } from "lucide-react";
 import { api, fileUrl } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
@@ -137,7 +138,7 @@ export function ImageView({ tabId, fileId, fileName }: { tabId: string; fileId: 
       if (!blob) throw new Error("L'image n'a pas pu être créée.");
       const name = `${fileName.replace(/\.[^.]+$/, "")} (annoté).png`;
       const f = await api.createFileBytes(name, await blob.arrayBuffer());
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
       toast(tr("pdf.exported", { name: f?.name ?? name }), "success");
     } catch (err) {
       reportError("image.export", err);

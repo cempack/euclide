@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { changed } from "../../api/client";
 import { Check, CornerDownLeft, Download, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
@@ -217,7 +218,7 @@ function Drawing({ turtle, plots, scriptName }: { turtle: TurtleOp[]; plots: str
     try {
       if (!blob) throw new Error("L'image n'a pas pu être créée.");
       await api.createFileBytes(name, await blob.arrayBuffer());
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
       toast(tr("python.savedToLibrary", { name }), "success");
     } catch (err) {
       reportError("python.saveDrawing", err);

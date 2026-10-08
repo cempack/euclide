@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { changed } from "../../api/client";
 import { q } from "../../api/queries";
 import { useToast } from "../../components/ui";
 import { api, type Reminder } from "../../lib/api";
@@ -6,8 +7,6 @@ import { errorMessage } from "../../lib/errors";
 import { cheer } from "../../lib/format";
 import { tr } from "../../lib/i18n";
 import { logged, reportError } from "../../lib/report";
-
-const changed = () => window.dispatchEvent(new CustomEvent("eu:reminders-changed"));
 
 /**
  * Ticking and deleting a reminder, the same on every screen: the list
@@ -26,7 +25,7 @@ export function useReminderActions() {
     if (optimistic) patch((list) => list.map((x) => (x.id === r.id ? { ...x, done } : x)));
     try {
       await api.toggleReminder(r.id, done);
-      changed();
+      changed("reminders");
       return true;
     } catch (err) {
       reportError("reminders.toggle", err);
@@ -54,20 +53,20 @@ export function useReminderActions() {
   const restore = async (r: Reminder) => {
     const back = await api.createReminder(r.title, r.due_at, r.course_id, r.repeat_rule);
     if (r.done && back?.id) await api.toggleReminder(back.id, true);
-    changed();
+    changed("reminders");
   };
 
   const remove = async (r: Reminder) => {
     patch((list) => list.filter((x) => x.id !== r.id));
     try {
       await api.deleteReminder(r.id);
-      changed();
+      changed("reminders");
       toast(tr("reminders.deleted", { name: r.title }), "info", {
         action: { label: tr("common.undo"), run: () => void restore(r).catch(logged("reminders.restore")) },
       });
     } catch (err) {
       reportError("reminders.delete", err);
-      changed();
+      changed("reminders");
       toast(errorMessage(err, tr("dashboard.errorDeleteReminder")), "error");
     }
   };

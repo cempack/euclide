@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { changed } from "../../api/client";
 import { createPortal, flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -732,7 +733,7 @@ export default function Board({
       api.logEvent("whiteboard_save", f.name, courseId);
       setDirty(false);
       if (!quiet) toast(tr("whiteboard.saved"), "success");
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
       api.getFileVersions(f.id).then(setVersions).catch(logged("board.versions"));
       // The Documents grid shows boards by their preview.
       if (isTauri() && d.items.length) {
@@ -741,7 +742,7 @@ export default function Board({
             void blob
               ?.arrayBuffer()
               .then((buf) => api.saveThumbnail(f.id, buf))
-              .then(() => window.dispatchEvent(new CustomEvent("eu:thumbnails-changed")))
+              .then(() => changed("thumbnails"))
               .catch(logged("board.thumbnail")),
           "image/jpeg",
           0.85,
@@ -774,7 +775,7 @@ export default function Board({
       );
       if (!blob) throw new Error(tr("messages.genericError"));
       const f = await api.createFileBytes(`${title()}.png`, await blob.arrayBuffer(), { courseId });
-      window.dispatchEvent(new CustomEvent("eu:library-changed"));
+      changed("library");
       toast(tr("board.exported", { name: f.name }), "success", {
         action: { label: tr("print.open"), run: () => openFile(f) },
       });
@@ -795,7 +796,7 @@ export default function Board({
       }
       try {
         const f = await api.printToPdf(title(), courseId);
-        window.dispatchEvent(new CustomEvent("eu:library-changed"));
+        changed("library");
         toast(tr("print.saved", { name: f.name }), "success", {
           action: { label: tr("print.open"), run: () => openFile(f) },
         });

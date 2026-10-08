@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { changed } from "./client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { q } from "./queries";
@@ -18,7 +19,7 @@ export function useSetting(key: string): [string | null | undefined, (value: str
       queryClient.setQueryData(q.setting(key).queryKey, value);
       api
         .setSetting(key, value)
-        .then(() => window.dispatchEvent(new CustomEvent("eu:settings-changed")))
+        .then(() => changed("settings"))
         .catch((err) => {
           reportError(`settings.${key}`, err);
           void queryClient.invalidateQueries({ queryKey: q.setting(key).queryKey });
