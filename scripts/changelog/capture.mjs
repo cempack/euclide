@@ -175,6 +175,30 @@ const SHOTS = {
     await page.waitForTimeout(4000);
     return page;
   },
+  "python-koch": async () => {
+    const page = await open();
+    await python(page, "Flocon de Koch");
+    await page.getByRole("button", { name: "Exécuter", exact: true }).click();
+    await away(page);
+    await page.waitForTimeout(5000);
+    return page;
+  },
+  "python-mandelbrot": async () => {
+    const page = await open();
+    await python(page, "Ensemble de Mandelbrot");
+    await page.getByRole("button", { name: "Exécuter", exact: true }).click();
+    await away(page);
+    await page.waitForTimeout(1500);
+    return page;
+  },
+  "python-galton": async () => {
+    const page = await open("dark");
+    await python(page, "Planche de Galton");
+    await page.getByRole("button", { name: "Exécuter", exact: true }).click();
+    await away(page);
+    await page.waitForTimeout(1500);
+    return page;
+  },
   "python-courbe": async () => {
     const page = await open("dark");
     await python(page, "Courbe d'une fonction");
@@ -195,20 +219,48 @@ const SHOTS = {
     const page = await open();
     await nav(page, "Python");
     await page.getByRole("button", { name: "Nouveau script" }).first().click();
+    await page
+      .getByRole("tab", { name: /Terminale/ })
+      .first()
+      .click();
+    await away(page);
     await settle(page);
     return page;
   },
+  // The library as a grid of previews, its PDFs only.
   documents: async () => {
     const page = await open();
     await nav(page, "Documents");
+    await page.getByRole("radio", { name: /Grille/ }).click();
+    await page.getByRole("button", { name: /^PDF/ }).first().click();
     await away(page);
     await settle(page, 800);
+    return page;
+  },
+  pdf: async () => {
+    const page = await open();
+    await nav(page, "Documents");
+    await page.getByText("Évaluation — Statistiques.pdf").first().click();
+    await away(page);
+    await settle(page, 2500);
     return page;
   },
   horloge: async () => {
     const page = await open("dark");
     await page.keyboard.press("Control+Shift+H");
     await page.waitForTimeout(1000);
+    return page;
+  },
+  // Five minutes started, 1 min 48 s gone: the ring, the digits, the
+  // controls faded away as they do when the mouse rests.
+  minuteur: async () => {
+    const page = await open("dark");
+    await page.keyboard.press("Control+Shift+H");
+    await page.waitForTimeout(500);
+    await page.keyboard.press("5");
+    await away(page);
+    await page.clock.runFor(108_000);
+    await page.waitForTimeout(800);
     return page;
   },
   palette: async () => {
@@ -225,6 +277,15 @@ const SHOTS = {
     await settle(page);
     return page;
   },
+  sauvegardes: async () => {
+    const page = await open();
+    await page.keyboard.press("Control+Comma");
+    await settle(page);
+    await page.getByRole("button", { name: "Sauvegardes" }).first().click();
+    await away(page);
+    await settle(page, 600);
+    return page;
+  },
 };
 
 /** Parts of a screen, cut out for the recap image (part-<name>.png). */
@@ -234,6 +295,10 @@ const PARTS = {
   "tableau-blanc": { tableau: (p) => p.locator(".eu-board") },
   diaporama: { diapo: (p) => p.locator(".eu-slides") },
   "python-tortue": { tortue: (p) => p.locator("figure canvas").first() },
+  "python-koch": { koch: (p) => p.locator("figure canvas").first() },
+  "python-mandelbrot": { mandelbrot: (p) => p.locator("figure img").first() },
+  "python-galton": { galton: (p) => p.locator("figure img").first() },
+  documents: { apercus: (p) => p.locator("main").first() },
   "python-courbe": { courbe: (p) => p.locator("figure img").first() },
   "python-verifier": { verifications: (p) => p.locator(".eu-output").first() },
   "python-modeles": { modeles: (p) => p.getByRole("dialog") },
