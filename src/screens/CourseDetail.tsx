@@ -42,9 +42,9 @@ function isMainClass(name: string): boolean {
 // Keep only "real" main class names from Pronote (e.g. "3C", "4A", "5B", "6D").
 // Drop subgroup/division entries that look like "4ITAGR.1", "3ESPGR.2", "5ALLGR.1", "4AP.1", "6P.1" etc.
 // These come from listeClasses but are not the primary class labels teachers usually attach for progression.
-function sanitizePronoteClasses(raw: any[]): any[] {
+function sanitizePronoteClasses(raw: { name: string }[]): { name: string }[] {
   const seen = new Set<string>();
-  const out: any[] = [];
+  const out: { name: string }[] = [];
   for (const c of raw || []) {
     if (!c || typeof c.name !== "string") continue;
     const n = c.name.trim();
@@ -105,9 +105,9 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   // We aggressively drop subgroup names containing "." (e.g. 4ITAGR.1, 3ESPGR.2, 5ALLGR.1, 4AP.1)
   // so only main classes like "3C", "4A", "5B", "6D" appear in the chooser.
   const availablePronoteClasses = useMemo(() => {
-    const attached = new Set(courseClasses.map((cc: any) => cc.class_name));
+    const attached = new Set(courseClasses.map((cc) => cc.class_name));
     const seen = new Set<string>();
-    return (pronoteClasses || []).filter((c: any) => {
+    return (pronoteClasses || []).filter((c) => {
       if (!c || typeof c.name !== "string") return false;
       const n = c.name.trim();
       if (!isMainClass(n) || attached.has(n) || seen.has(n)) return false;
@@ -159,8 +159,8 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
     try {
       // Load global docs + this course's current casier so we can exclude already-attached ones
       const [docs, currentCasier] = await Promise.all([api.listFiles(null), api.listFiles(courseId)]);
-      const attachedNames = new Set((currentCasier || []).map((f: any) => (f.name || "").toLowerCase()));
-      const available = (docs || []).filter((d: any) => !attachedNames.has((d.name || "").toLowerCase()));
+      const attachedNames = new Set((currentCasier || []).map((f) => (f.name || "").toLowerCase()));
+      const available = (docs || []).filter((d) => !attachedNames.has((d.name || "").toLowerCase()));
       setAttachDocs(available);
       setAttachSelected([]);
       setShowAttach(true);
@@ -187,8 +187,9 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       setShowAttach(false);
       refreshFiles();
       refreshClasses();
-    } catch (err: any) {
-      toast(err?.message || "Erreur lors de l'attachement", "error");
+    } catch (err) {
+      reportError("course.attachDocs", err);
+      toast(errorMessage(err, tr("courseDetail.attachError")), "error");
     }
   };
 
@@ -398,7 +399,7 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                   aria-label={tr("courseDetail.choosePronoteClass")}
                 >
                   <option value="">{tr("courseDetail.choosePronoteClass")}</option>
-                  {availablePronoteClasses.map((c: any, i: number) => (
+                  {availablePronoteClasses.map((c, i) => (
                     <option key={i} value={c.name}>
                       {c.name}
                     </option>
@@ -574,8 +575,9 @@ function FilesPane({
                 tabs.closeFile(f.id);
                 changed("library");
                 onChanged();
-              } catch (err: any) {
-                toast(err?.message || tr("messages.genericError"), "error");
+              } catch (err) {
+                reportError("course.deleteFile", err);
+                toast(errorMessage(err, tr("messages.genericError")), "error");
               }
             }}
             aria-label={`${tr("common.delete")} — ${f.name}`}

@@ -11,7 +11,7 @@ export function fmt(template: string, vars: Record<string, string | number> = {}
   }, template);
 }
 
-const t = strings as any; // for get(), the untyped lookup of a key built at run time
+const t: unknown = strings; // for get(), the untyped lookup of a key built at run time
 
 /**
  * Untyped lookup, for keys built at run time (palette aliases). Everything
@@ -21,18 +21,18 @@ const t = strings as any; // for get(), the untyped lookup of a key built at run
  * Never throws; returns fallback (or key) if missing.
  * Logs warning in dev for missing keys (helps catch JSON drift after centralization).
  */
-export function get(path: string, fallback: any = ""): any {
+export function get(path: string, fallback: unknown = ""): unknown {
   if (!path) return fallback;
   const parts = path.split(".");
-  let cur: any = t;
+  let cur: unknown = t;
   for (const p of parts) {
     if (cur == null || typeof cur !== "object" || !(p in cur)) {
-      if (typeof console !== "undefined" && (import.meta as any)?.env?.DEV) {
+      if (typeof console !== "undefined" && import.meta.env?.DEV) {
         console.warn(`[i18n] missing key "${path}" in src/locales/strings.json — using fallback`);
       }
       return fallback;
     }
-    cur = cur[p];
+    cur = (cur as Record<string, unknown>)[p];
   }
   return cur ?? fallback;
 }

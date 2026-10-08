@@ -266,7 +266,8 @@
       "other": "Attacher {count} documents"
     },
     "attachDocsNone": "Attacher des documents",
-    "libraryEmpty": "Aucun document dans la bibliothèque."
+    "libraryEmpty": "Aucun document dans la bibliothèque.",
+    "attachError": "Les documents n'ont pas pu être attachés."
   },
   "settings": {
     "pronoteTitle": "Pronote",

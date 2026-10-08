@@ -555,9 +555,17 @@ export const api = {
   // Matches the "Contenu de mes cours" / "Vision élève" style data (chronological lesson contents).
   // All filters optional. className supports class names like "3A". fromDate supports "YYYY-MM-DD" or "DD/MM/YYYY".
   pronoteContents: (subject?: string | null, className?: string | null, fromDate?: string | null) =>
-    invoke<any>("pronote_contents", { subject, className, fromDate }),
+    invoke<{ ok?: boolean; error?: string; contents?: Record<string, unknown>[] } | null>(
+      "pronote_contents",
+      {
+        subject,
+        className,
+        fromDate,
+      },
+    ),
   // Returns prof's available classes from Pronote (for dropdowns when attaching to courses)
-  pronoteClasses: () => invoke<any>("pronote_classes"),
+  pronoteClasses: () =>
+    invoke<{ ok?: boolean; error?: string; classes?: { name: string }[] } | null>("pronote_classes"),
 
   // Usage events (for various stats / history)
   logEvent: (kind: string, label: string, courseId: number | null) =>

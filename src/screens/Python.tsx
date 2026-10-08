@@ -251,9 +251,12 @@ export default function Python({ request }: { request?: { script: string; at: nu
     }
   };
 
+  // Quitting with « Enregistrer » saves what is on screen now.
+  const saveRef = useRef(save);
   useEffect(() => {
-    return editors.registerFlush("python", () => save(true));
-  }, [openScript]);
+    saveRef.current = save;
+  });
+  useEffect(() => editors.registerFlush("python", () => saveRef.current(true)), []);
 
   const run = async (withChecks: boolean) => {
     if (!openScript) return;
