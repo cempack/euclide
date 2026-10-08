@@ -35,3 +35,6 @@ src-tauri/resources/euclide-sidecar/*
 .shots/
 test-results/
 playwright-report/
+
+# changelog screenshots, remade by scripts/changelog/capture.mjs
+scripts/changelog/shots/

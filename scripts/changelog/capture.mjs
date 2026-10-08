@@ -2,16 +2,18 @@
 // (npm run dev), on the visual tests' frozen Tuesday morning. Python runs
 // replay what the real runner did (run-events.mjs writes run-events.json).
 //
-//   node scripts/changelog/capture.mjs <out-dir>
+//   node scripts/changelog/capture.mjs [out-dir] [shot…]
 //
-// Writes <name>.png at twice 1440 × 900.
+// Writes <name>.png at twice 1440 × 900, and part-<name>.png cut-outs, in
+// scripts/changelog/shots unless told otherwise (the recap page reads them
+// from there).
 import { readFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const out = resolve(process.argv[2] ?? "changelog-shots");
+const out = resolve(process.argv[2] ?? resolve(here, "shots"));
 mkdirSync(out, { recursive: true });
 const recorded = JSON.parse(readFileSync(resolve(here, "run-events.json"), "utf8"));
 const NOW = new Date("2026-10-06T10:40:00");
@@ -233,10 +235,35 @@ const PARTS = {
   diaporama: { diapo: (p) => p.locator(".eu-slides") },
   "python-tortue": { tortue: (p) => p.locator("figure canvas").first() },
   "python-courbe": { courbe: (p) => p.locator("figure img").first() },
-  "python-verifier": { verifications: (p) => p.locator("ul").filter({ hasText: "mention" }).first() },
+  "python-verifier": { verifications: (p) => p.locator(".eu-output").first() },
   "python-modeles": { modeles: (p) => p.getByRole("dialog") },
   palette: { palette: (p) => p.getByRole("dialog") },
   "cahier-de-textes": { semaine: (p) => p.locator("main section:visible").first() },
+};
+
+/** Parts the dark recap shows in the dark theme (part-<name>-dark.png). */
+const DARK_PARTS = {
+  "tableau-de-bord": ["maintenant", (p) => p.locator("main section.eu-panel:visible").first()],
+  "python-verifier": ["verifications", (p) => p.locator(".eu-output").first()],
+  "python-modeles": ["modeles", (p) => p.getByRole("dialog")],
+};
+const darkGo = {
+  "tableau-de-bord": () => open("dark"),
+  "python-verifier": async () => {
+    const page = await open("dark");
+    await python(page, "Moyenne et mention");
+    await page.getByRole("button", { name: "Vérifier", exact: true }).click();
+    await away(page);
+    await page.waitForTimeout(1500);
+    return page;
+  },
+  "python-modeles": async () => {
+    const page = await open("dark");
+    await nav(page, "Python");
+    await page.getByRole("button", { name: "Nouveau script" }).first().click();
+    await settle(page);
+    return page;
+  },
 };
 
 const only = process.argv.slice(3);
@@ -247,6 +274,12 @@ for (const [name, go] of Object.entries(SHOTS)) {
   for (const [part, find] of Object.entries(PARTS[name] ?? {}))
     await find(page).screenshot({ path: resolve(out, `part-${part}.png`) });
   await page.context().close();
+  if (DARK_PARTS[name]) {
+    const dark = await darkGo[name]();
+    const [part, find] = DARK_PARTS[name];
+    await find(dark).screenshot({ path: resolve(out, `part-${part}-dark.png`) });
+    await dark.context().close();
+  }
   console.log("✓", name);
 }
 await browser.close();
