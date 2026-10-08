@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import { tabs } from "../stores/tabs";
 import { api } from "../lib/api";
 import { EmptyState, Loading, useToast } from "../components/ui";
-import { MetaDot, PageHeader, Panel } from "../components/layout";
+import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { tr, trn } from "../lib/i18n";
 import { logged } from "../lib/report";
 import { BookOpen, FileText, RefreshCw } from "lucide-react";
@@ -93,11 +94,12 @@ export default function ClassContent({
     return m || ""; // fallback, partial match will try
   };
 
+  const [since, setSince] = useState<"month" | "term" | "year">("month");
   const coursesQ = useQuery(q.courses());
   const course = coursesQ.data?.find((x) => x.id === courseId) ?? null;
   const matiereKnown = matiere || course?.matiere || "";
   const contentsQ = useQuery({
-    ...q.pronoteContents(subjectForPronote(matiereKnown), className),
+    ...q.pronoteContents(subjectForPronote(matiereKnown), className, since),
     enabled: !!matiereKnown,
   });
   const contents = (contentsQ.data ?? NO_CONTENTS) as ContentItem[];
@@ -168,18 +170,30 @@ export default function ClassContent({
           </>
         }
         actions={
-          <button
-            onClick={refreshContents}
-            className="eu-btn-ghost eu-btn-sm"
-            disabled={loading || isRefreshing}
-          >
-            <Icon
-              icon={RefreshCw}
-              size={20}
-              className={`w-3.5 h-3.5 ${loading || isRefreshing ? "animate-spin" : ""}`}
+          <>
+            <Segmented
+              value={since}
+              onChange={setSince}
+              label={tr("classContent.since")}
+              options={[
+                { value: "month", label: tr("classContent.sinceMonth") },
+                { value: "term", label: tr("classContent.sinceTerm") },
+                { value: "year", label: tr("classContent.sinceYear") },
+              ]}
             />
-            {loading || isRefreshing ? tr("classContent.refreshing") : tr("classContent.refresh")}
-          </button>
+            <button
+              onClick={refreshContents}
+              className="eu-btn-ghost eu-btn-sm"
+              disabled={loading || isRefreshing}
+            >
+              <Icon
+                icon={RefreshCw}
+                size={20}
+                className={`w-3.5 h-3.5 ${loading || isRefreshing ? "animate-spin" : ""}`}
+              />
+              {loading || isRefreshing ? tr("classContent.refreshing") : tr("classContent.refresh")}
+            </button>
+          </>
         }
       />
 

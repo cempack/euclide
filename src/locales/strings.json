@@ -568,7 +568,11 @@
     "weekLast": "Semaine dernière",
     "weekNext": "Semaine prochaine",
     "weekOf": "Semaine du {date}",
-    "weekUnknown": "Sans date"
+    "weekUnknown": "Sans date",
+    "since": "Période",
+    "sinceMonth": "4 semaines",
+    "sinceTerm": "3 mois",
+    "sinceYear": "L'année"
   },
   "dragDrop": {
     "drop": "Déposez vos fichiers",
