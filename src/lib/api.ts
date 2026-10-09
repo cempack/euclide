@@ -324,6 +324,8 @@ export interface SearchResult {
   snippet: string;
   course_id: number | null;
   file_kind: string;
+  /** A document's page where its text first matches, for a content hit. */
+  page?: number;
 }
 
 /** One drawing operation of the turtle shim (sidecar/euclide_sidecar/shims/turtle.py). */
@@ -493,9 +495,16 @@ export const api = {
     autosave?: boolean;
   }) => invoke<FileItem>("save_board", { save }),
   readBoard: (id: number) => invoke<string>("read_board", { id }),
-  /** Replace a document's content; the previous content becomes a version. */
-  writeFileBytes: (fileId: number, bytes: ArrayBuffer | Uint8Array) =>
-    invokeBytes<FileItem>("write_file_bytes", bytes, { "x-eu-file-id": String(fileId) }),
+  /**
+   * Replace a document's content; the previous content becomes a version.
+   * `textChanged` (pages turned, added, taken out, an older version back):
+   * a PDF is read again for the search.
+   */
+  writeFileBytes: (fileId: number, bytes: ArrayBuffer | Uint8Array, opts: { textChanged?: boolean } = {}) =>
+    invokeBytes<FileItem>("write_file_bytes", bytes, {
+      "x-eu-file-id": String(fileId),
+      ...(opts.textChanged ? { "x-eu-text-changed": "1" } : {}),
+    }),
   /** Add a new document (exports, saved copies) to the library or a course. */
   createFileBytes: (
     name: string,

@@ -179,6 +179,9 @@ pub struct SearchResult {
     pub snippet: String,
     pub course_id: Option<i64>,
     pub file_kind: String,
+    /// A document's page where its text first matches (from 1), when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Clone)]

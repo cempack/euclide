@@ -9,7 +9,7 @@ export type OpenableFile = { id: number; name: string; kind: string; courseId?: 
  * Opens a file where Euclide shows it: boards in the whiteboard, PDFs and
  * images in the viewer, anything else in the PC's own application.
  */
-export function openFile(f: OpenableFile, event = "file_open") {
+export function openFile(f: OpenableFile, event = "file_open", opts: { find?: string } = {}) {
   api.logEvent(event, f.name, f.courseId ?? null).catch(logged("files.logOpen"));
   if (f.kind === "board") tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
   else if (f.kind === "pdf" || f.kind === "image")
@@ -17,7 +17,13 @@ export function openFile(f: OpenableFile, event = "file_open") {
       kind: "pdf",
       title: f.name,
       // Its course, where known: a copy made from the tab goes beside it.
-      params: { fileId: f.id, fileName: f.name, courseId: f.courseId ?? undefined },
+      params: {
+        fileId: f.id,
+        fileName: f.name,
+        courseId: f.courseId ?? undefined,
+        // A search hit: the PDF shows where the words are.
+        ...(opts.find ? { find: opts.find, findAt: Date.now() } : {}),
+      },
     });
   else api.openFile(f.id).catch(logged("files.openExternal"));
 }

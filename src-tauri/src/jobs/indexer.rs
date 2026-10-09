@@ -5,7 +5,7 @@
 
 use crate::db::Db;
 use crate::error::AppResult;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::json;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
@@ -43,6 +43,31 @@ pub fn spawn(app: AppHandle) {
 
 struct Progress {
     remaining: i64,
+}
+
+/// Text read before page breaks were kept (0.6.0) cannot say on which page
+/// a word is: every PDF is read again, once, in the background. A setting
+/// remembers it was done.
+pub fn reread_for_pages(conn: &mut Connection) -> AppResult<bool> {
+    let done: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM settings WHERE key = 'index_pages')",
+        [],
+        |r| r.get(0),
+    )?;
+    if done {
+        return Ok(false);
+    }
+    let tx = conn.transaction()?;
+    tx.execute(
+        "UPDATE files SET index_state = 'pending' WHERE kind = 'pdf'",
+        [],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('index_pages', '1')",
+        [],
+    )?;
+    tx.commit()?;
+    Ok(true)
 }
 
 /// Index one pending PDF. `Ok(None)` when there is nothing left.
@@ -107,4 +132,38 @@ async fn index_next(app: &AppHandle) -> AppResult<Option<Progress>> {
         .await?;
     let _ = app.emit("eu://index-progress", json!({ "remaining": remaining }));
     Ok(Some(Progress { remaining }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::migrations_for_tests;
+
+    #[test]
+    fn pdfs_are_read_again_once_for_their_pages() {
+        let mut conn = migrations_for_tests();
+        conn.execute_batch(
+            "INSERT INTO files (id, name, rel_path, kind, index_state) VALUES
+               (1, 'a.pdf', 'a.pdf', 'pdf', 'done'),
+               (2, 'b.pdf', 'b.pdf', 'pdf', 'failed'),
+               (3, 'c.png', 'c.png', 'image', 'skip');",
+        )
+        .unwrap();
+        let states = |conn: &Connection| -> Vec<String> {
+            let mut stmt = conn
+                .prepare("SELECT index_state FROM files ORDER BY id")
+                .unwrap();
+            let rows = stmt.query_map([], |r| r.get(0)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+        assert!(reread_for_pages(&mut conn).unwrap());
+        assert_eq!(states(&conn), ["pending", "pending", "skip"]);
+        conn.execute(
+            "UPDATE files SET index_state = 'done' WHERE kind = 'pdf'",
+            [],
+        )
+        .unwrap();
+        assert!(!reread_for_pages(&mut conn).unwrap(), "only once");
+        assert_eq!(states(&conn), ["done", "done", "skip"]);
+    }
 }

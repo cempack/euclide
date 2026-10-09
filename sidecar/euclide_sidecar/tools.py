@@ -47,7 +47,13 @@ def python_complete(payload):
         return {"ok": False, "error": str(exc), "completions": []}
 
 
+# Pages read for the search: a long textbook stays within the lane's minute.
+MAX_PAGES = 300
+
+
 def extract_pdf(payload):
+    """A PDF's text for the search, a form feed between pages: the search
+    counts them to say on which page a word is (commands/search.rs)."""
     path = payload.get("path")
     if not path:
         return {"text": ""}
@@ -55,12 +61,14 @@ def extract_pdf(payload):
         from pypdf import PdfReader
 
         reader = PdfReader(path)
-        chunks = []
-        for page in reader.pages[:60]:  # cap so huge PDFs stay snappy
+        pages = []
+        for page in reader.pages[:MAX_PAGES]:
             try:
-                chunks.append(page.extract_text() or "")
+                text = page.extract_text() or ""
             except Exception:  # noqa: BLE001
-                continue
-        return {"text": "\n".join(chunks)}
+                text = ""
+            # A page keeps its place, read or not.
+            pages.append(text.replace("\f", " "))
+        return {"text": "\f".join(pages)}
     except Exception as exc:  # noqa: BLE001
         return {"text": "", "error": str(exc)}

@@ -36,6 +36,9 @@ export interface TabParams {
   /** Settings: the section to show, and when it was asked for. */
   section?: string;
   sectionAt?: number;
+  /** A PDF: words to find in it (a search hit), and when they were asked for. */
+  find?: string;
+  findAt?: number;
 }
 
 export interface Tab {
@@ -319,6 +322,15 @@ export const tabs = {
     const reused = find();
     if (reused) {
       id = reused.id;
+      // A PDF already open, asked for with words to find: they go to it.
+      if (spec.kind === "pdf" && newParams.findAt)
+        commitTabs(
+          prev.map((t) =>
+            t.id === id
+              ? { ...t, params: { ...t.params, find: newParams.find, findAt: newParams.findAt } }
+              : t,
+          ),
+        );
     } else {
       id = keyOf(spec);
       const existing = prev.find((t) => t.id === id);

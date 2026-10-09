@@ -10,6 +10,7 @@ use crate::error::{AppError, AppResult};
 use crate::fsx::{
     abs_path, percent_decode, plain_file_name, rel_path, unique_dest, write_temp_beside,
 };
+use crate::jobs::indexer::Indexer;
 use crate::models::FileItem;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -163,22 +164,56 @@ pub(crate) fn raw_body(request: &Request<'_>) -> AppResult<Vec<u8>> {
     }
 }
 
-/// Overwrite a library document with the request body. Header `x-eu-file-id`.
+/// Overwrite a library document with the request body. Header `x-eu-file-id`;
+/// `x-eu-text-changed: 1` when its text may differ (pages turned, added or
+/// taken out, an older version back): a PDF is then read again for the
+/// search. Annotations alone leave the text as it was.
 #[tauri::command]
-pub async fn write_file_bytes(db: State<'_, Db>, request: Request<'_>) -> AppResult<FileItem> {
+pub async fn write_file_bytes(
+    db: State<'_, Db>,
+    indexer: State<'_, Indexer>,
+    request: Request<'_>,
+) -> AppResult<FileItem> {
     let id: i64 = header(&request, "x-eu-file-id")
         .and_then(|v| v.parse().ok())
         .ok_or_else(|| AppError::user("Document inconnu."))?;
+    let reread = header(&request, "x-eu-text-changed") == Some("1");
     let bytes = raw_body(&request)?;
-    db.write(move |conn| replace_content(conn, id, &bytes))
-        .await
+    let item = db
+        .write(move |conn| {
+            let item = replace_content(conn, id, &bytes)?;
+            if reread {
+                mark_for_index(conn, &item)?;
+            }
+            Ok(item)
+        })
+        .await?;
+    if reread {
+        indexer.kick();
+    }
+    Ok(item)
+}
+
+/// A PDF waits for the indexer to read its text again.
+fn mark_for_index(conn: &Connection, item: &FileItem) -> AppResult<()> {
+    if item.kind == "pdf" {
+        conn.execute(
+            "UPDATE files SET index_state='pending' WHERE id=?1",
+            [item.id],
+        )?;
+    }
+    Ok(())
 }
 
 /// Add a new document from the request body. Headers: `x-eu-name`
 /// (`%`-encoded), optional `x-eu-course-id`, optional `x-eu-folder:
 /// whiteboards` (default: the general library).
 #[tauri::command]
-pub async fn create_file_bytes(db: State<'_, Db>, request: Request<'_>) -> AppResult<FileItem> {
+pub async fn create_file_bytes(
+    db: State<'_, Db>,
+    indexer: State<'_, Indexer>,
+    request: Request<'_>,
+) -> AppResult<FileItem> {
     let name = percent_decode(header(&request, "x-eu-name").unwrap_or(""))?;
     let course_id = header(&request, "x-eu-course-id").and_then(|v| v.parse::<i64>().ok());
     let dir = match header(&request, "x-eu-folder") {
@@ -186,8 +221,12 @@ pub async fn create_file_bytes(db: State<'_, Db>, request: Request<'_>) -> AppRe
         _ => crate::paths::documents_dir(),
     };
     let bytes = raw_body(&request)?;
-    db.write(move |conn| create_from_bytes(conn, &dir, &name, course_id, &bytes))
-        .await
+    let item = db
+        .write(move |conn| create_from_bytes(conn, &dir, &name, course_id, &bytes))
+        .await?;
+    // A PDF (a copy, pages taken out) waits for the indexer: wake it.
+    indexer.kick();
+    Ok(item)
 }
 
 #[derive(Deserialize)]

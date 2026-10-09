@@ -73,6 +73,8 @@ export default function DocumentPane({
   fileId,
   fileName,
   courseId = null,
+  find,
+  findAt,
   visible = true,
 }: {
   tabId: string;
@@ -80,13 +82,24 @@ export default function DocumentPane({
   fileName: string;
   /** The file's course, where the tab knows it: copies go beside the file. */
   courseId?: number | null;
+  /** Words to find, from a search of the library, and when they were asked for. */
+  find?: string;
+  findAt?: number;
   /** The tab is in front. */
   visible?: boolean;
 }) {
   return isImage(fileName) ? (
     <ImageView tabId={tabId} fileId={fileId} fileName={fileName} />
   ) : (
-    <PdfPane tabId={tabId} fileId={fileId} fileName={fileName} courseId={courseId} visible={visible} />
+    <PdfPane
+      tabId={tabId}
+      fileId={fileId}
+      fileName={fileName}
+      courseId={courseId}
+      find={find}
+      findAt={findAt}
+      visible={visible}
+    />
   );
 }
 
@@ -150,12 +163,16 @@ function PdfPane({
   fileId,
   fileName,
   courseId,
+  find,
+  findAt,
   visible,
 }: {
   tabId: string;
   fileId: number;
   fileName: string;
   courseId: number | null;
+  find?: string;
+  findAt?: number;
   visible: boolean;
 }) {
   const toast = useToast();
@@ -260,7 +277,7 @@ function PdfPane({
     try {
       const res = await fetch(versionUrl(v.id));
       if (!res.ok) throw new Error(await res.text());
-      await api.writeFileBytes(fileId, new Uint8Array(await res.arrayBuffer()));
+      await api.writeFileBytes(fileId, new Uint8Array(await res.arrayBuffer()), { textChanged: true });
       setViewing(null);
       setDirty(false);
       setCurrent((c) => ({ url: fileUrl(fileId), revision: c.revision + 1 }));
@@ -335,6 +352,16 @@ function PdfPane({
     setQuery("");
     viewRef.current?.stopFind();
   };
+  // Opened from a search of the library: the words are found here too, and
+  // the view goes to the first, once the document is open.
+  const [foundFor, setFoundFor] = useState(0);
+  if (find && findAt && findAt !== foundFor && pages) {
+    setFoundFor(findAt);
+    setExtractText(null);
+    setQuery(find);
+    setFinding(true);
+  }
+
   // Ctrl+F looks in the document while it is the tab in front, as in a PDF reader.
   useShortcut("documents", openFind, visible && !!pages);
 
@@ -410,7 +437,7 @@ function PdfPane({
     changingPages.current = true;
     try {
       const bytes = await editPages(await view.documentBytes(), edit);
-      await api.writeFileBytes(fileId, bytes);
+      await api.writeFileBytes(fileId, bytes, { textChanged: true });
       setLanding(at);
       setDirty(false);
       setCurrent((c) => ({ url: fileUrl(fileId), revision: c.revision + 1 }));

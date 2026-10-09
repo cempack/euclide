@@ -391,12 +391,17 @@ function CommandPalette({
         snippet: r.snippet || undefined,
         icon: <Icon icon={FileText} size={16} />,
         run: () => {
-          openFile({ id: r.id, name: r.title, kind: r.file_kind ?? "file" });
+          openFile(
+            { id: r.id, name: r.title, kind: r.file_kind ?? "file", courseId: r.course_id },
+            "file_open",
+            // Found in its text: the viewer finds the words, and goes to them.
+            r.page ? { find: query.trim() } : {},
+          );
           onClose();
         },
       };
     });
-  }, [results, onClose]);
+  }, [results, onClose, query]);
 
   // Before anything is typed: the documents opened last, to go back to them.
   const recentActions = useMemo<Action[]>(

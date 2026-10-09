@@ -773,16 +773,23 @@ function search(query: string): SearchResult[] {
   // Names first, then what the documents say: the backend ranks content
   // hits below good name hits.
   const named = files.filter((f) => has(f.name));
-  for (const f of [...named, ...files.filter((f) => !has(f.name) && has(docText(f)))])
+  for (const f of [...named, ...files.filter((f) => !has(f.name) && has(docText(f)))]) {
+    const text = docText(f);
+    // A content hit says its page, from the form feeds between pages.
+    const page = named.includes(f)
+      ? undefined
+      : text.slice(0, text.toLowerCase().indexOf(q)).split("\f").length;
     out.push({
       kind: "file",
       id: f.id,
       title: f.name,
-      subtitle: named.includes(f) ? "document" : "contenu",
-      snippet: named.includes(f) ? "" : excerpt(docText(f), q),
+      subtitle: !page ? "document" : page > 1 ? `contenu · page ${page}` : "contenu",
+      snippet: named.includes(f) ? "" : excerpt(text, q),
       course_id: f.course_id,
       file_kind: f.kind,
+      ...(page ? { page } : {}),
     });
+  }
   for (const n of notes) {
     if (has(n.title) || has(n.body))
       out.push({

@@ -361,6 +361,28 @@ test("another PDF goes at the end, and a page moves after the next", async ({ pa
   await expect(of).toHaveText(`sur ${total}`);
 });
 
+test("a word found in a PDF's text opens the PDF on that word", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await settle(page);
+  await page.keyboard.press("Control+k");
+  await page.getByRole("textbox", { name: /Rechercher un cours/ }).fill("quartiles");
+  await page.getByRole("dialog").getByText("Évaluation — Statistiques.pdf").click();
+  // The viewer's own search, on the same word, at its first place.
+  const field = page.getByRole("textbox", { name: "Rechercher dans le document" });
+  await expect(field).toHaveValue("quartiles");
+  await expect(page.locator(".eu-pdf-find [aria-live]")).toHaveText(/^1 sur \d+$/);
+
+  // Already open: the tab in front, on the new word.
+  await page.keyboard.press("Escape");
+  await page.getByRole("navigation").getByRole("button", { name: "Documents" }).first().click();
+  await page.keyboard.press("Control+k");
+  await page.getByRole("textbox", { name: /Rechercher un cours/ }).fill("médiane");
+  await page.getByRole("dialog").getByText("Évaluation — Statistiques.pdf").click();
+  await expect(page.getByRole("tab", { name: /Évaluation — Statistiques/ })).toHaveCount(1);
+  await expect(field).toHaveValue("médiane");
+});
+
 test("Ctrl+P prints the pages as they show, then puts the sheet away", async ({ page }) => {
   // The dialog is the system's: here, only that it was asked for.
   await page.addInitScript(() => {
@@ -446,7 +468,10 @@ test("Ctrl+F finds a word on every page, and the outline goes to a chapter", asy
   await page.keyboard.press("Escape");
   await expect(page.locator(".eu-pdf-find")).toHaveCount(0);
 
+  // The panel narrows the pages: the zoom fits them again, keeping its middle
+  // (page 6). On a busy machine that lands after a click made at once.
   await page.getByRole("button", { name: "Vignettes des pages" }).click();
+  await settle(page);
   await page.getByRole("tab", { name: "Sommaire" }).click();
   await page.getByRole("button", { name: "Suites arithmétiques" }).click();
   await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("3");

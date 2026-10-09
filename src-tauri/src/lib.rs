@@ -189,11 +189,16 @@ pub fn run() {
             }
             perf::append(&marks);
 
-            // PDFs left unindexed by a previous session: resume once startup has settled.
+            // PDFs left unindexed by a previous session (or read before their
+            // pages were marked): resume once startup has settled.
             {
                 let indexer = app.state::<jobs::indexer::Indexer>().inner().clone();
+                let db = app.state::<db::Db>().inner().clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                    if let Err(e) = db.write(jobs::indexer::reread_for_pages).await {
+                        applog::warn(format!("[index] pages: {e}"));
+                    }
                     indexer.kick();
                 });
             }

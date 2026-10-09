@@ -42,6 +42,7 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
                     snippet: String::new(),
                     course_id: Some(id),
                     file_kind: String::new(),
+                    page: None,
                 },
             ));
         }
@@ -69,6 +70,7 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
                     snippet: String::new(),
                     course_id,
                     file_kind: kind,
+                    page: None,
                 },
             ));
         }
@@ -113,7 +115,8 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
         }
 
         let mut stmt = conn.prepare_cached(
-            "SELECT f.id, f.name, f.kind, f.course_id, snippet(doc_fts, 1, char(2), char(3), '…', 10) \
+            "SELECT f.id, f.name, f.kind, f.course_id, snippet(doc_fts, 1, char(2), char(3), '…', 10), \
+             highlight(doc_fts, 1, char(2), char(3)) \
              FROM doc_fts JOIN files f ON f.id = doc_fts.rowid \
              WHERE doc_fts MATCH ?1 ORDER BY rank LIMIT 10",
         )?;
@@ -124,9 +127,10 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
                 r.get::<_, String>(2)?,
                 r.get::<_, Option<i64>>(3)?,
                 r.get::<_, String>(4)?,
+                page_of_match(&r.get::<_, String>(5)?),
             ))
         })? {
-            let (id, name, kind, course_id, snip) = row?;
+            let (id, name, kind, course_id, snip, page) = row?;
             // Content hits rank below good name hits.
             let s = match_score(&name, &needle).max(52.0);
             scored.push((
@@ -135,10 +139,14 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
                     kind: "file".into(),
                     id,
                     title: name,
-                    subtitle: "contenu".into(),
+                    subtitle: match page {
+                        Some(p) if p > 1 => format!("contenu · page {p}"),
+                        _ => "contenu".into(),
+                    },
                     snippet: snip,
                     course_id,
                     file_kind: kind,
+                    page,
                 },
             ));
         }
@@ -160,6 +168,14 @@ pub fn search(conn: &Connection, query: &str) -> AppResult<Vec<SearchResult>> {
     Ok(results)
 }
 
+/// The page of a document's text where `highlighted` (FTS5's `highlight()`,
+/// matches between char(2) and char(3)) first matches: the indexer puts a
+/// form feed between pages (sidecar `extract_pdf`). None without a match.
+fn page_of_match(highlighted: &str) -> Option<i64> {
+    let at = highlighted.find('\u{2}')?;
+    Some(highlighted[..at].matches('\u{c}').count() as i64 + 1)
+}
+
 fn note_result(id: i64, title: String, snippet: String, course_id: Option<i64>) -> SearchResult {
     SearchResult {
         kind: "note".into(),
@@ -173,6 +189,7 @@ fn note_result(id: i64, title: String, snippet: String, course_id: Option<i64>) 
         snippet,
         course_id,
         file_kind: String::new(),
+        page: None,
     }
 }
 
@@ -330,5 +347,25 @@ mod tests {
             "{:?}",
             hit.snippet
         );
+    }
+
+    #[test]
+    fn a_match_in_a_document_says_its_page() {
+        let conn = migrations_for_tests();
+        conn.execute_batch(
+            "INSERT INTO files (id, name, rel_path, kind) VALUES (7, 'Cours.pdf', 'x.pdf', 'pdf');
+             UPDATE doc_fts SET content = 'Chapitre 1' || char(12) || 'Les suites' || char(12) || 'La fonction carrée' WHERE rowid = 7;
+             INSERT INTO files (id, name, rel_path, kind) VALUES (8, 'Ancien.pdf', 'y.pdf', 'pdf');
+             UPDATE doc_fts SET content = 'Une suite géométrique' WHERE rowid = 8;",
+        )
+        .unwrap();
+        let hit = &search(&conn, "carree").unwrap()[0];
+        assert_eq!((hit.id, hit.page), (7, Some(3)));
+        assert_eq!(hit.subtitle, "contenu · page 3");
+        // Text read before the pages were marked: page 1, not said.
+        let old = search(&conn, "geometrique").unwrap();
+        assert_eq!((old[0].id, old[0].page), (8, Some(1)));
+        assert_eq!(old[0].subtitle, "contenu");
+        assert_eq!(page_of_match("rien"), None);
     }
 }
