@@ -22,20 +22,25 @@ export async function saveTab(id: string): Promise<string | null> {
   return editors.isDirty(now) ? null : now;
 }
 
-/** A tab's close button, Ctrl+W: what is unsaved is the teacher's call. */
+/**
+ * A tab's close button, Ctrl+W. A note or a board saves what it holds, as
+ * it does by itself; anything else unsaved is the teacher's call.
+ */
 export async function closeTab(id: string, confirm: Confirm, toast: Toast): Promise<void> {
   if (!editors.isDirty(id)) {
     tabs.close(id);
     return;
   }
-  const choice = await confirm.dirty({
-    title: tr("confirm.unsavedTitle"),
-    message: tr("confirm.unsavedMessage"),
-  });
-  if (choice === "cancel") return;
-  if (choice === "discard") {
-    tabs.close(id, { discard: true });
-    return;
+  if (!editors.autosaves(id)) {
+    const choice = await confirm.dirty({
+      title: tr("confirm.unsavedTitle"),
+      message: tr("confirm.unsavedMessage"),
+    });
+    if (choice === "cancel") return;
+    if (choice === "discard") {
+      tabs.close(id, { discard: true });
+      return;
+    }
   }
   try {
     const saved = await saveTab(id);

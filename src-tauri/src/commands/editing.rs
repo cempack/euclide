@@ -87,6 +87,36 @@ pub fn replace_content(conn: &Connection, id: i64, bytes: &[u8]) -> AppResult<Fi
     files::get(conn, id)
 }
 
+/// Edits closer together than this share one version: autosaves while the
+/// teacher draws must not push the older versions out.
+const AUTOSAVE_MERGE: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// An autosave of library file `id`: in place when its newest version is
+/// younger than `merge_within`, else like any save (the content it replaces
+/// becomes a version).
+fn autosave_content(
+    conn: &Connection,
+    id: i64,
+    bytes: &[u8],
+    merge_within: std::time::Duration,
+) -> AppResult<FileItem> {
+    let recent: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM file_versions WHERE file_id=?1 AND created_at > datetime('now', ?2))",
+        params![id, format!("-{} seconds", merge_within.as_secs())],
+        |r| r.get(0),
+    )?;
+    if !recent {
+        return replace_content(conn, id, bytes);
+    }
+    let item = files::get(conn, id)?;
+    crate::fsx::atomic_write(&abs_path(&item.rel_path)?, bytes)?;
+    conn.execute(
+        "UPDATE files SET size=?1, added_at=datetime('now') WHERE id=?2",
+        params![bytes.len() as i64, id],
+    )?;
+    files::get(conn, id)
+}
+
 /// Keep the original and the newest `KEEP_VERSIONS` others.
 fn prune_versions(conn: &Connection, id: i64) -> AppResult<()> {
     let old: Vec<(i64, String)> = conn
@@ -169,6 +199,9 @@ pub struct BoardSave {
     #[serde(default)]
     name: Option<String>,
     json: String,
+    /// Saved by itself while the teacher draws, not asked for.
+    #[serde(default)]
+    autosave: bool,
 }
 
 /// Save a whiteboard in Euclide's editable vector format (`.euboard`, JSON).
@@ -176,7 +209,11 @@ pub struct BoardSave {
 pub async fn save_board(db: State<'_, Db>, save: BoardSave) -> AppResult<FileItem> {
     db.write(move |conn| {
         if let Some(id) = save.file_id {
-            return replace_content(conn, id, save.json.as_bytes());
+            return if save.autosave {
+                autosave_content(conn, id, save.json.as_bytes(), AUTOSAVE_MERGE)
+            } else {
+                replace_content(conn, id, save.json.as_bytes())
+            };
         }
         let base = save
             .name
@@ -297,6 +334,36 @@ mod tests {
             "Théorème (annoté).png"
         );
         assert_eq!(percent_decode("100%").unwrap(), "100%");
+    }
+
+    #[test]
+    fn autosaves_close_together_share_a_version() {
+        let _env = crate::paths::temp_data_dir("autosave");
+        let conn = crate::db::migrations_for_tests();
+        let dir = crate::paths::whiteboards_dir();
+        let board = create_from_bytes(&conn, &dir, "Tableau.euboard", None, b"a").unwrap();
+        let ten_minutes = std::time::Duration::from_secs(600);
+        // The first keeps what the board was; the next ones write in place.
+        for json in ["ab", "abc", "abcd"] {
+            autosave_content(&conn, board.id, json.as_bytes(), ten_minutes).unwrap();
+        }
+        let path = files::path_of(&conn, board.id).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"abcd");
+        assert_eq!(list_versions(&conn, board.id).unwrap().len(), 1);
+        // Past the delay, the content it replaces becomes a version again.
+        autosave_content(&conn, board.id, b"abcde", std::time::Duration::ZERO).unwrap();
+        let versions = list_versions(&conn, board.id).unwrap();
+        assert_eq!(versions.len(), 2);
+        let rel: String = conn
+            .query_row(
+                "SELECT rel_path FROM file_versions WHERE id=?1",
+                [versions[1].id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(fs::read(abs_path(&rel).unwrap()).unwrap(), b"abcd");
+        // No temporary file left beside the board.
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
     }
 
     #[test]

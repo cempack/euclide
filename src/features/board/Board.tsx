@@ -35,6 +35,7 @@ import { openFile } from "../../lib/files";
 import { tr, type StringKey } from "../../lib/i18n";
 import { keysOf, useShortcut } from "../../lib/keymap";
 import { logged, reportError } from "../../lib/report";
+import { useAutosave } from "../../lib/useAutosave";
 import { editors } from "../../stores/editors";
 import { tabs, useActiveId } from "../../stores/tabs";
 import { Icon } from "../../ui/Icon";
@@ -715,42 +716,86 @@ export default function Board({
       .find((t) => t.id === tabId)
       ?.title?.replace(/\.euboard$/i, "") || tr("app.tabWhiteboard");
 
-  const save = async (quiet = false) => {
-    if (editing) commitText();
+  // The board's file once it has one: a save that starts while the first is
+  // on its way must update that file, not create a second board.
+  const fileIdRef = useRef(currentFileId);
+  const saving = useRef<Promise<unknown>>(Promise.resolve());
+  const loggedSave = useRef(false);
+  const autosaveFailed = useRef(false);
+  // A save the timer made leaves the Documents preview behind; it is drawn
+  // when the teacher leaves the board.
+  const thumbStale = useRef(false);
+
+  const refreshThumbnail = (id: number) => {
+    const d = docRef.current;
+    thumbStale.current = false;
+    // The Documents grid shows boards by their preview.
+    if (!isTauri() || !d.items.length) return;
+    renderBoard(d.items, d.background, 1, 480).toBlob(
+      (blob) =>
+        void blob
+          ?.arrayBuffer()
+          .then((buf) => api.saveThumbnail(id, buf))
+          .then(() => changed("thumbnails"))
+          .catch(logged("board.thumbnail")),
+      "image/jpeg",
+      0.85,
+    );
+  };
+
+  /**
+   * `quiet`: no « Enregistré » (quitting, closing). `autosave`: the timer,
+   * while the teacher draws: no preview, and edits minutes apart share one
+   * version.
+   */
+  const saveOnce = async (quiet: boolean, autosave: boolean) => {
+    // Not while the teacher types in a text box: it would close it.
+    if (editing && !autosave) commitText();
     const d = docRef.current;
     try {
       const f = await api.saveBoard({
-        file_id: currentFileId ?? null,
+        file_id: fileIdRef.current ?? null,
         course_id: courseId,
         json: JSON.stringify({ version: 3, background: d.background, items: d.items, view: viewRef.current }),
+        autosave,
       });
       if (!f?.id) throw new Error(tr("messages.genericError"));
+      const created = fileIdRef.current == null;
+      fileIdRef.current = f.id;
       setCurrentFileId(f.id);
-      if (!currentFileId) tabs.retarget(tabId, `whiteboard:${f.id}`, f.name, { fileId: f.id, isNew: false });
+      if (created) tabs.retarget(tabId, `whiteboard:${f.id}`, f.name, { fileId: f.id, isNew: false });
       else tabs.rename(tabId, f.name);
-      api.logEvent("whiteboard_save", f.name, courseId);
-      setDirty(false);
+      if (!loggedSave.current) {
+        api.logEvent("whiteboard_save", f.name, courseId);
+        loggedSave.current = true;
+      }
+      // What was drawn while the save ran is still to save.
+      if (docRef.current === d) setDirty(false);
+      autosaveFailed.current = false;
       if (!quiet) toast(tr("whiteboard.saved"), "success");
       changed("library");
       api.getFileVersions(f.id).then(setVersions).catch(logged("board.versions"));
-      // The Documents grid shows boards by their preview.
-      if (isTauri() && d.items.length) {
-        renderBoard(d.items, d.background, 1, 480).toBlob(
-          (blob) =>
-            void blob
-              ?.arrayBuffer()
-              .then((buf) => api.saveThumbnail(f.id, buf))
-              .then(() => changed("thumbnails"))
-              .catch(logged("board.thumbnail")),
-          "image/jpeg",
-          0.85,
-        );
-      }
+      if (autosave) thumbStale.current = true;
+      else refreshThumbnail(f.id);
     } catch (err) {
       reportError("board.save", err);
-      toast(errorMessage(err, tr("messages.genericError")), "error");
+      // Once per run of failures: the timer would say it every few seconds.
+      if (!autosave || !autosaveFailed.current)
+        toast(errorMessage(err, tr("messages.genericError")), "error");
+      if (autosave) autosaveFailed.current = true;
       throw err;
     }
+  };
+  const saveOnceRef = useRef(saveOnce);
+  useEffect(() => {
+    saveOnceRef.current = saveOnce;
+  });
+  /** One save after another, each with the board as it is when it runs. */
+  const save = (quiet = false, autosave = false) => {
+    const next = () => saveOnceRef.current(quiet, autosave);
+    const run = saving.current.then(next, next);
+    saving.current = run.catch(() => undefined);
+    return run;
   };
 
   useEffect(() => {
@@ -762,7 +807,21 @@ export default function Board({
   useEffect(() => {
     saveRef.current = save;
   });
-  useEffect(() => editors.registerFlush(tabId, () => saveRef.current(true)), [tabId]);
+  useEffect(() => editors.registerFlush(tabId, () => saveRef.current(true), { autosaves: true }), [tabId]);
+  useAutosave({ dirty, change: doc, visible, save: () => save(true, true).catch(() => undefined) });
+  // Leaving the board (another tab, another program, closing it): its preview
+  // catches up with what the timer saved.
+  useEffect(() => {
+    const catchUp = () => {
+      if (thumbStale.current && fileIdRef.current != null) refreshThumbnail(fileIdRef.current);
+    };
+    if (!visible) catchUp();
+    window.addEventListener("blur", catchUp);
+    return () => {
+      window.removeEventListener("blur", catchUp);
+      catchUp();
+    };
+  }, [visible]);
   useShortcut("save", () => void save().catch(() => undefined), active);
 
   const exportPng = async () => {

@@ -12,17 +12,13 @@ type Toast = ReturnType<typeof useToast>;
 const dirtyIds = () => Object.keys(editors.dirtyMap());
 
 /**
- * Before the window closes, or Euclide restarts for an update: notes finish
- * their pending autosave without a word; whatever else is unsaved (a
- * whiteboard, a script) is the teacher's call. True when Euclide may quit.
+ * Before the window closes, or Euclide restarts for an update: notes and
+ * boards finish their pending autosave without a word; whatever else is
+ * unsaved (a script, a document's annotations) is the teacher's call. True
+ * when Euclide may quit.
  */
 export async function readyToQuit(confirm: Confirm, toast: Toast, forUpdate = false): Promise<boolean> {
-  const kindOf = new Map(tabs.list().map((t) => [t.id, t.kind]));
-  await Promise.allSettled(
-    dirtyIds()
-      .filter((id) => kindOf.get(id) === "note")
-      .map(editors.flush),
-  );
+  await Promise.allSettled(dirtyIds().filter(editors.autosaves).map(editors.flush));
   await afterCommit();
 
   const left = dirtyIds();
