@@ -13,6 +13,7 @@ import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Ellipsis } from "lucide-react";
 import { ArrowRight } from "lucide-react";
 import { Icon } from "../ui/Icon";
+import { placePopover } from "../ui/Menu";
 import { tr } from "../lib/i18n";
 
 /**
@@ -207,18 +208,23 @@ function MorePopover({ children }: { children: ReactNode }) {
     const pop = popRef.current;
     const button = buttonRef.current;
     if (!pop || !button) return;
+    const onBefore = (e: Event) => {
+      if ((e as ToggleEvent).newState === "open") delete pop.dataset.placed;
+    };
     const onToggle = (e: Event) => {
       if ((e as ToggleEvent).newState !== "open") return;
       void computePosition(button, pop, {
         placement: "bottom-end",
         strategy: "fixed",
         middleware: [offset(4), flip(), shift({ padding: 6 })],
-      }).then(({ x, y }) => {
-        pop.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
-      });
+      }).then(({ x, y, placement }) => placePopover(pop, x, y, placement));
     };
+    pop.addEventListener("beforetoggle", onBefore);
     pop.addEventListener("toggle", onToggle);
-    return () => pop.removeEventListener("toggle", onToggle);
+    return () => {
+      pop.removeEventListener("beforetoggle", onBefore);
+      pop.removeEventListener("toggle", onToggle);
+    };
   }, []);
 
   return (

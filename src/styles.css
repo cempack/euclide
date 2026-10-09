@@ -1211,15 +1211,37 @@
 
   /* Menus (ui/Menu.tsx): paper in the top layer; the item under the
      keyboard or the pointer is an ink tint. */
+  /* `translate` places it (Menu.tsx, placePopover); it comes out of its
+     button with `transform` (4 px and 0.98 from the side it opened on) once
+     placed, in 140 ms, and fades out in 100 ms, the way it came. */
   .eu-menu {
     @apply fixed m-0 min-w-48 max-w-96 p-1 rounded-md border border-line bg-panel text-ink shadow-pop z-dropdown;
     inset: auto;
     left: 0;
     top: 0;
-    animation: eu-rise 120ms var(--ease-out) both;
+    transition:
+      opacity 100ms var(--ease-in),
+      overlay 100ms allow-discrete,
+      display 100ms allow-discrete;
+  }
+  .eu-menu:popover-open:not([data-placed]) {
+    opacity: 0;
+  }
+  .eu-menu:popover-open[data-placed] {
+    animation: eu-menu-in 140ms var(--ease-out) backwards;
+  }
+  .eu-menu[data-side="top"] {
+    --eu-menu-from: translateY(4px);
+  }
+  .eu-menu[data-side="left"] {
+    --eu-menu-from: translateX(4px);
+  }
+  .eu-menu[data-side="right"] {
+    --eu-menu-from: translateX(-4px);
   }
   .eu-menu:not(:popover-open) {
     display: none;
+    opacity: 0;
   }
   .eu-menu-item {
     @apply w-full flex items-center gap-2.5 px-2.5 rounded text-left text-body text-ink outline-none;
@@ -1461,6 +1483,12 @@
 @keyframes eu-pulse {
   50% {
     opacity: 0.5;
+  }
+}
+@keyframes eu-menu-in {
+  from {
+    opacity: 0;
+    transform: var(--eu-menu-from, translateY(-4px)) scale(0.98);
   }
 }
 

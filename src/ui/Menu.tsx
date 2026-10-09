@@ -19,6 +19,23 @@ export type MenuEntry =
 type Anchor = HTMLElement | VirtualElement;
 
 /**
+ * Puts a popover at (x, y), where floating-ui placed it, then lets it come
+ * out of the side of its button (styles.css, .eu-menu[data-placed]): it
+ * starts once its side is known, not from wherever it last stood.
+ */
+export function placePopover(el: HTMLElement, x: number, y: number, at: Placement) {
+  const [side, align] = at.split("-");
+  const across = align === "end" ? "right" : align === "start" ? "left" : "center";
+  el.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
+  el.style.transformOrigin =
+    side === "top" || side === "bottom"
+      ? `${across} ${side === "top" ? "bottom" : "top"}`
+      : `${side === "left" ? "right" : "left"} ${align === "end" ? "bottom" : align === "start" ? "top" : "center"}`;
+  el.dataset.side = side;
+  el.dataset.placed = "";
+}
+
+/**
  * A menu in the top layer (popover="auto": a click outside or Escape closes
  * it). Arrow keys, Home/End and typing a few letters move between items;
  * Enter or Space picks one; focus goes back where it came from.
@@ -52,14 +69,13 @@ export function Menu({
     const menu = ref.current;
     if (!menu || !open || !anchor) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
+    delete menu.dataset.placed;
     menu.showPopover();
     void computePosition(anchor, menu, {
       placement,
       strategy: "fixed",
       middleware: [offset(4), flip(), shift({ padding: 6 })],
-    }).then(({ x, y }) => {
-      menu.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
-    });
+    }).then(({ x, y, placement: at }) => placePopover(menu, x, y, at));
     menu.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')?.focus();
     // Light dismiss (outside click, Escape) closes the popover by itself.
     const onToggle = (e: Event) => {
@@ -110,31 +126,31 @@ export function Menu({
       className="eu-menu"
       onKeyDown={onKeyDown}
     >
-      {open &&
-        items.map((item, i) =>
-          item === "separator" ? (
-            <div key={`sep-${i}`} role="separator" className="eu-menu-sep" />
-          ) : (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              aria-disabled={item.disabled || undefined}
-              data-danger={item.danger || undefined}
-              className="eu-menu-item"
-              onClick={() => {
-                if (item.disabled) return;
-                onClose();
-                item.onSelect();
-              }}
-            >
-              {item.icon ? <Icon icon={item.icon} /> : <span className="w-4" />}
-              <span className="flex-1 truncate">{item.label}</span>
-              {item.keys && <span className="eu-t-caption">{shortcutText(item.keys)}</span>}
-            </button>
-          ),
-        )}
+      {/* Kept while closed, for the menu to fade out with its items. */}
+      {items.map((item, i) =>
+        item === "separator" ? (
+          <div key={`sep-${i}`} role="separator" className="eu-menu-sep" />
+        ) : (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            aria-disabled={item.disabled || undefined}
+            data-danger={item.danger || undefined}
+            className="eu-menu-item"
+            onClick={() => {
+              if (item.disabled) return;
+              onClose();
+              item.onSelect();
+            }}
+          >
+            {item.icon ? <Icon icon={item.icon} /> : <span className="w-4" />}
+            <span className="flex-1 truncate">{item.label}</span>
+            {item.keys && <span className="eu-t-caption">{shortcutText(item.keys)}</span>}
+          </button>
+        ),
+      )}
     </div>
   );
 }
