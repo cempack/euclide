@@ -195,7 +195,18 @@
     "viewGrid": "Grille avec aperçus",
     "inContent": "Trouvé dans le contenu · {count}",
     "deleteFileTitle": "Supprimer le document",
-    "deleteMessage": "Supprimer « {name} » ? Il reste 30 jours dans la corbeille des sauvegardes."
+    "deleteMessage": "Supprimer « {name} » ? Il reste 30 jours dans la corbeille des sauvegardes.",
+    "typePdf": "PDF",
+    "typeImages": "Images",
+    "typeBoards": "Tableaux",
+    "typeNotes": "Notes",
+    "groupUndated": "Sans date",
+    "groupRecent": "Récents",
+    "groupToday": "Aujourd'hui",
+    "groupYesterday": "Hier",
+    "groupThisWeek": "Cette semaine",
+    "groupThisMonth": "Ce mois",
+    "groupLastMonth": "Mois dernier"
   },
   "whiteboard": {
     "saved": "Enregistré",
@@ -262,7 +273,9 @@
     },
     "attachDocsNone": "Attacher des documents",
     "libraryEmpty": "Aucun document dans la bibliothèque.",
-    "attachError": "Les documents n'ont pas pu être attachés."
+    "attachError": "Les documents n'ont pas pu être attachés.",
+    "matiereUpdated": "Matière mise à jour : {name}",
+    "matiereNone": "(aucune)"
   },
   "settings": {
     "pronoteTitle": "Pronote",
@@ -325,7 +338,26 @@
     "sections": "Parties des réglages",
     "dataDirChosen": "Dossier choisi : relancez Euclide pour l'utiliser.",
     "resetMessage": "Revenir au dossier par défaut (Euclide-Data, à côté d'Euclide) au prochain lancement ?",
-    "resetConfirm": "Revenir au dossier par défaut"
+    "resetConfirm": "Revenir au dossier par défaut",
+    "qrSteps": [
+      "Application mobile Pronote : Mon compte > Générer un QR code.",
+      "Choisissez un code PIN à 4 chiffres (à retenir).",
+      "Importez la capture d'écran du QR code ci-dessous.",
+      "Le QR code n'est valable que 10 minutes."
+    ],
+    "qrImport": "Importer l'image du QR code",
+    "qrLoaded": "QR code chargé",
+    "qrPin": "Code PIN (4 chiffres)",
+    "connecting": "Connexion…",
+    "directHelp": "Connexion directe par identifiant et mot de passe (comptes hors ENT, ou démonstration).",
+    "urlPlaceholder": "Adresse Pronote (https://…)",
+    "username": "Identifiant",
+    "password": "Mot de passe",
+    "accountPin": "Code PIN du compte",
+    "accountPinHint": "Votre compte Pronote exige un code PIN pour les nouveaux appareils.",
+    "accountPinAdd": "+ Code PIN du compte (optionnel)",
+    "toastPinRequired": "Code PIN requis pour cet appareil. Saisissez-le ci-dessous.",
+    "scheduleCourse": "Lier un cours…"
   },
   "app": {
     "tabWhiteboard": "Tableau",

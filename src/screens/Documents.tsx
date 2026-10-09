@@ -40,32 +40,32 @@ function filterFromHint(hint: string | undefined): Filter {
 type DocItem = { t: "file"; f: FileItem; date: string } | { t: "note"; n: Note; date: string };
 
 const TYPE_CHIPS = [
-  { value: "pdf", label: "PDF" },
-  { value: "image", label: "Images" },
-  { value: "board", label: "Tableaux" },
-  { value: "note", label: "Notes" },
+  { value: "pdf", label: tr("documents.typePdf") },
+  { value: "image", label: tr("documents.typeImages") },
+  { value: "board", label: tr("documents.typeBoards") },
+  { value: "note", label: tr("documents.typeNotes") },
 ];
 
 /** Recent first, then month by month: how a teacher remembers documents. */
 function getTimeBucket(iso: string): string {
-  if (!iso) return "Sans date";
+  if (!iso) return tr("documents.groupUndated");
   const normalized = iso.includes("T") ? iso : iso.replace(" ", "T") + "Z";
   const d = new Date(normalized);
-  if (isNaN(d.getTime())) return "Sans date";
+  if (isNaN(d.getTime())) return tr("documents.groupUndated");
 
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const itemDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.floor((today.getTime() - itemDay.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return "Récents";
-  if (diffDays === 0) return "Aujourd'hui";
-  if (diffDays === 1) return "Hier";
-  if (diffDays <= 7) return "Cette semaine";
+  if (diffDays < 0) return tr("documents.groupRecent");
+  if (diffDays === 0) return tr("documents.groupToday");
+  if (diffDays === 1) return tr("documents.groupYesterday");
+  if (diffDays <= 7) return tr("documents.groupThisWeek");
 
   const monthsAgo = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-  if (monthsAgo === 0) return "Ce mois";
-  if (monthsAgo === 1) return "Mois dernier";
+  if (monthsAgo === 0) return tr("documents.groupThisMonth");
+  if (monthsAgo === 1) return tr("documents.groupLastMonth");
   const month = d.toLocaleDateString("fr-FR", { month: "long" });
   return `${month.charAt(0).toUpperCase() + month.slice(1)} ${d.getFullYear()}`;
 }
