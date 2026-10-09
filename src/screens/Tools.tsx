@@ -265,7 +265,7 @@ function DrawSection() {
           {lists.length > 0 && className && (
             <div className="flex items-center gap-2 flex-wrap">
               <select
-                className="eu-input eu-field-sm w-auto"
+                className="eu-select eu-field-sm w-auto"
                 value={className}
                 onChange={(e) => setChosen(e.target.value)}
                 aria-label={tr("tools.drawClass")}
@@ -308,7 +308,7 @@ function DrawSection() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <select
-              className="eu-input eu-field-sm w-auto"
+              className="eu-select eu-field-sm w-auto"
               value={faces}
               onChange={(e) => setFaces(Number(e.target.value))}
               aria-label={tr("scene.faces")}

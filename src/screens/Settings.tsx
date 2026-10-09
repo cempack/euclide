@@ -833,7 +833,7 @@ function ScheduleSection() {
           />
           <div className="grid grid-cols-3 gap-2">
             <select
-              className="eu-input"
+              className="eu-select"
               value={form.day_of_week}
               onChange={(e) => setForm({ ...form, day_of_week: Number(e.target.value) })}
             >
@@ -864,7 +864,7 @@ function ScheduleSection() {
               onChange={(e) => setForm({ ...form, room: e.target.value })}
             />
             <select
-              className="eu-input"
+              className="eu-select"
               value={form.course_id ?? ""}
               onChange={(e) =>
                 setForm({ ...form, course_id: e.target.value ? Number(e.target.value) : null })

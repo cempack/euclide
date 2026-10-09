@@ -548,6 +548,10 @@
   [data-theme="dark"] .eu-select {
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8a84' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
+  /* In a toolbar, as tall as the buttons beside it. */
+  .eu-select.eu-field-sm {
+    height: var(--eu-control-sm);
+  }
 
   /* Switch (ui/Switch.tsx): the thumb slides, on the compositor. */
   .eu-switch {
@@ -2810,14 +2814,23 @@ input[type="radio"] {
   background: var(--color-stage-hover);
   border-color: var(--color-stage-accent);
 }
+/* The app's own chevron, in the stage's muted ink, not the system's arrow. */
 .eu-scene-select {
   height: 2.5rem;
-  padding: 0 0.6rem;
+  padding: 0 2rem 0 0.75rem;
   border-radius: 6px;
   border: 1px solid var(--color-stage-line);
-  background: var(--color-stage);
+  appearance: none;
+  background: var(--color-stage)
+    url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a09d97' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 0.6rem center;
   color: var(--color-stage-ink);
   font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.eu-scene-select:hover {
+  background-color: rgb(var(--eu-stage-ink) / 0.06);
 }
 .eu-scene-number {
   min-width: 2.5rem;
