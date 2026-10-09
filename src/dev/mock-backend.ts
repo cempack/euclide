@@ -1466,8 +1466,8 @@ function devFileUrl(kind: "file" | "version" | "thumb", id: number): string {
 
 const sampleImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#2f4f3f"/>' +
-    '<text x="60" y="120" font-family="serif" font-size="48" fill="#f2f0e6">f(x) = x²</text>' +
-    '<path d="M60 420 Q 400 -120 740 420" stroke="#f2f0e6" stroke-width="4" fill="none"/></svg>',
+    '<text x="40" y="475" font-family="serif" font-size="48" fill="#f2f0e6">f(x) = x²</text>' +
+    '<path d="M60 60 Q 400 780 740 60" stroke="#f2f0e6" stroke-width="4" fill="none"/></svg>',
 )}`;
 
 serveDevFiles(devFileUrl);

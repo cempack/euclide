@@ -2,6 +2,45 @@
 
 Ce qui change d'une version d'Euclide à l'autre.
 
+## 0.5.0
+
+### En classe
+
+- **Les élèves de chaque classe.** Sur la page d'une classe, la liste se charge depuis Pronote, ou se colle, un nom par ligne. Elle reste sur la clé, avec les données d'Euclide.
+- **Tirer un nom au sort.** Sur l'écran de classe (Ctrl+Maj+H), « Tirage » tire un nom dans la classe en cours. Un nom tiré ne revient pas avant « Recommencer ». Espace, Entrée ou → tirent le suivant : une télécommande de présentation suffit.
+- **Faire des groupes**, d'une taille donnée ou en un nombre donné. + et − changent le nombre, Espace refait les groupes.
+- **Le hasard** : un dé, un nombre entre deux bornes, pile ou face. Chaque élève et chaque face ont la même chance.
+- **Un chronomètre**, à côté du minuteur, dans la barre d'onglets et sur l'écran de classe. C le lance ou l'arrête, T note un tour.
+- **Un QR code** pour une adresse ou un texte, en plein écran : les élèves le scannent au lieu de recopier l'adresse. Chaque lien des Outils a son bouton QR code.
+
+<p>
+  <img src="docs/changelog/0.5.0/tirage.jpg" alt="Un nom tiré au sort : le troisième sur 26" width="49%">
+  <img src="docs/changelog/0.5.0/groupes.jpg" alt="La classe en six groupes" width="49%">
+</p>
+
+![Un lien des Outils en QR code, en plein écran](docs/changelog/0.5.0/qr-code.jpg)
+
+### Notes
+
+- **Des tableaux.** Le bouton Tableau en insère un, à remplir. Des cellules copiées depuis un tableur (LibreOffice, Excel) deviennent un tableau quand on les colle, et les colonnes de nombres s'alignent à droite.
+- **Des images.** Une capture d'écran collée, une image choisie avec le bouton Image ou glissée depuis l'explorateur s'ajoute à l'endroit du curseur. Elle rejoint aussi les documents du cours. `![légende|300](…)` règle sa largeur, et Ctrl+Z l'enlève.
+- Aussi : du texte barré, des cases à cocher, des notes de bas de page.
+
+![Une note : un tableau de valeurs, la photo du tableau, des cases à cocher](docs/changelog/0.5.0/note-tableau.jpg)
+
+### Tableau blanc
+
+- **Des formules.** L'outil Σ écrit une formule en LaTeX là où on touche la feuille, et la montre pendant qu'on la tape. Elle reste nette à tout zoom, on peut écrire par-dessus, et elle part dans les exports.
+- **Des images**, collées, choisies ou glissées sur la feuille. Elles restent sous le dessin : on écrit dessus, et la gomme ne les efface pas.
+- **La flèche de sélection** déplace un élément, l'agrandit par sa poignée, et Suppr l'enlève.
+- **Des pages.** Le bouton Nouvelle page en ajoute une. ‹ et ›, ou PgPréc et PgSuiv (les touches d'une télécommande de présentation), tournent les pages. L'export PDF imprime une page par feuille.
+
+![Une parabole dans un repère, ses racines calculées en formules](docs/changelog/0.5.0/tableau-formules.jpg)
+
+### À savoir
+
+- Euclide met ses données à jour pour les listes d'élèves (format 4). Il en fait d'abord une copie dans Euclide-Sauvegardes. Ensuite, une version plus ancienne d'Euclide ne les ouvre plus.
+
 ## 0.4.2
 
 **Enregistrez votre travail avant d'installer cette mise à jour.** Elle s'installe encore comme les précédentes : Euclide se ferme sans enregistrer. C'est la dernière fois. À partir de la suivante, Euclide enregistre tout seul avant d'installer, puis se rouvre sur la nouvelle version.

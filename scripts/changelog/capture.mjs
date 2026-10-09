@@ -34,6 +34,12 @@ async function open(theme = "light", viewport = { width: 1440, height: 900 }) {
     ([runs, version]) => {
       let seed = 42;
       Math.random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+      // And the classroom screen's draws: the same names in every picture.
+      crypto.getRandomValues = (array) => {
+        if (array instanceof Uint32Array)
+          for (let i = 0; i < array.length; i++) array[i] = Math.random() * 2 ** 32;
+        return array;
+      };
       localStorage.setItem("eu:theme", "auto");
       localStorage.setItem("eu:density", "comfortable");
       globalThis.__euRecordedRuns = runs;
@@ -99,6 +105,35 @@ $$a^2 - b^2 = (a - b)(a + b)$$
 
 /** The pointer out of the way: no tooltip in the picture. */
 const away = (page) => page.mouse.move(1430, 450);
+
+/** The lesson again, with a table of values and the photo of the board. */
+const LESSON_TABLE = `## Tableau de valeurs
+
+| $x$ | $-2$ | $-1$ | $0$ | $1$ | $2$ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| $f(x) = x^2$ | $4$ | $1$ | $0$ | $1$ | $4$ |
+
+## La courbe
+
+![Photo du tableau|420](eufile://file/8)
+
+La courbe de $f$ est une **parabole**, symétrique par rapport à l'axe des ordonnées.
+
+## À retenir
+
+- [x] $f$ est décroissante sur $]-\\infty ; 0]$
+- [x] $f$ est croissante sur $[0 ; +\\infty[$
+- [ ] Exercices 12 à 15 p. 87
+`;
+
+/** The classroom screen (Ctrl+Maj+H), on one of its modes. */
+const scene = async (page, mode) => {
+  await page.keyboard.press("Control+Shift+H");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: mode, exact: true }).click();
+  await dialog.focus();
+  return dialog;
+};
 
 const SHOTS = {
   "tableau-de-bord": async () => open(),
@@ -280,6 +315,79 @@ const SHOTS = {
     await page.getByText("Évaluation — Statistiques.pdf").first().click();
     await away(page);
     await settle(page, 2500);
+    return page;
+  },
+  // 0.5: three names drawn from the class in progress.
+  tirage: async () => {
+    const page = await open("dark");
+    await scene(page, "Tirage");
+    for (let i = 0; i < 3; i++) await page.keyboard.press("Space");
+    await away(page);
+    await page.waitForTimeout(600);
+    return page;
+  },
+  // The class in groups of four.
+  groupes: async () => {
+    const page = await open("dark");
+    const dialog = await scene(page, "Groupes");
+    await dialog.getByRole("button", { name: "Faire les groupes" }).click();
+    await dialog.getByRole("button", { name: "Un de plus" }).click();
+    await dialog.getByRole("button", { name: "Un de plus" }).click();
+    await away(page);
+    await page.waitForTimeout(600);
+    return page;
+  },
+  // A link of Outils as a QR code, for phones to scan.
+  "qr-code": async () => {
+    const page = await open("dark");
+    await nav(page, "Outils");
+    await page.getByRole("button", { name: "Afficher en QR code — Capytale" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("img", { name: /^QR code de / })
+      .waitFor();
+    await away(page);
+    await page.waitForTimeout(600);
+    return page;
+  },
+  // A note with a table of values, a picture and a task list.
+  "note-tableau": async () => {
+    const page = await open();
+    await nav(page, "Documents");
+    await page.getByText("Fonction carré — cours").first().click();
+    await settle(page, 400);
+    await page.locator("main textarea").first().fill(LESSON_TABLE);
+    await away(page);
+    await settle(page, 1200);
+    return page;
+  },
+  // A parabola on the axes, its roots worked out in formulas, one selected.
+  "tableau-formules": async () => {
+    const page = await open();
+    await nav(page, "Tableau blanc");
+    const palette = page.getByRole("toolbar", { name: /Outils/ });
+    await palette.getByRole("button", { name: "Courbe d'une fonction" }).click();
+    await page.getByRole("textbox", { name: "Expression de f(x)" }).fill("x^2 - 4x + 3");
+    await page.getByRole("button", { name: "Tracer" }).click();
+    await settle(page, 300);
+    const board = await page.locator(".eu-board").boundingBox();
+    await palette.getByRole("button", { name: "Formule (LaTeX)" }).click();
+    // On the left of the axes, where the curve leaves room.
+    for (const [x, y, tex] of [
+      [150, 40, "f(x) = x^2 - 4x + 3"],
+      [150, 115, "\\Delta = b^2 - 4ac = 4"],
+      [150, 190, "x_1 = \\frac{-b - \\sqrt{\\Delta}}{2a} = 1"],
+      [150, 290, "x_2 = \\frac{-b + \\sqrt{\\Delta}}{2a} = 3"],
+    ]) {
+      await page.mouse.click(board.x + x, board.y + y);
+      await page.getByRole("textbox", { name: "Formule en LaTeX" }).fill(tex);
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(300);
+    }
+    await palette.getByRole("button", { name: /^Sélection/ }).click();
+    await page.mouse.click(board.x + 170, board.y + 210);
+    await away(page);
+    await settle(page, 800);
     return page;
   },
   horloge: async () => {
