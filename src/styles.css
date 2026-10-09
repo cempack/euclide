@@ -1053,11 +1053,24 @@
     @apply bg-accent-soft text-ink rounded-xs px-px font-medium;
   }
   /* A colour to pick: the chosen one is ringed. */
+  /* A colour (features/pdf/ColorChoice.tsx): a dot inside its button, and
+     the chosen one's ring on the button's own edge, so neither the ring nor
+     a dot grown under the pointer reaches the next colour. The hairline
+     keeps black visible on the dark theme. */
   .eu-swatch {
-    @apply w-5 h-5 shrink-0 rounded-full border border-line transition-transform duration-fast hover:scale-110;
+    @apply relative w-6 h-6 shrink-0 rounded-full grid place-items-center;
+  }
+  .eu-swatch::before {
+    content: "";
+    @apply w-4 h-4 rounded-full transition-transform duration-fast;
+    background: var(--swatch);
+    box-shadow: inset 0 0 0 1px rgb(var(--eu-line) / var(--eu-line-a-strong));
+  }
+  .eu-swatch:hover::before {
+    transform: scale(1.12);
   }
   .eu-swatch[aria-checked="true"] {
-    @apply ring-2 ring-accent ring-offset-2 ring-offset-panel;
+    box-shadow: inset 0 0 0 2px rgb(var(--eu-accent));
   }
 
   /* Where a dragged tab will land: a bar between two tabs. */

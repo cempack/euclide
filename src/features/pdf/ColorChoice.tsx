@@ -22,7 +22,7 @@ export function ColorChoice({
           data-tip={tr(c.label)}
           onClick={() => onChange(c.value)}
           className="eu-swatch"
-          style={{ background: c.value }}
+          style={{ "--swatch": c.value } as React.CSSProperties}
         />
       ))}
     </div>
