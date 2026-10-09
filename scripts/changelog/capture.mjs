@@ -409,6 +409,16 @@ const SHOTS = {
     await settle(page, 600);
     return page;
   },
+  // 0.6: the photo of the board in the PDF viewer, with what the teacher drew on it.
+  "image-annotee": async () => {
+    const page = await open();
+    await nav(page, "Documents");
+    await page.getByRole("option", { name: /Photo du tableau/ }).click();
+    await page.locator(".eu-pdf-page").first().waitFor();
+    await settle(page, 1500);
+    await away(page);
+    return page;
+  },
   // 0.6: the « Pages » menu, on the page in view.
   "pdf-pages": async () => {
     const page = await pdfOpen();
