@@ -2,6 +2,40 @@
 
 Ce qui change d'une version d'Euclide à l'autre.
 
+## 0.4.2
+
+**Enregistrez votre travail avant d'installer cette mise à jour.** Elle s'installe encore comme les précédentes : Euclide se ferme sans enregistrer. C'est la dernière fois. À partir de la suivante, Euclide enregistre tout seul avant d'installer, puis se rouvre sur la nouvelle version.
+
+### Votre travail
+
+- Une note sans titre garde son texte : en l'enregistrant, elle s'appelle « Nouvelle note ».
+- Le tableau blanc s'enregistre tout seul, quelques secondes après chaque changement et quand on passe à un autre onglet.
+- Un onglet qu'on enregistre en le fermant se ferme vraiment.
+- Une mise à jour enregistre d'abord le travail ouvert, puis Euclide redémarre sur la nouvelle version.
+- Sur un PC lent, fermer la fenêtre laisse le temps d'enregistrer : Euclide attend la page jusqu'à 5 secondes, au lieu de 2.
+- Une erreur reste dans son onglet : « Cet onglet a rencontré une erreur », avec Réessayer et Fermer l'onglet. Les autres onglets continuent.
+- Une action qui échoue le dit, au lieu de ne rien faire : supprimer une note, un lien, un cours ou un créneau de l'emploi du temps, déconnecter Pronote…
+
+### PDF
+
+- Un PDF laissé en mode stylo, surligneur ou texte ne prend plus les touches des autres onglets : Retour arrière, Suppr et Ctrl+Z fonctionnent à nouveau dans les notes.
+- Un lien dans un PDF ou dans une note s'ouvre dans le navigateur. Il ne remplace plus la fenêtre d'Euclide.
+- Ouvrir une ancienne version demande d'abord quoi faire des annotations non enregistrées.
+- Le PDF sait ce qui n'est pas enregistré : une annotation effacée après l'enregistrement compte, et enregistrer sans rien de nouveau ne crée plus de version.
+
+### Vos données
+
+- Une restauration impossible (sauvegarde disparue ou abîmée) laisse les données telles qu'elles sont, et le dit au démarrage et dans Réglages, Sauvegardes.
+- L'« Archive complète » est écrite en entier ou pas du tout : une clé retirée pendant l'écriture ne laisse pas d'archive à moitié faite.
+- Une clé USB qui change de lettre (E: devenu F:) retrouve le dossier de données choisi. S'il reste introuvable, Euclide le dit et propose de le chercher, d'utiliser Euclide-Data ou de quitter, au lieu de repartir d'un dossier vide.
+- La clé qui protège le mot de passe Pronote ne part plus dans les sauvegardes, et le jeton de connexion Pronote est chiffré lui aussi. Après une restauration, Pronote demande seulement de se reconnecter.
+
+### Et aussi
+
+- Une nouvelle version n'est proposée qu'une fois publiée en entier et vérifiée, pour tous les systèmes.
+- Les erreurs de Python sont notées dans le journal d'Euclide.
+- La fenêtre de connexion à Pronote retrouve ses accents.
+
 ## 0.4.1
 
 - Le module Python d'Euclide passe d'environ 5 700 fichiers à moins de 900 : une mise à jour s'installe bien plus vite sur une clé USB, et la première ouverture qui suit aussi. Les fichiers retirés aidaient la complétion pour des bibliothèques qu'un script de cours ne peut pas importer ; la complétion ne change pas.
