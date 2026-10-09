@@ -7,8 +7,8 @@ import { settle } from "./app";
  * the other tabs, the unsaved mark, old versions and links. No screenshots.
  */
 
-// Wide enough for the whole PDF toolbar, Versions included.
-test.use({ viewport: { width: 1900, height: 1000 } });
+// Wide enough for the whole PDF toolbar, Versions included, with the pen's colours and widths out.
+test.use({ viewport: { width: 2000, height: 1000 } });
 
 const PDF = /Évaluation — Statistiques/;
 
@@ -302,6 +302,36 @@ test("a copy has what was drawn and typed fixed in its pages", async ({ page }) 
   expect(copy).not.toMatch(/\/Subtype\s*\/(Widget|Ink)/);
   // The document itself is as it was: still to be saved.
   await expect(page.getByTestId("dirty")).toHaveText("dirty");
+});
+
+test("a squared page is inserted, then taken back; pages go to a new document", async ({ page }) => {
+  await openPdf(page);
+  const of = page.getByText(/^sur \d+$/);
+  await expect(of).toHaveText("sur 1");
+  const menu = async () => {
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    return page.getByRole("menu");
+  };
+  // One page only: it cannot be deleted.
+  await expect((await menu()).getByRole("menuitem", { name: "Supprimer la page 1" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  await (await menu()).getByRole("menuitem", { name: /petits carreaux/ }).click();
+  await expect(of).toHaveText("sur 2");
+  await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("2");
+  // The toast's « Annuler » (the toolbar's undoes strokes).
+  await page.getByText("Annuler", { exact: true }).click();
+  await expect(of).toHaveText("sur 1");
+
+  await (await menu()).getByRole("menuitem", { name: /Extraire/ }).click();
+  const pagesBox = page.getByLabel("Pages à extraire");
+  await pagesBox.fill("2");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toContainText("De 1 à 1");
+  await pagesBox.fill("1");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText(/Pages extraites/)).toBeVisible();
+  await expect(page.getByLabel("Pages à extraire")).toHaveCount(0);
 });
 
 test("Ctrl+P prints the pages as they show, then puts the sheet away", async ({ page }) => {

@@ -152,6 +152,8 @@ export type PdfViewHandle = {
    * document shown does not change.
    */
   flatCopy(): Promise<Uint8Array>;
+  /** The document as it is now, with what is not saved yet: for a change to its pages. */
+  documentBytes(): Promise<Uint8Array>;
 };
 
 /** A page ready to print: its picture, and whether it lies wider than tall. */
@@ -184,6 +186,8 @@ type Props = {
    * the pages turned by `goTo`; the zoom before comes back after.
    */
   presenting?: boolean;
+  /** The page to open at (the one just changed), once the pages are laid out. */
+  startPage?: number;
   onReady?: (info: { pages: number }) => void;
   onPage?: (page: number) => void;
   onScale?: (scale: number) => void;
@@ -427,6 +431,7 @@ function Viewer({
   showPages = false,
   active = true,
   presenting = false,
+  startPage = 0,
   ...callbacks
 }: Props & {
   documentId: string;
@@ -518,6 +523,17 @@ function Viewer({
       if (e.documentId === documentId) events.current.onPage?.(e.pageNumber);
     });
   }, [scroll, documentId]);
+
+  // Opened at a given page, once the pages first have their places.
+  useEffect(() => {
+    if (!scroll || startPage < 2) return;
+    return scroll.onLayoutReady((e) => {
+      if (e.documentId !== documentId || !e.isInitial) return;
+      scroll
+        .forDocument(documentId)
+        .scrollToPage({ pageNumber: Math.min(startPage, e.totalPages), behavior: "instant" });
+    });
+  }, [scroll, documentId, startPage]);
 
   useEffect(() => {
     if (!zoom) return;
@@ -762,6 +778,13 @@ function Viewer({
       } finally {
         engine.closeDocument(copy);
       }
+    },
+    async documentBytes() {
+      const doc = state?.document;
+      if (!doc || readOnly) throw new Error(tr("pdf.notReady"));
+      await settle();
+      if (annotations) await annotations.forDocument(documentId).commit().toPromise();
+      return new Uint8Array(await pdfium().saveAsCopy(doc).toPromise());
     },
   }));
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,10 @@ import {
   Circle,
   Eraser,
   FileDown,
+  FileOutput,
+  FilePlus,
+  Files,
+  Grid3x3,
   Highlighter,
   History,
   Minus,
@@ -55,6 +59,7 @@ import { PdfView, type FindState, type PdfTool, type PdfViewHandle, type PrintPa
 import { printDialog, sheetReady } from "../notes/PrintSheet";
 import { ImageView } from "./ImageView";
 import { Presentation } from "./Presentation";
+import { editPages, pagesLabel, parsePages, type PageEdit } from "./pageEdits";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 
@@ -169,6 +174,10 @@ function PdfPane({
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<FindState>({ query: "", total: 0, current: 0, searching: false });
   const findRef = useRef<HTMLInputElement>(null);
+  /** The pages to put in a new document, as typed; null while the bar is closed. */
+  const [extractText, setExtractText] = useState<string | null>(null);
+  const [extractBad, setExtractBad] = useState(false);
+  const extractId = useId();
   /** The page count, once the document is open. */
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
@@ -183,6 +192,8 @@ function PdfPane({
   const [presenting, setPresenting] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
+  /** The page the view opens at after a change to the pages: the one changed. */
+  const [landing, setLanding] = useState(0);
   /** The file's address, taken again after a restore (the file changed underneath). */
   const [current, setCurrent] = useState(() => ({ url: fileUrl(fileId), revision: 0 }));
   /** An older version shown instead of the file (read-only). */
@@ -307,6 +318,7 @@ function PdfPane({
   }, [finding, query]);
 
   const openFind = () => {
+    setExtractText(null);
     setFinding(true);
     // Once the bar is there.
     window.setTimeout(() => {
@@ -377,6 +389,115 @@ function PdfPane({
       setCopying(false);
     }
   };
+
+  // The « Pages » menu: a page turned, inserted or deleted is written as the
+  // file's new content, with what is not saved yet; the content before stays
+  // a version, which « Annuler » brings back.
+  const [pagesAnchor, setPagesAnchor] = useState<HTMLElement | null>(null);
+  const changingPages = useRef(false);
+  const undoPages = async () => {
+    const list = await api.getFileVersions(fileId);
+    const before = list[list.length - 1];
+    if (before) await restore(before);
+  };
+  const changePages = async (edit: PageEdit, done: StringKey, at: number) => {
+    const view = viewRef.current;
+    if (!view || viewing || changingPages.current) return;
+    changingPages.current = true;
+    try {
+      const bytes = await editPages(await view.documentBytes(), edit);
+      await api.writeFileBytes(fileId, bytes);
+      setLanding(at);
+      setDirty(false);
+      setCurrent((c) => ({ url: fileUrl(fileId), revision: c.revision + 1 }));
+      void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
+      changed("library");
+      toast(tr(done), "success", { action: { label: tr("common.undo"), run: () => void undoPages() } });
+    } catch (err) {
+      reportError("pdf.pages", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    } finally {
+      changingPages.current = false;
+    }
+  };
+  const deletePage = async () => {
+    const n = page;
+    const ok = await confirm.ask({
+      title: tr("pdf.deletePageTitle", { n }),
+      message: tr("pdf.deletePageMessage"),
+      confirmLabel: tr("common.delete"),
+      danger: true,
+    });
+    if (ok) await changePages({ kind: "delete", page: n - 1 }, "pdf.pageDeleted", Math.min(n, pages - 1));
+  };
+  const extract = async () => {
+    const view = viewRef.current;
+    const list = parsePages(extractText ?? "", pages);
+    if (!list) {
+      setExtractBad(true);
+      return;
+    }
+    if (!view || changingPages.current) return;
+    changingPages.current = true;
+    try {
+      const bytes = await editPages(await view.documentBytes(), { kind: "extract", pages: list });
+      const name = tr("pdf.extractName", { name: fileName.replace(/\.pdf$/i, ""), pages: pagesLabel(list) });
+      const f = await api.createFileBytes(name, bytes, { courseId });
+      changed("library");
+      setExtractText(null);
+      toast(tr("pdf.extracted", { name: f.name }), "success", {
+        action: { label: tr("print.open"), run: () => openFile({ ...f, courseId: f.course_id }) },
+      });
+    } catch (err) {
+      reportError("pdf.extract", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    } finally {
+      changingPages.current = false;
+    }
+  };
+  const pageItems: MenuEntry[] = [
+    {
+      label: tr("pdf.turnRight", { n: page }),
+      icon: RotateCw,
+      onSelect: () => void changePages({ kind: "rotate", page: page - 1, turn: 1 }, "pdf.pageTurned", page),
+    },
+    {
+      label: tr("pdf.turnLeft", { n: page }),
+      icon: RotateCcw,
+      onSelect: () => void changePages({ kind: "rotate", page: page - 1, turn: -1 }, "pdf.pageTurned", page),
+    },
+    "separator",
+    {
+      label: tr("pdf.insertBlank", { n: page }),
+      icon: FilePlus,
+      onSelect: () =>
+        void changePages({ kind: "insert", after: page - 1, paper: "blank" }, "pdf.pageInserted", page + 1),
+    },
+    {
+      label: tr("pdf.insertSquared", { n: page }),
+      icon: Grid3x3,
+      onSelect: () =>
+        void changePages({ kind: "insert", after: page - 1, paper: "squared" }, "pdf.pageInserted", page + 1),
+    },
+    "separator",
+    {
+      label: tr("pdf.extract"),
+      icon: FileOutput,
+      onSelect: () => {
+        closeFind();
+        setExtractBad(false);
+        setExtractText(String(page));
+      },
+    },
+    "separator",
+    {
+      label: tr("pdf.deletePage", { n: page }),
+      icon: Trash2,
+      danger: true,
+      disabled: pages < 2,
+      onSelect: () => void deletePage(),
+    },
+  ];
   // F5, as for a note's slides.
   useShortcut("present", present, visible && !!pages && !presenting);
   // A tab put away (Ctrl+1…) takes its presentation with it.
@@ -572,6 +693,24 @@ function PdfPane({
           <span className="font-mono text-caption text-ink-muted whitespace-nowrap">
             {tr("pdf.pageOf", { count: count || "…" })}
           </span>
+          <button
+            type="button"
+            onClick={(e) => setPagesAnchor(e.currentTarget)}
+            disabled={!pages || !!viewing}
+            aria-haspopup="menu"
+            aria-label={tr("pdf.pagesMenu")}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            {...tip(tr("pdf.pagesMenuTitle"))}
+          >
+            <Icon icon={Files} size={14} />
+          </button>
+          <Menu
+            open={!!pagesAnchor}
+            anchor={pagesAnchor}
+            items={pageItems}
+            label={tr("pdf.pagesMenu")}
+            onClose={() => setPagesAnchor(null)}
+          />
         </ToolGroup>
         <ToolGroup collapse label={tr("whiteboard.zoom")}>
           <button
@@ -773,6 +912,51 @@ function PdfPane({
               </button>
             </div>
           )}
+          {extractText !== null && (
+            <form
+              className="eu-pdf-find"
+              aria-label={tr("pdf.extract")}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void extract();
+              }}
+            >
+              <label htmlFor={extractId} className="eu-t-small text-ink-muted whitespace-nowrap">
+                {tr("pdf.extractPages")}
+              </label>
+              <input
+                id={extractId}
+                autoFocus
+                value={extractText}
+                onChange={(e) => {
+                  setExtractText(e.target.value);
+                  setExtractBad(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setExtractText(null);
+                }}
+                placeholder="3-5"
+                aria-invalid={extractBad}
+                className="eu-input eu-field-sm w-28"
+              />
+              {extractBad && (
+                <span role="alert" className="eu-t-caption text-danger whitespace-nowrap">
+                  {tr("pdf.extractBad", { count: pages })}
+                </span>
+              )}
+              <button type="submit" className="eu-btn-primary eu-btn-sm">
+                {tr("pdf.extractGo")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setExtractText(null)}
+                aria-label={tr("common.close")}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              >
+                <Icon icon={X} />
+              </button>
+            </form>
+          )}
           {failed ? (
             <div className="h-full grid place-items-center p-6">
               <div className="max-w-[44ch] text-center text-stage-ink">
@@ -807,6 +991,7 @@ function PdfPane({
                 showPages={showPages && !presenting}
                 active={visible}
                 presenting={presenting}
+                startPage={landing}
                 onReady={(info) => {
                   setPages(info.pages);
                   setFailed(null);
