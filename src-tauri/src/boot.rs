@@ -6,8 +6,9 @@
 
 use rusqlite::Connection;
 use serde_json::{json, Map, Value};
+use tauri::webview::NewWindowResponse;
 use tauri::window::Color;
-use tauri::{Manager, Theme, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Theme, Url, WebviewWindow, WebviewWindowBuilder};
 
 use crate::commands::settings::{get_setting_raw, UI_SETTINGS};
 
@@ -52,6 +53,31 @@ fn window_size(app: &tauri::App) -> Option<(f64, f64)> {
     ))
 }
 
+/// Euclide's own pages: the app (`tauri://localhost`, `http://tauri.localhost`
+/// on Windows) and, in a dev build, Vite's. Anything else in the window would
+/// replace Euclide with a website the teacher has no way back from.
+fn is_own_page(url: &Url, dev: Option<&Url>) -> bool {
+    match url.scheme() {
+        "tauri" | "about" => true,
+        "http" | "https" => {
+            url.host_str() == Some("tauri.localhost")
+                || dev.is_some_and(|dev| dev.origin() == url.origin())
+        }
+        _ => false,
+    }
+}
+
+/// A link to a website (in a PDF, say) opens in the browser instead.
+fn open_outside(app: &AppHandle, url: &Url) {
+    let app = app.clone();
+    let url = url.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Err(e) = crate::commands::links::open_external(&app, &url) {
+            crate::applog::warn(format!("[liens] lien non ouvert : {}", e.message()));
+        }
+    });
+}
+
 pub fn create_main_window(app: &tauri::App, boot: &Value) -> tauri::Result<WebviewWindow> {
     let config = app
         .config()
@@ -67,8 +93,26 @@ pub fn create_main_window(app: &tauri::App, boot: &Value) -> tauri::Result<Webvi
         _ => None,
     };
     let script = format!("window.__EUCLIDE_BOOT__ = {boot};");
+    let dev = app
+        .config()
+        .build
+        .dev_url
+        .clone()
+        .filter(|_| tauri::is_dev());
+    let (navigating, popping_up) = (app.handle().clone(), app.handle().clone());
     let mut builder = WebviewWindowBuilder::from_config(app.handle(), &config)?
         .initialization_script(script)
+        .on_navigation(move |url| {
+            let own = is_own_page(url, dev.as_ref());
+            if !own {
+                open_outside(&navigating, url);
+            }
+            own
+        })
+        .on_new_window(move |url, _| {
+            open_outside(&popping_up, &url);
+            NewWindowResponse::Deny
+        })
         .theme(theme)
         .background_color(if theme == Some(Theme::Dark) {
             CANVAS_DARK
@@ -100,6 +144,35 @@ pub fn focus_main_window(app: &tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_euclide_pages_load_in_its_window() {
+        let url = |s: &str| Url::parse(s).unwrap();
+        let dev = url("http://localhost:1420");
+        for own in [
+            "tauri://localhost/",
+            "http://tauri.localhost/index.html",
+            "https://tauri.localhost/",
+            "about:blank",
+        ] {
+            assert!(is_own_page(&url(own), None), "{own}");
+        }
+        assert!(is_own_page(
+            &url("http://localhost:1420/?gallery"),
+            Some(&dev)
+        ));
+        for outside in [
+            "https://www.education.gouv.fr/",
+            "http://localhost:1420/",
+            "http://localhost:3000/",
+            "mailto:prof@example.fr",
+            "file:///C:/Users/prof/cours.pdf",
+            "data:text/html,<p>x</p>",
+        ] {
+            assert!(!is_own_page(&url(outside), None), "{outside}");
+        }
+        assert!(!is_own_page(&url("http://localhost:3000/"), Some(&dev)));
+    }
 
     #[test]
     fn boot_state_lists_every_ui_setting() {
