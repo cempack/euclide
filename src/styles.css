@@ -1208,7 +1208,7 @@
   /* Menus (ui/Menu.tsx): paper in the top layer; the item under the
      keyboard or the pointer is an ink tint. */
   .eu-menu {
-    @apply fixed m-0 min-w-48 max-w-80 p-1 rounded-md border border-line bg-panel text-ink shadow-pop z-dropdown;
+    @apply fixed m-0 min-w-48 max-w-96 p-1 rounded-md border border-line bg-panel text-ink shadow-pop z-dropdown;
     inset: auto;
     left: 0;
     top: 0;

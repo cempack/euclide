@@ -25,6 +25,11 @@ function start(wasmUrl: string) {
   return ready;
 }
 
+/** PDFium's handle on a document the engine opened (its cache keeps it). */
+const docPtrOf = (engine: PdfiumNative, doc: PdfDocumentObject) =>
+  (engine as unknown as { cache: { getContext(id: string): { docPtr: number } } }).cache.getContext(doc.id)
+    .docPtr;
+
 async function apply({ wasmUrl, bytes, edit }: Request): Promise<ArrayBuffer> {
   const { pdfium, engine } = await start(wasmUrl);
   // Each page's size as unturned, and its turn on the side.
@@ -36,10 +41,7 @@ async function apply({ wasmUrl, bytes, edit }: Request): Promise<ArrayBuffer> {
     switch (edit.kind) {
       case "rotate": {
         // PDFium's own page, for its turn: a quarter more to the right or left.
-        const docPtr = (
-          engine as unknown as { cache: { getContext(id: string): { docPtr: number } } }
-        ).cache.getContext(doc.id).docPtr;
-        const page = pdfium.FPDF_LoadPage(docPtr, edit.page);
+        const page = pdfium.FPDF_LoadPage(docPtrOf(engine, doc), edit.page);
         if (!page) throw new Error("page");
         try {
           const turn = (pdfium.FPDFPage_GetRotation(page) + edit.turn + 4) % 4;
@@ -52,6 +54,24 @@ async function apply({ wasmUrl, bytes, edit }: Request): Promise<ArrayBuffer> {
       case "delete":
         await engine.deletePage(doc, edit.page).toPromise();
         break;
+      case "move": {
+        // PDFium's own move: the page ends up at index `to`.
+        const indices = pdfium.pdfium.wasmExports.malloc(4);
+        try {
+          pdfium.pdfium.setValue(indices, edit.page, "i32");
+          if (!pdfium.FPDF_MovePages(docPtrOf(engine, doc), indices, 1, edit.to)) throw new Error("move");
+        } finally {
+          pdfium.pdfium.wasmExports.free(indices);
+        }
+        break;
+      }
+      case "append": {
+        const other = await engine.openDocumentBuffer({ id: "other", content: edit.other }).toPromise();
+        opened.push(other);
+        const all = other.pages.map((p) => p.index);
+        await engine.importPages(doc, other, all, doc.pageCount).toPromise();
+        break;
+      }
       case "insert": {
         // As big as the page it follows, as it shows (turned or not).
         const near = doc.pages[Math.max(0, Math.min(doc.pageCount - 1, edit.after))];

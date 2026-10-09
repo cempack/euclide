@@ -334,6 +334,33 @@ test("a squared page is inserted, then taken back; pages go to a new document", 
   await expect(page.getByLabel("Pages à extraire")).toHaveCount(0);
 });
 
+test("another PDF goes at the end, and a page moves after the next", async ({ page }) => {
+  await openPdf(page);
+  const of = page.getByText(/^sur \d+$/);
+  await expect(of).toHaveText("sur 1");
+  const menu = async () => {
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    return page.getByRole("menu");
+  };
+  await (await menu()).getByRole("menuitem", { name: /Ajouter un autre PDF/ }).click();
+  const chooser = page.getByRole("dialog");
+  await chooser.getByRole("option").first().click();
+  await expect(chooser).toHaveCount(0);
+  await expect(of).not.toHaveText("sur 1");
+  const total = Number((await of.textContent())!.replace(/\D/g, ""));
+  // The view opens at the first page added.
+  await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("2");
+
+  await page.getByRole("textbox", { name: "Aller à la page" }).fill("1");
+  await page.keyboard.press("Enter");
+  await expect(
+    (await menu()).getByRole("menuitem", { name: "Mettre la page 1 avant la page 0" }),
+  ).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Mettre la page 1 après la page 2" }).click();
+  await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("2");
+  await expect(of).toHaveText(`sur ${total}`);
+});
+
 test("Ctrl+P prints the pages as they show, then puts the sheet away", async ({ page }) => {
   // The dialog is the system's: here, only that it was asked for.
   await page.addInitScript(() => {

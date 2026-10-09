@@ -8,6 +8,8 @@ export type PageEdit =
   | { kind: "rotate"; page: number; turn: 1 | -1 }
   | { kind: "delete"; page: number }
   | { kind: "insert"; after: number; paper: Paper }
+  | { kind: "move"; page: number; to: number }
+  | { kind: "append"; other: ArrayBuffer }
   | { kind: "extract"; pages: number[] };
 
 /**

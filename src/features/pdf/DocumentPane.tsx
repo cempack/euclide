@@ -3,6 +3,8 @@ import { createPortal, flushSync } from "react-dom";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
+  ArrowUp,
   Brush,
   ChevronDown,
   ChevronUp,
@@ -11,6 +13,7 @@ import {
   FileDown,
   FileOutput,
   FilePlus,
+  FilePlus2,
   Files,
   Grid3x3,
   Highlighter,
@@ -38,7 +41,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { api, fileUrl, versionUrl, type FileVersion } from "../../lib/api";
+import { api, fileUrl, versionUrl, type FileItem, type FileVersion } from "../../lib/api";
 import { q } from "../../api/queries";
 import { errorMessage } from "../../lib/errors";
 import { openFile } from "../../lib/files";
@@ -59,6 +62,7 @@ import { PdfView, type FindState, type PdfTool, type PdfViewHandle, type PrintPa
 import { printDialog, sheetReady } from "../notes/PrintSheet";
 import { ImageView } from "./ImageView";
 import { Presentation } from "./Presentation";
+import { PdfChooser } from "./PdfChooser";
 import { editPages, pagesLabel, parsePages, type PageEdit } from "./pageEdits";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
@@ -455,6 +459,19 @@ function PdfPane({
       changingPages.current = false;
     }
   };
+  /** Another PDF of the library, added at the end of this one. */
+  const [appending, setAppending] = useState(false);
+  const append = async (other: FileItem) => {
+    setAppending(false);
+    try {
+      const res = await fetch(fileUrl(other.id));
+      if (!res.ok) throw new Error((await res.text()) || res.statusText);
+      await changePages({ kind: "append", other: await res.arrayBuffer() }, "pdf.pdfAppended", pages + 1);
+    } catch (err) {
+      reportError("pdf.append", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    }
+  };
   const pageItems: MenuEntry[] = [
     {
       label: tr("pdf.turnRight", { n: page }),
@@ -466,6 +483,27 @@ function PdfPane({
       icon: RotateCcw,
       onSelect: () => void changePages({ kind: "rotate", page: page - 1, turn: -1 }, "pdf.pageTurned", page),
     },
+    // A move only where there is a page to pass.
+    ...(page > 1
+      ? [
+          {
+            label: tr("pdf.moveBefore", { n: page, m: page - 1 }),
+            icon: ArrowUp,
+            onSelect: () =>
+              void changePages({ kind: "move", page: page - 1, to: page - 2 }, "pdf.pageMoved", page - 1),
+          },
+        ]
+      : []),
+    ...(page < pages
+      ? [
+          {
+            label: tr("pdf.moveAfter", { n: page, m: page + 1 }),
+            icon: ArrowDown,
+            onSelect: () =>
+              void changePages({ kind: "move", page: page - 1, to: page }, "pdf.pageMoved", page + 1),
+          },
+        ]
+      : []),
     "separator",
     {
       label: tr("pdf.insertBlank", { n: page }),
@@ -480,6 +518,11 @@ function PdfPane({
         void changePages({ kind: "insert", after: page - 1, paper: "squared" }, "pdf.pageInserted", page + 1),
     },
     "separator",
+    {
+      label: tr("pdf.append"),
+      icon: FilePlus2,
+      onSelect: () => setAppending(true),
+    },
     {
       label: tr("pdf.extract"),
       icon: FileOutput,
@@ -710,6 +753,14 @@ function PdfPane({
             items={pageItems}
             label={tr("pdf.pagesMenu")}
             onClose={() => setPagesAnchor(null)}
+          />
+          <PdfChooser
+            open={appending}
+            title={tr("pdf.appendTitle", { name: fileName })}
+            courseId={courseId}
+            exclude={fileId}
+            onPick={(f) => void append(f)}
+            onClose={() => setAppending(false)}
           />
         </ToolGroup>
         <ToolGroup collapse label={tr("whiteboard.zoom")}>
