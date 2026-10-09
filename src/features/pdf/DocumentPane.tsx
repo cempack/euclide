@@ -21,7 +21,7 @@ import { tr } from "../../lib/i18n";
 import { keysOf } from "../../lib/keymap";
 import { logged, reportError } from "../../lib/report";
 import { editors } from "../../stores/editors";
-import { useToast } from "../../components/ui";
+import { useConfirm, useToast } from "../../components/ui";
 import { OpenWithButton } from "../../components/OpenWithButton";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "../../components/layout";
 import { Icon } from "../../ui/Icon";
@@ -94,6 +94,7 @@ function PdfPane({
   visible: boolean;
 }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const viewRef = useRef<PdfViewHandle>(null);
   const [tool, setTool] = useState<PdfTool>("select");
@@ -128,7 +129,7 @@ function PdfPane({
     try {
       const bytes = await view.save();
       // The file is replaced; what it was becomes a version (write_file_bytes).
-      await api.writeFileBytes(fileId, bytes);
+      if (bytes) await api.writeFileBytes(fileId, bytes);
       view.markSaved();
       setDirty(false);
       void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
@@ -143,6 +144,26 @@ function PdfPane({
   }, [fileId, queryClient, toast, viewing]);
 
   useEffect(() => editors.registerFlush(tabId, save), [tabId, save]);
+
+  /** An old version takes the view's place: unsaved annotations first. */
+  const openVersion = async (v: FileVersion) => {
+    if (dirty && !viewing) {
+      const choice = await confirm.dirty({
+        title: tr("confirm.unsavedTitle"),
+        message: tr("pdf.unsavedVersionMessage"),
+      });
+      if (choice === "cancel") return;
+      if (choice === "save") {
+        try {
+          await save();
+        } catch {
+          return; // save() said why
+        }
+      }
+      setDirty(false);
+    }
+    setViewing(v);
+  };
 
   const restore = async (v: FileVersion) => {
     try {
@@ -175,7 +196,7 @@ function PdfPane({
   const versionItems: MenuEntry[] = (versions.data ?? [])
     .slice()
     .reverse()
-    .map((v) => ({ label: versionDate(v), icon: History, onSelect: () => setViewing(v) }));
+    .map((v) => ({ label: versionDate(v), icon: History, onSelect: () => void openVersion(v) }));
 
   const goTo = (n: number) => {
     const target = Math.min(Math.max(1, n), count || 1);
@@ -390,7 +411,7 @@ function PdfPane({
                   setPageText(String(n));
                 }}
                 onScale={setScale}
-                onDirty={() => setDirty(true)}
+                onDirty={setDirty}
                 onError={(err) => {
                   reportError("pdf.open", err);
                   setFailed(errorMessage(err, ""));

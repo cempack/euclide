@@ -531,7 +531,8 @@
     "exportPng": "Exporter une copie annotée (PNG)",
     "saved": "Enregistré",
     "colorsFor": "Couleurs",
-    "viewingOriginal": "Version d'origine : lecture seule."
+    "viewingOriginal": "Version d'origine : lecture seule.",
+    "unsavedVersionMessage": "Enregistrer vos annotations avant d'afficher cette version ?"
   },
   "openWith": {
     "label": "Ouvrir dehors",
