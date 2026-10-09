@@ -37,10 +37,14 @@ async function drawPdf(id: number): Promise<Blob | null> {
   try {
     const page = doc.pages[0];
     if (!page) return null;
-    // On white (JPEG has no transparency), with the notes and filled fields.
+    // Turned as the file says (PDFium keeps the turn aside: a scan saved
+    // sideways came out on its side), on white (JPEG has no transparency),
+    // with the notes and filled fields.
+    const across = page.rotation % 2 ? page.size.height : page.size.width;
     return await engine
       .renderPage(doc, page, {
-        scaleFactor: WIDTH / page.size.width,
+        scaleFactor: WIDTH / across,
+        rotation: page.rotation,
         dpr: 1,
         withAnnotations: true,
         withForms: true,
