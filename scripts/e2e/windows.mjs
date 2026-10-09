@@ -17,9 +17,10 @@ const check = async (what, run) => {
   try {
     const result = await run();
     if (result === false) throw new Error("no");
-    console.log(
-      `ok   ${what}${result !== undefined && result !== true ? ` (${JSON.stringify(result)})` : ""}`,
-    );
+    // A value worth reading; not the handle a wait gives back.
+    const shown =
+      result !== undefined && result !== true && (typeof result !== "object" || Array.isArray(result));
+    console.log(`ok   ${what}${shown ? ` (${JSON.stringify(result)})` : ""}`);
   } catch (err) {
     failures++;
     console.log(`FAIL ${what}: ${String(err?.message ?? err).split("\n")[0]}`);
@@ -123,12 +124,14 @@ try {
 
   // 2. The pen, saved into the file; the old file kept as a version.
   await check("nothing to save yet", async () => !(await saveButton().isEnabled()));
-  await toolbar().getByRole("button", { name: "Stylo", exact: true }).click();
-  await stroke();
-  await check("the stroke makes it unsaved", () => saveButton().isEnabled());
-  await saveButton().click();
-  await check("saved", () =>
-    page.waitForFunction(
+  await check("the stroke makes it unsaved", async () => {
+    await toolbar().getByRole("button", { name: "Stylo", exact: true }).click();
+    await stroke();
+    return saveButton().isEnabled();
+  });
+  await check("saved", async () => {
+    await saveButton().click({ timeout: 5000 });
+    await page.waitForFunction(
       () => {
         const b = [...document.querySelectorAll("[role=toolbar] button")].find(
           (x) => x.offsetParent && x.textContent.trim() === "Enregistrer",
@@ -137,8 +140,8 @@ try {
       },
       null,
       { timeout: 10_000 },
-    ),
-  );
+    );
+  });
   await check(
     "the old file is a version",
     async () => (await invoke("get_file_versions", { fileId: await fileId("cours") })).length === 1,
@@ -155,10 +158,12 @@ try {
   await check("Ctrl+Y brings it back", async () => (await paths()) === 1);
 
   // 4. The page box and the pages panel.
-  await page.getByLabel("Aller à la page").fill("3");
-  await page.getByLabel("Aller à la page").press("Enter");
-  await check("page 3 shows after typing it", () =>
-    page.waitForFunction(
+  await check("page 3 shows after typing it", async () => {
+    // The box, not the group around it, which has the same name.
+    const box = toolbar().getByRole("textbox", { name: "Aller à la page" });
+    await box.fill("3");
+    await box.press("Enter");
+    await page.waitForFunction(
       () =>
         [...document.querySelectorAll(".eu-pdf-page")].some(
           (p) =>
@@ -168,32 +173,32 @@ try {
         ),
       null,
       { timeout: 5000 },
-    ),
-  );
-  await toolbar().getByRole("button", { name: "Vignettes des pages" }).click();
-  await check("the pages panel draws its pages", () =>
-    page.waitForFunction(
+    );
+  });
+  await check("the pages panel draws its pages", async () => {
+    await toolbar().getByRole("button", { name: "Vignettes des pages" }).click();
+    await page.waitForFunction(
       () => [...document.querySelectorAll(".eu-pdf-thumb img")].some((i) => i.complete && i.naturalWidth > 0),
       null,
       { timeout: 10_000 },
-    ),
-  );
+    );
+  });
 
   // 5. A form, filled in and saved.
   await check("the form opens", () => open("form"));
-  const form = await shownPage().boundingBox();
-  const k = form.width / 595.28;
-  await page.mouse.click(form.x + 265 * k, form.y + 128 * k);
-  await sleep(400);
-  await check("a click puts the caret in « Nom »", () =>
-    page.evaluate(() => document.activeElement?.tagName === "INPUT"),
-  );
+  await check("a click puts the caret in « Nom »", async () => {
+    const form = await shownPage().boundingBox();
+    const k = form.width / 595.28;
+    await page.mouse.click(form.x + 265 * k, form.y + 128 * k);
+    await sleep(400);
+    return page.evaluate(() => document.activeElement?.tagName === "INPUT");
+  });
   await page.keyboard.type("Moreau");
   await page.keyboard.press("Tab");
   await page.keyboard.type("Élise");
   await sleep(300);
-  await saveButton().click();
   await check("the form is saved", async () => {
+    await saveButton().click({ timeout: 5000 });
     for (let i = 0; i < 40; i++) {
       if ((await invoke("get_file_versions", { fileId: await fileId("form") })).length === 1) return true;
       await sleep(250);
@@ -208,10 +213,10 @@ try {
     if (box.height <= box.width) throw new Error(`${box.width} × ${box.height}`);
     return [Math.round(box.width), Math.round(box.height)];
   });
-  await toolbar().getByRole("button", { name: "Stylo", exact: true }).click();
-  await stroke(-120);
-  await saveButton().click();
   await check("its drawing is kept apart from it", async () => {
+    await toolbar().getByRole("button", { name: "Stylo", exact: true }).click();
+    await stroke(-120);
+    await saveButton().click({ timeout: 5000 });
     for (let i = 0; i < 40; i++) {
       const json = await invoke("read_annotations", { fileId: await fileId("rotated") });
       if (json && JSON.parse(json).version === 2 && JSON.parse(json).annotations.length === 1) return true;
