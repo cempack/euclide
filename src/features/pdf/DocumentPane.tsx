@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Brush,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -22,8 +23,10 @@ import {
   Shapes,
   Slash,
   Square,
+  Strikethrough,
   Trash2,
   Type,
+  Underline,
   Undo2,
   X,
 } from "lucide-react";
@@ -109,6 +112,20 @@ const SHAPE_TOOLS: { id: PdfTool; icon: LucideIcon; label: StringKey }[] = [
 ];
 const isShape = (tool: PdfTool) => SHAPE_TOOLS.some((s) => s.id === tool);
 
+/**
+ * What the « Surligneur » does: mark the text it is dragged over (free-hand
+ * away from text), underline it, strike it out, or draw free-hand anywhere.
+ */
+const MARKUP_TOOLS: { id: PdfTool; icon: LucideIcon; label: StringKey }[] = [
+  { id: "highlight", icon: Highlighter, label: "pdf.markText" },
+  { id: "underline", icon: Underline, label: "pdf.underline" },
+  { id: "strikeout", icon: Strikethrough, label: "pdf.strikeout" },
+  { id: "marker", icon: Brush, label: "pdf.marker" },
+];
+const isMarkup = (tool: PdfTool) => MARKUP_TOOLS.some((m) => m.id === tool);
+/** In the highlighter's colours; a line under or through text takes the pen's. */
+const usesMarker = (tool: PdfTool) => tool === "highlight" || tool === "marker";
+
 function PdfPane({
   tabId,
   fileId,
@@ -133,6 +150,8 @@ function PdfPane({
   const [shapesAnchor, setShapesAnchor] = useState<HTMLElement | null>(null);
   /** The shape the « Formes » button shows: the last one picked. */
   const [shape, setShape] = useState<PdfTool>("line");
+  /** What the « Surligneur » button takes up again: the last one picked. */
+  const [markup, setMarkup] = useState<PdfTool>("highlight");
   /** The search bar: open or not, what it looks for, what was found. */
   const [finding, setFinding] = useState(false);
   const [query, setQuery] = useState("");
@@ -235,7 +254,7 @@ function PdfPane({
     setQuery("");
   }
   const count = pages;
-  const color = tool === "highlight" ? marker : ink;
+  const color = usesMarker(tool) ? marker : ink;
   const versionItems: MenuEntry[] = (versions.data ?? [])
     .slice()
     .reverse()
@@ -316,21 +335,25 @@ function PdfPane({
         </ToolGroup>
         <ToolSep />
         <ToolGroup label={tr("pdf.mode")}>
-          {TOOLS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTool(t.id)}
-              aria-pressed={tool === t.id}
-              disabled={!pages || !!viewing}
-              aria-label={tr(t.label)}
-              className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
-              {...tip(tr(t.hint))}
-            >
-              <Icon icon={t.icon} size={14} />
-              <span className="hidden @7xl:inline">{tr(t.label)}</span>
-            </button>
-          ))}
+          {TOOLS.map((t) => {
+            // The highlighter takes up the way it was last used.
+            const marks = t.id === "highlight";
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTool(marks ? markup : t.id)}
+                aria-pressed={marks ? isMarkup(tool) : tool === t.id}
+                disabled={!pages || !!viewing}
+                aria-label={tr(t.label)}
+                className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
+                {...tip(tr(t.hint))}
+              >
+                <Icon icon={(marks && MARKUP_TOOLS.find((m) => m.id === markup)?.icon) || t.icon} size={14} />
+                <span className="hidden @7xl:inline">{tr(t.label)}</span>
+              </button>
+            );
+          })}
           <button
             type="button"
             onClick={(e) => setShapesAnchor(e.currentTarget)}
@@ -394,12 +417,33 @@ function PdfPane({
             <Icon icon={Redo2} />
           </button>
         </ToolGroup>
+        {isMarkup(tool) && !viewing && (
+          <ToolGroup collapse label={tr("pdf.highlight")}>
+            <div className="eu-segment eu-segment-sm">
+              {MARKUP_TOOLS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  aria-pressed={tool === m.id}
+                  aria-label={tr(m.label)}
+                  onClick={() => {
+                    setMarkup(m.id);
+                    setTool(m.id);
+                  }}
+                  {...tip(tr(m.label))}
+                >
+                  <Icon icon={m.icon} size={14} />
+                </button>
+              ))}
+            </div>
+          </ToolGroup>
+        )}
         {tool !== "select" && tool !== "eraser" && !viewing && (
           <ToolGroup collapse label={tr("pdf.colorsFor")}>
             <ColorChoice
-              colors={tool === "highlight" ? HIGHLIGHT : INK}
+              colors={usesMarker(tool) ? HIGHLIGHT : INK}
               value={color}
-              onChange={tool === "highlight" ? setMarker : setInk}
+              onChange={usesMarker(tool) ? setMarker : setInk}
             />
           </ToolGroup>
         )}

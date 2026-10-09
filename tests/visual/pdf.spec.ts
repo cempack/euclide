@@ -187,43 +187,70 @@ test("a form filled in is saved into the file", async ({ page }) => {
   await expect(field.first()).toHaveValue("Moreau");
 });
 
-test("the highlighter marks a line of text, and draws free-hand where there is none", async ({ page }) => {
+type Point = { x: number; y: number };
+
+/**
+ * The outline fixture in the dev page, tall enough to draw on its first
+ * lines without scrolling. Gives where a point of the first page (in the
+ * page's points, from the top) is on the screen.
+ */
+async function openOutline(page: Page) {
   const pdf = fileURLToPath(new URL("./fixtures/outline.pdf", import.meta.url));
   await page.route(
     (url) => url.pathname === "/outline.pdf",
     (route) => route.fulfill({ path: pdf, contentType: "application/pdf" }),
   );
-  // Tall enough for both strokes without scrolling.
   await page.setViewportSize({ width: 1000, height: 1400 });
   await page.goto("/?pdf=/outline.pdf");
   const sheet = page.locator(".eu-pdf-page").first();
   await sheet.waitFor();
   await page.waitForTimeout(800);
-  await page.getByRole("button", { name: "highlight" }).click();
-  // In the page's points: « Ligne 1 » sits 170 pt from the top, from 60 pt on.
   const box = (await sheet.boundingBox())!;
-  const at = (x: number, y: number) => ({
+  return (x: number, y: number): Point => ({
     x: box.x + (x * box.width) / 595,
     y: box.y + (y * box.width) / 595,
   });
-  const strokes = [
-    [at(62, 166), at(220, 166)], // across the words
-    [at(20, 300), at(32, 420)], // down the margin
-  ];
-  for (const [from, to] of strokes) {
-    await page.mouse.move(from.x, from.y);
-    await page.mouse.down();
-    for (let i = 1; i <= 10; i++)
-      await page.mouse.move(from.x + ((to.x - from.x) * i) / 10, from.y + ((to.y - from.y) * i) / 10);
-    await page.mouse.up();
-  }
+}
+
+async function drag(page: Page, from: Point, to: Point) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++)
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / 10, from.y + ((to.y - from.y) * i) / 10);
+  await page.mouse.up();
+}
+
+/** What the dev page saves, as text: PDFium writes the annotations' types out plainly. */
+async function savedText(page: Page) {
   await page.getByRole("button", { name: "save" }).click();
   await expect(page.getByTestId("dirty")).toHaveText("clean");
-  const saved = await page.evaluate(() =>
+  return page.evaluate(() =>
     new TextDecoder("latin1").decode((window as { pdfSaved?: Uint8Array }).pdfSaved),
   );
+}
+
+// The fixture's lines: « Ligne 1 » 170 pt from the top, then one every 22 pt, from 60 pt on.
+
+test("the highlighter marks a line of text, and draws free-hand where there is none", async ({ page }) => {
+  const at = await openOutline(page);
+  await page.getByRole("button", { name: "highlight", exact: true }).click();
+  await drag(page, at(62, 166), at(220, 166));
+  // Down the margin.
+  await drag(page, at(20, 300), at(32, 420));
+  const saved = await savedText(page);
   expect(saved).toContain("/Subtype/Highlight");
   expect(saved).toContain("/Subtype/Ink");
+});
+
+test("a line of text is underlined or struck out", async ({ page }) => {
+  const at = await openOutline(page);
+  await page.getByRole("button", { name: "underline", exact: true }).click();
+  await drag(page, at(62, 188), at(220, 188));
+  await page.getByRole("button", { name: "strikeout", exact: true }).click();
+  await drag(page, at(62, 210), at(220, 210));
+  const saved = await savedText(page);
+  expect(saved).toContain("/Subtype/Underline");
+  expect(saved).toContain("/Subtype/StrikeOut");
 });
 
 test("Ctrl+F finds a word on every page, and the outline goes to a chapter", async ({ page }) => {

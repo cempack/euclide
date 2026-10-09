@@ -13,16 +13,18 @@ export default function PdfSpike() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex gap-2 p-2 border-b border-line items-center" data-testid="bar">
-        {(["select", "pen", "highlight", "text"] as PdfTool[]).map((t) => (
-          <button
-            key={t}
-            className="eu-btn-ghost eu-btn-sm"
-            aria-pressed={tool === t}
-            onClick={() => setTool(t)}
-          >
-            {t}
-          </button>
-        ))}
+        {(["select", "pen", "highlight", "underline", "strikeout", "marker", "text"] as PdfTool[]).map(
+          (t) => (
+            <button
+              key={t}
+              className="eu-btn-ghost eu-btn-sm"
+              aria-pressed={tool === t}
+              onClick={() => setTool(t)}
+            >
+              {t}
+            </button>
+          ),
+        )}
         <button className="eu-btn-ghost eu-btn-sm" onClick={() => ref.current?.zoom(1)}>
           +
         </button>
