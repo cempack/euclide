@@ -10,7 +10,14 @@ import {
 } from "react";
 import { createPluginRegistration, type PluginRegistry } from "@embedpdf/core";
 import { EmbedPDF, useDocumentState, useRegistry } from "@embedpdf/core/react";
-import { ignore, PdfErrorCode, Task, type PdfErrorReason, type Position } from "@embedpdf/models";
+import {
+  ignore,
+  PdfAnnotationSubtype,
+  PdfErrorCode,
+  Task,
+  type PdfErrorReason,
+  type Position,
+} from "@embedpdf/models";
 import { DocumentManagerPluginPackage, type DocumentManagerPlugin } from "@embedpdf/plugin-document-manager";
 import { ViewportPluginPackage } from "@embedpdf/plugin-viewport";
 import {
@@ -47,6 +54,7 @@ import { RotatePluginPackage, type RotatePlugin } from "@embedpdf/plugin-rotate"
 import { Rotate } from "@embedpdf/plugin-rotate/react";
 import { tr } from "../../lib/i18n";
 import { touches } from "./eraser";
+import { FreshNotes, freeTextNote } from "./FreeTextNote";
 import { newDocumentId, pdfium, restartPdfium } from "./pdfium";
 
 export type PdfTool =
@@ -187,6 +195,9 @@ function queueFormWrites(registry: PluginRegistry): () => Promise<void> {
   };
   return () => queue;
 }
+
+/** Euclide's text notes in EmbedPDF's place (FreeTextNote.tsx). */
+const RENDERERS = [freeTextNote];
 
 /** What is selected on a page, in the app's accent. */
 const OUTLINE = { color: "var(--color-accent)", style: "solid", width: 1.5, offset: 2 } as const;
@@ -470,6 +481,16 @@ function Viewer({
     }
   }, [annotations, readOnly, tool, color, size]);
 
+  // Text notes written since the document opened (FreeTextNote.tsx).
+  const [fresh] = useState(() => new Set<string>());
+  useEffect(() => {
+    if (!annotations) return;
+    return annotations.onAnnotationEvent((e) => {
+      if (e.documentId !== documentId || e.type !== "create" || e.committed) return;
+      if (e.annotation.type === PdfAnnotationSubtype.FREETEXT) fresh.add(e.annotation.id);
+    });
+  }, [annotations, documentId, fresh]);
+
   const deleteSelected = () => {
     const scope = annotations?.forDocument(documentId);
     const selected = scope?.getSelectedAnnotations() ?? [];
@@ -578,70 +599,77 @@ function Viewer({
 
   if (!loaded) return null;
   return (
-    <div className="absolute inset-0 flex">
-      {showPages && <PagesPanel documentId={documentId} annotations={annotations} forms={forms} />}
-      <div className="flex-1 min-w-0 relative">
-        <PdfViewport
-          documentId={documentId}
-          elementRef={viewer}
-          className="eu-pdf absolute inset-0"
-          onPointerDownCapture={onPointerDown}
-          onPointerUpCapture={onPointerUp}
-        >
-          <Scroller
+    <FreshNotes.Provider value={fresh}>
+      <div className="absolute inset-0 flex">
+        {showPages && <PagesPanel documentId={documentId} annotations={annotations} forms={forms} />}
+        <div className="flex-1 min-w-0 relative">
+          <PdfViewport
             documentId={documentId}
-            renderPage={({ pageIndex, width, height, rotatedWidth, rotatedHeight }) => (
-              // The sheet stays upright; what is on it turns with the view (Rotate).
-              <div
-                className="eu-pdf-page relative"
-                data-page={pageIndex + 1}
-                style={{ width: rotatedWidth, height: rotatedHeight }}
-              >
-                <Rotate documentId={documentId} pageIndex={pageIndex}>
-                  <PagePointerProvider
-                    documentId={documentId}
-                    pageIndex={pageIndex}
-                    style={{ width, height }}
-                  >
-                    {/* The whole page, small and quick; sharp tiles over it. A
+            elementRef={viewer}
+            className="eu-pdf absolute inset-0"
+            onPointerDownCapture={onPointerDown}
+            onPointerUpCapture={onPointerUp}
+          >
+            <Scroller
+              documentId={documentId}
+              renderPage={({ pageIndex, width, height, rotatedWidth, rotatedHeight }) => (
+                // The sheet stays upright; what is on it turns with the view (Rotate).
+                <div
+                  className="eu-pdf-page relative"
+                  data-page={pageIndex + 1}
+                  style={{ width: rotatedWidth, height: rotatedHeight }}
+                >
+                  <Rotate documentId={documentId} pageIndex={pageIndex}>
+                    <PagePointerProvider
+                      documentId={documentId}
+                      pageIndex={pageIndex}
+                      style={{ width, height }}
+                    >
+                      {/* The whole page, small and quick; sharp tiles over it. A
                         press goes through them to the page (EmbedPDF's tools). */}
-                    <RenderLayer
-                      documentId={documentId}
-                      pageIndex={pageIndex}
-                      scale={1}
-                      draggable={false}
-                      style={{ position: "absolute", inset: 0, width, height, pointerEvents: "none" }}
-                    />
-                    <TilingLayer
-                      documentId={documentId}
-                      pageIndex={pageIndex}
-                      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
-                    />
-                    <SelectionLayer
-                      documentId={documentId}
-                      pageIndex={pageIndex}
-                      background="var(--color-pdf-selection)"
-                    />
-                    {!readOnly && (
-                      <EraserOnPage documentId={documentId} pageIndex={pageIndex} annotations={annotations} />
-                    )}
-                    {!readOnly && (
-                      <AnnotationLayer
+                      <RenderLayer
                         documentId={documentId}
                         pageIndex={pageIndex}
-                        selectionOutline={OUTLINE}
-                        resizeUI={HANDLES}
-                        vertexUI={HANDLES}
+                        scale={1}
+                        draggable={false}
+                        style={{ position: "absolute", inset: 0, width, height, pointerEvents: "none" }}
                       />
-                    )}
-                  </PagePointerProvider>
-                </Rotate>
-              </div>
-            )}
-          />
-        </PdfViewport>
+                      <TilingLayer
+                        documentId={documentId}
+                        pageIndex={pageIndex}
+                        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+                      />
+                      <SelectionLayer
+                        documentId={documentId}
+                        pageIndex={pageIndex}
+                        background="var(--color-pdf-selection)"
+                      />
+                      {!readOnly && (
+                        <EraserOnPage
+                          documentId={documentId}
+                          pageIndex={pageIndex}
+                          annotations={annotations}
+                        />
+                      )}
+                      {!readOnly && (
+                        <AnnotationLayer
+                          documentId={documentId}
+                          pageIndex={pageIndex}
+                          selectionOutline={OUTLINE}
+                          resizeUI={HANDLES}
+                          vertexUI={HANDLES}
+                          annotationRenderers={RENDERERS}
+                        />
+                      )}
+                    </PagePointerProvider>
+                  </Rotate>
+                </div>
+              )}
+            />
+          </PdfViewport>
+        </div>
       </div>
-    </div>
+    </FreshNotes.Provider>
   );
 }
 
