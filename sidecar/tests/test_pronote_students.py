@@ -6,8 +6,9 @@ Run from sidecar/: python -m unittest discover -s tests -t .
 
 from __future__ import annotations
 
+import sys
 import unittest
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest import mock
 
 from euclide_sidecar import pronote
@@ -48,7 +49,11 @@ class FakeClient:
 
 class PronoteStudents(unittest.TestCase):
     def run_with(self, client, class_name):
-        with mock.patch.object(pronote, "_get_client", return_value=client):
+        # pronotepy only has to be there (CI installs none): the client is fake.
+        with (
+            mock.patch.dict(sys.modules, {"pronotepy": ModuleType("pronotepy")}),
+            mock.patch.object(pronote, "_get_client", return_value=client),
+        ):
             return pronote.pronote_students({"class": class_name})
 
     def test_names_of_the_class_in_its_order(self):
@@ -76,7 +81,10 @@ class PronoteStudents(unittest.TestCase):
         self.assertEqual(res["password"], "token-2")
 
     def test_no_class_no_call(self):
-        with mock.patch.object(pronote, "_get_client") as get:
+        with (
+            mock.patch.dict(sys.modules, {"pronotepy": ModuleType("pronotepy")}),
+            mock.patch.object(pronote, "_get_client") as get,
+        ):
             res = pronote.pronote_students({"class": "  "})
         self.assertFalse(res["ok"])
         get.assert_not_called()
