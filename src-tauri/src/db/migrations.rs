@@ -13,10 +13,10 @@ use crate::error::{AppError, AppResult};
 use rusqlite::{params, Connection, Transaction};
 use std::path::Path;
 
-pub const LATEST: i64 = 3;
+pub const LATEST: i64 = 4;
 
 type Up = fn(&Transaction, &Path) -> AppResult<()>;
-const MIGRATIONS: &[(i64, Up)] = &[(1, v1), (2, v2), (3, v3)];
+const MIGRATIONS: &[(i64, Up)] = &[(1, v1), (2, v2), (3, v3), (4, v4)];
 
 /// Columns added by releases that predate versioned migrations. Each statement
 /// fails harmlessly when the column already exists.
@@ -332,6 +332,28 @@ fn v3(tx: &Transaction, _data_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// v4
+// ---------------------------------------------------------------------------
+
+/// A class's students, for drawing a name and making groups: their names
+/// only, from Pronote or a list the teacher pastes, in the list's order.
+fn v4(tx: &Transaction, _data_dir: &Path) -> AppResult<()> {
+    tx.execute_batch(
+        "CREATE TABLE IF NOT EXISTS class_students (
+             id         INTEGER PRIMARY KEY AUTOINCREMENT,
+             -- As course_classes.class_name: the class's name on Pronote.
+             class_name TEXT NOT NULL,
+             name       TEXT NOT NULL,
+             position   INTEGER NOT NULL DEFAULT 0,
+             UNIQUE (class_name, name)
+         );
+         CREATE INDEX IF NOT EXISTS idx_class_students_class
+             ON class_students(class_name, position);",
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,6 +371,27 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("documents/.versions")).unwrap();
         dir
+    }
+
+    #[test]
+    fn v4_keeps_class_lists_one_name_each() {
+        let mut conn = legacy_db();
+        migrate(&mut conn, Path::new("/nonexistent"), None).unwrap();
+        conn.execute_batch(
+            "INSERT INTO class_students (class_name, name, position) VALUES
+                 ('2NDE7', 'Léa Dupont', 0), ('2NDE7', 'Hugo Martin', 1), ('1G3', 'Léa Dupont', 0);",
+        )
+        .unwrap();
+        assert!(conn
+            .execute(
+                "INSERT INTO class_students (class_name, name) VALUES ('2NDE7', 'Léa Dupont')",
+                []
+            )
+            .is_err());
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM class_students", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 3);
     }
 
     #[test]

@@ -147,7 +147,15 @@
     "keepAwakeAlways": "Toujours",
     "keepAwakeNever": "Jamais",
     "keepAwakeNowOn": "En ce moment : l'écran ne se mettra pas en veille.",
-    "keepAwakeNowOff": "En ce moment : veille normale."
+    "keepAwakeNowOff": "En ce moment : veille normale.",
+    "drawTitle": "Tirage au sort",
+    "drawStudents": "Élèves",
+    "drawStudentsHint": "Un nom au hasard, ou la classe en groupes, en plein écran.",
+    "drawClass": "Classe",
+    "drawNoList": "Aucune liste d'élèves : ajoutez-en une depuis la page d'une classe.",
+    "chance": "Hasard",
+    "chanceHint": "Un dé, un nombre entre deux bornes, pile ou face.",
+    "chanceResult": "Résultat"
   },
   "courses": {
     "subtitle": "Classes, séquences et casiers.",
@@ -935,7 +943,45 @@
     "restart": "Recommencer",
     "close": "Fermer",
     "keys": "Espace : pause · R : recommencer · + / − : une minute · 1…9 : minutes · Échap : fermer",
-    "fullscreen": "Plein écran"
+    "fullscreen": "Plein écran",
+    "modes": "Ce qui s'affiche",
+    "modeClock": "Horloge",
+    "modeDraw": "Tirage",
+    "modeGroups": "Groupes",
+    "modeChance": "Hasard",
+    "classLabel": "Classe",
+    "noClass": "Aucune classe en cours.",
+    "noClassHint": "Choisissez une classe ci-dessous.",
+    "noList": "Pas encore de liste d'élèves pour {class}.",
+    "noListHint": "Ajoutez-la depuis la page de la classe, depuis Pronote ou en collant une liste.",
+    "drawPrompt": "Espace pour tirer un nom",
+    "draw": "Tirer un nom",
+    "drawCount": "{done} sur {total}",
+    "drawAllDone": "Tout le monde est passé.",
+    "drawReset": "Recommencer",
+    "keysDraw": "Espace ou → : un nom · R : recommencer · Échap : fermer",
+    "groupsBySize": "Groupes de",
+    "groupsByCount": "Nombre de groupes",
+    "groupsHow": "Comment faire les groupes",
+    "groupsMake": "Faire les groupes",
+    "groupsRedo": "Refaire",
+    "groupN": "Groupe {n}",
+    "groupsLess": "Un de moins",
+    "groupsMore": "Un de plus",
+    "keysGroups": "Espace : refaire · + / − : changer le nombre · Échap : fermer",
+    "chanceKind": "Tirage au hasard",
+    "chanceDie": "Dé",
+    "chanceNumber": "Nombre",
+    "chanceCoin": "Pile ou face",
+    "faces": "Faces",
+    "from": "De",
+    "to": "à",
+    "roll": "Lancer",
+    "pile": "Pile",
+    "face": "Face",
+    "dieOf": "Dé à {faces} faces",
+    "numberBetween": "Entre {min} et {max}",
+    "keysChance": "Espace : relancer · Échap : fermer"
   },
   "print": {
     "menu": "Exporter ou imprimer",
@@ -1088,5 +1134,49 @@
     "colorLightGreen": "Vert clair",
     "colorPink": "Rose",
     "colorLightBlue": "Bleu clair"
+  },
+  "students": {
+    "title": "Élèves",
+    "count": {
+      "one": "{count} élève",
+      "other": "{count} élèves"
+    },
+    "empty": "Pas encore de liste d'élèves",
+    "emptyHint": "Pour tirer un nom au sort ou faire des groupes : chargez la liste depuis Pronote, ou collez-la, un nom par ligne.",
+    "onTheKey": "Les noms restent sur la clé, dans les données d'Euclide.",
+    "fromPronote": "Charger depuis Pronote",
+    "loading": "Chargement…",
+    "loaded": {
+      "one": "{count} élève chargé depuis Pronote",
+      "other": "{count} élèves chargés depuis Pronote"
+    },
+    "paste": "Coller une liste",
+    "pasteTitle": "Élèves de {class}",
+    "pasteHint": "Un nom par ligne, copié d'un tableur ou d'un document. Les numéros, les tirets et les noms en double sont retirés.",
+    "pasteLabel": "Noms des élèves",
+    "pasteCount": {
+      "one": "{count} nom",
+      "other": "{count} noms"
+    },
+    "saved": {
+      "one": "Liste enregistrée : {count} élève",
+      "other": "Liste enregistrée : {count} élèves"
+    },
+    "clear": "Effacer la liste",
+    "clearTitle": "Effacer la liste des élèves",
+    "clearMessage": "Effacer la liste des élèves de {class} ? Elle pourra être chargée ou collée de nouveau.",
+    "cleared": "Liste effacée",
+    "draw": "Tirer un nom",
+    "groups": "Faire des groupes",
+    "clearAll": "Effacer toutes les listes",
+    "clearAllTitle": "Listes d'élèves",
+    "clearAllHint": "Les noms chargés ou collés pour tirer au sort et faire des groupes.",
+    "clearAllNone": "Aucune liste pour l'instant.",
+    "clearAllSome": {
+      "one": "{count} classe a une liste.",
+      "other": "{count} classes ont une liste."
+    },
+    "clearAllMessage": "Effacer les listes d'élèves de toutes les classes ? Les noms ne restent nulle part dans Euclide.",
+    "clearedAll": "Listes effacées"
   }
 }

@@ -548,6 +548,70 @@ const boards = new Map<number, string>([
   ],
 ]);
 
+/** Fictional students, for the name picker: a list for 2NDE7 and TNSI, none yet for the others. */
+const FIRST = [
+  "Léa",
+  "Hugo",
+  "Inès",
+  "Noah",
+  "Chloé",
+  "Lucas",
+  "Jade",
+  "Adam",
+  "Louise",
+  "Gabriel",
+  "Emma",
+  "Raphaël",
+  "Alice",
+  "Arthur",
+  "Lina",
+  "Jules",
+  "Rose",
+  "Louis",
+  "Anna",
+  "Nathan",
+  "Mila",
+  "Paul",
+  "Zoé",
+  "Sacha",
+  "Ambre",
+  "Tom",
+];
+const LAST = [
+  "Martin",
+  "Bernard",
+  "Dubois",
+  "Thomas",
+  "Robert",
+  "Richard",
+  "Petit",
+  "Durand",
+  "Leroy",
+  "Blanc",
+  "Simon",
+  "Laurent",
+  "Lefebvre",
+  "Michel",
+  "Garcia",
+  "David",
+  "Bertrand",
+  "Roux",
+  "Vincent",
+  "Fournier",
+  "Morel",
+  "Girard",
+  "André",
+  "Mercier",
+  "Dupont",
+  "Lambert",
+];
+const fakeClass = (size: number, shift: number) =>
+  Array.from({ length: size }, (_, i) => `${FIRST[(i + shift) % 26]} ${LAST[(i * 7 + shift) % 26]}`);
+const studentLists = new Map<string, string[]>([
+  ["2NDE7", fakeClass(26, 0)],
+  ["TNSI", fakeClass(18, 5)],
+]);
+
 let keepAwake = true;
 const pronote: PronoteStatus = {
   connected: true,
@@ -574,6 +638,7 @@ if (empty) {
   pronote.connected = false;
   pronote.account_name = null;
   pronote.last_sync = null;
+  studentLists.clear();
 }
 
 /** The release a changelog's screenshots show (scripts/changelog/capture.mjs). */
@@ -909,6 +974,33 @@ function handle(cmd: string, args: Args): unknown {
       };
     case "pronote_contents":
       return pronoteContents(args);
+    case "pronote_students": {
+      const names = fakeClass(24, str(args, "className").length);
+      studentLists.set(str(args, "className").trim(), names);
+      return names.slice();
+    }
+
+    // Students
+    case "students_for_class":
+      return (studentLists.get(str(args, "className").trim()) ?? []).slice();
+    case "student_lists":
+      return [...studentLists]
+        .map(([class_name, names]) => ({ class_name, count: names.length }))
+        .sort((a, b) => a.class_name.localeCompare(b.class_name));
+    case "set_students": {
+      const seen = new Set<string>();
+      const names = ((args?.names as string[] | undefined) ?? [])
+        .map((n) => n.replace(/\s+/g, " ").trim())
+        .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+      studentLists.set(str(args, "className").trim(), names);
+      return names.slice();
+    }
+    case "clear_students":
+      studentLists.delete(str(args, "className").trim());
+      return null;
+    case "clear_all_students":
+      studentLists.clear();
+      return null;
 
     // Sequences
     case "list_sequences":

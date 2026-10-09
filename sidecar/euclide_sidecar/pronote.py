@@ -941,3 +941,71 @@ def pronote_classes(payload):
         "account_name": _account_name(client),
         **_credentials_reply(client),
     }
+
+
+def _class_key(name):
+    return " ".join(str(name or "").split()).casefold()
+
+
+def _student_name(entry):
+    """« Prénom NOM » from a ListeRessources entry; its « L » (« NOM Prénom ») otherwise."""
+    first = " ".join(str(entry.get("prenoms") or "").split())
+    last = " ".join(str(entry.get("nom") or "").split())
+    if first and last:
+        return f"{first} {last}"
+    return " ".join(str(entry.get("L") or "").split())
+
+
+def pronote_students(payload):
+    """The names of a class's students, first and last names only, for the
+    name picker. The request is pronotepy's StudentClass.students(), whose
+    Student would also demand birth dates and projects: only names are read
+    here, so an entry missing the rest does not lose the list.
+    """
+    try:
+        import pronotepy  # noqa: F401 - availability check
+    except ImportError:
+        return {"ok": False, "error": "pronotepy n'est pas installé dans le sidecar."}
+
+    wanted = _class_key(payload.get("class"))
+    if not wanted:
+        return {"ok": False, "error": "Aucune classe choisie."}
+    try:
+        client = _get_client(payload)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"Session Pronote expirée ou erreur : {exc}"}
+
+    # From here the token has turned: every reply hands the new one back.
+    reply = _credentials_reply(client)
+    classes = (
+        client.parametres_utilisateur.get("dataSec", {}).get("data", {}).get("listeClasses", {}).get("V", [])
+    )
+    match = next((c for c in classes if _class_key(c.get("L")) == wanted), None)
+    if match is None:
+        return {
+            "ok": False,
+            "error": f"La classe {payload.get('class')} n'est pas dans votre Pronote.",
+            **reply,
+        }
+    try:
+        period = getattr(client, "current_period", None) or client.periods[0]
+        res = client.post(
+            "ListeRessources",
+            105,
+            {"classe": {"N": match.get("N"), "G": 1}, "periode": {"N": period.id, "G": 1}},
+        )
+        entries = res["dataSec"]["data"]["listeRessources"]["V"]
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "error": f"Pronote ne donne pas la liste des élèves de {match.get('L')} : {exc}",
+            **reply,
+        }
+    names = [n for n in (_student_name(e) for e in entries) if n]
+    return {
+        "ok": True,
+        "class": match.get("L"),
+        "names": names,
+        "account_name": _account_name(client),
+        **reply,
+    }

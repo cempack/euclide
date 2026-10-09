@@ -17,5 +17,6 @@ pub mod search;
 pub mod sequences;
 pub mod settings;
 pub mod storage;
+pub mod students;
 
 pub(crate) use settings::{get_setting_raw, set_setting_raw};

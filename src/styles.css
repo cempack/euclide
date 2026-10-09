@@ -2563,3 +2563,114 @@ input[type="radio"] {
   background: var(--color-stage-hover);
   color: var(--color-stage-ink);
 }
+.eu-scene-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.eu-scene-modes {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6vh;
+}
+.eu-scene-tab[aria-pressed="true"] {
+  background: var(--color-stage-hover);
+  border-color: var(--color-stage-accent);
+}
+.eu-scene-select {
+  height: 2.5rem;
+  padding: 0 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-stage-line);
+  background: var(--color-stage);
+  color: var(--color-stage-ink);
+  font-size: 1rem;
+}
+.eu-scene-number {
+  min-width: 2.5rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tirage and Hasard: one name or one result, as big as the room needs. */
+.eu-scene-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3vh;
+  padding: 0 4vw;
+  text-align: center;
+}
+.eu-scene-name {
+  font-size: min(16vh, 9vw);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.eu-scene-name-wait {
+  font-size: min(6vh, 5vw);
+  font-weight: 500;
+  color: var(--color-stage-muted);
+}
+.eu-scene-name-rolling {
+  color: var(--color-stage-muted);
+}
+.eu-scene-result {
+  font-family: var(--font-mono);
+  font-size: min(36vh, 26vw);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.eu-scene-result.eu-scene-name-wait {
+  font-size: min(20vh, 14vw);
+}
+.eu-scene-count {
+  font-size: max(1rem, 3vh);
+  color: var(--color-stage-muted);
+}
+.eu-scene-note {
+  max-width: 40ch;
+  text-align: center;
+  font-size: max(1.1rem, 3.4vh);
+  font-weight: 600;
+}
+.eu-scene-hint {
+  margin-top: 1.2vh;
+  font-size: max(0.95rem, 2.4vh);
+  font-weight: 400;
+  color: var(--color-stage-muted);
+}
+
+/* Groupes: every group in sight at once, no scrolling on a projector. */
+/* Its columns and text size come from the groups (ClassroomScene's groupsLayout). */
+.eu-scene-groups {
+  display: grid;
+  gap: 2vh 2vw;
+  width: 100%;
+  max-height: 100%;
+  padding: 2vh 5vw;
+  align-content: center;
+}
+.eu-scene-group {
+  padding: 1.4vh 1.2vw;
+  border: 1px solid var(--color-stage-line);
+  border-radius: 8px;
+  min-width: 0;
+}
+.eu-scene-group h3 {
+  margin-bottom: 0.6vh;
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-stage-accent);
+}
+.eu-scene-group li {
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

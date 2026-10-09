@@ -280,6 +280,12 @@ export interface Reminder {
   repeat_rule: RepeatRule;
 }
 
+/** A class that has a list of students, and how many names it holds. */
+export interface StudentList {
+  class_name: string;
+  count: number;
+}
+
 export interface QuickLink {
   id: number;
   label: string;
@@ -572,6 +578,18 @@ export const api = {
   // Returns prof's available classes from Pronote (for dropdowns when attaching to courses)
   pronoteClasses: () =>
     invoke<{ ok?: boolean; error?: string; classes?: { name: string }[] } | null>("pronote_classes"),
+  /** A class's students from Pronote, kept as its list; the list it becomes. */
+  pronoteStudents: (className: string) =>
+    invoke<string[]>("pronote_students", { className }).then(asList<string>),
+
+  // A class's students, for the name picker and groups (commands/students.rs)
+  studentsForClass: (className: string) =>
+    invoke<string[]>("students_for_class", { className }).then(asList<string>),
+  studentLists: () => invoke<StudentList[]>("student_lists").then(asList<StudentList>),
+  setStudents: (className: string, names: string[]) =>
+    invoke<string[]>("set_students", { className, names }).then(asList<string>),
+  clearStudents: (className: string) => invoke<void>("clear_students", { className }),
+  clearAllStudents: () => invoke<void>("clear_all_students"),
 
   // Usage events (for various stats / history)
   logEvent: (kind: string, label: string, courseId: number | null) =>

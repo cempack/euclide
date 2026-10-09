@@ -70,6 +70,18 @@ export const q = {
       staleTime: 10 * 60_000,
       retry: 1,
     }),
+  /** A class's students, for the name picker and groups. */
+  students: (className: string) =>
+    queryOptions({
+      queryKey: ["students", "class", className],
+      queryFn: () => api.studentsForClass(className),
+    }),
+  /** The classes that have a list of students. */
+  studentLists: () =>
+    queryOptions({
+      queryKey: ["students", "lists"],
+      queryFn: () => api.studentLists(),
+    }),
   /** A class's lesson contents from Pronote (sidecar): kept 10 minutes, one retry. */
   /** A class's cahier de textes over a period: four weeks, three months or the year. */
   pronoteContents: (subject: string, className: string, since: "month" | "term" | "year" = "month") =>

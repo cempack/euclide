@@ -2,8 +2,8 @@ import { useState } from "react";
 import { changed } from "../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { q } from "../api/queries";
-import { api, type QuickLink } from "../lib/api";
-import { tr } from "../lib/i18n";
+import { api, type QuickLink, type StudentList } from "../lib/api";
+import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { EmptyState, Modal, useFailure, useToast, useConfirm } from "../components/ui";
@@ -12,15 +12,17 @@ import { useSetting } from "../api/hooks";
 import { useAppearance } from "../lib/theme";
 import { tabs } from "../stores/tabs";
 import { timer } from "../stores/timer";
+import { coin, randomInt, rollDie } from "../features/classroom/picker";
 import { scene } from "../stores/scene";
 import { keysOf } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { Maximize2 as MaximizeIcon } from "lucide-react";
-import { CodeXml, Coffee, Link, PenLine, Plus, Projector, Trash2 } from "lucide-react";
+import { CodeXml, Coffee, Dices, Link, PenLine, Plus, Projector, Shuffle, Trash2, Users } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 
 const NO_LINKS: QuickLink[] = [];
+const NO_LISTS: StudentList[] = [];
 
 export default function Tools() {
   return (
@@ -37,6 +39,7 @@ export default function Tools() {
       />
       <ClassroomSection />
       <TimerSection />
+      <DrawSection />
       <LinksSection />
     </>
   );
@@ -191,6 +194,153 @@ function TimerSection() {
               </button>
             </div>
           </Field>
+        </div>
+      </Panel>
+    </Section>
+  );
+}
+
+/** Drawing lots: a student, the class in groups (full screen), or chance right here. */
+function DrawSection() {
+  const lists = useQuery(q.studentLists()).data ?? NO_LISTS;
+  const [chosen, setChosen] = useState<string | null>(null);
+  const className = chosen ?? lists[0]?.class_name ?? null;
+  const [faces, setFaces] = useState(6);
+  const [min, setMin] = useState(1);
+  const [max, setMax] = useState(100);
+  const [result, setResult] = useState<string | null>(null);
+
+  return (
+    <Section
+      title={tr("tools.drawTitle")}
+      action={
+        <button
+          type="button"
+          onClick={() => scene.openOn("chance")}
+          className="eu-btn-ghost eu-btn-sm"
+          {...tip(tr("scene.open"))}
+        >
+          <MaximizeIcon className="w-3.5 h-3.5" />
+          {tr("scene.fullscreen")}
+        </button>
+      }
+    >
+      <Panel>
+        <div className="eu-row justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line text-ink-muted">
+              <Icon icon={Users} size={16} />
+            </span>
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">{tr("tools.drawStudents")}</p>
+              <p className="eu-t-meta">
+                {lists.length ? tr("tools.drawStudentsHint") : tr("tools.drawNoList")}
+              </p>
+            </div>
+          </div>
+          {lists.length > 0 && className && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="eu-input eu-field-sm w-auto"
+                value={className}
+                onChange={(e) => setChosen(e.target.value)}
+                aria-label={tr("tools.drawClass")}
+              >
+                {lists.map((l) => (
+                  <option key={l.class_name} value={l.class_name}>
+                    {l.class_name} · {trn("students.count", l.count)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="eu-btn-primary eu-btn-sm"
+                onClick={() => scene.openOn("draw", className)}
+              >
+                <Icon icon={Shuffle} size={14} />
+                {tr("students.draw")}
+              </button>
+              <button
+                type="button"
+                className="eu-btn-ghost eu-btn-sm"
+                onClick={() => scene.openOn("groups", className)}
+              >
+                <Icon icon={Users} size={14} />
+                {tr("students.groups")}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="eu-row justify-between flex-wrap gap-3 border-t border-line">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 shrink-0 grid place-items-center rounded border border-line text-ink-muted">
+              <Icon icon={Dices} size={16} />
+            </span>
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">{tr("tools.chance")}</p>
+              <p className="eu-t-meta">{tr("tools.chanceHint")}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              className="eu-input eu-field-sm w-auto"
+              value={faces}
+              onChange={(e) => setFaces(Number(e.target.value))}
+              aria-label={tr("scene.faces")}
+            >
+              {[4, 6, 8, 10, 12, 20].map((f) => (
+                <option key={f} value={f}>
+                  {tr("scene.dieOf", { faces: f })}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="eu-btn-ghost eu-btn-sm"
+              onClick={() => setResult(String(rollDie(faces)))}
+            >
+              {tr("scene.chanceDie")}
+            </button>
+            <span className="flex items-center gap-1.5">
+              <input
+                type="number"
+                value={min}
+                onChange={(e) => setMin(Number(e.target.value) || 0)}
+                className="eu-input eu-field-sm w-16 text-center tabular-nums"
+                aria-label={tr("scene.from")}
+              />
+              <span className="eu-t-meta">{tr("scene.to")}</span>
+              <input
+                type="number"
+                value={max}
+                onChange={(e) => setMax(Number(e.target.value) || 0)}
+                className="eu-input eu-field-sm w-16 text-center tabular-nums"
+                aria-label={tr("scene.to")}
+              />
+              <button
+                type="button"
+                className="eu-btn-ghost eu-btn-sm"
+                onClick={() => setResult(String(randomInt(min, max)))}
+              >
+                {tr("scene.chanceNumber")}
+              </button>
+            </span>
+            <button
+              type="button"
+              className="eu-btn-ghost eu-btn-sm"
+              onClick={() => setResult(tr(coin() === "pile" ? "scene.pile" : "scene.face"))}
+            >
+              {tr("scene.chanceCoin")}
+            </button>
+            <output
+              className="min-w-12 text-center eu-t-title font-mono tabular-nums text-ink"
+              aria-label={tr("tools.chanceResult")}
+              aria-live="polite"
+            >
+              {result ?? "—"}
+            </output>
+          </div>
         </div>
       </Panel>
     </Section>

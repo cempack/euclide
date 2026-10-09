@@ -589,6 +589,50 @@ pub async fn pronote_classes(
     .await
 }
 
+/// A class's students from Pronote, which become its list for the name
+/// picker (`commands::students`). An empty or failed answer keeps the list
+/// the class had.
+#[tauri::command]
+pub async fn pronote_students(
+    app: AppHandle,
+    db: State<'_, Db>,
+    lane: State<'_, PronoteLane>,
+    class_name: String,
+) -> AppResult<Vec<String>> {
+    let _turn = lane.0.lock().await;
+    let extra = json!({ "class": class_name });
+    let creds = db.read(move |conn| credentials(conn, extra)).await?;
+    let mut res = crate::sidecar::call(&app, "pronote_students", &creds).await?;
+    // The token turned even when the class is missing: keep the new one.
+    let res = db
+        .write(move |conn| {
+            take_rotated_credentials(conn, &mut res);
+            Ok(res)
+        })
+        .await?;
+    ensure_ok(&res, "Liste des élèves indisponible")?;
+    let names = student_names(&res);
+    if names.is_empty() {
+        return Err(AppError::user(
+            "Pronote ne donne aucun élève pour cette classe.",
+        ));
+    }
+    db.write(move |conn| crate::commands::students::replace(conn, &class_name, &names))
+        .await
+}
+
+fn student_names(res: &Value) -> Vec<String> {
+    res.get("names")
+        .and_then(|n| n.as_array())
+        .map(|names| {
+            names
+                .iter()
+                .filter_map(|n| n.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

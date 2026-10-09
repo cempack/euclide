@@ -30,6 +30,7 @@ def _handlers():
         "pronote_sync": pronote.pronote_sync,
         "pronote_contents": pronote.pronote_contents,
         "pronote_classes": pronote.pronote_classes,
+        "pronote_students": pronote.pronote_students,
     }
 
 

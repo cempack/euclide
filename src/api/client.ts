@@ -34,6 +34,7 @@ export type Scope =
   | "schedule"
   | "links"
   | "pronote"
+  | "students"
   | "keepAwake"
   | "settings"
   | "thumbnails";
@@ -45,6 +46,7 @@ const SCOPE_KEYS: Record<Scope, string[][]> = {
   schedule: [["schedule"]],
   links: [["links"]],
   pronote: [["pronote"], ["schedule"]],
+  students: [["students"]],
   keepAwake: [["keepAwake"]],
   settings: [["settings"]],
   thumbnails: [],

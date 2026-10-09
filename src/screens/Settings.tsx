@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { changed } from "../api/client";
-import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
+import {
+  api,
+  isTauri,
+  type AppInfo,
+  type Course,
+  type PronoteStatus,
+  type ScheduleEntry,
+  type StudentList,
+} from "../lib/api";
 import { tr, trList, trn } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
@@ -29,6 +37,7 @@ import { remoteFaviconsEnabled } from "../components/Favicon";
 
 const NO_ENTRIES: ScheduleEntry[] = [];
 const NO_COURSES: Course[] = [];
+const NO_LISTS: StudentList[] = [];
 
 const SECTIONS: NavSection[] = [
   { id: "profil", label: tr("settings.profileTitle") },
@@ -302,8 +311,54 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
             {tr("settings.resetFolder")}
           </button>
         </SettingRow>
+        <StudentListsRow />
       </Panel>
     </Section>
+  );
+}
+
+/** The class lists of the name picker: every name, cleared at once. */
+function StudentListsRow() {
+  const toast = useToast();
+  const failed = useFailure();
+  const confirmDlg = useConfirm();
+  const lists = useQuery(q.studentLists()).data ?? NO_LISTS;
+
+  const clearAll = async () => {
+    const ok = await confirmDlg.ask({
+      title: tr("students.clearAllTitle"),
+      message: tr("students.clearAllMessage"),
+      confirmLabel: tr("students.clearAll"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.clearAllStudents();
+      changed("students");
+      toast(tr("students.clearedAll"), "success");
+    } catch (err) {
+      failed("settings.clearStudents", err);
+    }
+  };
+
+  return (
+    <SettingRow
+      title={tr("students.clearAllTitle")}
+      hint={
+        <>
+          {tr("students.clearAllHint")}{" "}
+          {lists.length ? trn("students.clearAllSome", lists.length) : tr("students.clearAllNone")}
+        </>
+      }
+    >
+      <button
+        onClick={clearAll}
+        disabled={!lists.length}
+        className="eu-btn-quiet eu-btn-sm hover:text-danger"
+      >
+        {tr("students.clearAll")}
+      </button>
+    </SettingRow>
   );
 }
 

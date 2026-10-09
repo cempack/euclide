@@ -12,6 +12,7 @@ import { BookOpen, FileText, RefreshCw } from "lucide-react";
 import { Copy } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { matiereMatches } from "../features/classroom/lesson";
+import { StudentsPanel } from "../features/classroom/StudentsPanel";
 
 interface ContentItem {
   date?: string;
@@ -199,6 +200,8 @@ export default function ClassContent({
           </>
         }
       />
+
+      <StudentsPanel className={className} />
 
       {error && (
         <div className="eu-panel border-danger/30 bg-danger-soft p-[14px] flex items-start gap-3">
