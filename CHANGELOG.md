@@ -48,6 +48,8 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 ### À savoir
 
+- Cette mise à jour contient aussi la 0.5.0, qui n'est pas sortie seule. En classe : les élèves de chaque classe, le tirage au sort, les groupes, le hasard, un chronomètre, des QR codes. Dans les notes : des tableaux et des images. Au tableau blanc : des formules, des images, la sélection et des pages.
+- Euclide met ses données à jour pour les listes d'élèves (format 4). Il en fait d'abord une copie dans Euclide-Sauvegardes. Ensuite, une version plus ancienne d'Euclide ne les ouvre plus.
 - Au premier démarrage, Euclide relit les PDF en arrière-plan, pour savoir sur quelle page est chaque mot. Cela peut prendre quelques minutes, pendant lesquelles la recherche dans les PDF reste celle d'avant.
 
 ## 0.5.0
