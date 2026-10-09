@@ -10,7 +10,6 @@ import { EmptyState, Modal, useFailure, useToast, useConfirm } from "../componen
 import { Field, Panel, Section, PageHeader, MetaDot, Segmented } from "../components/layout";
 import { useSetting } from "../api/hooks";
 import { useAppearance } from "../lib/theme";
-import { tabs } from "../stores/tabs";
 import { stopwatch, timer, useStopwatchElapsed } from "../stores/timer";
 import { coin, randomInt, rollDie } from "../features/classroom/picker";
 import { scene } from "../stores/scene";
@@ -18,11 +17,9 @@ import { keysOf } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { Maximize2 as MaximizeIcon } from "lucide-react";
 import {
-  CodeXml,
   Coffee,
   Dices,
   Link,
-  PenLine,
   Plus,
   Projector,
   QrCode as QrIcon,
@@ -120,32 +117,6 @@ function ClassroomSection() {
             className={projection ? "eu-btn-primary eu-btn-sm" : "eu-btn-ghost eu-btn-sm"}
           >
             {projection ? tr("common.active") : tr("common.enable")}
-          </button>
-        </div>
-
-        <div className="eu-row gap-2 flex-wrap border-t border-line">
-          <span className="eu-t-meta mr-1">{tr("tools.shortcuts")}</span>
-          <button
-            type="button"
-            className="eu-btn-ghost eu-btn-sm"
-            onClick={() =>
-              tabs.open({
-                kind: "whiteboard",
-                title: tr("app.tabWhiteboard"),
-                params: { isNew: true },
-              })
-            }
-          >
-            <Icon icon={PenLine} size={14} />
-            {tr("nav.whiteboard")}
-          </button>
-          <button
-            type="button"
-            className="eu-btn-ghost eu-btn-sm"
-            onClick={() => tabs.open({ kind: "python" })}
-          >
-            <Icon icon={CodeXml} size={14} />
-            Python
           </button>
         </div>
       </Panel>
