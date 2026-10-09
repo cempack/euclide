@@ -12,10 +12,15 @@ import { createPluginRegistration, type PluginRegistry } from "@embedpdf/core";
 import { EmbedPDF, useDocumentState, useRegistry } from "@embedpdf/core/react";
 import {
   ignore,
+  PdfActionType,
   PdfAnnotationSubtype,
   PdfErrorCode,
+  PdfZoomMode,
   Task,
+  type PdfBookmarkObject,
   type PdfErrorReason,
+  type PdfLinkTarget,
+  type PdfPageObject,
   type Position,
 } from "@embedpdf/models";
 import { DocumentManagerPluginPackage, type DocumentManagerPlugin } from "@embedpdf/plugin-document-manager";
@@ -26,7 +31,7 @@ import {
   useViewportPlugin,
 } from "@embedpdf/plugin-viewport/react";
 import { ScrollPluginPackage } from "@embedpdf/plugin-scroll";
-import { Scroller, useScrollCapability } from "@embedpdf/plugin-scroll/react";
+import { Scroller, useScrollCapability, type ScrollScope } from "@embedpdf/plugin-scroll/react";
 import { RenderPluginPackage } from "@embedpdf/plugin-render";
 import { RenderLayer, useRenderCapability } from "@embedpdf/plugin-render/react";
 import { TilingPluginPackage } from "@embedpdf/plugin-tiling";
@@ -50,6 +55,10 @@ import type { FormCapability, FormPlugin } from "@embedpdf/plugin-form";
 import { FormPluginPackage } from "@embedpdf/plugin-form/react";
 import { ThumbnailPluginPackage } from "@embedpdf/plugin-thumbnail";
 import { ThumbnailsPane } from "@embedpdf/plugin-thumbnail/react";
+import { SearchPluginPackage } from "@embedpdf/plugin-search";
+import { SearchLayer, useSearchCapability } from "@embedpdf/plugin-search/react";
+import { BookmarkPluginPackage } from "@embedpdf/plugin-bookmark";
+import { useBookmarkCapability } from "@embedpdf/plugin-bookmark/react";
 import { RotatePluginPackage, type RotatePlugin } from "@embedpdf/plugin-rotate";
 import { Rotate } from "@embedpdf/plugin-rotate/react";
 import { tr } from "../../lib/i18n";
@@ -103,7 +112,16 @@ export type PdfViewHandle = {
   deleteSelected(): void;
   undo(): void;
   redo(): void;
+  /** Looks for text in the whole document; the matches are marked, the first shown. */
+  find(query: string): void;
+  findNext(): void;
+  findPrevious(): void;
+  /** No more search: the marks go. */
+  stopFind(): void;
 };
+
+/** Where a search is: its text, the matches found so far, the one shown (0 for none). */
+export type FindState = { query: string; total: number; current: number; searching: boolean };
 
 type Props = {
   /** The file's address (`fileUrl`, `versionUrl`). */
@@ -127,6 +145,7 @@ type Props = {
   onDirty?: (dirty: boolean) => void;
   /** Whether there is something to undo or redo. */
   onHistory?: (state: { canUndo: boolean; canRedo: boolean }) => void;
+  onFind?: (state: FindState) => void;
   onError?: (err: unknown) => void;
 };
 
@@ -268,6 +287,8 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
       createPluginRegistration(SelectionPluginPackage, { marquee: { enabled: !readOnly } }),
       createPluginRegistration(ThumbnailPluginPackage, { width: 120, gap: 8, labelHeight: 22, paddingY: 8 }),
       createPluginRegistration(RotatePluginPackage),
+      createPluginRegistration(SearchPluginPackage, { showAllResults: true }),
+      createPluginRegistration(BookmarkPluginPackage),
       ...(readOnly
         ? []
         : [
@@ -377,6 +398,7 @@ function Viewer({
   const forms = useMemo(() => registry?.getPlugin<FormPlugin>("form")?.provides() ?? null, [registry]);
   const { provides: selection } = useSelectionCapability();
   const { provides: interaction } = useInteractionManagerCapability();
+  const { provides: search } = useSearchCapability();
   const events = useRef(callbacks);
   useEffect(() => {
     events.current = callbacks;
@@ -458,6 +480,34 @@ function Viewer({
   useEffect(() => {
     interaction?.registerMode({ id: ERASER, scope: "page", exclusive: true, cursor: "crosshair" });
   }, [interaction]);
+
+  // A search: where it is, and its match in view (EmbedPDF marks them only).
+  useEffect(() => {
+    if (!search || !scroll) return;
+    const scope = search.forDocument(documentId);
+    const stops = [
+      scope.onStateChange((st) =>
+        events.current.onFind?.({
+          query: st.query,
+          total: Math.max(st.total, st.results.length),
+          current: st.activeResultIndex + 1,
+          searching: st.loading,
+        }),
+      ),
+      scope.onActiveResultChange((index) => {
+        const hit = scope.getState().results[index];
+        const at = hit?.rects[0];
+        if (!hit || !at) return;
+        scroll.forDocument(documentId).scrollToPage({
+          pageNumber: hit.pageIndex + 1,
+          pageCoordinates: { x: at.origin.x, y: at.origin.y },
+          alignY: 30,
+          behavior: "instant",
+        });
+      }),
+    ];
+    return () => stops.forEach((stop) => stop());
+  }, [search, scroll, documentId]);
 
   // The tool, once the document is there. The eraser is a mode of the
   // pointer, the others EmbedPDF's tools.
@@ -548,6 +598,18 @@ function Viewer({
       scroll?.forDocument(documentId).scrollToPage({ pageNumber: page, behavior: "instant" });
     },
     deleteSelected,
+    find(query) {
+      void search?.forDocument(documentId).searchAllPages(query);
+    },
+    findNext() {
+      search?.forDocument(documentId).nextResult();
+    },
+    findPrevious() {
+      search?.forDocument(documentId).previousResult();
+    },
+    stopFind() {
+      search?.forDocument(documentId).stopSearch();
+    },
   }));
 
   // A stroke starts with the pen pressed on a page: unsaved from then on.
@@ -601,7 +663,14 @@ function Viewer({
   return (
     <FreshNotes.Provider value={fresh}>
       <div className="absolute inset-0 flex">
-        {showPages && <PagesPanel documentId={documentId} annotations={annotations} forms={forms} />}
+        {showPages && (
+          <SidePanel
+            documentId={documentId}
+            annotations={annotations}
+            forms={forms}
+            pages={state?.document?.pages ?? []}
+          />
+        )}
         <div className="flex-1 min-w-0 relative">
           <PdfViewport
             documentId={documentId}
@@ -638,6 +707,13 @@ function Viewer({
                         documentId={documentId}
                         pageIndex={pageIndex}
                         style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+                      />
+                      <SearchLayer
+                        documentId={documentId}
+                        pageIndex={pageIndex}
+                        highlightColor="var(--color-pdf-match)"
+                        activeHighlightColor="var(--color-pdf-match-active)"
+                        style={{ position: "absolute", inset: 0 }}
                       />
                       <SelectionLayer
                         documentId={documentId}
@@ -771,6 +847,117 @@ function PdfViewport({
 }
 
 /**
+ * Takes the reader to a link's or an outline entry's place in the document;
+ * a website opens in the browser (boot.rs). A file or a program is never
+ * launched from a PDF.
+ */
+function goToTarget(target: PdfLinkTarget, scroll: ScrollScope, pages: PdfPageObject[]) {
+  if (target.type === "action" && target.action.type === PdfActionType.URI) {
+    window.open(target.action.uri, "_blank", "noopener,noreferrer");
+    return;
+  }
+  const to =
+    target.type === "destination"
+      ? target.destination
+      : target.action.type === PdfActionType.Goto || target.action.type === PdfActionType.RemoteGoto
+        ? target.action.destination
+        : null;
+  if (!to) return;
+  const page = pages[to.pageIndex];
+  const xyz = to.zoom.mode === PdfZoomMode.XYZ ? to.zoom.params : null;
+  scroll.scrollToPage({
+    pageNumber: to.pageIndex + 1,
+    // PDF coordinates go up from the bottom of the page.
+    pageCoordinates: xyz && page ? { x: xyz.x, y: page.size.height - xyz.y } : undefined,
+    behavior: "instant",
+  });
+}
+
+/** Beside the document: its pages, and its outline when it has one. */
+function SidePanel({
+  documentId,
+  annotations,
+  forms,
+  pages,
+}: {
+  documentId: string;
+  annotations: AnnotationCapability | null;
+  forms: FormCapability | null;
+  pages: PdfPageObject[];
+}) {
+  const { provides: bookmarks } = useBookmarkCapability();
+  const [outline, setOutline] = useState<PdfBookmarkObject[]>([]);
+  const [view, setView] = useState<"pages" | "outline">("pages");
+  useEffect(() => {
+    if (!bookmarks) return;
+    const task = bookmarks.forDocument(documentId).getBookmarks();
+    task.wait(({ bookmarks: found }) => setOutline(found), ignore);
+    return () => task.abort({ code: PdfErrorCode.Cancelled, message: "panel closed" });
+  }, [bookmarks, documentId]);
+  return (
+    <div className="w-48 shrink-0 flex flex-col border-r border-stage-line bg-stage-alt">
+      {outline.length > 0 && (
+        <div className="shrink-0 flex gap-1 p-1.5 border-b border-stage-line" role="tablist">
+          {(["pages", "outline"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={`eu-pdf-tab ${view === v ? "eu-pdf-tab-current" : ""}`}
+            >
+              {tr(v === "pages" ? "pdf.pages" : "pdf.outline")}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex-1 min-h-0">
+        {view === "outline" && outline.length > 0 ? (
+          <Outline documentId={documentId} entries={outline} pages={pages} />
+        ) : (
+          <PagesPanel documentId={documentId} annotations={annotations} forms={forms} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The document's outline (its bookmarks), each entry taking the reader to its page. */
+function Outline({
+  documentId,
+  entries,
+  pages,
+}: {
+  documentId: string;
+  entries: PdfBookmarkObject[];
+  pages: PdfPageObject[];
+}) {
+  const { provides: scroll } = useScrollCapability();
+  const go = (target?: PdfLinkTarget) => {
+    if (target && scroll) goToTarget(target, scroll.forDocument(documentId), pages);
+  };
+  const list = (items: PdfBookmarkObject[], depth: number): React.ReactNode => (
+    <ul role={depth ? "group" : "tree"} aria-label={depth ? undefined : tr("pdf.outline")}>
+      {items.map((b, i) => (
+        <li key={i} role="treeitem" aria-selected={false}>
+          <button
+            type="button"
+            onClick={() => go(b.target)}
+            className="eu-pdf-outline-entry"
+            style={{ paddingLeft: 8 + depth * 12 }}
+          >
+            {b.title}
+          </button>
+          {b.children?.length ? list(b.children, depth + 1) : null}
+        </li>
+      ))}
+    </ul>
+  );
+  return <div className="h-full overflow-y-auto py-1.5">{list(entries, 0)}</div>;
+}
+
+/**
  * The pages as small pictures, drawn as they scroll into view, with their
  * annotations and filled fields; a page is drawn again once a change on it
  * is in the document.
@@ -806,11 +993,7 @@ function PagesPanel({
     return () => stops.forEach((stop) => stop?.());
   }, [annotations, forms, documentId]);
   return (
-    <ThumbnailsPane
-      documentId={documentId}
-      className="w-40 shrink-0 border-r border-stage-line bg-stage-alt"
-      aria-label={tr("pdf.pages")}
-    >
+    <ThumbnailsPane documentId={documentId} aria-label={tr("pdf.pages")}>
       {(meta) => {
         const n = meta.pageIndex + 1;
         return (

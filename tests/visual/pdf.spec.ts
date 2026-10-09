@@ -186,3 +186,28 @@ test("a form filled in is saved into the file", async ({ page }) => {
   await expect(field.nth(1)).toHaveValue("Élise");
   await expect(field.first()).toHaveValue("Moreau");
 });
+
+test("Ctrl+F finds a word on every page, and the outline goes to a chapter", async ({ page }) => {
+  const pdf = fileURLToPath(new URL("./fixtures/outline.pdf", import.meta.url));
+  await page.route(/\/src\/dev\/fixtures\/docs\/\d+\.pdf$/, (route) =>
+    route.fulfill({ path: pdf, contentType: "application/pdf" }),
+  );
+  await openPdf(page);
+  // In front, the PDF takes Ctrl+F from the Documents screen.
+  await page.keyboard.press("Control+f");
+  const field = page.getByRole("textbox", { name: "Rechercher dans le document" });
+  await expect(field).toBeFocused();
+  await page.keyboard.type("dérivée");
+  const status = page.locator(".eu-pdf-find [aria-live]");
+  await expect(status).toHaveText("1 sur 120");
+  await page.keyboard.press("Shift+Enter");
+  await expect(status).toHaveText("120 sur 120");
+  await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("6");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".eu-pdf-find")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Vignettes des pages" }).click();
+  await page.getByRole("tab", { name: "Sommaire" }).click();
+  await page.getByRole("button", { name: "Suites arithmétiques" }).click();
+  await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("3");
+});

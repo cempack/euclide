@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ChevronDown,
+  ChevronUp,
   Circle,
   Eraser,
   Highlighter,
@@ -16,18 +18,20 @@ import {
   RotateCcw,
   RotateCw,
   ScanLine,
+  Search,
   Shapes,
   Slash,
   Square,
   Trash2,
   Type,
   Undo2,
+  X,
 } from "lucide-react";
 import { api, fileUrl, versionUrl, type FileVersion } from "../../lib/api";
 import { q } from "../../api/queries";
 import { errorMessage } from "../../lib/errors";
 import { tr, type StringKey } from "../../lib/i18n";
-import { keysOf } from "../../lib/keymap";
+import { keysOf, useShortcut } from "../../lib/keymap";
 import { logged, reportError } from "../../lib/report";
 import { editors } from "../../stores/editors";
 import { useConfirm, useToast } from "../../components/ui";
@@ -39,7 +43,7 @@ import { Menu, type MenuEntry } from "../../ui/Menu";
 import { tip } from "../../ui/Tooltip";
 import { ColorChoice } from "./ColorChoice";
 import { HIGHLIGHT, INK } from "./palette";
-import { PdfView, type PdfTool, type PdfViewHandle } from "./PdfView";
+import { PdfView, type FindState, type PdfTool, type PdfViewHandle } from "./PdfView";
 import { ImageView } from "./ImageView";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
@@ -129,6 +133,11 @@ function PdfPane({
   const [shapesAnchor, setShapesAnchor] = useState<HTMLElement | null>(null);
   /** The shape the « Formes » button shows: the last one picked. */
   const [shape, setShape] = useState<PdfTool>("line");
+  /** The search bar: open or not, what it looks for, what was found. */
+  const [finding, setFinding] = useState(false);
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<FindState>({ query: "", total: 0, current: 0, searching: false });
+  const findRef = useRef<HTMLInputElement>(null);
   /** The page count, once the document is open. */
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
@@ -222,6 +231,8 @@ function PdfPane({
     setDocFor(viewKey);
     setPages(0);
     setHistory({ canUndo: false, canRedo: false });
+    setFinding(false);
+    setQuery("");
   }
   const count = pages;
   const color = tool === "highlight" ? marker : ink;
@@ -249,6 +260,38 @@ function PdfPane({
     "separator",
     { label: tr("pdf.rotate"), icon: RotateCw, onSelect: () => viewRef.current?.rotate() },
   ];
+
+  // Looks while it is typed, once the typing pauses: a long document is
+  // searched page by page in PDFium's worker.
+  useEffect(() => {
+    if (!finding) return;
+    const wait = window.setTimeout(() => viewRef.current?.find(query), 250);
+    return () => window.clearTimeout(wait);
+  }, [finding, query]);
+
+  const openFind = () => {
+    setFinding(true);
+    // Once the bar is there.
+    window.setTimeout(() => {
+      findRef.current?.focus();
+      findRef.current?.select();
+    });
+  };
+  const closeFind = () => {
+    setFinding(false);
+    setQuery("");
+    viewRef.current?.stopFind();
+  };
+  // Ctrl+F looks in the document while it is the tab in front, as in a PDF reader.
+  useShortcut("documents", openFind, visible && !!pages);
+
+  const findStatus = found.searching
+    ? tr("pdf.searching")
+    : !found.query
+      ? ""
+      : found.total
+        ? tr("pdf.searchCount", { current: found.current, total: found.total })
+        : tr("pdf.searchNone");
 
   const goTo = (n: number) => {
     const target = Math.min(Math.max(1, n), count || 1);
@@ -379,6 +422,19 @@ function PdfPane({
           </ToolGroup>
         )}
         <ToolSep />
+        <ToolGroup>
+          <button
+            type="button"
+            onClick={() => (finding ? closeFind() : openFind())}
+            aria-pressed={finding}
+            disabled={!pages}
+            aria-label={tr("pdf.search")}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
+            {...tip(tr("pdf.search"), keysOf("documents"))}
+          >
+            <Icon icon={Search} />
+          </button>
+        </ToolGroup>
         <ToolGroup collapse label={tr("pdf.pageInput")}>
           <input
             value={pageText}
@@ -503,6 +559,61 @@ function PdfPane({
 
       <div className="flex-1 min-h-0 flex bg-stage">
         <div className="flex-1 min-w-0 relative">
+          {finding && (
+            <div className="eu-pdf-find" role="search">
+              <Icon icon={Search} size={14} className="text-ink-muted shrink-0" />
+              <input
+                ref={findRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (e.shiftKey) viewRef.current?.findPrevious();
+                    else viewRef.current?.findNext();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeFind();
+                  }
+                }}
+                placeholder={tr("pdf.search")}
+                aria-label={tr("pdf.search")}
+                className="eu-input eu-field-sm w-52"
+              />
+              <span className="font-mono text-caption text-ink-muted min-w-20 text-center" aria-live="polite">
+                {findStatus}
+              </span>
+              <button
+                type="button"
+                onClick={() => viewRef.current?.findPrevious()}
+                disabled={!found.total}
+                aria-label={tr("pdf.searchPrevious")}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                {...tip(tr("pdf.searchPrevious"), "shift+enter")}
+              >
+                <Icon icon={ChevronUp} />
+              </button>
+              <button
+                type="button"
+                onClick={() => viewRef.current?.findNext()}
+                disabled={!found.total}
+                aria-label={tr("pdf.searchNext")}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                {...tip(tr("pdf.searchNext"), "enter")}
+              >
+                <Icon icon={ChevronDown} />
+              </button>
+              <button
+                type="button"
+                onClick={closeFind}
+                aria-label={tr("pdf.searchClose")}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                {...tip(tr("pdf.searchClose"), "esc")}
+              >
+                <Icon icon={X} />
+              </button>
+            </div>
+          )}
           {failed ? (
             <div className="h-full grid place-items-center p-6">
               <div className="max-w-[44ch] text-center text-stage-ink">
@@ -547,6 +658,7 @@ function PdfPane({
                 onScale={setScale}
                 onDirty={setDirty}
                 onHistory={setHistory}
+                onFind={setFound}
                 onError={(err) => {
                   reportError("pdf.open", err);
                   setFailed(errorMessage(err, ""));

@@ -47,6 +47,9 @@
   --color-paper-ink: rgb(17 18 19);
   /* Text selected on a PDF page, multiplied over the paper. */
   --color-pdf-selection: rgb(179 212 252);
+  /* Search matches on a PDF page, the one shown stronger. */
+  --color-pdf-match: rgb(254 240 138);
+  --color-pdf-match-active: rgb(251 146 60);
   --color-transparent: transparent;
   --color-current: currentcolor;
 
@@ -878,6 +881,22 @@
   }
   .eu-pdf-thumb-current {
     @apply border-stage-accent hover:border-stage-accent;
+  }
+  /* The search bar, over the document's top right corner. */
+  .eu-pdf-find {
+    @apply absolute top-2 right-5 z-20 flex items-center gap-1 rounded-md border border-line bg-canvas
+      py-1 pl-2.5 pr-1 shadow-pop;
+  }
+  /* The side panel's « Pages » and « Sommaire ». */
+  .eu-pdf-tab {
+    @apply flex-1 rounded-sm px-2 py-1 text-caption text-stage-muted transition-colors duration-fast
+      hover:bg-stage-hover hover:text-stage-ink;
+  }
+  .eu-pdf-tab-current {
+    @apply bg-stage-pressed text-stage-ink;
+  }
+  .eu-pdf-outline-entry {
+    @apply block w-full text-left pr-2 py-1 text-small text-stage-ink rounded-sm hover:bg-stage-hover;
   }
   /* Documents: rows and cards open on click; date headers stay in sight. */
   .eu-doc-row {
