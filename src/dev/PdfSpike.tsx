@@ -40,6 +40,15 @@ export default function PdfSpike() {
         >
           save
         </button>
+        <button
+          className="eu-btn-ghost eu-btn-sm"
+          onClick={async () => {
+            // For the tests: the flattened copy.
+            (window as unknown as { pdfCopy?: Uint8Array }).pdfCopy = await ref.current!.flatCopy();
+          }}
+        >
+          copy
+        </button>
         <span data-testid="info">{info}</span>
         <span data-testid="saved">{saved}</span>
         <span data-testid="dirty">{dirty ? "dirty" : "clean"}</span>

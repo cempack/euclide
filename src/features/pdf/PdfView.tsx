@@ -15,6 +15,7 @@ import {
   PdfActionType,
   PdfAnnotationSubtype,
   PdfErrorCode,
+  PdfPageFlattenFlag,
   PdfZoomMode,
   restorePosition,
   Task,
@@ -145,6 +146,12 @@ export type PdfViewHandle = {
    * (`URL.revokeObjectURL`).
    */
   printPages(progress?: (done: number, total: number) => void): Promise<PrintPage[]>;
+  /**
+   * A copy with the annotations and the fields filled in made part of the
+   * pages, as on paper: the same in any reader, nothing left to move. The
+   * document shown does not change.
+   */
+  flatCopy(): Promise<Uint8Array>;
 };
 
 /** A page ready to print: its picture, and whether it lies wider than tall. */
@@ -730,6 +737,31 @@ function Viewer({
         throw err;
       }
       return pages;
+    },
+    async flatCopy() {
+      const doc = state?.document;
+      if (!doc) throw new Error(tr("pdf.notReady"));
+      await settle();
+      if (annotations) await annotations.forDocument(documentId).commit().toPromise();
+      // The pages, with what is on them, into a document of their own (a
+      // password stays with the original), then each one flattened as printed.
+      const engine = pdfium();
+      const pagesOnly = await engine
+        .extractPages(
+          doc,
+          doc.pages.map((p) => p.index),
+        )
+        .toPromise();
+      const copy = await engine
+        .openDocumentBuffer({ id: newDocumentId("copy"), content: pagesOnly }, { normalizeRotation: true })
+        .toPromise();
+      try {
+        for (const page of copy.pages)
+          await engine.flattenPage(copy, page, { flag: PdfPageFlattenFlag.Print }).toPromise();
+        return new Uint8Array(await engine.saveAsCopy(copy).toPromise());
+      } finally {
+        engine.closeDocument(copy);
+      }
     },
   }));
 

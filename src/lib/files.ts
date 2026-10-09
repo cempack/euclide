@@ -13,6 +13,11 @@ export function openFile(f: OpenableFile, event = "file_open") {
   api.logEvent(event, f.name, f.courseId ?? null).catch(logged("files.logOpen"));
   if (f.kind === "board") tabs.open({ kind: "whiteboard", title: f.name, params: { fileId: f.id } });
   else if (f.kind === "pdf" || f.kind === "image")
-    tabs.open({ kind: "pdf", title: f.name, params: { fileId: f.id, fileName: f.name } });
+    tabs.open({
+      kind: "pdf",
+      title: f.name,
+      // Its course, where known: a copy made from the tab goes beside it.
+      params: { fileId: f.id, fileName: f.name, courseId: f.courseId ?? undefined },
+    });
   else api.openFile(f.id).catch(logged("files.openExternal"));
 }

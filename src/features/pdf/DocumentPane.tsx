@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Circle,
   Eraser,
+  FileDown,
   Highlighter,
   History,
   Minus,
@@ -36,6 +37,7 @@ import {
 import { api, fileUrl, versionUrl, type FileVersion } from "../../lib/api";
 import { q } from "../../api/queries";
 import { errorMessage } from "../../lib/errors";
+import { openFile } from "../../lib/files";
 import { tr, type StringKey } from "../../lib/i18n";
 import { keysOf, useShortcut } from "../../lib/keymap";
 import { logged, reportError } from "../../lib/report";
@@ -61,18 +63,21 @@ export default function DocumentPane({
   tabId,
   fileId,
   fileName,
+  courseId = null,
   visible = true,
 }: {
   tabId: string;
   fileId: number;
   fileName: string;
+  /** The file's course, where the tab knows it: copies go beside the file. */
+  courseId?: number | null;
   /** The tab is in front. */
   visible?: boolean;
 }) {
   return isImage(fileName) ? (
     <ImageView tabId={tabId} fileId={fileId} fileName={fileName} />
   ) : (
-    <PdfPane tabId={tabId} fileId={fileId} fileName={fileName} visible={visible} />
+    <PdfPane tabId={tabId} fileId={fileId} fileName={fileName} courseId={courseId} visible={visible} />
   );
 }
 
@@ -135,11 +140,13 @@ function PdfPane({
   tabId,
   fileId,
   fileName,
+  courseId,
   visible,
 }: {
   tabId: string;
   fileId: number;
   fileName: string;
+  courseId: number | null;
   visible: boolean;
 }) {
   const toast = useToast();
@@ -347,6 +354,28 @@ function PdfPane({
     if (!pages) return;
     closeFind();
     setPresenting(true);
+  };
+
+  /** A copy with the annotations fixed in its pages, beside the file: for students. */
+  const [copying, setCopying] = useState(false);
+  const exportCopy = async () => {
+    const view = viewRef.current;
+    if (!view || !pages || copying) return;
+    setCopying(true);
+    try {
+      const bytes = await view.flatCopy();
+      const name = tr("pdf.copyName", { name: fileName.replace(/\.pdf$/i, "") });
+      const f = await api.createFileBytes(name, bytes, { courseId });
+      changed("library");
+      toast(tr("pdf.copySaved", { name: f.name }), "success", {
+        action: { label: tr("print.open"), run: () => openFile({ ...f, courseId: f.course_id }) },
+      });
+    } catch (err) {
+      reportError("pdf.exportCopy", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    } finally {
+      setCopying(false);
+    }
   };
   // F5, as for a note's slides.
   useShortcut("present", present, visible && !!pages && !presenting);
@@ -640,6 +669,17 @@ function PdfPane({
                 {printing.done}/{printing.total}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportCopy()}
+            disabled={!pages || copying}
+            aria-label={tr("pdf.exportCopy")}
+            aria-busy={copying}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            {...tip(tr("pdf.exportCopyTitle"))}
+          >
+            <Icon icon={FileDown} size={14} />
           </button>
           <OpenWithButton fileId={fileId} className="eu-btn-quiet eu-btn-sm" label={tr("openWith.label")} />
           <button

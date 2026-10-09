@@ -349,7 +349,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                 {recentFiles.map((f) => (
                   <button
                     key={f.id}
-                    onClick={() => openFile(f)}
+                    onClick={() => openFile({ ...f, courseId: f.course_id })}
                     className="eu-row-hover w-full text-left"
                     data-tip={f.name}
                     aria-label={f.name}

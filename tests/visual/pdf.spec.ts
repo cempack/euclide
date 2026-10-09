@@ -278,6 +278,32 @@ test("a PDF with a password opens once it is given, and stays protected when sav
   expect(saved).toContain("/Subtype/Ink");
 });
 
+test("a copy has what was drawn and typed fixed in its pages", async ({ page }) => {
+  const form = fileURLToPath(new URL("./fixtures/form.pdf", import.meta.url));
+  await page.route(
+    (url) => url.pathname === "/form.pdf",
+    (route) => route.fulfill({ path: form, contentType: "application/pdf" }),
+  );
+  await page.goto("/?pdf=/form.pdf");
+  const box = (await page.locator(".eu-pdf-page").first().boundingBox())!;
+  await page.waitForTimeout(800);
+  await page.mouse.click(box.x + box.width * 0.44, box.y + 268 * (box.width / 1248));
+  await page.keyboard.type("Moreau");
+  await page.getByRole("button", { name: "pen", exact: true }).click();
+  await stroke(page, 300);
+  await page.getByRole("button", { name: "copy", exact: true }).click();
+  await page.waitForFunction(() => (window as { pdfCopy?: Uint8Array }).pdfCopy);
+  const copy = await page.evaluate(() =>
+    new TextDecoder("latin1").decode((window as { pdfCopy?: Uint8Array }).pdfCopy),
+  );
+  // No field and no annotation left: all of it is drawn in the page.
+  expect(copy).toContain("%PDF");
+  expect(copy).not.toContain("/AcroForm");
+  expect(copy).not.toMatch(/\/Subtype\s*\/(Widget|Ink)/);
+  // The document itself is as it was: still to be saved.
+  await expect(page.getByTestId("dirty")).toHaveText("dirty");
+});
+
 test("Ctrl+P prints the pages as they show, then puts the sheet away", async ({ page }) => {
   // The dialog is the system's: here, only that it was asked for.
   await page.addInitScript(() => {

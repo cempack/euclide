@@ -217,6 +217,7 @@ function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; vis
           tabId={tab.id}
           fileId={tab.params.fileId!}
           fileName={tab.params.fileName ?? tab.title}
+          courseId={tab.params.courseId ?? null}
           visible={visible}
         />
       );
