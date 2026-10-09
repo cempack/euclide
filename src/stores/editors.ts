@@ -69,6 +69,13 @@ export const editors = {
   },
 };
 
+/**
+ * Editors publish their unsaved flag from an effect, so it changes when React
+ * commits, a moment after a save resolves (and a failed save that only shows
+ * a toast leaves it set). Wait for this before reading it back.
+ */
+export const afterCommit = () => new Promise((resolve) => window.setTimeout(resolve, 50));
+
 /** The unsaved-changes dots: only their readers re-render when one changes. */
 export function useDirtyMap(): DirtyMap {
   return useDirtyStore((s) => s.dirty);

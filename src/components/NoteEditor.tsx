@@ -130,50 +130,64 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   // note is created once and later saves update it instead of duplicating it.
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
 
-  const persistOnce = useCallback(async () => {
-    const d = draftRef.current;
-    if (!d.title) return d;
-    const wasNew = d.id == null;
-    const sent = { title: d.title, body: d.body || "", course_id: d.course_id ?? null };
-    const saved = await api.saveNote({ id: d.id, ...sent });
-    if (!saved?.id) {
-      throw new Error("La note n'a pas été enregistrée.");
-    }
-    // Keep whatever was typed while the save was in flight: take back only the
-    // fields the backend owns, and stay dirty if the draft moved on.
-    const cur = draftRef.current;
-    commitDraft({ ...cur, id: saved.id, updated_at: saved.updated_at });
-    const unchanged =
-      cur.title === sent.title &&
-      (cur.body || "") === sent.body &&
-      (cur.course_id ?? null) === sent.course_id;
-    if (unchanged) commitDirty(false);
-    // The tab shows the title being typed, not the one that was just saved.
-    const tabTitle = cur.title || saved.title || "Note";
-    if (wasNew && saved.id) {
-      api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
-      loggedWrite.current = true;
-      const nextId = `note:${saved.id}`;
-      if (tabId !== nextId) {
-        tabs.retarget(tabId, nextId, tabTitle, { noteId: saved.id, isNew: false });
+  // `named`: a save on request (Ctrl+S, closing the tab, quitting) gives an
+  // untitled note the default title rather than lose its text; autosave
+  // waits for the title being typed.
+  const persistOnce = useCallback(
+    async (named: boolean) => {
+      let d = draftRef.current;
+      if (!d.title?.trim()) {
+        if (!named) return d;
+        d = { ...d, title: tr("notes.newTitle") };
+        commitDraft(d);
       }
-      tabs.rename(nextId, tabTitle, { noteId: saved.id, isNew: false });
-    } else if (!loggedWrite.current) {
-      api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
-      loggedWrite.current = true;
-      tabs.rename(tabId, tabTitle);
-    } else {
-      tabs.rename(tabId, tabTitle);
-    }
-    changed("library");
-    return saved;
-  }, [tabId, commitDraft, commitDirty]);
+      const wasNew = d.id == null;
+      const sent = { title: d.title, body: d.body || "", course_id: d.course_id ?? null };
+      const saved = await api.saveNote({ id: d.id, ...sent });
+      if (!saved?.id) {
+        throw new Error("La note n'a pas été enregistrée.");
+      }
+      // Keep whatever was typed while the save was in flight: take back only the
+      // fields the backend owns, and stay dirty if the draft moved on.
+      const cur = draftRef.current;
+      commitDraft({ ...cur, id: saved.id, updated_at: saved.updated_at });
+      const unchanged =
+        cur.title === sent.title &&
+        (cur.body || "") === sent.body &&
+        (cur.course_id ?? null) === sent.course_id;
+      if (unchanged) commitDirty(false);
+      // The tab shows the title being typed, not the one that was just saved.
+      const tabTitle = cur.title || saved.title || "Note";
+      if (wasNew && saved.id) {
+        api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
+        loggedWrite.current = true;
+        const nextId = `note:${saved.id}`;
+        if (tabId !== nextId) {
+          tabs.retarget(tabId, nextId, tabTitle, { noteId: saved.id, isNew: false });
+        }
+        tabs.rename(nextId, tabTitle, { noteId: saved.id, isNew: false });
+      } else if (!loggedWrite.current) {
+        api.logEvent("note_write", saved.title || "Note", saved.course_id ?? null);
+        loggedWrite.current = true;
+        tabs.rename(tabId, tabTitle);
+      } else {
+        tabs.rename(tabId, tabTitle);
+      }
+      changed("library");
+      return saved;
+    },
+    [tabId, commitDraft, commitDirty],
+  );
 
-  const persist = useCallback(() => {
-    const run = saveChain.current.then(persistOnce, persistOnce);
-    saveChain.current = run.catch(() => undefined);
-    return run;
-  }, [persistOnce]);
+  const persist = useCallback(
+    (named = false) => {
+      const next = () => persistOnce(named);
+      const run = saveChain.current.then(next, next);
+      saveChain.current = run.catch(() => undefined);
+      return run;
+    },
+    [persistOnce],
+  );
 
   useEffect(() => {
     editors.setDirty(tabId, dirty);
@@ -182,14 +196,14 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
 
   useEffect(() => {
     return editors.registerFlush(tabId, async () => {
-      if (dirtyRef.current) await persist();
+      if (dirtyRef.current) await persist(true);
     });
   }, [tabId, persist]);
 
   // Auto save on changes (debounced)
   useEffect(() => {
     if (!isTauri()) return;
-    if (!dirty || !draft.title) return;
+    if (!dirty || !draft.title?.trim()) return;
     const t = setTimeout(() => {
       persist().catch((err) => {
         reportError("note.autosave", err);
@@ -199,16 +213,20 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     return () => clearTimeout(t);
   }, [dirty, draft, persist, toast]);
 
+  // On the way out only, not when a first save gives the tab its new id.
+  const leaving = useRef({ tabId, persist });
+  useEffect(() => {
+    leaving.current = { tabId, persist };
+  });
   useEffect(() => {
     return () => {
       // Closing with « Ne pas enregistrer » (or deleting the note) must not
       // write the abandoned draft back.
+      const { tabId, persist } = leaving.current;
       if (editors.takeDiscarded(tabId)) return;
-      if (dirtyRef.current && draftRef.current.title) {
-        persist().catch(logged("note.saveOnClose"));
-      }
+      if (dirtyRef.current) persist(true).catch(logged("note.saveOnClose"));
     };
-  }, [persist, tabId]);
+  }, []);
 
   const markDirty = (updates: Partial<Note>) => {
     commitDraft({ ...draftRef.current, ...updates });
@@ -360,12 +378,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   };
 
   const doSave = async () => {
-    if (!draft.title?.trim()) {
-      toast(tr("notes.titleRequired"), "error");
-      return;
-    }
     try {
-      await persist();
+      await persist(true);
       toast(tr("notes.saved"), "success");
     } catch (err) {
       reportError("note.save", err);

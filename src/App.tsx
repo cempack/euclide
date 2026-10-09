@@ -14,7 +14,6 @@ import { onTimerDone } from "./stores/timer";
 import { appReady, tabSwitchEnd } from "./lib/perf";
 
 import { tabs, useActiveTab, useTabsStore, useTabList, type Tab, type TabKind } from "./stores/tabs";
-import { editors } from "./stores/editors";
 import { ToastProvider, ConfirmProvider, useToast, useConfirm, Loading } from "./components/ui";
 import { Segmented } from "./components/layout";
 import { Sidebar, ProjectionRail } from "./shell/Sidebar";
@@ -22,6 +21,7 @@ import { TopBar } from "./shell/TopBar";
 import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
 import { useExitGuard } from "./shell/exitGuard";
+import { closeTab, saveActiveTab } from "./shell/closeTab";
 import { useImportFiles } from "./shell/useImportFiles";
 import { useShortcut } from "./lib/keymap";
 import { scene, useSceneOpen } from "./stores/scene";
@@ -389,30 +389,7 @@ function Shell() {
   const openCapture = useCallback(() => setCaptureOpen(true), []);
   const closeHelp = useCallback(() => setHelp(false), []);
 
-  const requestClose = useCallback(
-    async (id: string) => {
-      if (editors.isDirty(id)) {
-        const choice = await confirm.dirty({
-          title: tr("confirm.unsavedTitle"),
-          message: tr("confirm.unsavedMessage"),
-        });
-        if (choice === "cancel") return;
-        if (choice === "discard") {
-          tabs.close(id, { discard: true });
-          return;
-        }
-        try {
-          await editors.flush(id);
-        } catch (err) {
-          reportError("tabs.closeSave", err);
-          toast(errorMessage(err, tr("messages.genericError")), "error");
-          return;
-        }
-      }
-      tabs.close(id);
-    },
-    [confirm, toast],
-  );
+  const requestClose = useCallback((id: string) => closeTab(id, confirm, toast), [confirm, toast]);
 
   useEffect(() => {
     api.appInfo().then(setInfo).catch(logged("app.info"));
@@ -622,17 +599,7 @@ function Shell() {
   });
   // Save the active editor: notes, the whiteboard and the Python editor each
   // register how (stores/editors.ts), as the unsaved-changes prompt uses.
-  useShortcut("save", () => {
-    const id = tabs.activeId();
-    if (!editors.isDirty(id)) return;
-    editors
-      .flush(id)
-      .then(() => toast(tr("messages.saved"), "success"))
-      .catch((err) => {
-        reportError("editor.save", err);
-        toast(errorMessage(err, tr("messages.genericError")), "error");
-      });
-  });
+  useShortcut("save", () => void saveActiveTab(toast));
   // Escape is the way out of projection mode; open dialogs close first.
   useShortcut(
     "leaveProjection",
