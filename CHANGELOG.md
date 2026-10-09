@@ -14,11 +14,19 @@ Ce qui change d'une version d'Euclide à l'autre.
 - **Une note de texte** s'agrandit pendant qu'on écrit. Laissée vide, elle disparaît.
 - **Les formulaires** se remplissent et s'enregistrent dans le fichier.
 - **Ctrl+F cherche dans le document.** Chaque mot trouvé est surligné, Entrée passe au suivant. Le panneau des pages montre aussi le sommaire du PDF, quand il en a un.
+
+![Une évaluation corrigée à l'écran : une phrase surlignée, une question soulignée, le nombre d'élèves entouré, une flèche et une note](docs/changelog/0.6.0/annoter.jpg)
+
 - **Présenter** (F5) : une page à la fois, en plein écran. Les touches d'une télécommande de présentation tournent les pages. Le stylo, le surligneur, la gomme et un pointeur restent à portée, et ce qui est dessiné reste dans le document.
 - **Imprimer** (Ctrl+P) : les pages comme à l'écran, avec ce qui est dessiné dessus.
 - **Exporter une copie** : les annotations et les champs remplis y sont fixés, comme sur papier. C'est la copie à envoyer aux élèves.
 - **Le menu Pages** tourne une page pour de bon, en insère une blanche ou à petits carreaux, la déplace, la supprime, ajoute un autre PDF à la fin, ou extrait des pages dans un nouveau document. L'ancienne version reste dans l'historique, et « Annuler » la ramène.
 - **Un PDF protégé par un mot de passe** le demande, au lieu de refuser de s'ouvrir. Euclide ne le garde pas, et le fichier reste protégé.
+
+<p>
+  <img src="docs/changelog/0.6.0/presenter.jpg" alt="La même évaluation en plein écran, le nombre d'élèves entouré au stylo" width="49%">
+  <img src="docs/changelog/0.6.0/pages.jpg" alt="Le menu Pages : tourner, insérer, ajouter un PDF, extraire, supprimer" width="49%">
+</p>
 
 ### Recherche
 

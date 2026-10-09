@@ -352,16 +352,17 @@ const SHOTS = {
       await page.waitForTimeout(1000);
     };
     // Points of the sheet (595 × 842 points, from the top left): « Voici les
-    // notes… de 28 élèves » on y 227, the « 28 » at x 271, question 1 on y 308.
+    // notes… de 28 élèves » on y 227, the « 28 » at x 280, question 1 on y 308;
+    // the table from x 51 to 370 and y 244 to 293.
     await tool("Surligneur");
-    await drag(at(52, 227), at(260, 227));
+    await drag(at(52, 227), at(255, 227));
     await page.getByRole("button", { name: "Souligner", exact: true }).click();
     await drag(at(68, 308), at(232, 308));
     await tool("Stylo");
     const ring = [];
     for (let i = 0; i <= 24; i++) {
       const t = (i / 24) * 2 * Math.PI;
-      ring.push(at(271 + 14 * Math.cos(t), 226 + 10 * Math.sin(t)));
+      ring.push(at(280 + 14 * Math.cos(t), 226 + 10 * Math.sin(t)));
     }
     await page.mouse.move(...ring[0]);
     await page.mouse.down();
@@ -370,10 +371,12 @@ const SHOTS = {
     await page.waitForTimeout(1000);
     await page.getByRole("button", { name: "Formes", exact: true }).click();
     await page.getByRole("menuitem", { name: "Flèche" }).click();
-    await drag(at(384, 252), at(290, 232));
+    await drag(at(380, 210), at(296, 217));
     await tool("Texte");
-    // Right of the table, where the sheet is blank.
-    await page.mouse.click(...at(386, 244));
+    // Right of the exercise's heading, where the sheet is blank down to the
+    // table: a note is 160 points wide, centred on the click, so it runs from
+    // x 384 to 544, and its arrow reaches the « 28 » over blank paper.
+    await page.mouse.click(...at(464, 214));
     await page.keyboard.type("Vérifier la somme des effectifs");
     // Another tool: the note is finished, and the highlighter shows its ways.
     await tool("Surligneur");
@@ -395,7 +398,7 @@ const SHOTS = {
     for (let i = 0; i <= 28; i++) {
       const t = (i / 28) * 2 * Math.PI;
       // The « 28 » of « une classe de 28 élèves ».
-      ring.push([sheet.x + s * (271 + 16 * Math.cos(t)), sheet.y + s * (226 + 11 * Math.sin(t))]);
+      ring.push([sheet.x + s * (280 + 16 * Math.cos(t)), sheet.y + s * (226 + 11 * Math.sin(t))]);
     }
     await page.mouse.move(...ring[0]);
     await page.mouse.down();
