@@ -10,6 +10,7 @@ type DirtyMap = Readonly<Record<string, true>>;
 const useDirtyStore = create<{ dirty: DirtyMap }>()(() => ({ dirty: {} }));
 
 const flushers = new Map<string, () => Promise<void>>();
+const autosaving = new Set<string>();
 const discarded = new Set<string>();
 
 function setDirtyMap(update: (map: Record<string, true>) => void) {
@@ -31,13 +32,23 @@ export const editors = {
 
   dirtyMap: (): DirtyMap => useDirtyStore.getState().dirty,
 
-  /** The editor in tab `id` knows how to save itself; returns the unregister. */
-  registerFlush(id: string, fn: () => Promise<void>): () => void {
+  /**
+   * The editor in tab `id` knows how to save itself; returns the unregister.
+   * `autosaves`: it saves by itself as the teacher works (notes, boards), so
+   * closing its tab or quitting saves it without asking.
+   */
+  registerFlush(id: string, fn: () => Promise<void>, opts?: { autosaves?: boolean }): () => void {
     flushers.set(id, fn);
+    if (opts?.autosaves) autosaving.add(id);
+    else autosaving.delete(id);
     return () => {
-      if (flushers.get(id) === fn) flushers.delete(id);
+      if (flushers.get(id) !== fn) return;
+      flushers.delete(id);
+      autosaving.delete(id);
     };
   },
+
+  autosaves: (id: string) => autosaving.has(id),
 
   async flush(id: string) {
     await flushers.get(id)?.();
@@ -47,6 +58,7 @@ export const editors = {
   forget(id: string, discard = false) {
     if (discard) discarded.add(id);
     flushers.delete(id);
+    autosaving.delete(id);
     if (useDirtyStore.getState().dirty[id]) setDirtyMap((map) => void delete map[id]);
   },
 
@@ -66,6 +78,7 @@ export const editors = {
       flushers.delete(oldId);
       flushers.set(newId, fn);
     }
+    if (autosaving.delete(oldId)) autosaving.add(newId);
   },
 };
 

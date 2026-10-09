@@ -195,9 +195,13 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   }, [tabId, dirty]);
 
   useEffect(() => {
-    return editors.registerFlush(tabId, async () => {
-      if (dirtyRef.current) await persist(true);
-    });
+    return editors.registerFlush(
+      tabId,
+      async () => {
+        if (dirtyRef.current) await persist(true);
+      },
+      { autosaves: true },
+    );
   }, [tabId, persist]);
 
   // Auto save on changes (debounced)

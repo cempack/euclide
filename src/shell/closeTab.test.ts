@@ -11,14 +11,18 @@ const answer = (choice: "save" | "discard" | "cancel") =>
   ({ dirty: vi.fn(async () => choice) }) as unknown as Confirm;
 
 /** A new note that saves as the editor does: the tab takes the note's id. */
-function newNote(saves = true): string {
+function newNote(saves = true, autosaves = false): string {
   const tmp = tabs.open({ kind: "note", params: { isNew: true } });
   editors.setDirty(tmp, true);
-  const unregister = editors.registerFlush(tmp, async () => {
-    if (!saves) return;
-    tabs.retarget(tmp, "note:9", "Nouvelle note", { noteId: 9, isNew: false });
-    editors.setDirty("note:9", false);
-  });
+  const unregister = editors.registerFlush(
+    tmp,
+    async () => {
+      if (!saves) return;
+      tabs.retarget(tmp, "note:9", "Nouvelle note", { noteId: 9, isNew: false });
+      editors.setDirty("note:9", false);
+    },
+    { autosaves },
+  );
   cleanups.push(
     unregister,
     () => editors.forget("note:9"),
@@ -70,6 +74,14 @@ describe("closeTab", () => {
     await closeTab(tmp, answer("discard"), toast);
     expect(tabs.list().map((t) => t.id)).toEqual(["dashboard"]);
     expect(editors.takeDiscarded(tmp)).toBe(true);
+  });
+
+  it("saves an editor that saves by itself without asking", async () => {
+    const tmp = newNote(true, true);
+    const confirm = answer("cancel");
+    await closeTab(tmp, confirm, toast);
+    expect(confirm.dirty).not.toHaveBeenCalled();
+    expect(tabs.list().map((t) => t.id)).toEqual(["dashboard"]);
   });
 
   it("closes a tab with nothing unsaved without asking", async () => {

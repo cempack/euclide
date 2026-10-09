@@ -478,8 +478,14 @@ export const api = {
   deleteScheduleEntry: (id: number) => invoke<void>("delete_schedule_entry", { id }),
 
   // Whiteboard (editable .euboard vector format)
-  saveBoard: (save: { file_id?: number | null; course_id?: number | null; name?: string; json: string }) =>
-    invoke<FileItem>("save_board", { save }),
+  /** `autosave`: saved by itself; edits minutes apart share one version. */
+  saveBoard: (save: {
+    file_id?: number | null;
+    course_id?: number | null;
+    name?: string;
+    json: string;
+    autosave?: boolean;
+  }) => invoke<FileItem>("save_board", { save }),
   readBoard: (id: number) => invoke<string>("read_board", { id }),
   /** Replace a document's content; the previous content becomes a version. */
   writeFileBytes: (fileId: number, bytes: ArrayBuffer | Uint8Array) =>
