@@ -163,7 +163,10 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       return;
     }
     changed("courses");
-    toast(`Matière mise à jour : ${newMatiere || "(aucune)"}`, "success");
+    toast(
+      tr("courseDetail.matiereUpdated", { name: newMatiere || tr("courseDetail.matiereNone") }),
+      "success",
+    );
   };
 
   const openAttachModal = async () => {

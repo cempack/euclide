@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { changed } from "../api/client";
 import { api, isTauri, type AppInfo, type Course, type PronoteStatus, type ScheduleEntry } from "../lib/api";
-import { tr, trn } from "../lib/i18n";
+import { tr, trList, trn } from "../lib/i18n";
 import { errorCode, errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import {
@@ -394,7 +394,7 @@ function PronoteSection() {
       const msg = errorMessage(err, "");
       if (errorCode(err) === "pronote_needs_pin") {
         setNeedsPin(true);
-        toast(msg || "Code PIN requis pour cet appareil. Saisissez-le ci-dessous.", "error");
+        toast(msg || tr("settings.toastPinRequired"), "error");
       } else {
         toast(msg || tr("settings.toastConnectFail"), "error");
       }
@@ -530,10 +530,9 @@ function PronoteSection() {
           {method === "qr" ? (
             <>
               <ol className="eu-t-body text-ink-muted flex flex-col gap-1.5 list-decimal list-inside">
-                <li>Application mobile Pronote : Mon compte &gt; Generer un QR code.</li>
-                <li>Choisissez un code PIN a 4 chiffres (a retenir).</li>
-                <li>Importez la capture d'ecran du QR code ci-dessous.</li>
-                <li>Le QR code n'est valable que 10 minutes.</li>
+                {trList("settings.qrSteps").map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
               </ol>
               <input
                 ref={fileRef}
@@ -543,15 +542,15 @@ function PronoteSection() {
                 onChange={(e) => e.target.files?.[0] && decodeImage(e.target.files[0])}
               />
               <button onClick={() => fileRef.current?.click()} className="eu-btn-ghost justify-center py-3">
-                <Icon icon={QrCode} size={20} /> Importer l'image du QR code
+                <Icon icon={QrCode} size={20} /> {tr("settings.qrImport")}
               </button>
               {qrJson && (
                 <p className="eu-chip w-fit">
-                  <Icon icon={Check} size={14} /> QR code charge
+                  <Icon icon={Check} size={14} /> {tr("settings.qrLoaded")}
                 </p>
               )}
               <div>
-                <p className="eu-t-body text-ink-muted mb-1.5">Code PIN (4 chiffres)</p>
+                <p className="eu-t-body text-ink-muted mb-1.5">{tr("settings.qrPin")}</p>
                 <input
                   className="eu-input tracking-[0.5em] text-center text-title font-mono"
                   inputMode="numeric"
@@ -566,41 +565,37 @@ function PronoteSection() {
                   {tr("common.cancel")}
                 </button>
                 <button className="eu-btn-primary" onClick={connectQr} disabled={busy}>
-                  {busy ? "Connexion..." : tr("common.connect")}
+                  {busy ? tr("settings.connecting") : tr("common.connect")}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p className="eu-t-body text-ink-muted">
-                Connexion directe par identifiant et mot de passe (comptes hors ENT, ou demonstration).
-              </p>
+              <p className="eu-t-body text-ink-muted">{tr("settings.directHelp")}</p>
               <input
                 className="eu-input"
-                placeholder="Adresse Pronote (https://...)"
+                placeholder={tr("settings.urlPlaceholder")}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
               <input
                 className="eu-input"
-                placeholder="Identifiant"
+                placeholder={tr("settings.username")}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
               <input
                 className="eu-input"
                 type="password"
-                placeholder="Mot de passe"
+                placeholder={tr("settings.password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
               {/* PIN field: shown when the account requires it (auto-detected) or expandable */}
               {needsPin ? (
                 <div className="border border-accent/30 rounded p-3 bg-panel-alt/50">
-                  <p className="eu-t-body font-medium text-ink mb-1.5">Code PIN du compte</p>
-                  <p className="eu-t-small text-ink-muted mb-2">
-                    Votre compte Pronote exige un code PIN pour les nouveaux appareils.
-                  </p>
+                  <p className="eu-t-body font-medium text-ink mb-1.5">{tr("settings.accountPin")}</p>
+                  <p className="eu-t-small text-ink-muted mb-2">{tr("settings.accountPinHint")}</p>
                   <input
                     className="eu-input tracking-[0.5em] text-center text-title font-mono"
                     inputMode="numeric"
@@ -617,7 +612,7 @@ function PronoteSection() {
                   onClick={() => setNeedsPin(true)}
                   className="eu-t-small text-ink-muted hover:text-ink transition-colors text-left"
                 >
-                  + Code PIN du compte (optionnel)
+                  {tr("settings.accountPinAdd")}
                 </button>
               )}
               <div className="flex justify-end gap-2">
@@ -625,7 +620,7 @@ function PronoteSection() {
                   {tr("common.cancel")}
                 </button>
                 <button className="eu-btn-primary" onClick={connectDirect} disabled={busy}>
-                  {busy ? "Connexion..." : tr("common.connect")}
+                  {busy ? tr("settings.connecting") : tr("common.connect")}
                 </button>
               </div>
             </>
@@ -820,7 +815,7 @@ function ScheduleSection() {
                 setForm({ ...form, course_id: e.target.value ? Number(e.target.value) : null })
               }
             >
-              <option value="">Lier un cours...</option>
+              <option value="">{tr("settings.scheduleCourse")}</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
