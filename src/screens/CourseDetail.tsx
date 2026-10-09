@@ -9,7 +9,7 @@ import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
 import { fileKindLabel, humanSize, relativeTime } from "../lib/format";
-import { COURSE_ICONS, EmptyState, Loading, Modal, useToast, useConfirm } from "../components/ui";
+import { COURSE_ICONS, EmptyState, Loading, Modal, useFailure, useToast, useConfirm } from "../components/ui";
 import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { Progression } from "../features/classroom/Progression";
@@ -57,6 +57,7 @@ function sanitizePronoteClasses(raw: { name: string }[]): { name: string }[] {
 
 export default function CourseDetail({ courseId, visible = true }: { courseId: number; visible?: boolean }) {
   const toast = useToast();
+  const failed = useFailure();
   const confirmDlg = useConfirm();
 
   const queryClient = useQueryClient();
@@ -144,13 +145,23 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
       danger: true,
     });
     if (!ok) return;
-    await api.detachCourseClass(cc.id);
+    try {
+      await api.detachCourseClass(cc.id);
+    } catch (err) {
+      failed("course.detachClass", err);
+      return;
+    }
     refreshClasses();
   };
 
   const updateMatiere = async (newMatiere: string) => {
     if (!course) return;
-    await api.updateCourse({ ...course, matiere: newMatiere });
+    try {
+      await api.updateCourse({ ...course, matiere: newMatiere });
+    } catch (err) {
+      failed("course.matiere", err);
+      return;
+    }
     changed("courses");
     toast(`Matière mise à jour : ${newMatiere || "(aucune)"}`, "success");
   };
@@ -267,7 +278,12 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
                   danger: true,
                 });
                 if (!ok) return;
-                await api.deleteCourse(courseId);
+                try {
+                  await api.deleteCourse(courseId);
+                } catch (err) {
+                  failed("course.delete", err);
+                  return;
+                }
                 changed("courses");
                 tabs.open({ kind: "courses" });
                 tabs.close(`course:${courseId}`);
@@ -617,6 +633,7 @@ function ClassCard({
   onRefresh: () => void;
   onDetach: (cc: CourseClass) => void;
 }) {
+  const failed = useFailure();
   const [notesDraft, setNotesDraft] = useState(cc.notes);
   const [savingNotes, setSavingNotes] = useState(false);
   // Saved notes changed underneath (another tab, a refetch): show them.
@@ -632,13 +649,20 @@ function ClassCard({
     try {
       await api.updateCourseClassNotes(courseId, cc.class_name, notesDraft);
       onRefresh();
+    } catch (err) {
+      failed("course.classNotes", err);
     } finally {
       setSavingNotes(false);
     }
   };
 
   const setProgress = async (fileId: number | null) => {
-    await api.setCourseClassProgress(courseId, cc.class_name, fileId);
+    try {
+      await api.setCourseClassProgress(courseId, cc.class_name, fileId);
+    } catch (err) {
+      failed("course.progress", err);
+      return;
+    }
     onRefresh();
   };
 

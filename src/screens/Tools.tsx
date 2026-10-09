@@ -6,7 +6,7 @@ import { api, type QuickLink } from "../lib/api";
 import { tr } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { reportError } from "../lib/report";
-import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
+import { EmptyState, Modal, useFailure, useToast, useConfirm } from "../components/ui";
 import { Field, Panel, Section, PageHeader, MetaDot, Segmented } from "../components/layout";
 import { useSetting } from "../api/hooks";
 import { useAppearance } from "../lib/theme";
@@ -199,6 +199,7 @@ function TimerSection() {
 
 function LinksSection() {
   const toast = useToast();
+  const failed = useFailure();
   const confirmDlg = useConfirm();
   const queryClient = useQueryClient();
   const links = useQuery(q.links()).data ?? NO_LINKS;
@@ -212,17 +213,21 @@ function LinksSection() {
   const add = async () => {
     if (!label.trim() || !url.trim()) return;
     const normalized = url.startsWith("http") ? url : `https://${url}`;
-    const created = await api.createLink(label.trim(), normalized, "");
-    if (!created?.id) {
-      toast(tr("common.error"), "error");
-      return;
+    try {
+      const created = await api.createLink(label.trim(), normalized, "");
+      if (!created?.id) {
+        toast(tr("common.error"), "error");
+        return;
+      }
+      setLabel("");
+      setUrl("");
+      setOpen(false);
+      toast(tr("tools.toastLinkAdded"), "success");
+      changed("links");
+      refresh();
+    } catch (err) {
+      failed("tools.addLink", err);
     }
-    setLabel("");
-    setUrl("");
-    setOpen(false);
-    toast(tr("tools.toastLinkAdded"), "success");
-    changed("links");
-    refresh();
   };
 
   return (
@@ -276,7 +281,12 @@ function LinksSection() {
                       danger: true,
                     });
                     if (!ok) return;
-                    await api.deleteLink(l.id);
+                    try {
+                      await api.deleteLink(l.id);
+                    } catch (err) {
+                      failed("tools.deleteLink", err);
+                      return;
+                    }
                     changed("links");
                     refresh();
                   }}

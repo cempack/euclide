@@ -11,7 +11,7 @@ import { useActiveId } from "../stores/tabs";
 import { tabs } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
-import { useToast, useConfirm, Loading } from "./ui";
+import { useFailure, useToast, useConfirm, Loading } from "./ui";
 import { CodeXml, Link as LinkGlyph, Trash2 } from "lucide-react";
 import { tr } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
@@ -40,6 +40,7 @@ const Slides = lazy(() => import("../features/notes/SlideShow"));
 
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const toast = useToast();
+  const failed = useFailure();
   const confirm = useConfirm();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -375,7 +376,12 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
       danger: true,
     });
     if (!ok) return;
-    await api.deleteNote(draft.id);
+    try {
+      await api.deleteNote(draft.id);
+    } catch (err) {
+      failed("note.delete", err);
+      return;
+    }
     toast(tr("notes.deleted"), "success");
     changed("library");
     tabs.close(tabId, { discard: true });

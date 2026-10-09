@@ -10,7 +10,8 @@ import {
   type ReactNode,
   type ErrorInfo,
 } from "react";
-import { describeError, reportLine } from "../lib/report";
+import { describeError, reportError, reportLine } from "../lib/report";
+import { errorMessage } from "../lib/errors";
 import {
   Atom,
   Book,
@@ -269,6 +270,18 @@ type ToastFn = (message: string, tone?: ToastTone, options?: ToastOptions) => vo
 const ToastCtx = createContext<ToastFn>(() => {});
 
 export const useToast = () => useContext(ToastCtx);
+
+/**
+ * For an action that failed: logged with where it happened, and the
+ * teacher is told why (or « Erreur »), instead of nothing at all.
+ */
+export function useFailure() {
+  const toast = useToast();
+  return (where: string, err: unknown) => {
+    reportError(where, err);
+    toast(errorMessage(err, tr("messages.genericError")), "error");
+  };
+}
 
 const TOAST_ICONS = { info: Info, success: CircleCheck, error: CircleAlert } as const;
 

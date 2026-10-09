@@ -4,7 +4,7 @@ import { api, isTauri, type PythonDemo } from "../lib/api";
 import { tr, trn } from "../lib/i18n";
 import { errorMessage } from "../lib/errors";
 import { logged, reportError } from "../lib/report";
-import { useToast, useConfirm } from "../components/ui";
+import { useFailure, useToast, useConfirm } from "../components/ui";
 import { useActiveKind } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import PythonEditor from "../features/python/PythonEditor";
@@ -39,6 +39,7 @@ function fileName(script: { name: string; path?: string }): string {
 
 export default function Python({ request }: { request?: { script: string; at: number } }) {
   const toast = useToast();
+  const failed = useFailure();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const scriptsQ = useQuery(q.scripts());
@@ -194,7 +195,13 @@ export default function Python({ request }: { request?: { script: string; at: nu
       });
       if (!ok) return;
     }
-    const d = await api.importScript();
+    let d: PythonDemo | null;
+    try {
+      d = await api.importScript();
+    } catch (err) {
+      failed("python.import", err);
+      return;
+    }
     if (d) {
       setOpenScript({
         name: d.name,
@@ -330,7 +337,12 @@ export default function Python({ request }: { request?: { script: string; at: nu
         danger: true,
       });
       if (!ok) return;
-      await api.deleteScript(openScript.path);
+      try {
+        await api.deleteScript(openScript.path);
+      } catch (err) {
+        failed("python.delete", err);
+        return;
+      }
     }
     setOpenScript(null);
     const list = await refresh();
