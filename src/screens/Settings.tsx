@@ -12,7 +12,7 @@ import {
 } from "../lib/updater";
 import { DAY_LABELS, isoDayOfWeek } from "../lib/format";
 
-import { EmptyState, Modal, useToast, useConfirm } from "../components/ui";
+import { EmptyState, Modal, useFailure, useToast, useConfirm } from "../components/ui";
 import { PageHeader, Panel, Section, Segmented } from "../components/layout";
 import { BackupsSection } from "../features/settings/BackupsSection";
 import { SettingRow, SettingsNav, type NavSection } from "../features/settings/SettingRow";
@@ -313,6 +313,7 @@ type LoginMethod = "qr" | "direct";
 
 function PronoteSection() {
   const toast = useToast();
+  const failed = useFailure();
   const queryClient = useQueryClient();
   const status = useQuery(q.pronoteStatus()).data ?? null;
   const setStatus = (s: PronoteStatus) => queryClient.setQueryData(q.pronoteStatus().queryKey, s);
@@ -491,7 +492,12 @@ function PronoteSection() {
               </button>
               <button
                 onClick={async () => {
-                  await api.pronoteLogout();
+                  try {
+                    await api.pronoteLogout();
+                  } catch (err) {
+                    failed("settings.pronoteLogout", err);
+                    return;
+                  }
                   changed("pronote");
                   refresh();
                 }}
@@ -634,6 +640,7 @@ function PronoteSection() {
 
 function ScheduleSection() {
   const toast = useToast();
+  const failed = useFailure();
   const queryClient = useQueryClient();
   const entries = useQuery(q.schedule()).data ?? NO_ENTRIES;
   const courses = useQuery(q.courses()).data ?? NO_COURSES;
@@ -674,7 +681,12 @@ function ScheduleSection() {
   const todayIso = isoDayOfWeek();
 
   const remove = async (id: number) => {
-    await api.deleteScheduleEntry(id);
+    try {
+      await api.deleteScheduleEntry(id);
+    } catch (err) {
+      failed("settings.removeSchedule", err);
+      return;
+    }
     changed("schedule");
     refresh();
   };
