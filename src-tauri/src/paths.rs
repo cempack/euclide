@@ -121,21 +121,124 @@ pub fn data_root_config_path() -> PathBuf {
     exe_dir().join("euclide-data.json")
 }
 
-/// If a config exists and is valid, returns the (resolved) data root folder chosen by the user.
-/// Supports absolute paths and paths relative to the exe dir (for max USB portability).
-fn load_configured_data_dir() -> Option<PathBuf> {
-    let cfg_path = data_root_config_path();
-    let content = fs::read_to_string(cfg_path).ok()?;
+/// Where the pointer says the data is, best first: `dataDir` (relative to
+/// the app's folder when both share a volume), the `absolute` form kept
+/// beside it, and on Windows each of them on the app's own drive: a key that
+/// comes back as F: still finds the folder an older Euclide wrote as E:\….
+/// None without a pointer.
+fn pointer_candidates() -> Option<Vec<PathBuf>> {
+    let content = fs::read_to_string(data_root_config_path()).ok()?;
     let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let s = val.get("dataDir")?.as_str()?;
-    let mut p = PathBuf::from(s);
-    if p.is_relative() {
-        p = exe_dir().join(p);
+    let exe = exe_dir();
+    let mut out: Vec<PathBuf> = ["dataDir", "absolute"]
+        .iter()
+        .filter_map(|key| val.get(key)?.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| {
+            let p = PathBuf::from(s);
+            if p.is_relative() {
+                exe.join(p)
+            } else {
+                p
+            }
+        })
+        .collect();
+    #[cfg(windows)]
+    {
+        let moved: Vec<PathBuf> = out.iter().filter_map(|p| on_drive_of(p, &exe)).collect();
+        out.extend(moved);
     }
-    if is_appimage_payload_path(&p) {
+    out.retain(|p| !is_appimage_payload_path(p));
+    (!out.is_empty()).then_some(out)
+}
+
+/// If a config exists and is valid, returns the (resolved) data root folder
+/// chosen by the user: the first of the pointer's forms that exists.
+fn load_configured_data_dir() -> Option<PathBuf> {
+    let mut candidates = pointer_candidates()?;
+    let found = candidates.iter().position(|p| p.is_dir()).unwrap_or(0);
+    Some(candidates.swap_remove(found))
+}
+
+/// A pointer whose folder is nowhere: the key came back under another
+/// letter, or the folder was moved. Creating it empty would look like lost
+/// data, so startup asks instead (`ask_for_missing_data_dir`).
+fn missing_configured_data_dir() -> Option<PathBuf> {
+    let candidates = pointer_candidates()?;
+    if candidates.iter().any(|p| p.is_dir()) {
         return None;
     }
-    Some(p)
+    candidates.into_iter().next()
+}
+
+/// `path` on the drive (or share) of `anchor`: `E:\Profs\Euclide-Data` for an
+/// app now in `F:\Euclide` gives `F:\Profs\Euclide-Data`.
+#[cfg(windows)]
+fn on_drive_of(path: &Path, anchor: &Path) -> Option<PathBuf> {
+    let mut parts = path.components();
+    let Some(std::path::Component::Prefix(_)) = parts.next() else {
+        return None;
+    };
+    let Some(prefix @ std::path::Component::Prefix(_)) = anchor.components().next() else {
+        return None;
+    };
+    let moved: PathBuf = std::iter::once(prefix).chain(parts).collect();
+    (moved != path).then_some(moved)
+}
+
+fn same_component(a: &std::path::Component, b: &std::path::Component) -> bool {
+    if cfg!(windows) {
+        // NTFS and FAT ignore case.
+        a.as_os_str().eq_ignore_ascii_case(b.as_os_str())
+    } else {
+        a == b
+    }
+}
+
+/// `target` seen from `base`, both absolute and on the same root: `..` up
+/// to what they share, then down. None across drives.
+fn relative_path(base: &Path, target: &Path) -> Option<PathBuf> {
+    if !base.is_absolute() || !target.is_absolute() {
+        return None;
+    }
+    let base: Vec<_> = base.components().collect();
+    let target: Vec<_> = target.components().collect();
+    let shared = base
+        .iter()
+        .zip(&target)
+        .take_while(|(a, b)| same_component(a, b))
+        .count();
+    // Not even the drive (or the root) in common.
+    if shared == 0 || (cfg!(windows) && shared < 2) {
+        return None;
+    }
+    let mut rel = PathBuf::new();
+    for _ in shared..base.len() {
+        rel.push("..");
+    }
+    for part in &target[shared..] {
+        rel.push(part.as_os_str());
+    }
+    if rel.as_os_str().is_empty() {
+        rel.push(".");
+    }
+    Some(rel)
+}
+
+/// Whether `a` and `b` (existing folders) are on one volume: the same USB
+/// key, which may come back under another drive letter or mount point.
+fn same_volume(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        matches!((fs::metadata(a), fs::metadata(b)), (Ok(x), Ok(y)) if x.dev() == y.dev())
+    }
+    #[cfg(not(unix))]
+    {
+        // Windows: the same drive letter (or share), which relative_path checks.
+        let _ = (a, b);
+        true
+    }
 }
 
 /// Startup picker: the database is not open yet, so this process switches to
@@ -147,8 +250,17 @@ pub fn save_configured_data_dir(dir: &Path) {
 
 /// Settings: only write the pointer. The running process keeps its folder
 /// (the database is open there); the new one is used after a restart.
+///
+/// On the app's volume, `dataDir` is relative to the app's folder, so the
+/// key finds its data under any drive letter; older versions read it too.
+/// `absolute` stays beside it for an app moved away from its data.
 pub fn write_data_dir_pointer(dir: &Path) -> std::io::Result<()> {
-    let cfg = serde_json::json!({ "dataDir": dir.to_string_lossy() });
+    let exe = exe_dir();
+    let absolute = dir.to_string_lossy().to_string();
+    let cfg = match relative_path(&exe, dir).filter(|_| same_volume(&exe, dir)) {
+        Some(rel) => serde_json::json!({ "dataDir": rel.to_string_lossy(), "absolute": absolute }),
+        None => serde_json::json!({ "dataDir": absolute }),
+    };
     let s = serde_json::to_string_pretty(&cfg).map_err(std::io::Error::other)?;
     fs::write(data_root_config_path(), s)
 }
@@ -229,6 +341,13 @@ pub fn freeze_data_dir() -> PathBuf {
 ///
 /// Returns `false` if the user refuses; the caller should exit without panicking.
 pub fn ensure_writable_data_dir() -> bool {
+    if data_dir_override().is_none() {
+        if let Some(missing) = missing_configured_data_dir() {
+            if !ask_for_missing_data_dir(&missing) {
+                return false;
+            }
+        }
+    }
     let dir = intended_data_dir();
     if dir_is_writable(&dir) {
         ensure_subdirs(&dir);
@@ -284,6 +403,50 @@ fn ask_permission_for_data_dir(failed: &Path) -> bool {
             return false;
         }
     }
+}
+
+const FIND_FOLDER: &str = "Choisir le dossier…";
+const USE_DEFAULT: &str = "Utiliser Euclide-Data";
+
+/// The folder the teacher chose for the data is not there. Never created
+/// empty (that would look like lost data): the teacher shows where it is,
+/// goes back to Euclide-Data beside the app, or quits.
+fn ask_for_missing_data_dir(missing: &Path) -> bool {
+    let msg = format!(
+        "Le dossier des données d'Euclide est introuvable :\n{}\n\nLa clé a peut-être changé de lettre, ou le dossier a été déplacé. Indiquez où il se trouve, ou utilisez le dossier Euclide-Data à côté d'Euclide.",
+        missing.display()
+    );
+    let choice = rfd::MessageDialog::new()
+        .set_title("Euclide")
+        .set_level(rfd::MessageLevel::Warning)
+        .set_description(&msg)
+        .set_buttons(rfd::MessageButtons::YesNoCancelCustom(
+            FIND_FOLDER.into(),
+            USE_DEFAULT.into(),
+            "Quitter".into(),
+        ))
+        .show();
+    let find = match choice {
+        rfd::MessageDialogResult::Custom(label) if label == FIND_FOLDER => true,
+        rfd::MessageDialogResult::Yes => true,
+        rfd::MessageDialogResult::Custom(label) if label == USE_DEFAULT => false,
+        rfd::MessageDialogResult::No => false,
+        _ => return false,
+    };
+    if !find {
+        return remove_data_dir_pointer().is_ok();
+    }
+    let Some(picked) = rfd::FileDialog::new()
+        .set_title("Dossier des données d'Euclide")
+        .pick_folder()
+    else {
+        return false;
+    };
+    if !dir_is_writable(&picked) {
+        return false;
+    }
+    save_configured_data_dir(&picked);
+    true
 }
 
 fn dialog_ok(res: rfd::MessageDialogResult) -> bool {
@@ -521,6 +684,122 @@ mod tests {
         restore("APPDIR", prev_appdir);
         let _ = fs::remove_dir_all(&tmp);
         clear_override();
+    }
+
+    /// The app as if it ran from `dir` (an AppImage there), for the pointer.
+    fn app_in(dir: &Path) {
+        std::env::set_var("APPIMAGE", dir.join("Euclide.AppImage"));
+    }
+
+    #[test]
+    fn a_chosen_folder_is_found_wherever_the_key_is_mounted() {
+        let _g = TEST_ENV_LOCK.lock().unwrap();
+        clear_override();
+        let prev_app = std::env::var_os("APPIMAGE");
+        let prev_appdir = std::env::var_os("APPDIR");
+        std::env::remove_var("APPDIR");
+
+        let key = unique("euclide-key-e");
+        let data = key.join("Profs").join("Euclide-Data");
+        fs::create_dir_all(&data).unwrap();
+        app_in(&key);
+        write_data_dir_pointer(&data).unwrap();
+        let cfg: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(data_root_config_path()).unwrap()).unwrap();
+        assert_eq!(
+            Path::new(cfg["dataDir"].as_str().unwrap()),
+            Path::new("Profs").join("Euclide-Data")
+        );
+        assert_eq!(Path::new(cfg["absolute"].as_str().unwrap()), data);
+        assert_eq!(intended_data_dir(), data);
+
+        // The same key, mounted elsewhere (another drive letter on Windows).
+        let moved = unique("euclide-key-f");
+        fs::rename(&key, &moved).unwrap();
+        app_in(&moved);
+        assert_eq!(
+            intended_data_dir(),
+            moved.join("Profs").join("Euclide-Data")
+        );
+        assert_eq!(missing_configured_data_dir(), None);
+
+        restore("APPIMAGE", prev_app);
+        restore("APPDIR", prev_appdir);
+        let _ = fs::remove_dir_all(&moved);
+        clear_override();
+    }
+
+    #[test]
+    fn a_missing_folder_is_reported_not_created() {
+        let _g = TEST_ENV_LOCK.lock().unwrap();
+        clear_override();
+        let prev_app = std::env::var_os("APPIMAGE");
+        let prev_appdir = std::env::var_os("APPDIR");
+        std::env::remove_var("APPDIR");
+
+        let app = unique("euclide-app");
+        fs::create_dir_all(&app).unwrap();
+        app_in(&app);
+        let gone = unique("euclide-gone").join("Euclide-Data");
+        fs::write(
+            data_root_config_path(),
+            serde_json::json!({ "dataDir": gone.to_string_lossy() }).to_string(),
+        )
+        .unwrap();
+        assert_eq!(missing_configured_data_dir(), Some(gone.clone()));
+        assert_eq!(intended_data_dir(), gone);
+        assert!(!gone.exists());
+        // No pointer at all: the default folder, nothing missing.
+        remove_data_dir_pointer().unwrap();
+        assert_eq!(missing_configured_data_dir(), None);
+        assert_eq!(intended_data_dir(), app.join("Euclide-Data"));
+
+        restore("APPIMAGE", prev_app);
+        restore("APPDIR", prev_appdir);
+        let _ = fs::remove_dir_all(&app);
+        clear_override();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn relative_paths_go_up_to_what_they_share() {
+        let rel = |a: &str, b: &str| relative_path(Path::new(a), Path::new(b));
+        assert_eq!(
+            rel("/media/key/app", "/media/key/Euclide-Data"),
+            Some("../Euclide-Data".into())
+        );
+        assert_eq!(
+            rel("/media/key", "/media/key/Euclide-Data"),
+            Some("Euclide-Data".into())
+        );
+        assert_eq!(rel("/media/key", "/media/key"), Some(".".into()));
+        assert_eq!(rel("media/key", "/media/key"), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn relative_paths_stay_on_one_drive() {
+        let rel = |a: &str, b: &str| relative_path(Path::new(a), Path::new(b));
+        assert_eq!(
+            rel(r"E:\Euclide", r"E:\Profs\Euclide-Data"),
+            Some(r"..\Profs\Euclide-Data".into())
+        );
+        assert_eq!(
+            rel(r"E:\Euclide", r"e:\euclide\Euclide-Data"),
+            Some("Euclide-Data".into())
+        );
+        assert_eq!(rel(r"E:\Euclide", r"F:\Euclide-Data"), None);
+        assert_eq!(
+            on_drive_of(
+                Path::new(r"E:\Profs\Euclide-Data"),
+                Path::new(r"F:\Euclide")
+            ),
+            Some(PathBuf::from(r"F:\Profs\Euclide-Data"))
+        );
+        assert_eq!(
+            on_drive_of(Path::new(r"F:\Data"), Path::new(r"F:\Euclide")),
+            None
+        );
     }
 
     #[test]
