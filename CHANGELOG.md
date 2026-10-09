@@ -25,6 +25,14 @@ Ce qui change d'une version d'Euclide à l'autre.
 - **Un mot trouvé dans un PDF dit sa page**, et ouvre le PDF sur ce mot, surligné.
 - La recherche lit les 300 premières pages d'un PDF, au lieu de 60. Un PDF dont les pages changent est relu.
 
+### Partout
+
+- **En mode projection**, les traits fins et les textes pâles sont plus foncés : ils restent lisibles au vidéoprojecteur.
+- Passer du thème clair au thème sombre se fait en fondu, sans éclair.
+- Dans une fenêtre basse, les outils du tableau blanc se rangent sur deux colonnes : aucun n'est caché.
+- Dans une barre étroite, « Ouvrir dehors » devient une icône : le zoom du PDF reste dans la barre.
+- Les menus s'ouvrent depuis leur bouton, et un bouton cède un peu sous le clic.
+
 ### À savoir
 
 - Au premier démarrage, Euclide relit les PDF en arrière-plan, pour savoir sur quelle page est chaque mot. Cela peut prendre quelques minutes, pendant lesquelles la recherche dans les PDF reste celle d'avant.
