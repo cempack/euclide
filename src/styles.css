@@ -2940,6 +2940,18 @@ input[type="radio"] {
 .eu-scene-name-rolling {
   color: var(--color-stage-muted);
 }
+/* The name drawn, or the die's number, settles in place when it lands: it
+   grows the last few percent and darkens, without a bounce. */
+.eu-scene-landed {
+  display: inline-block;
+  animation: eu-land 260ms var(--ease-out) both;
+}
+@keyframes eu-land {
+  from {
+    opacity: 0.5;
+    transform: scale(0.94);
+  }
+}
 .eu-scene-result {
   font-family: var(--font-mono);
   font-size: min(36vh, 26vw);

@@ -63,6 +63,8 @@ type Chance = {
   min: number;
   max: number;
   result: string | null;
+  /** Throws so far: each result lands anew, even the same number twice. */
+  throws: number;
 };
 
 /** The countdown's ring: full when the timer starts, empty when it ends. */
@@ -182,7 +184,14 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
     makeGroups("size" in by ? { size: n } : { count: n });
   };
 
-  const [chance, setChance] = useState<Chance>({ kind: "die", faces: 6, min: 1, max: 100, result: null });
+  const [chance, setChance] = useState<Chance>({
+    kind: "die",
+    faces: 6,
+    min: 1,
+    max: 100,
+    result: null,
+    throws: 0,
+  });
   const throwChance = (next: Chance = chance) => {
     const result =
       next.kind === "die"
@@ -190,7 +199,7 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
         : next.kind === "number"
           ? String(randomInt(next.min, next.max))
           : tr(coin() === "pile" ? "scene.pile" : "scene.face");
-    setChance({ ...next, result });
+    setChance({ ...next, result, throws: next.throws + 1 });
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -340,7 +349,13 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
                 className={`eu-scene-name ${!current && !rolling ? "eu-scene-name-wait" : ""} ${rolling ? "eu-scene-name-rolling" : ""}`}
                 aria-live="polite"
               >
-                {rolling ?? current ?? tr("scene.drawPrompt")}
+                {/* The name drawn lands once the shuffle stops (.eu-scene-landed). */}
+                <span
+                  key={rolling ? "rolling" : drawn.length}
+                  className={!rolling && current ? "eu-scene-landed" : undefined}
+                >
+                  {rolling ?? current ?? tr("scene.drawPrompt")}
+                </span>
               </span>
               <span className="eu-scene-count">
                 {allDrawn && !rolling
@@ -389,7 +404,9 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
               className={`eu-scene-result ${chance.result ? "" : "eu-scene-name-wait"}`}
               aria-live="polite"
             >
-              {chance.result ?? "?"}
+              <span key={chance.throws} className={chance.result ? "eu-scene-landed" : undefined}>
+                {chance.result ?? "?"}
+              </span>
             </span>
             <span className="eu-scene-count">
               {chance.kind === "die"
