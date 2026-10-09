@@ -16,6 +16,7 @@ import {
   PanelLeft,
   PenLine,
   Plus,
+  Presentation as PresentIcon,
   Printer,
   Redo2,
   RotateCcw,
@@ -51,6 +52,7 @@ import { HIGHLIGHT, INK } from "./palette";
 import { PdfView, type FindState, type PdfTool, type PdfViewHandle, type PrintPage } from "./PdfView";
 import { printDialog, sheetReady } from "../notes/PrintSheet";
 import { ImageView } from "./ImageView";
+import { Presentation } from "./Presentation";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 
@@ -170,6 +172,9 @@ function PdfPane({
   const [failed, setFailed] = useState<string | null>(null);
   /** The viewer asks for the document's password. */
   const [locked, setLocked] = useState(false);
+  /** Shown one page at a time to the whole screen (Presentation.tsx). */
+  const [presenting, setPresenting] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   /** The file's address, taken again after a restore (the file changed underneath). */
   const [current, setCurrent] = useState(() => ({ url: fileUrl(fileId), revision: 0 }));
@@ -337,6 +342,16 @@ function PdfPane({
     }
   };
   useShortcut("print", () => void print(), visible && !!pages);
+
+  const present = () => {
+    if (!pages) return;
+    closeFind();
+    setPresenting(true);
+  };
+  // F5, as for a note's slides.
+  useShortcut("present", present, visible && !!pages && !presenting);
+  // A tab put away (Ctrl+1…) takes its presentation with it.
+  if (presenting && !visible) setPresenting(false);
 
   const findStatus = found.searching
     ? tr("pdf.searching")
@@ -602,6 +617,16 @@ function PdfPane({
         <ToolGroup>
           <button
             type="button"
+            onClick={present}
+            disabled={!pages}
+            aria-label={tr("pdf.present")}
+            className="eu-btn-quiet eu-btn-sm"
+            {...tip(tr("pdf.presentTitle"), keysOf("present"))}
+          >
+            <Icon icon={PresentIcon} size={14} />
+          </button>
+          <button
+            type="button"
             onClick={() => void print()}
             disabled={!pages || !!printing}
             aria-label={tr("pdf.print")}
@@ -651,7 +676,7 @@ function PdfPane({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 flex bg-stage">
+      <div ref={stageRef} className={presenting ? "eu-pdf-presenting" : "flex-1 min-h-0 flex bg-stage"}>
         <div className="flex-1 min-w-0 relative">
           {finding && (
             <div className="eu-pdf-find" role="search">
@@ -739,8 +764,9 @@ function PdfPane({
                 size={size}
                 readOnly={!!viewing}
                 author={author}
-                showPages={showPages}
+                showPages={showPages && !presenting}
                 active={visible}
+                presenting={presenting}
                 onReady={(info) => {
                   setPages(info.pages);
                   setFailed(null);
@@ -760,6 +786,24 @@ function PdfPane({
                 }}
               />
             </>
+          )}
+          {presenting && (
+            <Presentation
+              stage={stageRef}
+              view={viewRef}
+              pages={pages}
+              first={page}
+              scale={scale}
+              tool={viewing ? "select" : tool}
+              onTool={setTool}
+              canUndo={history.canUndo}
+              readOnly={!!viewing}
+              onClose={(shown) => {
+                setPresenting(false);
+                // At the top of the page shown last, once the zoom from before is back.
+                window.setTimeout(() => viewRef.current?.goTo(shown), 150);
+              }}
+            />
           )}
         </div>
       </div>

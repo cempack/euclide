@@ -1,24 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { isTauri } from "../../lib/api";
+import { fullscreen } from "../../lib/fullscreen";
 import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
 import { Markdown } from "./Markdown";
 import { isTitleSlide, splitSlides } from "./slides";
-
-/**
- * The window full screen while presenting (and back after). In a browser,
- * the slides element itself: the whole page would cover it in the top layer.
- */
-async function fullscreen(on: boolean, el: HTMLElement) {
-  if (isTauri()) {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().setFullscreen(on);
-  } else if (on) {
-    await el.requestFullscreen?.();
-  } else if (document.fullscreenElement) {
-    await document.exitFullscreen();
-  }
-}
 
 const clock = (ms: number) => {
   const s = Math.floor(ms / 1000);

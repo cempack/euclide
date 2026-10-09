@@ -39,7 +39,7 @@ import { RenderPluginPackage } from "@embedpdf/plugin-render";
 import { RenderLayer, useRenderCapability } from "@embedpdf/plugin-render/react";
 import { TilingPluginPackage } from "@embedpdf/plugin-tiling";
 import { TilingLayer } from "@embedpdf/plugin-tiling/react";
-import { ZoomMode, ZoomPluginPackage } from "@embedpdf/plugin-zoom";
+import { ZoomMode, ZoomPluginPackage, type ZoomLevel } from "@embedpdf/plugin-zoom";
 import { useZoomCapability } from "@embedpdf/plugin-zoom/react";
 import { InteractionManagerPluginPackage } from "@embedpdf/plugin-interaction-manager";
 import {
@@ -127,7 +127,8 @@ export type PdfViewHandle = {
   zoomTo(level: number | "width" | "page"): void;
   /** Turns the pages a quarter to the right, on screen only. */
   rotate(): void;
-  goTo(page: number): void;
+  /** Brings a page into view: its top, or (`centered`) its middle in the middle. */
+  goTo(page: number, centered?: boolean): void;
   /** Removes the selected drawings, highlights and notes. */
   deleteSelected(): void;
   undo(): void;
@@ -171,6 +172,11 @@ type Props = {
   showPages?: boolean;
   /** The tab is in front: its keys (Ctrl+Z, Suppr, Ctrl+C…) are the document's. */
   active?: boolean;
+  /**
+   * Presented (Presentation.tsx): the whole page in view and no scrolling,
+   * the pages turned by `goTo`; the zoom before comes back after.
+   */
+  presenting?: boolean;
   onReady?: (info: { pages: number }) => void;
   onPage?: (page: number) => void;
   onScale?: (scale: number) => void;
@@ -413,6 +419,7 @@ function Viewer({
   readOnly = false,
   showPages = false,
   active = true,
+  presenting = false,
   ...callbacks
 }: Props & {
   documentId: string;
@@ -511,6 +518,21 @@ function Viewer({
       if (e.documentId === documentId) events.current.onScale?.(e.state.currentZoomLevel);
     });
   }, [zoom, documentId]);
+
+  // Presented: the whole page in view, kept fitted as the window goes full
+  // screen; afterwards, the zoom from before (a fit stays a fit).
+  const zoomBefore = useRef<ZoomLevel | null>(null);
+  useEffect(() => {
+    const scope = zoom?.forDocument(documentId);
+    if (!scope || !loaded) return;
+    if (presenting) {
+      zoomBefore.current = scope.getState().zoomLevel;
+      scope.requestZoom(ZoomMode.FitPage);
+    } else if (zoomBefore.current !== null) {
+      scope.requestZoom(zoomBefore.current);
+      zoomBefore.current = null;
+    }
+  }, [presenting, zoom, documentId, loaded]);
 
   useEffect(() => {
     if (!history) return;
@@ -650,8 +672,16 @@ function Viewer({
     redo() {
       history?.forDocument(documentId).redo();
     },
-    goTo(page) {
-      scroll?.forDocument(documentId).scrollToPage({ pageNumber: page, behavior: "instant" });
+    goTo(page, centered) {
+      // EmbedPDF puts the point aimed at (the page's corner, or here its
+      // middle) where alignX / alignY say in the view.
+      const size = state?.document?.pages[page - 1]?.size;
+      scroll?.forDocument(documentId).scrollToPage({
+        pageNumber: page,
+        behavior: "instant",
+        ...(centered &&
+          size && { pageCoordinates: { x: size.width / 2, y: size.height / 2 }, alignX: 50, alignY: 50 }),
+      });
     },
     deleteSelected,
     find(query) {
@@ -804,6 +834,7 @@ function Viewer({
             documentId={documentId}
             elementRef={viewer}
             className="eu-pdf absolute inset-0"
+            still={presenting}
             onPointerDownCapture={onPointerDown}
             onPointerUpCapture={onPointerUp}
             onPointerCancelCapture={onPointerUp}
@@ -924,12 +955,15 @@ function PdfViewport({
   documentId,
   elementRef,
   className,
+  still = false,
   children,
   ...handlers
 }: {
   documentId: string;
   elementRef: React.RefObject<HTMLDivElement | null>;
   className: string;
+  /** No scrolling by hand (presenting): the pages are turned by the keys. */
+  still?: boolean;
   children: ReactNode;
 } & Pick<
   React.HTMLAttributes<HTMLDivElement>,
@@ -1005,7 +1039,7 @@ function PdfViewport({
         ref={elementRef}
         tabIndex={-1}
         className={className}
-        style={{ overflow: "auto", padding: gap }}
+        style={{ overflow: still ? "hidden" : "auto", padding: gap }}
         {...handlers}
       >
         {!gated && children}

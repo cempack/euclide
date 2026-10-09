@@ -207,7 +207,8 @@ export function matchShortcut(
   return null;
 }
 
-function typingIn(target: EventTarget | null): boolean {
+/** A key pressed in a field, a text area or something editable. */
+export function typingIn(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el?.tagName) return false;
   return (

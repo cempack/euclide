@@ -15,7 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { q } from "../../api/queries";
-import { isTauri, type Course, type CourseClass, type ScheduleEntry, type StudentList } from "../../lib/api";
+import type { Course, CourseClass, ScheduleEntry, StudentList } from "../../lib/api";
+import { fullscreen } from "../../lib/fullscreen";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../../lib/format";
 import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
@@ -63,17 +64,6 @@ type Chance = {
   max: number;
   result: string | null;
 };
-
-async function fullscreen(on: boolean, el: HTMLElement) {
-  if (isTauri()) {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().setFullscreen(on);
-  } else if (on) {
-    await el.requestFullscreen?.();
-  } else if (document.fullscreenElement) {
-    await document.exitFullscreen();
-  }
-}
 
 /** The countdown's ring: full when the timer starts, empty when it ends. */
 function Ring({ fraction, done }: { fraction: number; done: boolean }) {

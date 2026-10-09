@@ -297,6 +297,53 @@ test("Ctrl+P prints the pages as they show, then puts the sheet away", async ({ 
   await expect(save(page)).toBeEnabled();
 });
 
+test("F5 presents the pages one at a time, and Échap comes back to the last one", async ({ page }) => {
+  const pdf = fileURLToPath(new URL("./fixtures/outline.pdf", import.meta.url));
+  await page.route(/\/src\/dev\/fixtures\/docs\/\d+\.pdf$/, (route) =>
+    route.fulfill({ path: pdf, contentType: "application/pdf" }),
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openPdf(page);
+  await page.keyboard.press("F5");
+  const count = page.locator(".eu-pdf-present-count");
+  await expect(count).toHaveText("1 / 6");
+  // A clicker's keys, then the wheel.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("PageDown");
+  await expect(count).toHaveText("3 / 6");
+  // Page 3 alone, the whole of it in the middle of the screen.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>(".eu-pdf-page")]
+          .filter((p) => getComputedStyle(p).visibility === "visible")
+          .map((p) => {
+            const r = p.getBoundingClientRect();
+            return `${p.dataset.page}:${Math.abs(r.top + r.bottom - innerHeight) <= 2 ? "centred" : r.top}`;
+          }),
+      ),
+    )
+    .toEqual(["3:centred"]);
+  await page.keyboard.press("b");
+  await expect(page.locator(".eu-pdf-present-blank")).toHaveCount(1);
+  await page.keyboard.press("x");
+  await expect(page.locator(".eu-pdf-present-blank")).toHaveCount(0);
+  await page.mouse.move(640, 400);
+  await page.mouse.wheel(0, 120);
+  await expect(count).toHaveText("4 / 6");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".eu-pdf-presenting")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const top = document.querySelector('.eu-pdf-page[data-page="4"]')!.getBoundingClientRect().top;
+        return top > 0 && top < 200;
+      }),
+    )
+    .toBe(true);
+});
+
 test("Ctrl+F finds a word on every page, and the outline goes to a chapter", async ({ page }) => {
   const pdf = fileURLToPath(new URL("./fixtures/outline.pdf", import.meta.url));
   await page.route(/\/src\/dev\/fixtures\/docs\/\d+\.pdf$/, (route) =>

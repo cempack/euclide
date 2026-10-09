@@ -898,6 +898,51 @@
   .eu-pdf-outline-entry {
     @apply block w-full text-left pr-2 py-1 text-small text-stage-ink rounded-sm hover:bg-stage-hover;
   }
+  /* A PDF presented (features/pdf/Presentation.tsx): the viewer's stage over
+     the whole window, one page in view, a bar at the bottom that goes, with
+     the pointer, while the pointer rests. */
+  .eu-pdf-presenting {
+    @apply fixed inset-0 z-overlay flex bg-stage;
+  }
+  .eu-pdf-presenting[data-idle],
+  .eu-pdf-presenting[data-idle] * {
+    cursor: none !important;
+  }
+  /* The pointer: a red dot for the class to follow, over the page's own cursors. */
+  .eu-pdf-presenting[data-pointer] .eu-pdf,
+  .eu-pdf-presenting[data-pointer] .eu-pdf * {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='8' fill='%23e0301e' fill-opacity='0.85' stroke='white' stroke-width='2'/%3E%3C/svg%3E")
+        12 12,
+      auto !important;
+  }
+  .eu-pdf-present-bar {
+    @apply absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full
+      bg-stage p-1 text-stage-ink shadow-pop transition-opacity duration-300;
+  }
+  .eu-pdf-presenting[data-idle] .eu-pdf-present-bar {
+    @apply pointer-events-none opacity-0;
+  }
+  .eu-pdf-present-btn {
+    @apply inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-2 text-small
+      transition-colors duration-fast hover:bg-stage-hover disabled:opacity-40 disabled:hover:bg-transparent;
+  }
+  .eu-pdf-present-btn[aria-pressed="true"] {
+    @apply bg-stage-hover text-stage-accent;
+  }
+  .eu-pdf-present-count,
+  .eu-pdf-present-clock {
+    @apply px-1.5 font-mono text-caption;
+  }
+  .eu-pdf-present-clock {
+    @apply text-stage-muted;
+  }
+  .eu-pdf-present-sep {
+    @apply mx-1 h-5 w-px bg-stage-hover;
+  }
+  .eu-pdf-present-blank {
+    @apply absolute inset-0 z-10;
+  }
   /* Documents: rows and cards open on click; date headers stay in sight. */
   .eu-doc-row {
     @apply cursor-pointer;
