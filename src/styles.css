@@ -478,6 +478,13 @@
       whitespace-nowrap border border-transparent transition-colors duration-fast
       disabled:opacity-45 disabled:pointer-events-none;
     height: var(--eu-control);
+    transition-property: color, background-color, border-color, scale;
+  }
+  /* Pressed, a button gives a little under the pointer, at once: the press
+     is felt before the click lands. A full-width one only darkens. */
+  :is(.eu-btn, .eu-btn-primary, .eu-btn-ghost, .eu-btn-quiet, .eu-btn-danger):active:not(.w-full) {
+    scale: 0.97;
+    transition-duration: 60ms;
   }
   .eu-btn-primary {
     @apply bg-ink text-panel border-ink hover:bg-ink/88 active:bg-ink/80;
