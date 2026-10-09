@@ -73,12 +73,17 @@ jobs:
       # Windows-only code (portable updater, keep-awake) only compiles here.
       # CI build settings (no debug info, plain dependencies): .github/ci-cargo.toml.
       - run: cargo clippy --all-targets --config ../.github/ci-cargo.toml -- -D warnings
-      # Advisories, licences and sources of the dependencies (deny.toml).
+      # Advisories, licences and sources of the dependencies (deny.toml). The
+      # binary comes from GitHub: the action's Docker image came from Docker
+      # Hub, whose limit on anonymous pulls failed the job by itself.
+      - name: install cargo-deny
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.20.2
       - name: cargo deny
         if: runner.os == 'Linux'
-        uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          manifest-path: src-tauri/Cargo.toml
+        run: cargo deny --log-level warn --all-features check
 
   rust-test:
     name: rust test (${{ matrix.platform }})
