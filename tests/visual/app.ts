@@ -18,6 +18,12 @@ export async function boot(page: Page, v: Variant) {
     // Deterministic « random » greetings and cheers.
     let seed = 42;
     Math.random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    // And the classroom screen's draws (features/classroom/picker.ts).
+    crypto.getRandomValues = <T extends ArrayBufferView | null>(array: T): T => {
+      if (array instanceof Uint32Array)
+        for (let i = 0; i < array.length; i++) array[i] = Math.random() * 2 ** 32;
+      return array;
+    };
     localStorage.setItem("eu:theme", "auto");
     localStorage.setItem("eu:density", density);
   }, v.density);
@@ -50,6 +56,14 @@ async function openPython(page: Page) {
     return Math.abs(el.getBoundingClientRect().top - line.getBoundingClientRect().top) < 1;
   });
   await page.waitForTimeout(200);
+}
+
+/** The classroom screen (Ctrl+Maj+H), on one of its modes. */
+async function openScene(page: Page, mode: string) {
+  await page.keyboard.press("Control+Shift+H");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: mode, exact: true }).click();
+  await dialog.focus();
 }
 
 export async function nav(page: Page, label: string) {
@@ -145,6 +159,35 @@ export const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }>
       await p.getByRole("textbox", { name: /Rechercher un cours/ }).fill("fonc");
       // The search is debounced and asynchronous: wait for its results.
       await p.getByText("Fonction carré — cours").waitFor();
+      await settle(p);
+    },
+  },
+  {
+    // The classroom screen, full screen: a name drawn from the class in progress.
+    name: "scene-draw",
+    go: async (p) => {
+      await openScene(p, "Tirage");
+      await p.keyboard.press("Space");
+      await settle(p);
+    },
+  },
+  {
+    name: "scene-groups",
+    go: async (p) => {
+      await openScene(p, "Groupes");
+      await p.getByRole("dialog").getByRole("button", { name: "Faire les groupes" }).click();
+      await settle(p);
+    },
+  },
+  {
+    name: "scene-qr",
+    go: async (p) => {
+      await nav(p, "Outils");
+      await p.getByRole("button", { name: "Afficher en QR code — Capytale" }).click();
+      await p
+        .getByRole("dialog")
+        .getByRole("img", { name: /^QR code de / })
+        .waitFor();
       await settle(p);
     },
   },
