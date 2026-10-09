@@ -20,7 +20,7 @@ import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../../
 import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
 import { picker, useDrawn, useGroups, useGroupsBy } from "../../stores/picker";
-import { scene, useSceneClass, useSceneMode, type SceneMode } from "../../stores/scene";
+import { scene, useSceneClass, useSceneMode, useSceneQrText, type SceneMode } from "../../stores/scene";
 import {
   formatTimer,
   stopwatch,
@@ -33,6 +33,7 @@ import {
   useTimerTotal,
 } from "../../stores/timer";
 import { Icon } from "../../ui/Icon";
+import { QrCode } from "../../ui/QrCode";
 import { groupOf, placeEntry } from "./lesson";
 import { coin, randomInt, rollDie, type GroupsBy } from "./picker";
 
@@ -46,12 +47,13 @@ const NO_NAMES: string[] = [];
 
 const MODES: {
   mode: SceneMode;
-  label: "scene.modeClock" | "scene.modeDraw" | "scene.modeGroups" | "scene.modeChance";
+  label: "scene.modeClock" | "scene.modeDraw" | "scene.modeGroups" | "scene.modeChance" | "scene.modeQr";
 }[] = [
   { mode: "clock", label: "scene.modeClock" },
   { mode: "draw", label: "scene.modeDraw" },
   { mode: "groups", label: "scene.modeGroups" },
   { mode: "chance", label: "scene.modeChance" },
+  { mode: "qr", label: "scene.modeQr" },
 ];
 
 type Chance = {
@@ -109,6 +111,7 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
   const watching = useStopwatchRunning();
   const laps = useStopwatchLaps();
   const mode = useSceneMode();
+  const qrText = useSceneQrText();
   const classes = useQuery(q.todayClasses()).data ?? NONE;
   const courses = useQuery(q.courses()).data ?? NO_COURSES;
   const courseClasses = useQuery(q.allCourseClasses()).data ?? NO_CLASSES;
@@ -228,7 +231,7 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
       else if (k === "+" || k === "=") regroup(1);
       else if (k === "-" || k === "_") regroup(-1);
       else return;
-    } else if (go) throwChance();
+    } else if (mode === "chance" && go) throwChance();
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -378,6 +381,16 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <span className="eu-scene-name eu-scene-name-wait">{tr("scene.groupsMake")}</span>
+          ))}
+
+        {mode === "qr" &&
+          (qrText.trim() ? (
+            <div className="eu-scene-pick">
+              <QrCode text={qrText.trim()} className="eu-scene-qr" />
+              <span className="eu-scene-count eu-scene-qr-text">{qrText.trim()}</span>
+            </div>
+          ) : (
+            <span className="eu-scene-name eu-scene-name-wait">{tr("scene.qrEmpty")}</span>
           ))}
 
         {mode === "chance" && (
@@ -635,6 +648,19 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
               </button>
             </div>
             <p className="eu-scene-keys">{tr("scene.keysChance")}</p>
+          </>
+        )}
+
+        {mode === "qr" && (
+          <>
+            <input
+              className="eu-scene-select w-[min(40rem,90vw)]"
+              value={qrText}
+              onChange={(e) => scene.setQrText(e.target.value)}
+              placeholder={tr("scene.qrPlaceholder")}
+              aria-label={tr("scene.qrPlaceholder")}
+            />
+            <p className="eu-scene-keys">{tr("scene.keysQr")}</p>
           </>
         )}
       </div>

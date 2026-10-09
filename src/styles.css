@@ -2631,6 +2631,32 @@ input[type="radio"] {
   font-size: max(1rem, 3vh);
   color: var(--color-stage-muted);
 }
+/* A QR code: black on paper in either theme, with paper around it, so a
+   phone reads it off a projector. */
+.eu-qr {
+  display: block;
+  aspect-ratio: 1;
+  background: var(--color-paper);
+  fill: var(--color-paper-ink);
+}
+.eu-qr-too-long {
+  color: var(--color-danger);
+}
+.eu-scene-qr {
+  height: min(62vh, 80vw);
+  padding: 1.2vh;
+  border-radius: 8px;
+}
+.eu-scene-pick .eu-qr-too-long {
+  font-size: min(6vh, 5vw);
+  font-weight: 500;
+}
+.eu-scene-qr-text {
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .eu-scene-laps {
   display: flex;
   flex-wrap: wrap;

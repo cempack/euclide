@@ -25,6 +25,7 @@ import {
   PenLine,
   Plus,
   Projector,
+  QrCode as QrIcon,
   Shuffle,
   Timer as TimerIcon,
   Trash2,
@@ -442,6 +443,15 @@ function LinksSection() {
                   <Favicon url={l.url} className="w-5 h-5 text-[0.625rem]" remote={remoteIcons} />
                   <span className="eu-t-body text-ink truncate">{l.label}</span>
                   <span className="eu-t-meta truncate hidden @xl:inline">{l.url}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scene.showQr(l.url)}
+                  aria-label={`${tr("tools.showQr")} — ${l.label}`}
+                  data-tip={tr("tools.showQr")}
+                  className="eu-row-actions eu-btn-quiet eu-btn-icon eu-btn-sm"
+                >
+                  <Icon icon={QrIcon} size={14} />
                 </button>
                 <button
                   onClick={async () => {

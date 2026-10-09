@@ -155,7 +155,8 @@
     "drawNoList": "Aucune liste d'élèves : ajoutez-en une depuis la page d'une classe.",
     "chance": "Hasard",
     "chanceHint": "Un dé, un nombre entre deux bornes, pile ou face.",
-    "chanceResult": "Résultat"
+    "chanceResult": "Résultat",
+    "showQr": "Afficher en QR code"
   },
   "courses": {
     "subtitle": "Classes, séquences et casiers.",
@@ -985,7 +986,13 @@
     "dieOf": "Dé à {faces} faces",
     "numberBetween": "Entre {min} et {max}",
     "keysChance": "Espace : relancer · Échap : fermer",
-    "stopwatch": "Chronomètre"
+    "stopwatch": "Chronomètre",
+    "modeQr": "QR code",
+    "qrLabel": "QR code de {text}",
+    "qrPlaceholder": "Adresse ou texte à montrer",
+    "qrEmpty": "Tapez ou collez une adresse ci-dessous.",
+    "qrTooLong": "Trop long pour un QR code.",
+    "keysQr": "Échap : fermer"
   },
   "print": {
     "menu": "Exporter ou imprimer",
