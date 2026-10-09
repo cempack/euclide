@@ -103,7 +103,8 @@ fn write_zip(
     add("euclide.db", db_snapshot)?;
 
     // Iterative walk: no recursion limits, and we can skip our own output
-    // folder plus the live database files (replaced by the snapshot above).
+    // folder plus the live database files (replaced by the snapshot above),
+    // and the Pronote key: an archive opens nothing (`secrets`).
     let mut stack = vec![src.to_path_buf()];
     while let Some(dir) = stack.pop() {
         let entries = match fs::read_dir(&dir) {
@@ -123,7 +124,11 @@ fn write_zip(
                 stack.push(path);
                 continue;
             }
-            if name == "euclide.db" || name.ends_with("-wal") || name.ends_with("-shm") {
+            if name == "euclide.db"
+                || name.ends_with("-wal")
+                || name.ends_with("-shm")
+                || name == crate::secrets::KEY_FILE
+            {
                 continue;
             }
             add(&name, &path)?;
@@ -255,6 +260,7 @@ mod tests {
         fs::write(src.join("euclide.db-wal"), b"wal").unwrap();
         fs::write(src.join("euclide.db-shm"), b"shm").unwrap();
         fs::write(src.join("documents/note.txt"), b"hello").unwrap();
+        fs::write(src.join(crate::secrets::KEY_FILE), [7u8; 32]).unwrap();
         fs::create_dir_all(src.join("Euclide-Sauvegardes")).unwrap();
         fs::write(src.join("Euclide-Sauvegardes/old.zip"), b"old").unwrap();
         let snapshot = tmp.join("snapshot.db");
@@ -285,6 +291,7 @@ mod tests {
             .iter()
             .any(|n| n.ends_with("-wal") || n.ends_with("-shm")));
         assert!(!names.iter().any(|n| n.contains("Euclide-Sauvegardes")));
+        assert!(!names.iter().any(|n| n == crate::secrets::KEY_FILE));
 
         let mut db = archive.by_name("euclide.db").unwrap();
         let mut buf = String::new();
