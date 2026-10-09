@@ -138,7 +138,20 @@ export type PdfViewHandle = {
   findPrevious(): void;
   /** No more search: the marks go. */
   stopFind(): void;
+  /**
+   * Every page as a picture for paper, as it shows on screen: what is drawn
+   * on it and the fields filled in. The caller lets go of the pictures
+   * (`URL.revokeObjectURL`).
+   */
+  printPages(progress?: (done: number, total: number) => void): Promise<PrintPage[]>;
 };
+
+/** A page ready to print: its picture, and whether it lies wider than tall. */
+export type PrintPage = { url: string; wide: boolean };
+
+/** Pictures for paper: sharp at 200 dpi, a large page kept to a few million pixels. */
+const PRINT_DPI = 200;
+const PRINT_MAX_PX = 2400;
 
 /** Where a search is: its text, the matches found so far, the one shown (0 for none). */
 export type FindState = { query: string; total: number; current: number; searching: boolean };
@@ -586,17 +599,22 @@ function Viewer({
     scope.deleteAnnotations(selected.map((a) => ({ pageIndex: a.object.pageIndex, id: a.object.id })));
   };
 
+  /** What is being drawn or typed, in the document: before a save or a print. */
+  const settle = async () => {
+    // A field being typed in keeps its text until it loses the focus.
+    if (document.activeElement instanceof HTMLElement && viewer.current?.contains(document.activeElement))
+      document.activeElement.blur();
+    // A stroke just drawn becomes an annotation a moment after the pen lifts.
+    const wait = Math.min(STROKE_DELAY + 100, track.current.strokeEnd + STROKE_DELAY + 100 - Date.now());
+    if (wait > 0) await new Promise((r) => window.setTimeout(r, wait));
+    await formsWritten();
+  };
+
   useImperativeHandle(handleRef, () => ({
     async save() {
       const doc = state?.document;
       if (!doc || readOnly) throw new Error(tr("pdf.notReady"));
-      // A field being typed in keeps its text until it loses the focus.
-      if (document.activeElement instanceof HTMLElement && viewer.current?.contains(document.activeElement))
-        document.activeElement.blur();
-      // A stroke just drawn becomes an annotation a moment after the pen lifts.
-      const wait = Math.min(STROKE_DELAY + 100, track.current.strokeEnd + STROKE_DELAY + 100 - Date.now());
-      if (wait > 0) await new Promise((r) => window.setTimeout(r, wait));
-      await formsWritten();
+      await settle();
       const t = track.current;
       t.saving = historyStep(registry, documentId);
       if (t.saving !== undefined && t.saving === t.saved) return null;
@@ -647,6 +665,41 @@ function Viewer({
     },
     stopFind() {
       search?.forDocument(documentId).stopSearch();
+    },
+    async printPages(progress) {
+      const doc = state?.document;
+      if (!doc) throw new Error(tr("pdf.notReady"));
+      await settle();
+      if (annotations) await annotations.forDocument(documentId).commit().toPromise();
+      const pages: PrintPage[] = [];
+      try {
+        for (const page of doc.pages) {
+          // Its own turn (PDFium has it put aside) and the view's.
+          const rotation = ((page.rotation + (state?.rotation ?? 0)) % 4) as Rotation;
+          const { width, height } = page.size;
+          const scale = Math.min(PRINT_DPI / 72, PRINT_MAX_PX / Math.max(width, height));
+          const picture = await pdfium()
+            .renderPage(doc, page, {
+              scaleFactor: scale,
+              rotation,
+              dpr: 1,
+              withAnnotations: true,
+              withForms: true,
+              imageType: "image/jpeg",
+              imageQuality: 0.9,
+            })
+            .toPromise();
+          pages.push({
+            url: URL.createObjectURL(picture),
+            wide: rotation % 2 ? height > width : width > height,
+          });
+          progress?.(pages.length, doc.pages.length);
+        }
+      } catch (err) {
+        for (const p of pages) URL.revokeObjectURL(p.url);
+        throw err;
+      }
+      return pages;
     },
   }));
 

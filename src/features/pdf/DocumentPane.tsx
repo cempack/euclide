@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal, flushSync } from "react-dom";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,6 +16,7 @@ import {
   PanelLeft,
   PenLine,
   Plus,
+  Printer,
   Redo2,
   RotateCcw,
   RotateCw,
@@ -46,7 +48,8 @@ import { Menu, type MenuEntry } from "../../ui/Menu";
 import { tip } from "../../ui/Tooltip";
 import { ColorChoice } from "./ColorChoice";
 import { HIGHLIGHT, INK } from "./palette";
-import { PdfView, type FindState, type PdfTool, type PdfViewHandle } from "./PdfView";
+import { PdfView, type FindState, type PdfTool, type PdfViewHandle, type PrintPage } from "./PdfView";
+import { printDialog, sheetReady } from "../notes/PrintSheet";
 import { ImageView } from "./ImageView";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
@@ -306,6 +309,34 @@ function PdfPane({
   };
   // Ctrl+F looks in the document while it is the tab in front, as in a PDF reader.
   useShortcut("documents", openFind, visible && !!pages);
+
+  /** Pages being drawn for paper: how many of how many. */
+  const [printing, setPrinting] = useState<{ done: number; total: number } | null>(null);
+  const [sheet, setSheet] = useState<PrintPage[]>([]);
+  const busyPrinting = useRef(false);
+  /** The pages as they show, drawn for paper, then the system's print dialog. */
+  const print = async () => {
+    const view = viewRef.current;
+    if (!view || !pages || busyPrinting.current) return;
+    busyPrinting.current = true;
+    setPrinting({ done: 0, total: pages });
+    let drawn: PrintPage[] = [];
+    try {
+      drawn = await view.printPages((done, total) => setPrinting({ done, total }));
+      flushSync(() => setSheet(drawn));
+      await sheetReady();
+      await printDialog();
+    } catch (err) {
+      reportError("pdf.print", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    } finally {
+      setSheet([]);
+      for (const p of drawn) URL.revokeObjectURL(p.url);
+      setPrinting(null);
+      busyPrinting.current = false;
+    }
+  };
+  useShortcut("print", () => void print(), visible && !!pages);
 
   const findStatus = found.searching
     ? tr("pdf.searching")
@@ -569,6 +600,22 @@ function PdfPane({
           />
         </ToolGroup>
         <ToolGroup>
+          <button
+            type="button"
+            onClick={() => void print()}
+            disabled={!pages || !!printing}
+            aria-label={tr("pdf.print")}
+            aria-busy={!!printing}
+            className="eu-btn-quiet eu-btn-sm"
+            {...tip(printing ? tr("pdf.printing") : tr("pdf.print"), keysOf("print"))}
+          >
+            <Icon icon={Printer} size={14} />
+            {printing && (
+              <span className="font-mono text-caption">
+                {printing.done}/{printing.total}
+              </span>
+            )}
+          </button>
           <OpenWithButton fileId={fileId} className="eu-btn-quiet eu-btn-sm" label={tr("openWith.label")} />
           <button
             type="button"
@@ -716,6 +763,18 @@ function PdfPane({
           )}
         </div>
       </div>
+
+      {sheet.length > 0 &&
+        createPortal(
+          <div className="eu-print" data-theme="light" aria-hidden>
+            {sheet.map((p) => (
+              <div key={p.url} className={p.wide ? "eu-print-pdf is-wide" : "eu-print-pdf"}>
+                <img src={p.url} alt="" />
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

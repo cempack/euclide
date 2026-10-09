@@ -554,6 +554,8 @@
     "zoomFit": "Ajuster à la largeur",
     "zoomPage": "Page entière",
     "rotate": "Faire pivoter à droite",
+    "print": "Imprimer",
+    "printing": "Préparation des pages pour l'impression…",
     "search": "Rechercher dans le document",
     "searchCount": "{current} sur {total}",
     "searchNone": "Aucun résultat",

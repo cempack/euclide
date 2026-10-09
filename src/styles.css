@@ -2344,6 +2344,36 @@ input[type="radio"] {
   max-height: 250mm;
   margin: 0 auto;
 }
+/* A PDF prints its pages as they show (features/pdf/DocumentPane.tsx), one
+   per sheet: inside the notes' margins, or edge to edge where the webview
+   knows named pages (WebView2 does), turned for a page wider than tall.
+   The name goes on a box around the picture: Chromium ignores it on an
+   image. */
+.eu-print-pdf + .eu-print-pdf {
+  break-before: page;
+}
+.eu-print-pdf > img {
+  display: block;
+  max-width: 178mm;
+  max-height: 263mm;
+  margin: 0 auto;
+}
+@supports (page: pdf) {
+  .eu-print-pdf {
+    page: pdf;
+  }
+  .eu-print-pdf.is-wide {
+    page: pdf-wide;
+  }
+  .eu-print-pdf > img {
+    max-width: 209mm;
+    max-height: 296mm;
+  }
+  .eu-print-pdf.is-wide > img {
+    max-width: 296mm;
+    max-height: 209mm;
+  }
+}
 
 /* A class already over: dimmed by colour, which keeps it readable (an
    opacity took the text below 4.5:1). */
@@ -2545,6 +2575,23 @@ input[type="radio"] {
       font-family: "IBM Plex Mono", monospace;
       font-size: 7.5pt;
       color: rgb(17 18 19 / 0.55);
+    }
+  }
+  /* A PDF's own pages: no margins, no page count of Euclide's on them. */
+  @page pdf {
+    size: A4;
+    margin: 0;
+
+    @bottom-right {
+      content: none;
+    }
+  }
+  @page pdf-wide {
+    size: A4 landscape;
+    margin: 0;
+
+    @bottom-right {
+      content: none;
     }
   }
   html,

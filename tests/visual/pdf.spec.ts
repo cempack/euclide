@@ -278,6 +278,25 @@ test("a PDF with a password opens once it is given, and stays protected when sav
   expect(saved).toContain("/Subtype/Ink");
 });
 
+test("Ctrl+P prints the pages as they show, then puts the sheet away", async ({ page }) => {
+  // The dialog is the system's: here, only that it was asked for.
+  await page.addInitScript(() => {
+    window.print = () => {
+      (window as { printAsked?: number }).printAsked = 1;
+    };
+  });
+  await openPdf(page);
+  await tool(page, "Stylo").click();
+  await stroke(page);
+  await page.keyboard.press("Control+p");
+  await page.waitForFunction(() => (window as { printAsked?: number }).printAsked === 1);
+  // One picture per page, drawn with the stroke not yet saved.
+  await expect(page.locator(".eu-print .eu-print-pdf img")).toHaveCount(1);
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await expect(page.locator(".eu-print")).toHaveCount(0);
+  await expect(save(page)).toBeEnabled();
+});
+
 test("Ctrl+F finds a word on every page, and the outline goes to a chapter", async ({ page }) => {
   const pdf = fileURLToPath(new URL("./fixtures/outline.pdf", import.meta.url));
   await page.route(/\/src\/dev\/fixtures\/docs\/\d+\.pdf$/, (route) =>
