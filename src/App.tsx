@@ -523,13 +523,13 @@ function Shell() {
           // Only « enter » and « drop » carry the paths.
           if (p.type === "enter") draggedPaths = p.paths ?? [];
           if (p.type === "enter" || p.type === "over") {
-            setDragging(dropTargetAt(p.position, draggedPaths) ?? "library");
+            setDragging(dropTargetAt(p.position, draggedPaths)?.target ?? "library");
           } else if (p.type === "drop") {
             setDragging(null);
             const paths = p.paths ?? [];
             if (!paths.length) return;
-            const target = dropTargetAt(p.position, paths);
-            if (target) target.drop(paths);
+            const hit = dropTargetAt(p.position, paths);
+            if (hit) hit.target.drop(paths, hit.at);
             else await importDropped(paths);
           } else {
             setDragging(null);

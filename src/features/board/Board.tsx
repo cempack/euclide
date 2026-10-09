@@ -12,13 +12,18 @@ import {
   Hand,
   Highlighter,
   History,
+  ImagePlus,
   Maximize,
+  MousePointer2,
   PenLine,
+  Pencil,
   Redo2,
   Ruler,
+  Sigma,
   Slash,
   Square,
   SquareFunction,
+  Trash2,
   TriangleRight,
   Type,
   Undo2,
@@ -29,7 +34,8 @@ import {
 import { q } from "../../api/queries";
 import { Toolbar, ToolGroup, ToolSpacer } from "../../components/layout";
 import { useConfirm, useToast } from "../../components/ui";
-import { api, isTauri, versionUrl, type FileVersion } from "../../lib/api";
+import katex from "katex";
+import { api, isTauri, versionUrl, type FileItem, type FileVersion } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { openFile } from "../../lib/files";
 import { tr, type StringKey } from "../../lib/i18n";
@@ -42,7 +48,11 @@ import { Icon } from "../../ui/Icon";
 import { MenuButton, type MenuEntry } from "../../ui/Menu";
 import { tip } from "../../ui/Tooltip";
 import { printDialog, sheetReady } from "../notes/PrintSheet";
+import { PICTURE_TYPES, fileStem, imageExtension, isImageName, pastedPictures } from "../notes/images";
+import { addDropTarget } from "../../shell/drop";
+import { loadPictures, onAssetsReady, picture } from "./assets";
 import { compile } from "./expr";
+import { checkMath, measureMath } from "./math";
 import {
   InstrumentLayer,
   alongEdge,
@@ -58,20 +68,38 @@ import {
   dist,
   distanceTo,
   gridStep,
+  itemAt,
+  moveItem,
   newId,
   nextLabel,
   parseBoard,
+  resizable,
+  resizeItem,
   snap,
+  withPicture,
   type Background,
   type Item,
+  type MathItem,
   type P,
+  type Picture,
   type Text,
   type View,
 } from "./model";
-import { drawBackground, drawItem, drawItems, plotFunction, renderBoard } from "./render";
+import { drawBackground, drawItem, drawItems, plotFunction, renderBoardReady } from "./render";
 
 type Tool =
-  "hand" | "pen" | "highlighter" | "eraser" | "segment" | "circle" | "rect" | "point" | "text" | "plot";
+  | "select"
+  | "hand"
+  | "pen"
+  | "highlighter"
+  | "eraser"
+  | "segment"
+  | "circle"
+  | "rect"
+  | "point"
+  | "text"
+  | "math"
+  | "plot";
 
 interface Doc {
   items: Item[];
@@ -113,6 +141,7 @@ const BACKGROUNDS: { value: Background; label: StringKey }[] = [
 
 const TOOLS: { tool: Tool; icon: LucideIcon; label: StringKey }[][] = [
   [
+    { tool: "select", icon: MousePointer2, label: "board.select" },
     { tool: "hand", icon: Hand, label: "board.hand" },
     { tool: "pen", icon: PenLine, label: "board.pen" },
     { tool: "highlighter", icon: Highlighter, label: "board.highlighter" },
@@ -124,6 +153,7 @@ const TOOLS: { tool: Tool; icon: LucideIcon; label: StringKey }[][] = [
     { tool: "rect", icon: Square, label: "board.rect" },
     { tool: "point", icon: Crosshair, label: "board.point" },
     { tool: "text", icon: Type, label: "board.text" },
+    { tool: "math", icon: Sigma, label: "board.math" },
     { tool: "plot", icon: SquareFunction, label: "board.plot" },
   ],
 ];
@@ -165,7 +195,10 @@ type Gesture =
   | { type: "erase"; removed: Set<string> }
   | { type: "shape"; tool: "segment" | "circle" | "rect"; a: P; b: P }
   | { type: "point"; p: P }
-  | { type: "pinch"; d0: number; mid0: P; from: View };
+  | { type: "pinch"; d0: number; mid0: P; from: View }
+  // The selection tool: `base` is the board before, for one undo.
+  | { type: "move"; id: string; from: P; base: Doc; moved: boolean }
+  | { type: "resize"; id: string; base: Doc };
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 8;
@@ -204,6 +237,19 @@ export default function Board({
   const [textSize, setTextSize] = useState<number>(TEXT_SIZES[1].value);
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [editing, setEditing] = useState<{ p: P; text: string; size: number; color: string } | null>(null);
+  // A formula being written: `id` when it replaces one on the board.
+  const [editingMath, setEditingMath] = useState<{
+    id: string | null;
+    p: P;
+    tex: string;
+    size: number;
+    color: string;
+  } | null>(null);
+  const [mathError, setMathError] = useState("");
+  // What the selection tool holds.
+  const [selected, setSelected] = useState<string | null>(null);
+  // Bumped when a picture or a formula is ready to draw.
+  const [assets, setAssets] = useState(0);
   const [plotExpr, setPlotExpr] = useState("");
   const [plotError, setPlotError] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -222,6 +268,8 @@ export default function Board({
   const inkRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const mathRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLInputElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const pointers = useRef(new Map<number, P>());
   const spaceDown = useRef(false);
@@ -240,6 +288,11 @@ export default function Board({
     setHistory((h) => ({ past: [...h.past.slice(-99), prev], future: [] }));
     setDirty(true);
   };
+  /** A change shown while a gesture runs; the gesture commits it at its end. */
+  const show = (next: Doc) => {
+    docRef.current = next;
+    setDoc(next);
+  };
   const undo = () => {
     const prev = history.past[history.past.length - 1];
     if (!prev) return;
@@ -256,6 +309,21 @@ export default function Board({
     setDoc(next);
     setDirty(true);
   };
+
+  /** The selection tool's item, off the board. */
+  const removeSelected = () => {
+    const d = docRef.current;
+    if (!selected || !d.items.some((i) => i.id === selected)) return;
+    commit({ ...d, items: d.items.filter((i) => i.id !== selected) });
+    setSelected(null);
+  };
+
+  /** The board's name, from its tab (exports, pictures added). */
+  const title = () =>
+    tabs
+      .list()
+      .find((t) => t.id === tabId)
+      ?.title?.replace(/\.euboard$/i, "") || tr("app.tabWhiteboard");
 
   const changeView = (next: View) => {
     const v = { ...next, zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next.zoom)) };
@@ -366,9 +434,14 @@ export default function Board({
     }
     const bg = bgRef.current?.getContext("2d");
     const ink = inkRef.current?.getContext("2d");
+    // A formula being rewritten shows in its editor, not twice.
+    const hidden = editingMath?.id;
+    const items = hidden ? doc.items.filter((i) => i.id !== hidden) : doc.items;
     if (bg) drawBackground(bg, doc.background, view, w, h, dpr);
-    if (ink) drawItems(ink, doc.items, view, w, h, dpr, boundsOf);
-  }, [doc, view, size, dpr, visible]);
+    if (ink) drawItems(ink, items, view, w, h, dpr, boundsOf);
+  }, [doc, view, size, dpr, visible, assets, editingMath?.id]);
+
+  useEffect(() => onAssetsReady(() => setAssets((n) => n + 1)), []);
 
   /** The preview of what is being drawn, and the snap marker. */
   const drawLive = (preview: Item | null, marker: P | null) => {
@@ -416,6 +489,25 @@ export default function Board({
       commitText();
       return;
     }
+    if (editingMath) {
+      void commitMath();
+      return;
+    }
+    if (tool === "math" && e.button === 0 && !spaceDown.current) {
+      // Keep the focus for the formula's field that opens.
+      e.preventDefault();
+      const p = worldOf(e);
+      const hit = [...docRef.current.items]
+        .reverse()
+        .find((i): i is MathItem => i.kind === "math" && distanceTo(i, p) === 0);
+      setMathError("");
+      setEditingMath(
+        hit
+          ? { id: hit.id, p: hit.p, tex: hit.tex, size: hit.size, color: hit.color }
+          : { id: null, p, tex: "", size: textSize, color },
+      );
+      return;
+    }
     if (tool === "text" && e.button === 0 && !spaceDown.current) {
       // Keep the focus for the text field that opens.
       e.preventDefault();
@@ -451,6 +543,17 @@ export default function Board({
     if (e.button !== 0) return;
     const p = worldOf(e);
     const v = viewRef.current;
+    if (tool === "select") {
+      const hit = itemAt(docRef.current.items, p, 8 / v.zoom);
+      setSelected(hit?.id ?? null);
+      // Beside everything, the sheet moves.
+      if (hit) gesture.current = { type: "move", id: hit.id, from: p, base: docRef.current, moved: false };
+      else {
+        gesture.current = { type: "pan", x: e.clientX, y: e.clientY, from: v };
+        setPanning(true);
+      }
+      return;
+    }
     if (tool === "pen" || tool === "highlighter") {
       const edge = tool === "pen" ? edgeNear(p, instruments, 14 / v.zoom) : null;
       const start = edge ? alongEdge(p, edge) : p;
@@ -473,7 +576,8 @@ export default function Board({
     if (g?.type !== "erase") return;
     const reach = 8 / viewRef.current.zoom;
     for (const item of docRef.current.items) {
-      if (g.removed.has(item.id) || (item.kind === "ink" && item.erase)) continue;
+      // A picture goes with the selection tool: erasing the ink over it leaves it.
+      if (g.removed.has(item.id) || (item.kind === "ink" && item.erase) || item.kind === "image") continue;
       const pad = "width" in item ? item.width / 2 : 0;
       const f = item.kind === "plot" ? (plotFunction(item.expr) ?? undefined) : undefined;
       if (distanceTo(item, p, f) <= reach + pad) g.removed.add(item.id);
@@ -525,6 +629,22 @@ export default function Board({
       return;
     }
     const p = worldOf(e);
+    if (g.type === "move") {
+      const dx = p.x - g.from.x;
+      const dy = p.y - g.from.y;
+      // A click is not a move.
+      if (!g.moved && Math.hypot(dx, dy) * viewRef.current.zoom < 3) return;
+      g.moved = true;
+      show({ ...g.base, items: g.base.items.map((i) => (i.id === g.id ? moveItem(i, dx, dy) : i)) });
+      return;
+    }
+    if (g.type === "resize") {
+      const item = g.base.items.find((i) => i.id === g.id);
+      if (!item || !resizable(item)) return;
+      const width = Math.max(12 / viewRef.current.zoom, p.x - item.p.x);
+      show({ ...g.base, items: g.base.items.map((i) => (i.id === g.id ? resizeItem(item, width) : i)) });
+      return;
+    }
     if (g.type === "ink") {
       if (g.edge) {
         const q = alongEdge(p, g.edge);
@@ -585,7 +705,13 @@ export default function Board({
     if (!g) return;
     const d = docRef.current;
     if (g.type === "pan") setPanning(false);
-    else if (g.type === "ink") {
+    else if (g.type === "move" || g.type === "resize") {
+      // One undo for the whole move.
+      if (d !== g.base) {
+        docRef.current = g.base;
+        commit(d);
+      }
+    } else if (g.type === "ink") {
       commit({ ...d, items: [...d.items, { ...inkPreview(g.pts), id: newId() }] });
     } else if (g.type === "erase") {
       if (g.removed.size) commit({ ...d, items: d.items.filter((i) => !g.removed.has(i.id)) });
@@ -636,6 +762,15 @@ export default function Board({
         setPanning(true);
         e.preventDefault();
       }
+      if (selected && tool === "select" && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        removeSelected();
+        return;
+      }
+      if (selected && e.key === "Escape") {
+        setSelected(null);
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (mod && !e.altKey && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
@@ -682,6 +817,179 @@ export default function Board({
     });
   };
 
+  // ---- formulas ----------------------------------------------------------------
+
+  const editingMathOpen = editingMath != null;
+  useEffect(() => {
+    if (editingMathOpen) mathRef.current?.focus();
+  }, [editingMathOpen]);
+
+  /**
+   * The formula being written goes on the board (in place of the one it
+   * rewrites); emptied, that one goes. One KaTeX cannot set keeps its field
+   * open, with what is wrong.
+   */
+  const commitMath = async () => {
+    const m = editingMath;
+    if (!m) return;
+    const tex = m.tex.trim();
+    const d = docRef.current;
+    const before = m.id ? d.items.find((i) => i.id === m.id) : undefined;
+    if (!tex) {
+      setEditingMath(null);
+      if (before) commit({ ...d, items: d.items.filter((i) => i !== before) });
+      return;
+    }
+    const error = checkMath(tex);
+    if (error) {
+      setMathError(error);
+      mathRef.current?.focus();
+      return;
+    }
+    setEditingMath(null);
+    setMathError("");
+    if (before?.kind === "math" && before.tex === tex && before.size === m.size && before.color === m.color)
+      return;
+    try {
+      const { w, h } = await measureMath(tex, m.size);
+      const item: MathItem = {
+        id: m.id ?? newId(),
+        kind: "math",
+        p: m.p,
+        tex,
+        size: m.size,
+        color: m.color,
+        w,
+        h,
+      };
+      const now = docRef.current;
+      commit({
+        ...now,
+        items: before ? now.items.map((i) => (i.id === item.id ? item : i)) : [...now.items, item],
+      });
+    } catch (err) {
+      reportError("board.math", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    }
+  };
+
+  /** The selected formula, back in its field. */
+  const editSelectedMath = () => {
+    const item = docRef.current.items.find((i) => i.id === selected);
+    if (item?.kind !== "math") return;
+    setTool("math");
+    setSelected(null);
+    setMathError("");
+    setEditingMath({ id: item.id, p: item.p, tex: item.tex, size: item.size, color: item.color });
+  };
+
+  // ---- pictures ----------------------------------------------------------------
+
+  /**
+   * Pictures from the library on the board, centred on `at` (else the
+   * middle of the screen), at most 60 % of it, under the drawing; the last
+   * one selected, to move it or size it at once.
+   */
+  const placePictures = async (files: FileItem[], at?: P) => {
+    if (!files.length) return;
+    await loadPictures(files.map((f) => f.id));
+    const v = viewRef.current;
+    const { w: sw, h: sh } = sizeRef.current;
+    const centre = at ?? { x: v.x + sw / 2 / v.zoom, y: v.y + sh / 2 / v.zoom };
+    let d = docRef.current;
+    let last: Picture | null = null;
+    files.forEach((f, i) => {
+      const img = picture(f.id);
+      // Its pixels as the screen showed them (a screenshot at 150 % is 1.5 times larger).
+      const natural = img ? { w: img.naturalWidth / dpr, h: img.naturalHeight / dpr } : { w: 320, h: 240 };
+      const k = Math.min(1, (0.6 * sw) / v.zoom / natural.w, (0.6 * sh) / v.zoom / natural.h);
+      const w = natural.w * k;
+      const h = natural.h * k;
+      const step = (24 * i) / v.zoom;
+      last = {
+        id: newId(),
+        kind: "image",
+        p: { x: centre.x - w / 2 + step, y: centre.y - h / 2 + step },
+        w,
+        h,
+        file: f.id,
+      };
+      d = { ...d, items: withPicture(d.items, last) };
+    });
+    commit(d);
+    if (last) {
+      setTool("select");
+      setSelected((last as Picture).id);
+    }
+  };
+
+  /** Pictures picked or pasted: into the documents (with the board's course), then onto the board. */
+  const addPictures = async (files: File[], at?: P) => {
+    const pictures = files.filter((f) => PICTURE_TYPES.includes(f.type));
+    if (!pictures.length) return;
+    const stem = fileStem(title());
+    const added: FileItem[] = [];
+    try {
+      for (const file of pictures) {
+        const named = isImageName(file.name) && file.name !== "image.png";
+        const name = named ? file.name : `${stem} - image.${imageExtension(file.type)}`;
+        added.push(await api.createFileBytes(name, await file.arrayBuffer(), { courseId }));
+      }
+    } catch (err) {
+      reportError("board.picture", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    }
+    // Those saved before a failure still go on the board.
+    if (!added.length) return;
+    changed("library");
+    await placePictures(added, at);
+  };
+
+  /** Pictures dropped from the file explorer, where they were dropped. */
+  const addPicturePaths = async (paths: string[], at: P) => {
+    try {
+      const added = await api.importPaths(paths, courseId);
+      changed("library");
+      await placePictures(added, at);
+    } catch (err) {
+      reportError("board.dropPicture", err);
+      toast(errorMessage(err, tr("messages.genericError")), "error");
+    }
+  };
+
+  // Pasted pictures (not while typing a text or a formula).
+  useEffect(() => {
+    if (!active || !visible) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA"].includes(t.tagName)))
+        return;
+      const pictures = e.clipboardData ? pastedPictures(e.clipboardData) : [];
+      if (!pictures.length) return;
+      e.preventDefault();
+      void addPictures(pictures);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  });
+
+  // Pictures dropped on the sheet go on it.
+  const dropPictures = useRef(addPicturePaths);
+  useEffect(() => {
+    dropPictures.current = addPicturePaths;
+  });
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    return addDropTarget({
+      el,
+      takes: (paths) => paths.every(isImageName),
+      drop: (paths, at) => void dropPictures.current(paths, worldOf({ clientX: at.x, clientY: at.y })),
+      title: tr("dragDrop.boardTitle"),
+      hint: tr("dragDrop.boardHint"),
+    });
+  }, []);
+
   // ---- plots -----------------------------------------------------------------
 
   const addPlot = () => {
@@ -710,12 +1018,6 @@ export default function Board({
 
   // ---- saving, exporting -----------------------------------------------------
 
-  const title = () =>
-    tabs
-      .list()
-      .find((t) => t.id === tabId)
-      ?.title?.replace(/\.euboard$/i, "") || tr("app.tabWhiteboard");
-
   // The board's file once it has one: a save that starts while the first is
   // on its way must update that file, not create a second board.
   const fileIdRef = useRef(currentFileId);
@@ -731,16 +1033,20 @@ export default function Board({
     thumbStale.current = false;
     // The Documents grid shows boards by their preview.
     if (!isTauri() || !d.items.length) return;
-    renderBoard(d.items, d.background, 1, 480).toBlob(
-      (blob) =>
-        void blob
-          ?.arrayBuffer()
-          .then((buf) => api.saveThumbnail(id, buf))
-          .then(() => changed("thumbnails"))
-          .catch(logged("board.thumbnail")),
-      "image/jpeg",
-      0.85,
-    );
+    void renderBoardReady(d.items, d.background, 1, 480)
+      .then((canvas) =>
+        canvas.toBlob(
+          (blob) =>
+            void blob
+              ?.arrayBuffer()
+              .then((buf) => api.saveThumbnail(id, buf))
+              .then(() => changed("thumbnails"))
+              .catch(logged("board.thumbnail")),
+          "image/jpeg",
+          0.85,
+        ),
+      )
+      .catch(logged("board.thumbnail"));
   };
 
   /**
@@ -827,9 +1133,8 @@ export default function Board({
   const exportPng = async () => {
     const d = docRef.current;
     try {
-      const blob = await new Promise<Blob | null>((resolve) =>
-        renderBoard(d.items, d.background, 2).toBlob(resolve, "image/png"),
-      );
+      const canvas = await renderBoardReady(d.items, d.background, 2);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error(tr("messages.genericError"));
       const f = await api.createFileBytes(`${title()}.png`, await blob.arrayBuffer(), { courseId });
       changed("library");
@@ -844,7 +1149,8 @@ export default function Board({
 
   const exportPdf = async () => {
     const d = docRef.current;
-    flushSync(() => setPrintImage(renderBoard(d.items, d.background, 2.5).toDataURL("image/png")));
+    const canvas = await renderBoardReady(d.items, d.background, 2.5);
+    flushSync(() => setPrintImage(canvas.toDataURL("image/png")));
     try {
       await sheetReady();
       if (!isTauri()) {
@@ -944,6 +1250,7 @@ export default function Board({
     </ToolGroup>
   );
 
+  const selectedItem = selected ? (doc.items.find((i) => i.id === selected) ?? null) : null;
   let context: React.ReactNode;
   if (tool === "pen" || tool === "segment" || tool === "circle" || tool === "rect")
     context = (
@@ -954,12 +1261,31 @@ export default function Board({
     );
   else if (tool === "highlighter") context = swatches(HIGHLIGHTS, highlight, setHighlight);
   else if (tool === "point") context = swatches(COLORS, color, setColor);
-  else if (tool === "text")
+  else if (tool === "text" || tool === "math")
     context = (
       <>
         {swatches(COLORS, color, setColor)}
         {choice(TEXT_SIZES, textSize, setTextSize)}
+        {tool === "math" && <span className="eu-t-caption truncate">{tr("board.mathHint")}</span>}
       </>
+    );
+  else if (tool === "select")
+    context = selectedItem ? (
+      <ToolGroup className="gap-1 min-w-0" label={tr("board.select")}>
+        {selectedItem.kind === "math" && (
+          <button type="button" className="eu-btn-ghost eu-btn-sm" onClick={editSelectedMath}>
+            <Icon icon={Pencil} size={14} />
+            {tr("board.editMath")}
+          </button>
+        )}
+        <button type="button" className="eu-btn-ghost eu-btn-sm hover:text-danger" onClick={removeSelected}>
+          <Icon icon={Trash2} size={14} />
+          {tr("board.removeSelected")}
+        </button>
+        <span className="eu-t-caption truncate">{tr("board.selectedHint")}</span>
+      </ToolGroup>
+    ) : (
+      <span className="eu-t-caption truncate">{tr("board.selectHint")}</span>
     );
   else if (tool === "plot")
     context = (
@@ -996,11 +1322,15 @@ export default function Board({
     ? "grabbing"
     : tool === "hand"
       ? "grab"
-      : tool === "text"
-        ? "text"
-        : tool === "eraser"
-          ? "cell"
-          : "crosshair";
+      : tool === "select"
+        ? "default"
+        : tool === "text" || tool === "math"
+          ? "text"
+          : tool === "eraser"
+            ? "cell"
+            : "crosshair";
+  // The selection's frame, in the board's pixels.
+  const selectedBox = selectedItem && tool === "select" ? boundsOf(selectedItem) : null;
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -1163,6 +1493,87 @@ export default function Board({
             aria-label={tr("board.text")}
           />
         )}
+        {selectedItem && selectedBox && (
+          <div
+            className="eu-board-selection"
+            style={{
+              left: (selectedBox.x0 - view.x) * view.zoom - 4,
+              top: (selectedBox.y0 - view.y) * view.zoom - 4,
+              width: (selectedBox.x1 - selectedBox.x0) * view.zoom + 8,
+              height: (selectedBox.y1 - selectedBox.y0) * view.zoom + 8,
+            }}
+          >
+            {resizable(selectedItem) && (
+              <div
+                className="eu-board-handle"
+                aria-hidden
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  wrapRef.current?.setPointerCapture(e.pointerId);
+                  pointers.current.set(e.pointerId, screenOf(e));
+                  gesture.current = { type: "resize", id: selectedItem.id, base: docRef.current };
+                }}
+              />
+            )}
+          </div>
+        )}
+        {editingMath && (
+          <div
+            className="eu-board-math"
+            style={{
+              left: (editingMath.p.x - view.x) * view.zoom,
+              top: (editingMath.p.y - view.y) * view.zoom,
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div
+              className="eu-board-math-preview"
+              style={{ fontSize: editingMath.size * view.zoom, color: editingMath.color }}
+              // KaTeX's own markup, from the formula typed here.
+              dangerouslySetInnerHTML={{
+                __html: katex.renderToString(editingMath.tex || "\\phantom{x}", {
+                  displayMode: true,
+                  throwOnError: false,
+                  output: "html",
+                }),
+              }}
+            />
+            <input
+              ref={mathRef}
+              className={`eu-input eu-field-sm font-mono ${mathError ? "border-danger" : ""}`}
+              value={editingMath.tex}
+              placeholder={"\\frac{1}{2}, \\sqrt{x}, \\vec{u}"}
+              spellCheck={false}
+              onChange={(e) => {
+                setEditingMath({ ...editingMath, tex: e.target.value });
+                setMathError("");
+              }}
+              onBlur={() => void commitMath()}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setEditingMath(null);
+                  setMathError("");
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  void commitMath();
+                }
+              }}
+              aria-label={tr("board.mathInput")}
+              aria-invalid={!!mathError}
+              aria-describedby={mathError ? "eu-board-math-error" : undefined}
+            />
+            {mathError && (
+              <div id="eu-board-math-error" className="eu-board-math-error" role="alert">
+                <p>{tr("board.mathError")}</p>
+                {/* KaTeX's own words, in English, for the place of the mistake. */}
+                <p className="font-mono opacity-80" lang="en">
+                  {mathError}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div
           className="eu-board-palette"
@@ -1184,6 +1595,8 @@ export default function Board({
                   data-tip-place="right"
                   onClick={() => {
                     if (editing) commitText();
+                    if (editingMath) void commitMath();
+                    if (t.tool !== "select") setSelected(null);
                     setTool(t.tool);
                     drawLive(null, null);
                   }}
@@ -1193,6 +1606,30 @@ export default function Board({
               ))}
             </div>
           ))}
+          <div className="eu-board-palette-group">
+            <button
+              type="button"
+              className="eu-btn-quiet eu-btn-icon"
+              aria-label={tr("board.picture")}
+              data-tip={tr("board.pictureTip")}
+              data-tip-place="right"
+              onClick={() => pickerRef.current?.click()}
+            >
+              <Icon icon={ImagePlus} size={16} />
+            </button>
+            <input
+              ref={pickerRef}
+              type="file"
+              accept={PICTURE_TYPES.join(",")}
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                void addPictures(files);
+              }}
+            />
+          </div>
           <div className="eu-board-palette-group">
             {INSTRUMENTS.map((ins) => (
               <button

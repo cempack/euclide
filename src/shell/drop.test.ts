@@ -24,7 +24,7 @@ describe("files dropped on the window", () => {
     const at = vi.spyOn(document, "elementFromPoint").mockReturnValue(inside);
 
     // Tauri's physical pixels, halved on a screen at 200 %.
-    expect(dropTargetAt({ x: 300, y: 80 }, ["C:\\figure.png"])).toBe(target);
+    expect(dropTargetAt({ x: 300, y: 80 }, ["C:\\figure.png"])).toEqual({ target, at: { x: 150, y: 40 } });
     expect(at).toHaveBeenCalledWith(150, 40);
     // A document among the pictures goes to the library.
     expect(dropTargetAt({ x: 300, y: 80 }, ["a.png", "cours.pdf"])).toBeNull();

@@ -1,5 +1,16 @@
+import { formula, loadFormulas, loadPictures, picture } from "./assets";
 import { compile, type Compiled } from "./expr";
-import { CM, MM, contentBounds, type Background, type Box, type Item, type View } from "./model";
+import {
+  CM,
+  MM,
+  contentBounds,
+  type Background,
+  type Box,
+  type Item,
+  type MathItem,
+  type Picture,
+  type View,
+} from "./model";
 
 /** The board is paper in every theme. */
 export const PAPER = "#ffffff";
@@ -288,6 +299,46 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: Item, view: View, 
         .forEach((line, i) => ctx.fillText(line, item.p.x, item.p.y + i * item.size * 1.25));
       break;
     }
+    case "image": {
+      const img = picture(item.file);
+      if (img) {
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, item.p.x, item.p.y, item.w, item.h);
+        break;
+      }
+      // Loading, or its document deleted: a frame where it lies, crossed when missing.
+      ctx.fillStyle = "rgba(17, 18, 19, 0.04)";
+      ctx.fillRect(item.p.x, item.p.y, item.w, item.h);
+      ctx.strokeStyle = "rgba(17, 18, 19, 0.3)";
+      ctx.lineWidth = 1 / view.zoom;
+      ctx.setLineDash([6 / view.zoom, 4 / view.zoom]);
+      ctx.strokeRect(item.p.x, item.p.y, item.w, item.h);
+      if (img === false) {
+        ctx.beginPath();
+        ctx.moveTo(item.p.x, item.p.y);
+        ctx.lineTo(item.p.x + item.w, item.p.y + item.h);
+        ctx.moveTo(item.p.x + item.w, item.p.y);
+        ctx.lineTo(item.p.x, item.p.y + item.h);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "math": {
+      // The context's scale is canvas pixels per world unit (zoom, screen, export).
+      const t = ctx.getTransform();
+      const drawn = formula(item, t.a);
+      if (!drawn) break;
+      if (drawn.exact) {
+        // Pixel for pixel, on whole pixels: as sharp as text.
+        const x = (Math.round(t.a * item.p.x + t.e) - t.e) / t.a;
+        const y = (Math.round(t.d * item.p.y + t.f) - t.f) / t.d;
+        ctx.drawImage(drawn.canvas, x, y, drawn.canvas.width / t.a, drawn.canvas.height / t.d);
+      } else {
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(drawn.canvas, item.p.x, item.p.y, item.w, item.h);
+      }
+      break;
+    }
     case "plot": {
       const f = plotFunction(item.expr);
       if (!f) break;
@@ -384,4 +435,21 @@ export function renderBoard(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(ink, 0, 0);
   return canvas;
+}
+
+/** renderBoard, once the board's pictures and formulas are ready to draw. */
+export async function renderBoardReady(
+  items: Item[],
+  background: Background,
+  scale: number,
+  maxSide = 4096,
+): Promise<HTMLCanvasElement> {
+  await Promise.all([
+    loadPictures(items.filter((i): i is Picture => i.kind === "image").map((i) => i.file)),
+    loadFormulas(
+      items.filter((i): i is MathItem => i.kind === "math"),
+      scale,
+    ),
+  ]);
+  return renderBoard(items, background, scale, maxSide);
 }

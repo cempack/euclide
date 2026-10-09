@@ -29,6 +29,27 @@ export function imageMarkdown(id: number, caption = ""): string {
 
 export const isImageName = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 
+/** The pictures a note or the board takes: those the webview shows on every system. */
+export const PICTURE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/svg+xml",
+];
+
+/**
+ * The pictures among what was pasted: `files` in Chromium (Windows), only
+ * `items` in some WebKit builds (Linux).
+ */
+export function pastedPictures(data: DataTransfer): File[] {
+  const files = data.files.length
+    ? Array.from(data.files)
+    : Array.from(data.items, (item) => item.getAsFile()).filter((f): f is File => f != null);
+  return files.filter((f) => PICTURE_TYPES.includes(f.type));
+}
+
 /** A note's title as a file name: what Windows refuses becomes « - ». */
 export function fileStem(title: string): string {
   const clean = title

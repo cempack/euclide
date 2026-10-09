@@ -26,7 +26,15 @@ import { Markdown } from "../features/notes/Markdown";
 import { PrintSheet, printDialog, sheetReady, type PrintJob } from "../features/notes/PrintSheet";
 import { TemplateMenu, TemplateStrip } from "../features/notes/TemplatePicker";
 import { fillTemplate, type NoteTemplate } from "../features/notes/templates";
-import { asBlock, fileStem, imageExtension, imageMarkdown, isImageName } from "../features/notes/images";
+import {
+  PICTURE_TYPES,
+  asBlock,
+  fileStem,
+  imageExtension,
+  imageMarkdown,
+  isImageName,
+  pastedPictures,
+} from "../features/notes/images";
 import { emptyTable, markdownTable, parseCells, tableFromClipboard } from "../features/notes/tables";
 import { addDropTarget } from "../shell/drop";
 
@@ -40,9 +48,6 @@ interface NoteEditorProps {
 type NoteView = "edit" | "split" | "preview";
 
 const Slides = lazy(() => import("../features/notes/SlideShow"));
-
-/** The pictures a note takes: those the webview shows on every system. */
-const PICTURE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"];
 
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const toast = useToast();
@@ -416,13 +421,10 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
     // Text copied from Word or a page may come with a picture of itself:
     // the text is what was meant.
     if (text) return;
-    // `files` in Chromium (Windows); some WebKit builds (Linux) fill only `items`.
-    const files = data.files.length
-      ? Array.from(data.files)
-      : Array.from(data.items, (item) => item.getAsFile()).filter((f): f is File => f != null);
-    if (!files.some((f) => PICTURE_TYPES.includes(f.type))) return;
+    const pictures = pastedPictures(data);
+    if (!pictures.length) return;
     e.preventDefault();
-    void addImages(files);
+    void addImages(pictures);
   };
 
   // Pictures dropped on the note, from the file explorer, go into it.

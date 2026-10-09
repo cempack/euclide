@@ -80,8 +80,32 @@ export interface Plot extends Stroked {
   kind: "plot";
   expr: string;
 }
+/**
+ * A picture of the library (`file`, its id), `w` × `h` world units from its
+ * top-left corner `p`. Pictures lie under the drawing: ink goes over them.
+ */
+export interface Picture {
+  id: string;
+  kind: "image";
+  p: P;
+  w: number;
+  h: number;
+  file: number;
+}
+/** A formula in LaTeX, set by KaTeX at `size`; `w` × `h` is its box then. */
+export interface MathItem {
+  id: string;
+  kind: "math";
+  p: P;
+  tex: string;
+  size: number;
+  color: string;
+  w: number;
+  h: number;
+}
 
-export type Item = Ink | Segment | Circle | Arc | Rect | Ellipse | PointItem | Text | Plot;
+export type Item =
+  Ink | Segment | Circle | Arc | Rect | Ellipse | PointItem | Text | Plot | Picture | MathItem;
 
 /** Where the screen looks: the world point at its top-left, and the scale. */
 export interface View {
@@ -273,8 +297,10 @@ export function distanceTo(item: Item, p: P, plot?: (x: number) => number): numb
     }
     case "point":
       return dist(p, item.p);
-    case "text": {
-      const { w, h } = textBox(item);
+    case "text":
+    case "image":
+    case "math": {
+      const { w, h } = item.kind === "text" ? textBox(item) : item;
       const dx = Math.max(item.p.x - p.x, 0, p.x - (item.p.x + w));
       const dy = Math.max(item.p.y - p.y, 0, p.y - (item.p.y + h));
       return Math.hypot(dx, dy);
@@ -340,13 +366,80 @@ export function boundsOf(item: Item): Box | null {
         x1: item.p.x + 8 + item.label.length * 12,
         y1: item.p.y + 8,
       };
-    case "text": {
-      const { w, h } = textBox(item);
+    case "text":
+    case "image":
+    case "math": {
+      const { w, h } = item.kind === "text" ? textBox(item) : item;
       return { x0: item.p.x, y0: item.p.y, x1: item.p.x + w, y1: item.p.y + h };
     }
     case "plot":
       return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Moving and resizing (the selection tool)
+// ---------------------------------------------------------------------------
+
+const shift = (p: P, dx: number, dy: number): P => ({ x: p.x + dx, y: p.y + dy });
+
+/** The item moved by (dx, dy). A plot follows the axes and stays. */
+export function moveItem(item: Item, dx: number, dy: number): Item {
+  switch (item.kind) {
+    case "ink":
+      return { ...item, pts: item.pts.map((v, i) => v + (i % 2 ? dy : dx)) };
+    case "segment":
+    case "rect":
+    case "ellipse":
+      return { ...item, a: shift(item.a, dx, dy), b: shift(item.b, dx, dy) };
+    case "circle":
+    case "arc":
+      return { ...item, c: shift(item.c, dx, dy) };
+    case "point":
+    case "text":
+    case "image":
+    case "math":
+      return { ...item, p: shift(item.p, dx, dy) };
+    case "plot":
+      return item;
+  }
+}
+
+/** Items the selection's handle resizes: a picture, a formula, a text. */
+export const resizable = (item: Item): item is Picture | MathItem | Text =>
+  item.kind === "image" || item.kind === "math" || item.kind === "text";
+
+/** The item `width` world units wide, its proportions and top-left corner kept. */
+export function resizeItem<T extends Picture | MathItem | Text>(item: T, width: number): T {
+  const w = item.kind === "text" ? textBox(item).w : item.w;
+  const k = Math.max(0.05, width / (w || 1));
+  if (item.kind === "text") return { ...item, size: Math.max(6, item.size * k) };
+  if (item.kind === "math") return { ...item, size: item.size * k, w: item.w * k, h: item.h * k };
+  return { ...item, w: item.w * k, h: item.h * k };
+}
+
+/**
+ * The item under `p` that the selection tool takes: the one drawn last,
+ * within `reach` of its line. Plots (they follow the axes) and format 2's
+ * eraser strokes are left out.
+ */
+export function itemAt(items: Item[], p: P, reach: number): Item | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.kind === "plot" || (it.kind === "ink" && it.erase)) continue;
+    const pad = "width" in it ? it.width / 2 : 0;
+    if (distanceTo(it, p) <= reach + pad) return it;
+  }
+  return null;
+}
+
+/** A picture put on the board: over the other pictures, under the drawing. */
+export function withPicture(items: Item[], picture: Picture): Item[] {
+  let at = 0;
+  items.forEach((it, i) => {
+    if (it.kind === "image") at = i + 1;
+  });
+  return [...items.slice(0, at), picture, ...items.slice(at)];
 }
 
 /** Everything drawn, or null for an empty board. */
