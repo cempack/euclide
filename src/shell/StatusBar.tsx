@@ -145,11 +145,13 @@ function UpdateItem() {
   const label =
     phase === "installing"
       ? tr("updater.statusInstalling", { percent })
-      : phase === "installed"
-        ? tr("updater.statusInstalled")
-        : phase === "error"
-          ? tr("updater.statusError")
-          : tr("updater.statusAvailable", { version: update.version });
+      : phase === "restarting"
+        ? tr("updater.statusRestarting")
+        : phase === "installed"
+          ? tr("updater.statusInstalled")
+          : phase === "error"
+            ? tr("updater.statusError")
+            : tr("updater.statusAvailable", { version: update.version });
   const hint =
     phase === "installed"
       ? tr("updater.statusInstalledTip")
@@ -160,7 +162,7 @@ function UpdateItem() {
     <button
       type="button"
       onClick={() => void install()}
-      disabled={phase === "installing" || phase === "installed"}
+      disabled={phase === "installing" || phase === "restarting" || phase === "installed"}
       {...tip(hint)}
       data-tip-place="top"
       className={`eu-status-item eu-status-button tabular-nums ${

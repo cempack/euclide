@@ -2,14 +2,15 @@
 //! than a second ago, a whiteboard, a Python script), so a click on the
 //! close button is held and handed to the page: it saves what it can, asks
 //! about the rest, then calls `app_exit`. A page that does not answer
-//! within two seconds (crashed, stuck) cannot keep the window open.
+//! within five seconds (crashed, stuck) cannot keep the window open.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 pub const CLOSE_REQUESTED: &str = "eu://close-requested";
-const ACK_TIMEOUT: Duration = Duration::from_secs(2);
+/// A busy school PC can take seconds to hand the page an event.
+const ACK_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Default)]
 pub struct ExitGate {
@@ -58,4 +59,9 @@ pub fn close_ack(gate: State<'_, ExitGate>, request: u64) {
 #[tauri::command]
 pub fn app_exit(app: AppHandle, gate: State<'_, ExitGate>) {
     gate.approve_and_exit(&app);
+}
+
+/// Quit from Rust once the page has saved (after an update).
+pub fn quit(app: &AppHandle) {
+    app.state::<ExitGate>().approve_and_exit(app);
 }

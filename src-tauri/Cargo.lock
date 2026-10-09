@@ -1021,6 +1021,7 @@ dependencies = [
  "futures-util",
  "gtk",
  "keepawake",
+ "libc",
  "minisign-verify",
  "reqwest",
  "rfd",

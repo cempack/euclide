@@ -34,6 +34,9 @@ pub fn apply_linux_runtime_env() {
 pub fn run() {
     perf::start();
     applog::install_panic_hook();
+    // Before the single-instance check: the version an update replaced may
+    // still be quitting.
+    let waited_for_predecessor = relaunch::wait_for_predecessor();
     apply_linux_runtime_env();
     tauri::Builder::default()
         // First, so a second launch (a double-click while the window is still
@@ -51,7 +54,7 @@ pub fn run() {
                 responder.respond(protocol::handle(&app, &request));
             });
         })
-        .setup(|app| {
+        .setup(move |app| {
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
@@ -170,6 +173,9 @@ pub fn run() {
             }
             if sidecar_swapped {
                 marks.push("app.sidecar_swapped".into());
+            }
+            if let Some(waited) = waited_for_predecessor {
+                marks.push(format!("app.relaunched waited_ms={}", waited.as_millis()));
             }
             perf::append(&marks);
 
