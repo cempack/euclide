@@ -44,7 +44,8 @@ export default function News({ since }: { since?: string }) {
         icon={<Icon icon={KIND_ICONS.news} size={20} />}
         meta={since && newer.length ? tr("news.since", { version: since }) : tr("news.all")}
       />
-      <div className="mt-6 flex flex-col max-w-[46rem]">
+      {/* Focusable: with nothing else to tab to, the keyboard scrolls it. */}
+      <article tabIndex={0} aria-label={tr("news.title")} className="mt-6 flex flex-col max-w-[46rem]">
         {shown.map((release, i) => (
           <section
             key={release.version}
@@ -73,7 +74,7 @@ export default function News({ since }: { since?: string }) {
             {tr("news.older")}
           </button>
         )}
-      </div>
+      </article>
     </>
   );
 }
