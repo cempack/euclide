@@ -631,6 +631,8 @@
     "diagnostics": "En cas de souci",
     "diagnosticsHint": "Ces informations et le dossier des journaux aident à comprendre un problème : joignez-les à votre message.",
     "openLogs": "Ouvrir les journaux",
+    "newsHint": "Ce qui a changé dans chaque version d'Euclide, en images.",
+    "newsOpen": "Voir",
     "version": "Version",
     "portable": "portable",
     "dataFormat": "Format des données",
@@ -643,6 +645,13 @@
       "one": "{count} document à relire, en arrière-plan.",
       "other": "{count} documents à relire, en arrière-plan."
     }
+  },
+  "news": {
+    "title": "Nouveautés",
+    "since": "Ce qui a changé depuis la version {version}",
+    "all": "Ce qui a changé d'une version à l'autre",
+    "version": "Version {version}",
+    "older": "Versions précédentes"
   },
   "updater": {
     "check": "Vérifier les mises à jour",
@@ -832,6 +841,7 @@
       "whiteboard": "board tableau craie dessin ardoise",
       "note": "notes memo mémo",
       "recap": "stats statistiques recapitulatif récapitulatif summary bilan",
+      "news": "nouveautes nouveautés quoi de neuf changelog journal versions mise a jour update whats new",
       "settings": "settings parametres paramètres config configuration preferences préférences prefs options reglages réglages",
       "help": "shortcuts raccourcis clavier keymap help aide",
       "timer": "timer chrono countdown minuteur minute horloge classe",

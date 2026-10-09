@@ -144,6 +144,16 @@ export const SCREENS: Array<{ name: string; go: (page: Page) => Promise<void> }>
     },
   },
   {
+    // What changed, version after version, with its pictures (from Réglages).
+    name: "news",
+    go: async (p) => {
+      await p.keyboard.press("Control+Comma");
+      await settle(p);
+      await p.getByRole("button", { name: "Voir", exact: true }).click();
+      await settle(p);
+    },
+  },
+  {
     name: "note",
     go: async (p) => {
       await nav(p, "Documents");

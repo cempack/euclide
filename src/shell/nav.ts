@@ -10,6 +10,7 @@ import {
   Presentation,
   Settings,
   SquareTerminal,
+  Sparkles,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export const KIND_ICONS: Record<TabKind, LucideIcon> = {
   python: SquareTerminal,
   tools: Wrench,
   recap: ChartColumn,
+  news: Sparkles,
   settings: Settings,
   pdf: FileText,
 };

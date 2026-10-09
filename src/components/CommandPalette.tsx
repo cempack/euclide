@@ -21,6 +21,7 @@ import { keysOf } from "../lib/keymap";
 import {
   Bell,
   BookOpen,
+  ChartColumn,
   CircleHelp,
   Clock,
   CodeXml,
@@ -227,8 +228,16 @@ function CommandPalette({
         group: G,
         label: tr("nav.recap"),
         aliases: cmdAliases("recap"),
-        icon: <Icon icon={Sparkles} size={16} />,
+        icon: <Icon icon={ChartColumn} size={16} />,
         run: go("recap", tr("nav.recap")),
+      },
+      {
+        id: "news",
+        group: G,
+        label: tr("news.title"),
+        aliases: cmdAliases("news"),
+        icon: <Icon icon={Sparkles} size={16} />,
+        run: go("news", tr("news.title")),
       },
       {
         id: "settings",

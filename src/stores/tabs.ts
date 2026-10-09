@@ -18,7 +18,8 @@ export type TabKind =
   | "pdf"
   | "reminders"
   | "note"
-  | "recap";
+  | "recap"
+  | "news";
 
 export interface TabParams {
   courseId?: number;
@@ -39,6 +40,8 @@ export interface TabParams {
   /** A PDF: words to find in it (a search hit), and when they were asked for. */
   find?: string;
   findAt?: number;
+  /** Nouveautés: the version Euclide was updated from. */
+  since?: string;
 }
 
 export interface Tab {
@@ -68,6 +71,7 @@ const SINGLETONS: TabKind[] = [
   "settings",
   "reminders",
   "recap",
+  "news",
 ];
 
 /** How the tab cap is chosen. `auto` follows the strip width; the others are explicit. */
@@ -100,6 +104,7 @@ const DEFAULT_TITLES: Record<TabKind, string> = {
   reminders: "Rappels",
   note: "Note",
   recap: "Bilan",
+  news: "Nouveautés",
 };
 
 function newMountId(): string {

@@ -47,6 +47,7 @@ const screenModules = {
   settings: () => import("./screens/Settings"),
   reminders: () => import("./screens/Reminders"),
   recap: () => import("./screens/Recap"),
+  news: () => import("./screens/News"),
   classContent: () => import("./screens/ClassContent"),
   whiteboard: () => import("./features/board/Board"),
   pdf: () => import("./features/pdf/DocumentPane"),
@@ -62,6 +63,7 @@ const Python = lazy(screenModules.python);
 const Settings = lazy(screenModules.settings);
 const Reminders = lazy(screenModules.reminders);
 const Recap = lazy(screenModules.recap);
+const News = lazy(screenModules.news);
 const ClassContent = lazy(screenModules.classContent);
 const Whiteboard = lazy(screenModules.whiteboard);
 const PdfViewer = lazy(screenModules.pdf);
@@ -202,6 +204,8 @@ function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; vis
       return <Reminders />;
     case "recap":
       return <Recap />;
+    case "news":
+      return <News since={tab.params.since} />;
     case "whiteboard":
       return (
         <Whiteboard
@@ -475,10 +479,14 @@ function Shell() {
     [toast],
   );
 
-  // First launch after an update or a restore: say so, once.
+  // First launch after an update or a restore: say so, once. After an
+  // update, « Nouveautés » tells everything since the version it came from.
   useEffect(() => {
     const updated = takeBootUpdate();
-    if (updated) toast(tr("updater.updatedTo", { version: updated.to }), "success");
+    if (updated) {
+      toast(tr("updater.updatedTo", { version: updated.to }), "success");
+      tabs.open({ kind: "news", title: tr("news.title"), params: { since: updated.from } });
+    }
     const restored = takeBootRestore();
     if (restored) {
       const day = dayLabel(restored.name.replace(/\.db$/, ""));

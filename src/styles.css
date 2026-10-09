@@ -1817,6 +1817,23 @@ input[type="radio"] {
   list-style: none;
   padding-left: 0.2em;
 }
+/* « Nouveautés » (screens/News.tsx): a version's groups (PDF, En classe…)
+   are labels under its number, and its pictures take some air. */
+.eu-news h3 {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-weight: var(--text-label--font-weight);
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+  color: rgb(var(--eu-ink-faint));
+  margin-top: 1.8em;
+}
+.eu-news h3:first-child {
+  margin-top: 0;
+}
+.eu-news p:has(> img) {
+  margin-block: 1.1em 1.4em;
+}
 .eu-prose .contains-task-list .contains-task-list {
   padding-left: 1.35em;
 }

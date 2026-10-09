@@ -1091,8 +1091,16 @@ function AboutSection({ info }: { info: AppInfo | null }) {
         )}
       </Panel>
 
-      {/* What to tell when something goes wrong. */}
+      {/* What changed, and what to tell when something goes wrong. */}
       <Panel pad>
+        <SettingRow title={tr("news.title")} hint={tr("about.newsHint")}>
+          <button
+            className="eu-btn-quiet eu-btn-sm"
+            onClick={() => tabs.open({ kind: "news", title: tr("news.title") })}
+          >
+            {tr("about.newsOpen")}
+          </button>
+        </SettingRow>
         <SettingRow title={tr("about.diagnostics")} hint={tr("about.diagnosticsHint")}>
           <button
             className="eu-btn-quiet eu-btn-sm"
