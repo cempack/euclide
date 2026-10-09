@@ -329,12 +329,18 @@ pub fn python_dir() -> PathBuf {
 #[cfg(test)]
 pub(crate) fn temp_data_dir(name: &str) -> TempDataDir {
     let guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let dir = std::env::temp_dir().join(format!("euclide-test-{name}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
+    // The data folder one level down: its Euclide-Sauvegardes beside it is
+    // this test's own too.
+    let root = std::env::temp_dir().join(format!("euclide-test-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let dir = root.join("Euclide-Data");
     fs::create_dir_all(&dir).unwrap();
     set_data_dir_override(dir.clone());
     ensure_subdirs(&dir);
-    TempDataDir { dir, _guard: guard }
+    TempDataDir {
+        dir: root,
+        _guard: guard,
+    }
 }
 
 #[cfg(test)]

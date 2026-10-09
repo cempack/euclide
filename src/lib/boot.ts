@@ -1,4 +1,4 @@
-import type { PronoteStatus } from "./api";
+import type { PronoteStatus, RestoreReport } from "./api";
 
 /**
  * The boot state the backend injects before any script runs (see
@@ -15,6 +15,8 @@ type BootState = {
   pronote?: PronoteStatus;
   /** Set on the first launch after an update. */
   updated?: { from: string; to: string } | null;
+  /** Set on the launch that restored a snapshot (or failed to). */
+  restored?: RestoreReport | null;
 };
 
 declare global {
@@ -65,4 +67,11 @@ export function takeBootUpdate(): { from: string; to: string } | null {
   const updated = boot?.updated ?? null;
   if (boot) boot.updated = null;
   return updated;
+}
+
+/** The restore this launch did or refused, if any: told once. */
+export function takeBootRestore(): RestoreReport | null {
+  const restored = boot?.restored ?? null;
+  if (boot) boot.restored = null;
+  return restored;
 }

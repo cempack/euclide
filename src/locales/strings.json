@@ -974,6 +974,8 @@
     "restorePending": "Au prochain lancement, Euclide reviendra à une copie précédente.",
     "restoreCancel": "Annuler",
     "restoreCancelled": "Euclide garde les données actuelles.",
+    "restored": "Euclide est revenu à la copie de {day}. Les données d'avant sont dans Euclide-Sauvegardes.",
+    "restoreFailed": "La copie de {day} n'a pas été remise, les données n'ont pas changé. {error}",
     "damaged": "Euclide a trouvé un problème dans ses données ({detail}). Revenez à la copie d'un jour où tout allait bien.",
     "archiveTitle": "Archive complète",
     "archiveHint": "Une archive .zip de tout le dossier, documents compris, à emporter ailleurs.",

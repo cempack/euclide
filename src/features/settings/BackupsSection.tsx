@@ -4,26 +4,13 @@ import { Archive, FolderOpen, History, RotateCcw, ShieldAlert, ShieldCheck } fro
 import { q } from "../../api/queries";
 import { Panel, Section } from "../../components/layout";
 import { Modal, useConfirm, useToast } from "../../components/ui";
-import { api, isTauri } from "../../lib/api";
+import { api, isTauri, type RestoreReport } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
-import { humanSize } from "../../lib/format";
+import { dayLabel, humanSize } from "../../lib/format";
 import { tr, trn } from "../../lib/i18n";
 import { reportError } from "../../lib/report";
 import { Icon } from "../../ui/Icon";
 import { SettingRow } from "./SettingRow";
-
-/** « aujourd'hui », « hier », or « lundi 5 octobre ». */
-function dayLabel(ymd: string): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const day = new Date(y, m - 1, d);
-  const today = new Date();
-  const diff = Math.round(
-    (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - day.getTime()) / 86_400_000,
-  );
-  if (diff === 0) return tr("backups.today");
-  if (diff === 1) return tr("backups.yesterday");
-  return day.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-}
 
 /**
  * The copies Euclide makes by itself (one a day, on the key), the copy on
@@ -82,6 +69,7 @@ export function BackupsSection({ id }: { id: string }) {
         </button>
       }
     >
+      {status?.last_restore && <RestoreOutcome report={status.last_restore} />}
       {status?.restore_pending && (
         <div className="eu-banner" role="status">
           <Icon icon={RotateCcw} size={16} className="shrink-0" />
@@ -225,5 +213,21 @@ export function BackupsSection({ id }: { id: string }) {
         </div>
       </Modal>
     </Section>
+  );
+}
+
+/** What this launch's restore did: done, or refused with the data untouched. */
+function RestoreOutcome({ report }: { report: RestoreReport }) {
+  const day = dayLabel(report.name.replace(/\.db$/, ""));
+  return report.error ? (
+    <div className="eu-banner eu-banner-danger" role="alert">
+      <Icon icon={ShieldAlert} size={16} className="shrink-0" />
+      <p className="flex-1 min-w-0">{tr("backups.restoreFailed", { day, error: report.error })}</p>
+    </div>
+  ) : (
+    <div className="eu-banner" role="status">
+      <Icon icon={RotateCcw} size={16} className="shrink-0" />
+      <p className="flex-1 min-w-0">{tr("backups.restored", { day })}</p>
+    </div>
   );
 }

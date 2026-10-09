@@ -60,11 +60,20 @@ pub fn run() {
             }
             crate::paths::freeze_data_dir();
             // A restore chosen in Settings is applied before the database opens.
-            match jobs::backup::apply_pending_restore() {
-                Ok(Some(name)) => perf::append(&[format!("backup.restored={name}")]),
-                Ok(None) => {}
-                Err(e) => applog::warn(format!("[backup] restore: {}", e.message())),
+            let restored = jobs::backup::apply_pending_restore();
+            match &restored {
+                Some(jobs::backup::RestoreReport { name, error: None }) => {
+                    perf::append(&[format!("backup.restored={name}")])
+                }
+                Some(jobs::backup::RestoreReport {
+                    name,
+                    error: Some(e),
+                }) => applog::warn(format!("[backup] restore of {name}: {e}")),
+                None => {}
             }
+            app.manage(jobs::backup::LastRestore(std::sync::Mutex::new(
+                restored.clone(),
+            )));
             let db = match db::Db::open(&crate::paths::db_path()) {
                 Ok(db) => db,
                 Err(err) => {
@@ -88,7 +97,7 @@ pub fn run() {
 
             // The window first: the webview starts loading while the rest of
             // setup runs, and opens with everything its first render needs.
-            let boot_state = boot::state(&db.lock(), updated_from.as_deref());
+            let boot_state = boot::state(&db.lock(), updated_from.as_deref(), restored.as_ref());
             boot::create_main_window(app, &boot_state)?;
             let window_ms = perf::uptime_ms();
 
