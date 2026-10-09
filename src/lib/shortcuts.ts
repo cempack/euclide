@@ -25,6 +25,11 @@ export function shortcutKeys(spec: string): string[] {
         return isMac ? "↩" : "Entrée";
       case "esc":
         return "Échap";
+      // As French keyboards print them.
+      case "pageup":
+        return isMac ? "⇞" : "PgPréc";
+      case "pagedown":
+        return isMac ? "⇟" : "PgSuiv";
       default:
         return key.length === 1 ? key.toUpperCase() : key;
     }
