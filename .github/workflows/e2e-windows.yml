@@ -1,0 +1,49 @@
+name: "e2e-windows"
+
+# The app on Windows, as the teacher runs it: WebView2, the real backend, the
+# app's CSP and its eufile protocol. A debug build opens WebView2's DevTools
+# port (scripts/e2e/tauri.e2e.conf.json), and Playwright drives it there
+# (scripts/e2e/windows.mjs): PDFs drawn, annotated, saved and filled in, a
+# phone photo shown upright and drawn on. Run by hand before a release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: windows-latest
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: "npm"
+      - run: npm ci
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: e2e-windows
+          cache-on-failure: true
+      - name: build (debug, no installer, no sidecar)
+        run: npx tauri build --debug --no-bundle --config scripts/e2e/tauri.e2e.conf.json
+      - name: run
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force e2e-app | Out-Null
+          Copy-Item src-tauri\target\debug\euclide.exe e2e-app\
+          node scripts/e2e/windows.mjs "$PWD\e2e-app\euclide.exe" e2e-out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-windows
+          path: |
+            e2e-out/
+            e2e-app/Euclide-Data/logs/
+          if-no-files-found: ignore
+          retention-days: 7
