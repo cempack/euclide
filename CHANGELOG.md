@@ -2,6 +2,33 @@
 
 Ce qui change d'une version d'Euclide à l'autre.
 
+## 0.6.0
+
+### PDF
+
+- **Un nouveau moteur.** Les PDF s'affichent avec PDFium, le moteur de Chrome. Les pages se dessinent à part, sans bloquer la fenêtre, et restent nettes à tout zoom. Ctrl + molette zoome autour du pointeur.
+- **Ce qui est dessiné va dans le fichier**, en annotations ordinaires : un autre lecteur PDF les montre aussi. Un trait, une note ou une forme se déplace, s'agrandit, s'efface.
+- **Annuler et Rétablir** ont leurs boutons, pour un stylet sans Ctrl+Z.
+- **Le stylo** a trois épaisseurs. **Le surligneur** marque le texte qu'on balaie, et trace à main levée ailleurs : dans une marge, sur un scan. Il souligne et barre aussi.
+- **Des formes** : un trait, une flèche, un rectangle, une ellipse. **La gomme** efface ce qu'elle touche.
+- **Une note de texte** s'agrandit pendant qu'on écrit. Laissée vide, elle disparaît.
+- **Les formulaires** se remplissent et s'enregistrent dans le fichier.
+- **Ctrl+F cherche dans le document.** Chaque mot trouvé est surligné, Entrée passe au suivant. Le panneau des pages montre aussi le sommaire du PDF, quand il en a un.
+- **Présenter** (F5) : une page à la fois, en plein écran. Les touches d'une télécommande de présentation tournent les pages. Le stylo, le surligneur, la gomme et un pointeur restent à portée, et ce qui est dessiné reste dans le document.
+- **Imprimer** (Ctrl+P) : les pages comme à l'écran, avec ce qui est dessiné dessus.
+- **Exporter une copie** : les annotations et les champs remplis y sont fixés, comme sur papier. C'est la copie à envoyer aux élèves.
+- **Le menu Pages** tourne une page pour de bon, en insère une blanche ou à petits carreaux, la déplace, la supprime, ajoute un autre PDF à la fin, ou extrait des pages dans un nouveau document. L'ancienne version reste dans l'historique, et « Annuler » la ramène.
+- **Un PDF protégé par un mot de passe** le demande, au lieu de refuser de s'ouvrir. Euclide ne le garde pas, et le fichier reste protégé.
+
+### Recherche
+
+- **Un mot trouvé dans un PDF dit sa page**, et ouvre le PDF sur ce mot, surligné.
+- La recherche lit les 300 premières pages d'un PDF, au lieu de 60. Un PDF dont les pages changent est relu.
+
+### À savoir
+
+- Au premier démarrage, Euclide relit les PDF en arrière-plan, pour savoir sur quelle page est chaque mot. Cela peut prendre quelques minutes, pendant lesquelles la recherche dans les PDF reste celle d'avant.
+
 ## 0.5.0
 
 ### En classe

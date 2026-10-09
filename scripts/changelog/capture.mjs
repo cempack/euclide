@@ -135,6 +135,23 @@ const scene = async (page, mode) => {
   return dialog;
 };
 
+/** The exercise sheet open, the side panel closed, the pages laid out. */
+async function pdfOpen() {
+  const page = await open();
+  await nav(page, "Documents");
+  await page.getByText("Évaluation — Statistiques.pdf").first().click();
+  await page.locator(".eu-pdf-page").first().waitFor();
+  await settle(page, 1500);
+  return page;
+}
+
+/** Where a point of the PDF's first page (595 × 842, from the top left) is on the screen. */
+async function pagePoint(page) {
+  const box = await page.locator(".eu-pdf-page").first().boundingBox();
+  const s = box.width / 595;
+  return (x, y) => [box.x + x * s, box.y + y * s];
+}
+
 const SHOTS = {
   "tableau-de-bord": async () => open(),
   "tableau-de-bord-sombre": async () => open("dark"),
@@ -315,6 +332,86 @@ const SHOTS = {
     await page.getByText("Évaluation — Statistiques.pdf").first().click();
     await away(page);
     await settle(page, 2500);
+    return page;
+  },
+  // 0.6: an exercise sheet corrected on screen: a highlight, an underline, a
+  // circled value, an arrow and a note; the highlighter's ways in the toolbar.
+  "pdf-annoter": async () => {
+    const page = await pdfOpen();
+    const at = await pagePoint(page);
+    const tool = (name) => page.getByRole("button", { name, exact: true }).click();
+    const drag = async (from, to, steps = 12) => {
+      await page.mouse.move(...from);
+      await page.mouse.down();
+      for (let i = 1; i <= steps; i++)
+        await page.mouse.move(
+          from[0] + ((to[0] - from[0]) * i) / steps,
+          from[1] + ((to[1] - from[1]) * i) / steps,
+        );
+      await page.mouse.up();
+      await page.waitForTimeout(1000);
+    };
+    // Points of the sheet (595 × 842 points, from the top left): « Voici les
+    // notes… de 28 élèves » on y 227, the « 28 » at x 271, question 1 on y 308.
+    await tool("Surligneur");
+    await drag(at(52, 227), at(260, 227));
+    await page.getByRole("button", { name: "Souligner", exact: true }).click();
+    await drag(at(68, 308), at(232, 308));
+    await tool("Stylo");
+    const ring = [];
+    for (let i = 0; i <= 24; i++) {
+      const t = (i / 24) * 2 * Math.PI;
+      ring.push(at(271 + 14 * Math.cos(t), 226 + 10 * Math.sin(t)));
+    }
+    await page.mouse.move(...ring[0]);
+    await page.mouse.down();
+    for (const p of ring.slice(1)) await page.mouse.move(...p);
+    await page.mouse.up();
+    await page.waitForTimeout(1000);
+    await page.getByRole("button", { name: "Formes", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Flèche" }).click();
+    await drag(at(384, 252), at(290, 232));
+    await tool("Texte");
+    // Right of the table, where the sheet is blank.
+    await page.mouse.click(...at(386, 244));
+    await page.keyboard.type("Vérifier la somme des effectifs");
+    // Another tool: the note is finished, and the highlighter shows its ways.
+    await tool("Surligneur");
+    await page.keyboard.press("Escape");
+    await away(page);
+    await settle(page, 800);
+    return page;
+  },
+  // 0.6: the same sheet presented, a stroke drawn in class.
+  "pdf-presenter": async () => {
+    const page = await pdfOpen();
+    await page.keyboard.press("F5");
+    await page.locator(".eu-pdf-present-bar").waitFor();
+    await page.waitForTimeout(800);
+    await page.getByRole("toolbar", { name: "Présenter" }).getByRole("button", { name: "Stylo" }).click();
+    const sheet = await page.locator(".eu-pdf-page").first().boundingBox();
+    const s = sheet.width / 595;
+    const ring = [];
+    for (let i = 0; i <= 28; i++) {
+      const t = (i / 28) * 2 * Math.PI;
+      // The « 28 » of « une classe de 28 élèves ».
+      ring.push([sheet.x + s * (271 + 16 * Math.cos(t)), sheet.y + s * (226 + 11 * Math.sin(t))]);
+    }
+    await page.mouse.move(...ring[0]);
+    await page.mouse.down();
+    for (const p of ring.slice(1)) await page.mouse.move(...p);
+    await page.mouse.up();
+    await page.waitForTimeout(1200);
+    await page.mouse.move(720, 860);
+    await settle(page, 600);
+    return page;
+  },
+  // 0.6: the « Pages » menu, on the page in view.
+  "pdf-pages": async () => {
+    const page = await pdfOpen();
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    await page.getByRole("menu").waitFor();
+    await settle(page, 400);
     return page;
   },
   // 0.5: three names drawn from the class in progress.
