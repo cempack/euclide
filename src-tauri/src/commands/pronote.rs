@@ -621,6 +621,41 @@ pub async fn pronote_students(
         .await
 }
 
+/// Every class of the teacher's account with its students, in one Pronote
+/// session: each becomes its class's list for the name picker, as
+/// `pronote_students` does for one. A class Pronote refuses, or gives no one
+/// for, keeps the list it had; the refused ones come back in `failed`.
+#[tauri::command]
+pub async fn pronote_students_all(
+    app: AppHandle,
+    db: State<'_, Db>,
+    lane: State<'_, PronoteLane>,
+) -> AppResult<Value> {
+    let _turn = lane.0.lock().await;
+    let creds = db.read(|conn| credentials(conn, json!({}))).await?;
+    let mut res = crate::sidecar::call(&app, "pronote_all_students", &creds).await?;
+    let res = db
+        .write(move |conn| {
+            take_rotated_credentials(conn, &mut res);
+            Ok(res)
+        })
+        .await?;
+    ensure_ok(&res, "Listes des élèves indisponibles")?;
+    let lists = class_lists(&res);
+    let failed = res.get("failed").cloned().unwrap_or_else(|| json!([]));
+    let loaded = db
+        .write(move |conn| {
+            let mut loaded = Vec::new();
+            for (class_name, names) in &lists {
+                let saved = crate::commands::students::replace(conn, class_name, names)?;
+                loaded.push(json!({ "class": class_name, "count": saved.len() }));
+            }
+            Ok(loaded)
+        })
+        .await?;
+    Ok(json!({ "loaded": loaded, "failed": failed }))
+}
+
 fn student_names(res: &Value) -> Vec<String> {
     res.get("names")
         .and_then(|n| n.as_array())
@@ -633,12 +668,50 @@ fn student_names(res: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// The sidecar's `classes`: each class's name and its students, the ones
+/// with a name and at least one student.
+fn class_lists(res: &Value) -> Vec<(String, Vec<String>)> {
+    res.get("classes")
+        .and_then(|c| c.as_array())
+        .map(|classes| {
+            classes
+                .iter()
+                .filter_map(|c| {
+                    let name = c.get("class")?.as_str()?.trim();
+                    let names = student_names(c);
+                    (!name.is_empty() && !names.is_empty()).then(|| (name.to_string(), names))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn conn() -> Connection {
         crate::db::migrations_for_tests()
+    }
+
+    #[test]
+    fn every_class_with_a_name_and_students_is_kept() {
+        let res = json!({
+            "classes": [
+                { "class": " 2NDE7 ", "names": ["Léa DUPONT", "Hugo MARTIN"] },
+                { "class": "1G3", "names": [] },
+                { "class": "", "names": ["Zoé BERNARD"] },
+                { "names": ["Sans classe"] }
+            ]
+        });
+        assert_eq!(
+            class_lists(&res),
+            vec![(
+                "2NDE7".to_string(),
+                vec!["Léa DUPONT".to_string(), "Hugo MARTIN".to_string()]
+            )]
+        );
+        assert!(class_lists(&json!({})).is_empty());
     }
 
     #[test]

@@ -607,6 +607,8 @@ const LAST = [
 ];
 const fakeClass = (size: number, shift: number) =>
   Array.from({ length: size }, (_, i) => `${FIRST[(i + shift) % 26]} ${LAST[(i * 7 + shift) % 26]}`);
+/** The classes of the sample teacher's Pronote. */
+const PRONOTE_CLASSES = ["2NDE4", "2NDE7", "TNSI", "TEXP1", "1SPE3", "2NDE1"];
 const studentLists = new Map<string, string[]>([
   ["2NDE7", fakeClass(26, 0)],
   ["TNSI", fakeClass(18, 5)],
@@ -975,16 +977,20 @@ function handle(cmd: string, args: Args): unknown {
       return null;
     }
     case "pronote_classes":
-      return {
-        ok: true,
-        classes: ["2NDE4", "2NDE7", "TNSI", "TEXP1", "1SPE3", "2NDE1"].map((name) => ({ name })),
-      };
+      return { ok: true, classes: PRONOTE_CLASSES.map((name) => ({ name })) };
     case "pronote_contents":
       return pronoteContents(args);
     case "pronote_students": {
       const names = fakeClass(24, str(args, "className").length);
       studentLists.set(str(args, "className").trim(), names);
       return names.slice();
+    }
+    case "pronote_students_all": {
+      const loaded = PRONOTE_CLASSES.map((name) => {
+        studentLists.set(name, fakeClass(24, name.length));
+        return { class: name, count: 24 };
+      });
+      return { loaded, failed: [] };
     }
 
     // Students

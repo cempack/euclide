@@ -918,22 +918,10 @@ def pronote_classes(payload):
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": f"Session Pronote expiree ou erreur : {exc}"}
 
-    classes_raw = (
-        client.parametres_utilisateur.get("dataSec", {}).get("data", {}).get("listeClasses", {}).get("V", [])
-    )
-    classes = []
-    for c in classes_raw:
-        name = (c.get("L") or "").strip()
-        # Filter out subgroups, options, or admin codes.
-        # Main classes have no space, dot, parenthesis, or comma, and length <= 6.
-        if name and len(name) <= 6 and not any(char in name for char in [" ", ".", "(", ")", ","]):
-            classes.append(
-                {
-                    "name": name,
-                    "N": c.get("N"),
-                    "G": c.get("G", 1),
-                }
-            )
+    classes = [
+        {"name": (c.get("L") or "").strip(), "N": c.get("N"), "G": c.get("G", 1)}
+        for c in _main_classes(client)
+    ]
 
     return {
         "ok": True,
@@ -941,6 +929,43 @@ def pronote_classes(payload):
         "account_name": _account_name(client),
         **_credentials_reply(client),
     }
+
+
+def _account_classes(client):
+    """The classes the account sees (`listeClasses`), as pronotepy's
+    VieScolaireClient.classes reads them."""
+    return (
+        client.parametres_utilisateur.get("dataSec", {}).get("data", {}).get("listeClasses", {}).get("V", [])
+    )
+
+
+def _main_classes(client):
+    """The account's classes without its subgroups, options and codes: a
+    class's name has no space, dot, bracket or comma, and 6 signs at most."""
+    found = []
+    for c in _account_classes(client):
+        name = (c.get("L") or "").strip()
+        if name and len(name) <= 6 and not any(char in name for char in " .(),"):
+            found.append(c)
+    return found
+
+
+def _period(client):
+    return getattr(client, "current_period", None) or client.periods[0]
+
+
+def _class_students(client, entry, period):
+    """A class's student names: pronotepy's StudentClass.students()
+    (ListeRessources, tab 105, the class and a period). Its Student would
+    also demand birth dates and projects: only names are read here, so an
+    entry missing the rest does not lose the list."""
+    res = client.post(
+        "ListeRessources",
+        105,
+        {"classe": {"N": entry.get("N"), "G": 1}, "periode": {"N": period.id, "G": 1}},
+    )
+    entries = res["dataSec"]["data"]["listeRessources"]["V"]
+    return [n for n in (_student_name(e) for e in entries) if n]
 
 
 def _class_key(name):
@@ -958,9 +983,7 @@ def _student_name(entry):
 
 def pronote_students(payload):
     """The names of a class's students, first and last names only, for the
-    name picker. The request is pronotepy's StudentClass.students(), whose
-    Student would also demand birth dates and projects: only names are read
-    here, so an entry missing the rest does not lose the list.
+    name picker (_class_students).
     """
     try:
         import pronotepy  # noqa: F401 - availability check
@@ -977,10 +1000,7 @@ def pronote_students(payload):
 
     # From here the token has turned: every reply hands the new one back.
     reply = _credentials_reply(client)
-    classes = (
-        client.parametres_utilisateur.get("dataSec", {}).get("data", {}).get("listeClasses", {}).get("V", [])
-    )
-    match = next((c for c in classes if _class_key(c.get("L")) == wanted), None)
+    match = next((c for c in _account_classes(client) if _class_key(c.get("L")) == wanted), None)
     if match is None:
         return {
             "ok": False,
@@ -988,24 +1008,57 @@ def pronote_students(payload):
             **reply,
         }
     try:
-        period = getattr(client, "current_period", None) or client.periods[0]
-        res = client.post(
-            "ListeRessources",
-            105,
-            {"classe": {"N": match.get("N"), "G": 1}, "periode": {"N": period.id, "G": 1}},
-        )
-        entries = res["dataSec"]["data"]["listeRessources"]["V"]
+        names = _class_students(client, match, _period(client))
     except Exception as exc:  # noqa: BLE001
         return {
             "ok": False,
             "error": f"Pronote ne donne pas la liste des élèves de {match.get('L')} : {exc}",
             **reply,
         }
-    names = [n for n in (_student_name(e) for e in entries) if n]
     return {
         "ok": True,
         "class": match.get("L"),
         "names": names,
+        "account_name": _account_name(client),
+        **reply,
+    }
+
+
+def pronote_all_students(payload):
+    """Every class of the account with its students, in one session: as
+    pronotepy's VieScolaireClient.classes, then StudentClass.students() for
+    each, on the teacher's own classes (the ones the class pickers show). A
+    class Pronote refuses is told apart; the others come back all the same.
+    """
+    try:
+        import pronotepy  # noqa: F401 - availability check
+    except ImportError:
+        return {"ok": False, "error": "pronotepy n'est pas installé dans le sidecar."}
+    try:
+        client = _get_client(payload)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"Session Pronote expirée ou erreur : {exc}"}
+
+    # From here the token has turned: every reply hands the new one back.
+    reply = _credentials_reply(client)
+    try:
+        period = _period(client)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"Pronote ne donne pas la période en cours : {exc}", **reply}
+    classes, failed = [], []
+    for entry in _main_classes(client):
+        name = (entry.get("L") or "").strip()
+        try:
+            names = _class_students(client, entry, period)
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"class": name, "error": str(exc)})
+            continue
+        if names:
+            classes.append({"class": name, "names": names})
+    return {
+        "ok": True,
+        "classes": classes,
+        "failed": failed,
         "account_name": _account_name(client),
         **reply,
     }

@@ -308,6 +308,7 @@ pub fn run() {
             commands::courses::update_course_class_notes,
             commands::pronote::pronote_classes,
             commands::pronote::pronote_students,
+            commands::pronote::pronote_students_all,
             commands::students::students_for_class,
             commands::students::student_lists,
             commands::students::set_students,

@@ -31,20 +31,23 @@ class FakeClient:
     client_identifier = ""
 
     def __init__(self, entries=None, fail=False):
-        self.parametres_utilisateur = {
-            "dataSec": {"data": {"listeClasses": {"V": [{"L": "2NDE7", "N": "C7"}, {"L": "1G3", "N": "C3"}]}}}
-        }
+        classes = [{"L": "2NDE7", "N": "C7"}, {"L": "1G3", "N": "C3"}, {"L": "2NDE7 GR.A", "N": "G1"}]
+        self.parametres_utilisateur = {"dataSec": {"data": {"listeClasses": {"V": classes}}}}
         self.current_period = SimpleNamespace(id="P2")
         self.info = SimpleNamespace(name="M. PROF")
+        # One list for every class, or one per class's id.
         self.entries = ENTRIES if entries is None else entries
+        # True for every class, or the ids Pronote refuses.
         self.fail = fail
         self.posted = []
 
     def post(self, function, onglet, data):
         self.posted.append((function, onglet, data))
-        if self.fail:
+        class_id = data["classe"]["N"]
+        if self.fail is True or (self.fail and class_id in self.fail):
             raise RuntimeError("accès refusé")
-        return {"dataSec": {"data": {"listeRessources": {"V": self.entries}}}}
+        entries = self.entries.get(class_id, []) if isinstance(self.entries, dict) else self.entries
+        return {"dataSec": {"data": {"listeRessources": {"V": entries}}}}
 
 
 class PronoteStudents(unittest.TestCase):
@@ -88,6 +91,54 @@ class PronoteStudents(unittest.TestCase):
             res = pronote.pronote_students({"class": "  "})
         self.assertFalse(res["ok"])
         get.assert_not_called()
+
+
+class PronoteAllStudents(unittest.TestCase):
+    """Every class at once: pronotepy's classes, then each one's students."""
+
+    def run_with(self, client):
+        with (
+            mock.patch.dict(sys.modules, {"pronotepy": ModuleType("pronotepy")}),
+            mock.patch.object(pronote, "_get_client", return_value=client),
+        ):
+            return pronote.pronote_all_students({})
+
+    def test_each_class_with_its_names_and_no_group(self):
+        client = FakeClient(entries={"C7": ENTRIES, "C3": ENTRIES[:1]})
+        res = self.run_with(client)
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(
+            res["classes"],
+            [
+                {"class": "2NDE7", "names": ["Léa DUPONT", "Hugo Jean MARTIN", "BERNARD Zoé"]},
+                {"class": "1G3", "names": ["Léa DUPONT"]},
+            ],
+        )
+        self.assertEqual(res["failed"], [])
+        # One request per class, in the current period; the group is not asked for.
+        self.assertEqual([data["classe"]["N"] for _, _, data in client.posted], ["C7", "C3"])
+        self.assertTrue(all(post[:2] == ("ListeRessources", 105) for post in client.posted))
+        self.assertEqual(res["password"], "token-2")
+
+    def test_a_refused_class_is_told_and_the_others_kept(self):
+        res = self.run_with(FakeClient(fail={"C3"}))
+        self.assertTrue(res["ok"], res)
+        self.assertEqual([c["class"] for c in res["classes"]], ["2NDE7"])
+        self.assertEqual(res["failed"], [{"class": "1G3", "error": "accès refusé"}])
+
+    def test_a_class_without_students_is_left_out(self):
+        res = self.run_with(FakeClient(entries={"C7": ENTRIES}))
+        self.assertEqual([c["class"] for c in res["classes"]], ["2NDE7"])
+        self.assertEqual(res["failed"], [])
+
+    def test_no_session_says_so(self):
+        with (
+            mock.patch.dict(sys.modules, {"pronotepy": ModuleType("pronotepy")}),
+            mock.patch.object(pronote, "_get_client", side_effect=RuntimeError("expirée")),
+        ):
+            res = pronote.pronote_all_students({})
+        self.assertFalse(res["ok"])
+        self.assertIn("expirée", res["error"])
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ import { EmptyState, Modal, useFailure, useToast, useConfirm } from "../componen
 import { Field, Panel, Section, PageHeader, MetaDot, Segmented } from "../components/layout";
 import { useSetting } from "../api/hooks";
 import { useAppearance } from "../lib/theme";
+import { tabs } from "../stores/tabs";
 import { stopwatch, timer, useStopwatchElapsed } from "../stores/timer";
 import { coin, randomInt, rollDie } from "../features/classroom/picker";
 import { scene } from "../stores/scene";
@@ -19,6 +20,7 @@ import { Maximize2 as MaximizeIcon } from "lucide-react";
 import {
   Coffee,
   Dices,
+  Download,
   Link,
   Plus,
   Projector,
@@ -197,9 +199,34 @@ function TimerSection() {
 
 /** Drawing lots: a student, the class in groups (full screen), or chance right here. */
 function DrawSection() {
+  const toast = useToast();
+  const failed = useFailure();
   const lists = useQuery(q.studentLists()).data ?? NO_LISTS;
+  const pronote = useQuery(q.pronoteStatus()).data?.connected ?? false;
   const [chosen, setChosen] = useState<string | null>(null);
   const className = chosen ?? lists[0]?.class_name ?? null;
+  const [loading, setLoading] = useState(false);
+
+  /** Every class's students from Pronote, in one go: each becomes its class's list. */
+  const fromPronote = async () => {
+    setLoading(true);
+    try {
+      const { loaded, failed: refused } = await api.pronoteStudentsAll();
+      changed("students");
+      if (loaded.length)
+        toast(
+          tr("tools.drawLoaded", { classes: loaded.map((l) => `${l.class} (${l.count})`).join(", ") }),
+          "success",
+        );
+      else if (!refused.length) toast(tr("tools.drawLoadedNone"), "error");
+      if (refused.length)
+        toast(tr("tools.drawRefused", { classes: refused.map((r) => r.class).join(", ") }), "error");
+    } catch (err) {
+      failed("students.pronoteAll", err);
+    } finally {
+      setLoading(false);
+    }
+  };
   const [faces, setFaces] = useState(6);
   const [min, setMin] = useState(1);
   const [max, setMax] = useState(100);
@@ -229,7 +256,9 @@ function DrawSection() {
             <div className="min-w-0">
               <p className="eu-t-body font-medium text-ink">{tr("tools.drawStudents")}</p>
               <p className="eu-t-meta">
-                {lists.length ? tr("tools.drawStudentsHint") : tr("tools.drawNoList")}
+                {lists.length
+                  ? tr("tools.drawStudentsHint")
+                  : tr(pronote ? "tools.drawNoList" : "tools.drawNoListPaste")}
               </p>
             </div>
           </div>
@@ -262,6 +291,40 @@ function DrawSection() {
               >
                 <Icon icon={Users} size={14} />
                 {tr("students.groups")}
+              </button>
+              {pronote && (
+                <button
+                  type="button"
+                  className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                  onClick={() => void fromPronote()}
+                  disabled={loading}
+                  aria-label={tr("tools.drawUpdateFromPronote")}
+                  {...tip(tr("tools.drawUpdateFromPronote"))}
+                >
+                  <Icon icon={Download} size={14} />
+                </button>
+              )}
+            </div>
+          )}
+          {!lists.length && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {pronote && (
+                <button
+                  type="button"
+                  className="eu-btn-primary eu-btn-sm"
+                  onClick={() => void fromPronote()}
+                  disabled={loading}
+                >
+                  <Icon icon={Download} size={14} />
+                  {loading ? tr("tools.drawLoading") : tr("tools.drawFromPronote")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="eu-btn-ghost eu-btn-sm"
+                onClick={() => tabs.open({ kind: "courses" })}
+              >
+                {tr("tools.drawOpenCourses")}
               </button>
             </div>
           )}

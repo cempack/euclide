@@ -31,6 +31,7 @@ def _handlers():
         "pronote_contents": pronote.pronote_contents,
         "pronote_classes": pronote.pronote_classes,
         "pronote_students": pronote.pronote_students,
+        "pronote_all_students": pronote.pronote_all_students,
     }
 
 

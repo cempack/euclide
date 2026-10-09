@@ -40,7 +40,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 ### En classe
 
-- **Les élèves de chaque classe.** Sur la page d'une classe, la liste se charge depuis Pronote ou se colle.
+- **Les élèves de chaque classe**, chargés d'un coup depuis Pronote (Outils, « Charger depuis Pronote »), ou collés dans Cours (onglet Classes du cours).
 - **Tirer un nom au sort**, sur l'écran de classe (Ctrl+Maj+H). Un nom tiré ne revient pas avant « Recommencer ». Espace ou la télécommande tire le suivant.
 - **Faire des groupes**, d'une taille ou d'un nombre donné.
 - **Le hasard** : un dé, un nombre, pile ou face.

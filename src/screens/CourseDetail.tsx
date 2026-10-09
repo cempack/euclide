@@ -14,7 +14,7 @@ import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { Progression } from "../features/classroom/Progression";
 import { useAppearance } from "../lib/theme";
-import { BookOpen, File, Layers, PenLine, Plus, Trash2 } from "lucide-react";
+import { BookOpen, File, Layers, PenLine, Plus, Trash2, Users } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { FileKindIcon } from "../ui/FileKindIcon";
 
@@ -753,22 +753,22 @@ function ClassCard({
         />
       </div>
 
-      {courseMatiere && (
-        <button
-          onClick={() => {
-            tabs.open({
-              kind: "class-content",
-              title: tr("courseDetail.contentTab", { name: cc.class_name }),
-              params: { courseId, className: cc.class_name, matiere: courseMatiere },
-            });
-          }}
-          className="eu-btn-ghost eu-btn-sm w-full"
-          data-tip={tr("courseDetail.showPronoteContentsTitle")}
-        >
-          <Icon icon={BookOpen} size={14} />
-          {tr("courseDetail.showPronoteContents")}
-        </button>
-      )}
+      {/* The class's page: its students first, then Pronote's cahier de textes
+          (which says so when the course has no matière). */}
+      <button
+        onClick={() => {
+          tabs.open({
+            kind: "class-content",
+            title: cc.class_name,
+            params: { courseId, className: cc.class_name, matiere: courseMatiere },
+          });
+        }}
+        className="eu-btn-ghost eu-btn-sm w-full"
+        data-tip={tr("courseDetail.showPronoteContentsTitle")}
+      >
+        <Icon icon={Users} size={14} />
+        {tr("courseDetail.showPronoteContents")}
+      </button>
     </div>
   );
 }

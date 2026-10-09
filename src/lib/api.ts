@@ -590,6 +590,11 @@ export const api = {
   /** A class's students from Pronote, kept as its list; the list it becomes. */
   pronoteStudents: (className: string) =>
     invoke<string[]>("pronote_students", { className }).then(asList<string>),
+  /** Every class's students from Pronote, each saved as the class's list. */
+  pronoteStudentsAll: () =>
+    invoke<{ loaded: { class: string; count: number }[]; failed: { class: string; error: string }[] }>(
+      "pronote_students_all",
+    ),
 
   // A class's students, for the name picker and groups (commands/students.rs)
   studentsForClass: (className: string) =>
