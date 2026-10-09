@@ -234,7 +234,11 @@ export function ImageView({ tabId, fileId, fileName }: { tabId: string; fileId: 
           >
             <Icon icon={ImageDown} />
           </button>
-          <OpenWithButton fileId={fileId} className="eu-btn-quiet eu-btn-sm" label={tr("openWith.label")} />
+          <OpenWithButton
+            fileId={fileId}
+            className="eu-btn-quiet eu-btn-sm"
+            labelClassName="hidden @6xl:inline"
+          />
           <button
             type="button"
             onClick={() =>

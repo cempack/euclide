@@ -898,7 +898,11 @@ function PdfPane({
           >
             <Icon icon={FileDown} size={14} />
           </button>
-          <OpenWithButton fileId={fileId} className="eu-btn-quiet eu-btn-sm" label={tr("openWith.label")} />
+          <OpenWithButton
+            fileId={fileId}
+            className="eu-btn-quiet eu-btn-sm"
+            labelClassName="hidden @6xl:inline"
+          />
           <button
             type="button"
             onClick={() =>
@@ -1042,11 +1046,7 @@ function PdfPane({
                 <p className="eu-t-small text-stage-muted mt-1.5">{tr("pdf.openFailedHint")}</p>
                 <p className="eu-t-caption text-stage-muted mt-1 selectable">{failed}</p>
                 <div className="mt-4 flex justify-center">
-                  <OpenWithButton
-                    fileId={fileId}
-                    className="eu-btn-ghost eu-btn-sm"
-                    label={tr("openWith.label")}
-                  />
+                  <OpenWithButton fileId={fileId} className="eu-btn-ghost eu-btn-sm" />
                 </div>
               </div>
             </div>

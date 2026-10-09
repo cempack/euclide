@@ -1,92 +1,90 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
+import { ExternalLink, File, Folder, Globe, type LucideIcon } from "lucide-react";
 
 import { api, openWith, type Opener } from "../lib/api";
-import { File, Folder, Globe } from "lucide-react";
-import { Icon } from "../ui/Icon";
 import { tr } from "../lib/i18n";
 import { reportError } from "../lib/report";
+import { Icon } from "../ui/Icon";
+import { Menu } from "../ui/Menu";
+import { tip } from "../ui/Tooltip";
 
+/** The opener's glyph: its folder, the browser, or an application. */
+function iconFor(opt: Opener): LucideIcon {
+  if (opt.is_reveal) return Folder;
+  return /navigateur|browser/i.test(opt.name) ? Globe : File;
+}
+
+/**
+ * « Ouvrir dehors »: the file in another application of the PC, or its
+ * folder in the explorer, from the app's own menu. `labelClassName` hides
+ * the words where room is short (a toolbar), the icon and tooltip stay.
+ */
 export function OpenWithButton({
   fileId,
   className = "eu-btn-ghost",
-  label = "Ouvrir dehors",
+  labelClassName = "",
 }: {
   fileId: number;
   className?: string;
-  label?: string;
+  labelClassName?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [options, setOptions] = useState<Opener[] | null>(null);
+  // A press on the button first light-dismisses the open menu; the click
+  // that follows must not open it again.
+  const closedAt = useRef(0);
+  const id = useId();
 
+  // The PC's applications, asked for once, when the menu first opens.
   const load = async () => {
-    if (options) return options;
+    if (options) return;
     try {
-      const list = await api.listOpeners(fileId);
-      setOptions(list);
-      return list;
+      setOptions(await api.listOpeners(fileId));
     } catch (err) {
       reportError("openWith.list", err);
-      // fallback minimal
-      const fb: Opener[] = [
+      setOptions([
         { name: tr("openWith.browser"), app: undefined, is_reveal: false },
         { name: tr("openWith.defaultApp"), app: undefined, is_reveal: false },
         { name: tr("openWith.reveal"), app: undefined, is_reveal: true },
-      ];
-      setOptions(fb);
-      return fb;
+      ]);
     }
-  };
-
-  const handleClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await load();
-    setOpen(!open);
-  };
-
-  const handle = async (opt: Opener) => {
-    setOpen(false);
-    try {
-      await openWith(fileId, opt);
-    } catch (err) {
-      reportError("openWith.open", err);
-    }
-  };
-
-  const getIcon = (opt: Opener) => {
-    const iconClass = "w-3.5 h-3.5 shrink-0";
-    if (opt.is_reveal) return <Icon icon={Folder} size={20} className={iconClass} />;
-    const nameLower = opt.name.toLowerCase();
-    if (nameLower.includes("navigateur") || nameLower.includes("browser")) {
-      return <Icon icon={Globe} size={20} className={iconClass} />;
-    }
-    if (!opt.app || nameLower.includes("application") || nameLower.includes("défaut")) {
-      return <Icon icon={File} size={20} className={iconClass} />;
-    }
-    return <Icon icon={File} size={20} className={iconClass} />;
   };
 
   return (
-    <div className="relative inline-block" onBlur={() => setTimeout(() => setOpen(false), 150)}>
-      <button onClick={handleClick} className={className} data-tip={tr("openWith.title")}>
-        {label || tr("openWith.label")}
+    <>
+      <button
+        type="button"
+        className={className}
+        aria-label={tr("openWith.label")}
+        aria-haspopup="menu"
+        aria-expanded={!!anchor}
+        aria-controls={id}
+        {...tip(tr("openWith.title"))}
+        onClick={(e) => {
+          if (anchor || performance.now() - closedAt.current < 300) return;
+          const button = e.currentTarget;
+          void load().then(() => setAnchor(button));
+        }}
+      >
+        <Icon icon={ExternalLink} size={14} />
+        <span className={labelClassName}>{tr("openWith.label")}</span>
       </button>
-      {open && options && (
-        <div
-          className="absolute right-0 mt-1 z-100 min-w-[220px] eu-panel p-1 eu-t-body bg-panel border border-line shadow-pop"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {options.map((opt, idx) => (
-            <button
-              key={idx}
-              onClick={() => handle(opt)}
-              className="flex w-full items-center text-left px-3 py-1.5 rounded hover:bg-panel-alt text-ink active:bg-panel-alt"
-            >
-              <span className="mr-2">{getIcon(opt)}</span>
-              <span>{opt.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      <Menu
+        id={id}
+        open={!!anchor && !!options}
+        anchor={anchor}
+        label={tr("openWith.label")}
+        placement="bottom-end"
+        items={(options ?? []).map((opt) => ({
+          label: opt.name,
+          icon: iconFor(opt),
+          onSelect: () => void openWith(fileId, opt).catch((err) => reportError("openWith.open", err)),
+        }))}
+        onClose={() => {
+          closedAt.current = performance.now();
+          setAnchor(null);
+        }}
+      />
+    </>
   );
 }
