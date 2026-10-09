@@ -9,8 +9,8 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./index.js",
-      "require": "./index.cjs"
+      "require": "./fonts.cjs"
     }
   },
-  "main": "./index.cjs"
+  "main": "./fonts.cjs"
 }
