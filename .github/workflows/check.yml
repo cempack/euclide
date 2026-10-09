@@ -116,7 +116,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install ruff
+          cache: pip
+          cache-dependency-path: sidecar/requirements.txt
+      # The sidecar's own libraries too: a test reads a PDF with pypdf.
+      - run: pip install ruff -r sidecar/requirements.txt
       - run: ruff check .
       # live_pronote_demo.py needs the network and Pronote's demo server: not run here.
       - name: unit tests
