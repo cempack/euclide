@@ -339,7 +339,12 @@
     "unpinTab": "Détacher l'onglet",
     "closeOthers": "Fermer les autres onglets",
     "closeRight": "Fermer les onglets à droite",
-    "allTabs": "Tous les onglets"
+    "allTabs": "Tous les onglets",
+    "paneError": "Cet onglet a rencontré une erreur.",
+    "overlayError": "Cet écran a rencontré une erreur.",
+    "paneErrorHint": "Le reste d'Euclide fonctionne toujours. Réessayez, ou fermez-le.",
+    "paneRetry": "Réessayer",
+    "paneClose": "Fermer l'onglet"
   },
   "messages": {
     "genericError": "Erreur",

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Copy, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { EmptyState, Loading, useConfirm, useToast } from "../components/ui";
+import { PaneBoundary } from "../shell/PaneBoundary";
 import {
   MetaDot,
   PageHeader,
@@ -36,6 +37,11 @@ const SWATCHES = [
   "danger",
   "stage",
 ];
+
+/** Throws on every render: what PaneBoundary shows in its place. */
+function Broken(): React.ReactNode {
+  throw new Error("Démonstration d'une erreur d'affichage");
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -260,6 +266,14 @@ export default function Gallery() {
                 hint="Essayez un autre mot."
               />
             </Panel>
+          </div>
+        </Section>
+
+        <Section title="Erreur d'un onglet">
+          <div className="eu-panel">
+            <PaneBoundary where="gallery" onClose={() => {}}>
+              <Broken />
+            </PaneBoundary>
           </div>
         </Section>
 

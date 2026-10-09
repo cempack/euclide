@@ -22,6 +22,7 @@ import { StatusBar } from "./shell/StatusBar";
 import { TimerStage } from "./shell/Timer";
 import { useExitGuard } from "./shell/exitGuard";
 import { closeTab, saveActiveTab } from "./shell/closeTab";
+import { PaneBoundary } from "./shell/PaneBoundary";
 import { useImportFiles } from "./shell/useImportFiles";
 import { useShortcut } from "./lib/keymap";
 import { scene, useSceneOpen } from "./stores/scene";
@@ -115,17 +116,20 @@ const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }
             aria-hidden={!visible}
             inert={!visible}
           >
-            {FULL_BLEED.includes(tab.kind) ? (
-              // Tool screens own their whole surface; wrapping them in the
-              // reading column is what pushed the Python pane off-screen.
-              <div className="flex-1 min-h-0 flex flex-col">
-                <TabPane info={info} tab={tab} visible={visible} />
-              </div>
-            ) : (
-              <Scroll>
-                <TabPane info={info} tab={tab} visible={visible} />
-              </Scroll>
-            )}
+            {/* A screen that crashes takes only its own tab down. */}
+            <PaneBoundary where={tab.kind} onClose={() => tabs.close(tab.id)}>
+              {FULL_BLEED.includes(tab.kind) ? (
+                // Tool screens own their whole surface; wrapping them in the
+                // reading column is what pushed the Python pane off-screen.
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <TabPane info={info} tab={tab} visible={visible} />
+                </div>
+              ) : (
+                <Scroll>
+                  <TabPane info={info} tab={tab} visible={visible} />
+                </Scroll>
+              )}
+            </PaneBoundary>
           </div>
         );
       })}
@@ -632,20 +636,33 @@ function Shell() {
       {projection && <TimerStage />}
 
       {paletteUsed && (
-        <Suspense fallback={null}>
-          <CommandPalette open={palette} onClose={closePalette} onHelp={handleHelp} onCapture={openCapture} />
-        </Suspense>
+        <PaneBoundary where="palette" overlay onClose={closePalette} resetKey={palette}>
+          <Suspense fallback={null}>
+            <CommandPalette
+              open={palette}
+              onClose={closePalette}
+              onHelp={handleHelp}
+              onCapture={openCapture}
+            />
+          </Suspense>
+        </PaneBoundary>
       )}
-      <QuickCapture open={captureOpen} onClose={closeCapture} />
+      <PaneBoundary where="capture" overlay onClose={closeCapture} resetKey={captureOpen}>
+        <QuickCapture open={captureOpen} onClose={closeCapture} />
+      </PaneBoundary>
       {helpUsed && (
-        <Suspense fallback={null}>
-          <ShortcutsHelp open={help} onClose={closeHelp} />
-        </Suspense>
+        <PaneBoundary where="help" overlay onClose={closeHelp} resetKey={help}>
+          <Suspense fallback={null}>
+            <ShortcutsHelp open={help} onClose={closeHelp} />
+          </Suspense>
+        </PaneBoundary>
       )}
       {sceneOpen && (
-        <Suspense fallback={null}>
-          <ClassroomScene onClose={scene.close} />
-        </Suspense>
+        <PaneBoundary where="scene" overlay onClose={scene.close}>
+          <Suspense fallback={null}>
+            <ClassroomScene onClose={scene.close} />
+          </Suspense>
+        </PaneBoundary>
       )}
       {dragging && (
         <div className="fixed inset-0 z-80 grid place-items-center bg-accent/10 pointer-events-none">

@@ -332,23 +332,55 @@ async fn exchange(pipes: &mut Pipes, message: &Value) -> Result<Value, String> {
     serde_json::from_str(reply.trim()).map_err(|e| format!("Réponse de Python illisible : {e}"))
 }
 
+/// Most lines of one process's stderr that reach euclide.log: Python's own
+/// errors (a crash, a library's warning), not a flood.
+const STDERR_LINES_LOGGED: usize = 200;
+
+/// Python's stderr goes to euclide.log, where a release build can show it
+/// (it has no console).
 pub(crate) fn drain_stderr(stderr: tokio::process::ChildStderr, label: &'static str) {
-    tokio::spawn(async move {
-        let mut r = BufReader::new(stderr);
-        let mut l = String::new();
-        loop {
-            l.clear();
-            match r.read_line(&mut l).await {
-                Ok(0) | Err(_) => break,
-                Ok(_) => {
-                    let t = l.trim();
-                    if !t.is_empty() {
-                        eprintln!("[sidecar {label}] {t}");
-                    }
+    tokio::spawn(drain_lines(
+        BufReader::new(stderr),
+        STDERR_LINES_LOGGED,
+        move |text| {
+            let line = format!("[sidecar {label}] {text}");
+            eprintln!("{line}");
+            tokio::task::spawn_blocking(move || {
+                crate::applog::append(crate::applog::EVENTS, &[line])
+            });
+        },
+    ));
+}
+
+/// Hands the first `max` non-empty lines of `reader` to `log`, then one
+/// line saying the rest was left out. Reads to the end either way, bytes
+/// that are not UTF-8 included: a process whose stderr is not read blocks.
+async fn drain_lines<R: tokio::io::AsyncBufRead + Unpin>(
+    mut reader: R,
+    max: usize,
+    mut log: impl FnMut(&str),
+) {
+    let mut buf = Vec::new();
+    let mut logged = 0;
+    loop {
+        buf.clear();
+        match reader.read_until(b'\n', &mut buf).await {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {
+                let text = String::from_utf8_lossy(&buf);
+                let text = text.trim();
+                if text.is_empty() || logged > max {
+                    continue;
+                }
+                logged += 1;
+                if logged > max {
+                    log("… (la suite n'est pas consignée)");
+                } else {
+                    log(text);
                 }
             }
         }
-    });
+    }
 }
 
 pub(crate) fn wait_all(children: &mut [Child], wait: Duration) {
@@ -512,6 +544,22 @@ pub(crate) fn error_from_sidecar(val: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn python_errors_are_logged_up_to_a_limit() {
+        let stderr: &[u8] = b"Traceback (most recent call last):\n\n  \xff bad bytes\r\nKeyError: 'x'\nfour\nfive\n";
+        let mut lines = vec![];
+        drain_lines(stderr, 3, |l| lines.push(l.to_string())).await;
+        assert_eq!(
+            lines,
+            [
+                "Traceback (most recent call last):",
+                "\u{fffd} bad bytes",
+                "KeyError: 'x'",
+                "… (la suite n'est pas consignée)",
+            ]
+        );
+    }
 
     #[test]
     fn error_from_sidecar_does_not_quote_strings() {
