@@ -21,6 +21,7 @@ import {
   Task,
   transformSize,
   type Rotation,
+  type PdfAnnotationObject,
   type PdfBookmarkObject,
   type PdfErrorReason,
   type PdfLinkTarget,
@@ -154,6 +155,14 @@ export type PdfViewHandle = {
   flatCopy(): Promise<Uint8Array>;
   /** The document as it is now, with what is not saved yet: for a change to its pages. */
   documentBytes(): Promise<Uint8Array>;
+  /**
+   * The annotations of every page, as PDFium reads them back: what an
+   * image keeps of what is drawn on it (imageNotes.ts). Null when nothing
+   * changed since it was opened or last saved; `markSaved` after.
+   */
+  annotations(): Promise<PdfAnnotationObject[] | null>;
+  /** The first page with what is drawn on it, as a picture `side` pixels on its long side. */
+  picture(side: number, type: "image/png" | "image/jpeg"): Promise<Blob>;
 };
 
 /** A page ready to print: its picture, and whether it lies wider than tall. */
@@ -169,6 +178,8 @@ export type FindState = { query: string; total: number; current: number; searchi
 type Props = {
   /** The file's address (`fileUrl`, `versionUrl`). */
   url: string;
+  /** Where the bytes come from, if not from `url`: an image's page (imageDocument.ts). */
+  load?: () => Promise<ArrayBuffer>;
   tool: PdfTool;
   color: string;
   /** The pen's width, in points. */
@@ -188,7 +199,8 @@ type Props = {
   presenting?: boolean;
   /** The page to open at (the one just changed), once the pages are laid out. */
   startPage?: number;
-  onReady?: (info: { pages: number }) => void;
+  /** Open: its pages, and the first one's size in points. */
+  onReady?: (info: { pages: number; first?: { width: number; height: number } }) => void;
   onPage?: (page: number) => void;
   onScale?: (scale: number) => void;
   /** Whether the document now differs from what the file holds. */
@@ -305,29 +317,32 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
   const formsWritten = useRef<() => Promise<void>>(() => Promise.resolve());
   const [fetched, setFetched] = useState(false);
   const onError = useRef(props.onError);
+  const load = useRef(props.load);
   useEffect(() => {
     onError.current = props.onError;
+    load.current = props.load;
   });
 
   // Read here rather than by PDFium, which would take a missing file's
   // error page for a damaged PDF.
   useEffect(() => {
     let cancelled = false;
-    fetch(url)
-      .then(async (res) => {
+    const bytes =
+      load.current?.() ??
+      fetch(url).then(async (res) => {
         if (!res.ok) throw new Error((await res.text()) || `${res.status} ${res.statusText}`);
         return res.arrayBuffer();
-      })
-      .then(
-        (buffer) => {
-          if (cancelled) return;
-          bytesRef.current = buffer;
-          setFetched(true);
-        },
-        (err) => {
-          if (!cancelled) onError.current?.(err);
-        },
-      );
+      });
+    bytes.then(
+      (buffer) => {
+        if (cancelled) return;
+        bytesRef.current = buffer;
+        setFetched(true);
+      },
+      (err) => {
+        if (!cancelled) onError.current?.(err);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -526,7 +541,7 @@ function Viewer({
     events.current.onLocked?.(locked);
     if (status === "loaded") {
       onOpened();
-      events.current.onReady?.({ pages: pageCount });
+      events.current.onReady?.({ pages: pageCount, first: state?.document?.pages[0]?.size });
     } else if (status === "error" && !locked) {
       onOpened();
       if (state?.errorCode === PdfErrorCode.Initialization) restartPdfium();
@@ -804,6 +819,35 @@ function Viewer({
       await settle();
       if (annotations) await annotations.forDocument(documentId).commit().toPromise();
       return new Uint8Array(await pdfium().saveAsCopy(doc).toPromise());
+    },
+    async annotations() {
+      const doc = state?.document;
+      if (!doc || readOnly) throw new Error(tr("pdf.notReady"));
+      await settle();
+      const t = track.current;
+      t.saving = historyStep(registry, documentId);
+      if (t.saving !== undefined && t.saving === t.saved) return null;
+      if (annotations) await annotations.forDocument(documentId).commit().toPromise();
+      const all: PdfAnnotationObject[] = [];
+      for (const page of doc.pages) all.push(...(await pdfium().getPageAnnotations(doc, page).toPromise()));
+      return all;
+    },
+    async picture(side, type) {
+      const doc = state?.document;
+      if (!doc) throw new Error(tr("pdf.notReady"));
+      await settle();
+      if (annotations) await annotations.forDocument(documentId).commit().toPromise();
+      const { width, height } = doc.pages[0].size;
+      return pdfium()
+        .renderPage(doc, doc.pages[0], {
+          scaleFactor: side / Math.max(width, height),
+          dpr: 1,
+          withAnnotations: true,
+          withForms: true,
+          imageType: type,
+          imageQuality: 0.92,
+        })
+        .toPromise();
     },
   }));
 

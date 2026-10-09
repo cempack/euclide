@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { createPdfiumEngine } from "@embedpdf/engines/pdfium-worker-engine";
 import { settle } from "./app";
 
 /**
@@ -475,6 +477,108 @@ test("Ctrl+F finds a word on every page, and the outline goes to a chapter", asy
   await page.getByRole("tab", { name: "Sommaire" }).click();
   await page.getByRole("button", { name: "Suites arithmétiques" }).click();
   await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("3");
+});
+
+const PHOTO = /Photo du tableau/;
+
+/** The photo of the board (dev data), opened from Documents; `again` in the same session (the dev data in memory kept). */
+async function openPhoto(page: Page, again = false) {
+  if (!again) {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await settle(page);
+  }
+  await page.getByRole("navigation").getByRole("button", { name: "Documents" }).first().click();
+  await settle(page);
+  await page.getByRole("option", { name: PHOTO }).click();
+  await page.locator(".eu-pdf-page").first().waitFor();
+  await expect(page.getByText("Chargement de l'image…")).toHaveCount(0);
+  await page.waitForTimeout(500);
+}
+
+/** The strokes on the page, as drawn (each also has a clear path for the pointer). */
+const strokes = (page: Page) =>
+  page.locator(".eu-pdf-page [data-no-interaction] svg path:not([stroke='transparent'])");
+
+test("an image opens with what was drawn on it before, and keeps what is drawn now apart from it", async ({
+  page,
+}) => {
+  await openPhoto(page);
+  // The old annotator's ring and underline (the dev data), as ink.
+  await expect(strokes(page)).toHaveCount(2);
+  // A PDF's tools, without what an image has not: pages, text, versions.
+  await expect(page.getByRole("button", { name: "Pages", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Rechercher dans le document" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Versions/ })).toHaveCount(0);
+
+  await tool(page, "Stylo").click();
+  await page.waitForTimeout(300);
+  await stroke(page);
+  await expect(save(page)).toBeEnabled();
+  await save(page).click();
+  await expect(save(page)).toBeDisabled();
+  await expect(page.getByText("Annotations image enregistrées")).toBeVisible();
+
+  // Opened again: the three strokes, once each, nothing left to save.
+  await page.keyboard.press("Control+w");
+  await expect(page.getByRole("tab", { name: PHOTO })).toHaveCount(0);
+  await openPhoto(page, true);
+  await expect(strokes(page)).toHaveCount(3);
+  await expect(save(page)).toBeDisabled();
+
+  // A copy with them on it, beside the image: a photo stays a JPEG.
+  await page.getByRole("button", { name: "Exporter une copie" }).click();
+  await expect(page.getByText(/Copie enregistrée.*Photo du tableau \(copie annotée\)\.jpg/)).toBeVisible();
+});
+
+test("a phone photo keeps its turn: its page shows it as the browser does", async ({ page }) => {
+  // Stored 400 × 200 in four colours, EXIF orientation 6: shown 200 × 400.
+  const jpeg = readFileSync(fileURLToPath(new URL("./fixtures/rotated.jpg", import.meta.url))).toString(
+    "base64",
+  );
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  const result = await page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: "image/jpeg" });
+    // The app's own modules, from the dev server.
+    const load = (path: string) => import(/* @vite-ignore */ path);
+    const { imagePdf } = (await load(
+      "/src/features/pdf/imagePage.ts",
+    )) as typeof import("../../src/features/pdf/imagePage");
+    const { pdfium, newDocumentId } = (await load("/src/features/pdf/pdfium.ts")) as {
+      pdfium: () => ReturnType<typeof createPdfiumEngine>;
+      newDocumentId: (prefix: string) => string;
+    };
+    const { pdf, page: size } = await imagePdf(blob);
+    const engine = pdfium();
+    const doc = await engine
+      .openDocumentBuffer({ id: newDocumentId("test"), content: pdf.buffer as ArrayBuffer })
+      .toPromise();
+    const drawn = await engine
+      .renderPage(doc, doc.pages[0], { scaleFactor: 1, imageType: "image/png" })
+      .toPromise();
+    engine.closeDocument(doc);
+    /** The colour a quarter of the way in from each corner. */
+    const corners = async (source: Blob) => {
+      const bitmap = await createImageBitmap(source);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(bitmap, 0, 0);
+      const at = (fx: number, fy: number) =>
+        Array.from(ctx.getImageData(Math.floor(bitmap.width * fx), Math.floor(bitmap.height * fy), 1, 1).data)
+          .slice(0, 3)
+          .map((v) => Math.round(v / 64));
+      return {
+        size: [bitmap.width, bitmap.height],
+        colours: [at(0.25, 0.25), at(0.75, 0.25), at(0.25, 0.75), at(0.75, 0.75)],
+      };
+    };
+    return { size, page: await corners(drawn), browser: await corners(blob) };
+  }, jpeg);
+  expect(result.size.height, "a page as tall as the photo shows").toBeGreaterThan(result.size.width);
+  expect(result.browser.size).toEqual([200, 400]);
+  expect(result.page.colours).toEqual(result.browser.colours);
 });
 
 test("annotations written before 0.6 (pdf.js's ink and highlight) show as drawn", async ({ page }) => {

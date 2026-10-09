@@ -1361,6 +1361,9 @@ function handle(cmd: string, args: Args): unknown {
     case "get_file_versions":
       return (fileVersions.get(num(args, "fileId") ?? 0) ?? []).slice();
     case "read_annotations":
+      return imageNotes.get(num(args, "fileId") ?? 0) ?? null;
+    case "save_annotations":
+      imageNotes.set(num(args, "fileId") ?? 0, String(args?.json ?? ""));
       return null;
 
     default:
@@ -1448,6 +1451,42 @@ function mockSquare() {
  * its old ones as a version.
  */
 const fileUrls = new Map<number, string>();
+
+/**
+ * What is drawn on images (file_annotations). The photo of the board was
+ * drawn on before 0.6, in the old annotator's strokes: the vertex of the
+ * parabola ringed in red, f(x) underlined in blue and the end of the line
+ * rubbed out, as a teacher's would be.
+ */
+const ring = Array.from({ length: 41 }, (_, k) => {
+  const t = (k / 40) * 2 * Math.PI;
+  return { x: Math.round(480 + 46 * Math.cos(t)), y: Math.round(500 + 30 * Math.sin(t)) };
+});
+const imageNotes = new Map<number, string>([
+  [
+    8,
+    JSON.stringify({
+      strokes: [
+        { tool: "pen", color: "#c0262d", size: 2.5, pts: ring },
+        {
+          tool: "pen",
+          color: "#0f4fa8",
+          size: 2.5,
+          pts: Array.from({ length: 31 }, (_, k) => ({ x: 48 + k * 9, y: 584 })),
+        },
+        {
+          tool: "eraser",
+          color: "#000000",
+          size: 16,
+          pts: [
+            { x: 300, y: 560 },
+            { x: 330, y: 600 },
+          ],
+        },
+      ],
+    }),
+  ],
+]);
 const versionUrls = new Map<number, string>();
 const fileVersions = new Map<number, import("../lib/api").FileVersion[]>();
 

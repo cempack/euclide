@@ -18,6 +18,7 @@ import {
   Grid3x3,
   Highlighter,
   History,
+  ImageDown,
   Minus,
   MousePointer2,
   MoveUpRight,
@@ -60,14 +61,19 @@ import { ColorChoice } from "./ColorChoice";
 import { HIGHLIGHT, INK } from "./palette";
 import { PdfView, type FindState, type PdfTool, type PdfViewHandle, type PrintPage } from "./PdfView";
 import { printDialog, sheetReady } from "../notes/PrintSheet";
-import { ImageView } from "./ImageView";
+import { imageDocument } from "./imageDocument";
+import { copySide } from "./imagePage";
+import { writeNotes } from "./imageNotes";
 import { Presentation } from "./Presentation";
 import { PdfChooser } from "./PdfChooser";
 import { editPages, pagesLabel, parsePages, type PageEdit } from "./pageEdits";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 
-/** A document tab: a PDF (PDFium, annotated with EmbedPDF) or an image (drawn over). */
+/**
+ * A document tab: a PDF (PDFium, annotated with EmbedPDF), or an image, which
+ * opens as a page of its own with the same tools (imageDocument.ts).
+ */
 export default function DocumentPane({
   tabId,
   fileId,
@@ -88,13 +94,12 @@ export default function DocumentPane({
   /** The tab is in front. */
   visible?: boolean;
 }) {
-  return isImage(fileName) ? (
-    <ImageView tabId={tabId} fileId={fileId} fileName={fileName} />
-  ) : (
+  return (
     <PdfPane
       tabId={tabId}
       fileId={fileId}
       fileName={fileName}
+      image={isImage(fileName)}
       courseId={courseId}
       find={find}
       findAt={findAt}
@@ -162,6 +167,7 @@ function PdfPane({
   tabId,
   fileId,
   fileName,
+  image,
   courseId,
   find,
   findAt,
@@ -170,6 +176,11 @@ function PdfPane({
   tabId: string;
   fileId: number;
   fileName: string;
+  /**
+   * An image: one page, no text, no versions (the file never changes); what
+   * is drawn on it is kept apart (imageNotes.ts).
+   */
+  image: boolean;
   courseId: number | null;
   find?: string;
   findAt?: number;
@@ -201,6 +212,8 @@ function PdfPane({
   const extractId = useId();
   /** The page count, once the document is open. */
   const [pages, setPages] = useState(0);
+  /** The first page's size in points: an image's, for its annotated copy. */
+  const [first, setFirst] = useState<{ width: number; height: number } | null>(null);
   const [page, setPage] = useState(1);
   const [pageText, setPageText] = useState("1");
   const [scale, setScale] = useState(1);
@@ -225,7 +238,9 @@ function PdfPane({
   const versions = useQuery({
     queryKey: ["library", "versions", fileId],
     queryFn: () => api.getFileVersions(fileId),
+    enabled: !image,
   });
+  const loadImage = useCallback(() => imageDocument(fileId), [fileId]);
 
   useEffect(() => {
     editors.setDirty(tabId, dirty);
@@ -236,12 +251,19 @@ function PdfPane({
     if (!view || viewing) return;
     setSaving(true);
     try {
-      const bytes = await view.save();
-      // The file is replaced; what it was becomes a version (write_file_bytes).
-      if (bytes) await api.writeFileBytes(fileId, bytes);
-      view.markSaved();
-      void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
-      changed("library");
+      if (image) {
+        // What is drawn on an image is kept apart from it: the image stays as it was.
+        const notes = await view.annotations();
+        if (notes) await api.saveAnnotations(fileId, writeNotes(notes));
+        view.markSaved();
+      } else {
+        const bytes = await view.save();
+        // The file is replaced; what it was becomes a version (write_file_bytes).
+        if (bytes) await api.writeFileBytes(fileId, bytes);
+        view.markSaved();
+        void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
+        changed("library");
+      }
     } catch (err) {
       reportError("pdf.save", err);
       toast(errorMessage(err, tr("messages.genericError")), "error");
@@ -249,7 +271,7 @@ function PdfPane({
     } finally {
       setSaving(false);
     }
-  }, [fileId, queryClient, toast, viewing]);
+  }, [fileId, image, queryClient, toast, viewing]);
 
   useEffect(() => editors.registerFlush(tabId, save), [tabId, save]);
 
@@ -363,7 +385,7 @@ function PdfPane({
   }
 
   // Ctrl+F looks in the document while it is the tab in front, as in a PDF reader.
-  useShortcut("documents", openFind, visible && !!pages);
+  useShortcut("documents", openFind, visible && !!pages && !image);
 
   /** Pages being drawn for paper: how many of how many. */
   const [printing, setPrinting] = useState<{ done: number; total: number } | null>(null);
@@ -399,15 +421,31 @@ function PdfPane({
     setPresenting(true);
   };
 
-  /** A copy with the annotations fixed in its pages, beside the file: for students. */
+  /**
+   * A copy with the annotations fixed in its pages, beside the file: for
+   * students. An image's is a picture, as large as the image (copySide), a
+   * photo kept a JPEG.
+   */
   const [copying, setCopying] = useState(false);
   const exportCopy = async () => {
     const view = viewRef.current;
     if (!view || !pages || copying) return;
     setCopying(true);
     try {
-      const bytes = await view.flatCopy();
-      const name = tr("pdf.copyName", { name: fileName.replace(/\.pdf$/i, "") });
+      let bytes: Uint8Array;
+      let name: string;
+      if (image) {
+        const photo = /\.jpe?g$/i.test(fileName);
+        const picture = await view.picture(
+          copySide(first ?? { width: 1100, height: 1100 }),
+          photo ? "image/jpeg" : "image/png",
+        );
+        bytes = new Uint8Array(await picture.arrayBuffer());
+        name = `${tr("pdf.imageCopyName", { name: fileName.replace(/\.[^.]+$/, "") })}.${photo ? "jpg" : "png"}`;
+      } else {
+        bytes = await view.flatCopy();
+        name = tr("pdf.copyName", { name: fileName.replace(/\.pdf$/i, "") });
+      }
       const f = await api.createFileBytes(name, bytes, { courseId });
       changed("library");
       toast(tr("pdf.copySaved", { name: f.name }), "success", {
@@ -590,35 +628,41 @@ function PdfPane({
   return (
     <div className="h-full flex flex-col">
       <Toolbar className="h-9 py-0">
-        <ToolGroup>
-          <button
-            type="button"
-            onClick={() => setShowPages((s) => !s)}
-            aria-pressed={showPages}
-            aria-label={tr("pdf.pagesTitle")}
-            className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
-            {...tip(tr("pdf.pagesTitle"))}
-          >
-            <Icon icon={PanelLeft} />
-          </button>
-        </ToolGroup>
-        <ToolSep />
+        {!image && (
+          <ToolGroup>
+            <button
+              type="button"
+              onClick={() => setShowPages((s) => !s)}
+              aria-pressed={showPages}
+              aria-label={tr("pdf.pagesTitle")}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
+              {...tip(tr("pdf.pagesTitle"))}
+            >
+              <Icon icon={PanelLeft} />
+            </button>
+          </ToolGroup>
+        )}
+        {!image && <ToolSep />}
         <ToolGroup label={tr("pdf.mode")}>
           {TOOLS.map((t) => {
-            // The highlighter takes up the way it was last used.
+            // The highlighter takes up the way it was last used; on an
+            // image, with no text to mark, it draws free-hand.
             const marks = t.id === "highlight";
             return (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setTool(marks ? markup : t.id)}
+                onClick={() => setTool(marks ? (image ? "marker" : markup) : t.id)}
                 aria-pressed={marks ? isMarkup(tool) : tool === t.id}
                 disabled={!pages || !!viewing}
                 aria-label={tr(t.label)}
                 className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
                 {...tip(tr(t.hint))}
               >
-                <Icon icon={(marks && MARKUP_TOOLS.find((m) => m.id === markup)?.icon) || t.icon} size={14} />
+                <Icon
+                  icon={(marks && !image && MARKUP_TOOLS.find((m) => m.id === markup)?.icon) || t.icon}
+                  size={14}
+                />
                 <span className="hidden @7xl:inline">{tr(t.label)}</span>
               </button>
             );
@@ -686,7 +730,7 @@ function PdfPane({
             <Icon icon={Redo2} />
           </button>
         </ToolGroup>
-        {isMarkup(tool) && !viewing && (
+        {isMarkup(tool) && !viewing && !image && (
           <ToolGroup collapse label={tr("pdf.highlight")}>
             <div className="eu-segment eu-segment-sm">
               {MARKUP_TOOLS.map((m) => (
@@ -735,61 +779,65 @@ function PdfPane({
           </ToolGroup>
         )}
         <ToolSep />
-        <ToolGroup>
-          <button
-            type="button"
-            onClick={() => (finding ? closeFind() : openFind())}
-            aria-pressed={finding}
-            disabled={!pages}
-            aria-label={tr("pdf.search")}
-            className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
-            {...tip(tr("pdf.search"), keysOf("documents"))}
-          >
-            <Icon icon={Search} />
-          </button>
-        </ToolGroup>
-        <ToolGroup collapse label={tr("pdf.pageInput")}>
-          <input
-            value={pageText}
-            onChange={(e) => setPageText(e.target.value.replace(/\D/g, ""))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") goTo(Number(pageText));
-            }}
-            onBlur={() => setPageText(String(page))}
-            inputMode="numeric"
-            aria-label={tr("pdf.pageInput")}
-            className="eu-input eu-field-sm w-11 text-center font-mono"
-          />
-          <span className="font-mono text-caption text-ink-muted whitespace-nowrap">
-            {tr("pdf.pageOf", { count: count || "…" })}
-          </span>
-          <button
-            type="button"
-            onClick={(e) => setPagesAnchor(e.currentTarget)}
-            disabled={!pages || !!viewing}
-            aria-haspopup="menu"
-            aria-label={tr("pdf.pagesMenu")}
-            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-            {...tip(tr("pdf.pagesMenuTitle"))}
-          >
-            <Icon icon={Files} size={14} />
-          </button>
-          <Menu
-            open={!!pagesAnchor}
-            anchor={pagesAnchor}
-            items={pageItems}
-            label={tr("pdf.pagesMenu")}
-            onClose={() => setPagesAnchor(null)}
-          />
-          <PdfChooser
-            open={appending}
-            title={tr("pdf.appendTitle", { name: fileName })}
-            courseId={courseId}
-            exclude={fileId}
-            onPick={(f) => void append(f)}
-            onClose={() => setAppending(false)}
-          />
-        </ToolGroup>
+        {!image && (
+          <ToolGroup>
+            <button
+              type="button"
+              onClick={() => (finding ? closeFind() : openFind())}
+              aria-pressed={finding}
+              disabled={!pages}
+              aria-label={tr("pdf.search")}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm eu-btn-toggle"
+              {...tip(tr("pdf.search"), keysOf("documents"))}
+            >
+              <Icon icon={Search} />
+            </button>
+          </ToolGroup>
+        )}
+        {!image && (
+          <ToolGroup collapse label={tr("pdf.pageInput")}>
+            <input
+              value={pageText}
+              onChange={(e) => setPageText(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") goTo(Number(pageText));
+              }}
+              onBlur={() => setPageText(String(page))}
+              inputMode="numeric"
+              aria-label={tr("pdf.pageInput")}
+              className="eu-input eu-field-sm w-11 text-center font-mono"
+            />
+            <span className="font-mono text-caption text-ink-muted whitespace-nowrap">
+              {tr("pdf.pageOf", { count: count || "…" })}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => setPagesAnchor(e.currentTarget)}
+              disabled={!pages || !!viewing}
+              aria-haspopup="menu"
+              aria-label={tr("pdf.pagesMenu")}
+              className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+              {...tip(tr("pdf.pagesMenuTitle"))}
+            >
+              <Icon icon={Files} size={14} />
+            </button>
+            <Menu
+              open={!!pagesAnchor}
+              anchor={pagesAnchor}
+              items={pageItems}
+              label={tr("pdf.pagesMenu")}
+              onClose={() => setPagesAnchor(null)}
+            />
+            <PdfChooser
+              open={appending}
+              title={tr("pdf.appendTitle", { name: fileName })}
+              courseId={courseId}
+              exclude={fileId}
+              onPick={(f) => void append(f)}
+              onClose={() => setAppending(false)}
+            />
+          </ToolGroup>
+        )}
         <ToolGroup collapse label={tr("whiteboard.zoom")}>
           <button
             type="button"
@@ -837,29 +885,31 @@ function PdfPane({
           </button>
         </ToolGroup>
         <ToolSpacer />
-        <ToolGroup collapse label={tr("pdf.versions")}>
-          <button
-            type="button"
-            onClick={(e) => setVersionsAnchor(e.currentTarget)}
-            disabled={!versionItems.length}
-            className="eu-btn-quiet eu-btn-sm"
-            aria-haspopup="menu"
-            {...tip(versionItems.length ? tr("pdf.versions") : tr("pdf.noVersionsYet"))}
-          >
-            <Icon icon={History} size={14} />
-            <span className="hidden @3xl:inline">
-              {tr("pdf.versions")} ({versionItems.length})
-            </span>
-          </button>
-          <Menu
-            open={!!versionsAnchor}
-            anchor={versionsAnchor}
-            items={versionItems}
-            label={tr("pdf.versions")}
-            placement="bottom-end"
-            onClose={() => setVersionsAnchor(null)}
-          />
-        </ToolGroup>
+        {!image && (
+          <ToolGroup collapse label={tr("pdf.versions")}>
+            <button
+              type="button"
+              onClick={(e) => setVersionsAnchor(e.currentTarget)}
+              disabled={!versionItems.length}
+              className="eu-btn-quiet eu-btn-sm"
+              aria-haspopup="menu"
+              {...tip(versionItems.length ? tr("pdf.versions") : tr("pdf.noVersionsYet"))}
+            >
+              <Icon icon={History} size={14} />
+              <span className="hidden @3xl:inline">
+                {tr("pdf.versions")} ({versionItems.length})
+              </span>
+            </button>
+            <Menu
+              open={!!versionsAnchor}
+              anchor={versionsAnchor}
+              items={versionItems}
+              label={tr("pdf.versions")}
+              placement="bottom-end"
+              onClose={() => setVersionsAnchor(null)}
+            />
+          </ToolGroup>
+        )}
         <ToolGroup>
           <button
             type="button"
@@ -894,9 +944,9 @@ function PdfPane({
             aria-label={tr("pdf.exportCopy")}
             aria-busy={copying}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm"
-            {...tip(tr("pdf.exportCopyTitle"))}
+            {...tip(tr(image ? "pdf.exportImageTitle" : "pdf.exportCopyTitle"))}
           >
-            <Icon icon={FileDown} size={14} />
+            <Icon icon={image ? ImageDown : FileDown} size={14} />
           </button>
           <OpenWithButton
             fileId={fileId}
@@ -907,7 +957,12 @@ function PdfPane({
             type="button"
             onClick={() =>
               void save()
-                .then(() => toast(tr("pdf.annotationsSaved", { name: fileName }), "success"))
+                .then(() =>
+                  toast(
+                    image ? tr("pdf.imageAnnotationsSaved") : tr("pdf.annotationsSaved", { name: fileName }),
+                    "success",
+                  ),
+                )
                 .catch(logged("pdf.saveButton"))
             }
             disabled={!dirty || saving || !!viewing}
@@ -1054,13 +1109,14 @@ function PdfPane({
             <>
               {!pages && !locked && (
                 <div className="absolute inset-0 z-10 grid place-items-center text-stage-muted eu-t-small">
-                  {tr("pdf.loading")}
+                  {tr(image ? "pdf.loadingImage" : "pdf.loading")}
                 </div>
               )}
               <PdfView
                 key={viewKey}
                 ref={viewRef}
                 url={url}
+                load={image ? loadImage : undefined}
                 tool={viewing ? "select" : tool}
                 color={color}
                 size={size}
@@ -1072,6 +1128,7 @@ function PdfPane({
                 startPage={landing}
                 onReady={(info) => {
                   setPages(info.pages);
+                  setFirst(info.first ?? null);
                   setFailed(null);
                 }}
                 onPage={(n) => {
