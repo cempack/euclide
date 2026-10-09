@@ -1265,7 +1265,7 @@ function PagesPanel({
             className={`eu-pdf-thumb absolute inset-x-0 mx-auto ${n === current ? "eu-pdf-thumb-current" : ""}`}
             style={{ top: meta.top, height: meta.wrapperHeight, width: meta.width + 4 }}
           >
-            <span className="block bg-paper" style={{ width: meta.width, height: meta.height }}>
+            <span className="eu-pdf-thumb-page" style={{ width: meta.width, height: meta.height }}>
               <PageThumb
                 documentId={documentId}
                 pageIndex={meta.pageIndex}
@@ -1273,11 +1273,8 @@ function PagesPanel({
                 drawn={drawn[meta.pageIndex] ?? 0}
               />
             </span>
-            <span
-              className="block text-center font-mono text-caption text-stage-muted"
-              style={{ height: meta.labelHeight }}
-            >
-              {n}
+            <span className="eu-pdf-thumb-n" style={{ height: meta.labelHeight }}>
+              <span>{n}</span>
             </span>
           </button>
         );

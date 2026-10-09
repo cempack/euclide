@@ -914,12 +914,29 @@
     -webkit-user-drag: none;
     user-select: none;
   }
+  /* A page in the side panel: the ring goes round the page alone, and the
+     page in view says its number in an accent pill, as in an album. */
   .eu-pdf-thumb {
-    @apply block w-full rounded-sm border-2 border-transparent overflow-hidden transition-colors duration-fast
-      hover:border-stage-line;
+    @apply block w-full border-2 border-transparent;
   }
-  .eu-pdf-thumb-current {
-    @apply border-stage-accent hover:border-stage-accent;
+  .eu-pdf-thumb-page {
+    @apply block bg-paper rounded-[1px] outline-2 outline-transparent transition-[outline-color] duration-fast;
+  }
+  .eu-pdf-thumb:hover .eu-pdf-thumb-page {
+    @apply outline-stage-line;
+  }
+  .eu-pdf-thumb-current .eu-pdf-thumb-page,
+  .eu-pdf-thumb-current:hover .eu-pdf-thumb-page {
+    @apply outline-stage-accent;
+  }
+  .eu-pdf-thumb-n {
+    @apply flex items-center justify-center font-mono text-caption text-stage-muted;
+  }
+  .eu-pdf-thumb-n > span {
+    @apply rounded-full px-1.5 leading-4 transition-colors duration-fast;
+  }
+  .eu-pdf-thumb-current .eu-pdf-thumb-n > span {
+    @apply bg-stage-accent text-stage font-medium;
   }
   /* The search bar, over the document's top right corner. */
   .eu-pdf-find {
