@@ -19,20 +19,23 @@ async function openPdf(page: Page) {
   await page.getByRole("navigation").getByRole("button", { name: "Documents" }).first().click();
   await settle(page);
   await page.getByRole("option", { name: PDF }).click();
-  await page.locator(".page").first().waitFor();
+  await page.locator(".eu-pdf-page").first().waitFor();
   await expect(page.getByText("Chargement du PDF…")).toHaveCount(0);
   await page.waitForTimeout(500);
 }
 
+/** A stroke on page 1, and where it passes. */
 async function stroke(page: Page, dy = 0) {
-  const box = (await page.locator(".page").first().boundingBox())!;
+  const box = (await page.locator(".eu-pdf-page").first().boundingBox())!;
   const x = box.x + box.width / 3;
   const y = box.y + 150 + dy;
   await page.mouse.move(x, y);
   await page.mouse.down();
   for (let i = 1; i <= 8; i++) await page.mouse.move(x + i * 14, y + i * 5);
   await page.mouse.up();
-  await page.waitForTimeout(400);
+  // The pen waits a moment for the next stroke of the same word.
+  await page.waitForTimeout(1200);
+  return { x: x + 4 * 14, y: y + 4 * 5 };
 }
 
 const tool = (page: Page, name: "Sélection" | "Stylo") => page.getByRole("button", { name, exact: true });
@@ -76,16 +79,17 @@ test("the unsaved mark follows the annotations", async ({ page }) => {
   await expect(save(page)).toBeDisabled();
   await tool(page, "Stylo").click();
   await page.waitForTimeout(300);
-  await stroke(page);
+  const on = await stroke(page);
   await expect(save(page)).toBeEnabled();
   await save(page).click();
   await expect(save(page)).toBeDisabled();
   // Changing tools changes nothing.
   await tool(page, "Sélection").click();
   await tool(page, "Stylo").click();
+  await tool(page, "Sélection").click();
   await page.waitForTimeout(300);
   await expect(save(page)).toBeDisabled();
-  await page.keyboard.press("Control+a");
+  await page.mouse.click(on.x, on.y);
   await page.keyboard.press("Delete");
   await page.waitForTimeout(500);
   await expect(save(page), "deleted after the save").toBeEnabled();
@@ -130,14 +134,55 @@ test("a link in a PDF asks for a window of its own", async ({ page }) => {
   // No network in tests: the request says where the link went.
   await page.context().route(/^https?:\/\/(?!localhost)/, (route) => route.abort());
   await page.goto("/?pdf=/link.pdf");
-  const link = page.locator(".annotationLayer a[href^='https://']");
-  await link.waitFor({ state: "attached" });
-  expect(await link.getAttribute("target")).toBe("_blank");
-  expect(await link.getAttribute("rel")).toContain("noopener");
+  // The link's area on the page, followed on a click (not selected for editing).
+  const link = page.locator(".eu-pdf-page [style*='cursor: pointer']").first();
+  await link.waitFor();
   const asked = page.context().waitForEvent("request", (r) => r.url().includes("education.gouv.fr"));
   const popup = page.waitForEvent("popup");
   await link.click();
   await popup;
   await asked;
   expect(page.url()).toContain("?pdf=");
+  // With the pen on, a stroke started on the link stays a stroke.
+  await page.getByRole("button", { name: "pen" }).click();
+  const box = (await link.boundingBox())!;
+  let opened = false;
+  page.on("popup", () => (opened = true));
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(500);
+  expect(opened).toBe(false);
+});
+
+test("a form filled in is saved into the file", async ({ page }) => {
+  const form = fileURLToPath(new URL("./fixtures/form.pdf", import.meta.url));
+  let served: Buffer | string = form;
+  await page.route(
+    (url) => url.pathname === "/form.pdf",
+    (route) =>
+      typeof served === "string"
+        ? route.fulfill({ path: served, contentType: "application/pdf" })
+        : route.fulfill({ body: served, contentType: "application/pdf" }),
+  );
+  await page.goto("/?pdf=/form.pdf");
+  const field = page.locator(".eu-pdf-page input[type='text']");
+  const box = (await page.locator(".eu-pdf-page").first().boundingBox())!;
+  await page.waitForTimeout(800);
+  // « Nom », then Tab to « Prénom ».
+  await page.mouse.click(box.x + box.width * 0.44, box.y + 268 * (box.width / 1248));
+  await expect(field.first()).toBeFocused();
+  await page.keyboard.type("Moreau");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("Élise");
+  await expect(page.getByTestId("dirty")).toHaveText("dirty");
+  // Saved while still typing in the field.
+  await page.getByRole("button", { name: "save" }).click();
+  await expect(page.getByTestId("dirty")).toHaveText("clean");
+  served = Buffer.from(
+    await page.evaluate(() => Array.from((window as { pdfSaved?: Uint8Array }).pdfSaved ?? [])),
+  );
+
+  // The saved file, opened again.
+  await page.goto("/?pdf=/form.pdf");
+  await expect(field.nth(1)).toHaveValue("Élise");
+  await expect(field.first()).toHaveValue("Moreau");
 });

@@ -507,6 +507,7 @@
   },
   "pdf": {
     "loading": "Chargement du PDF…",
+    "notReady": "Le document n'est pas encore ouvert.",
     "viewerError": "Visualiseur non prêt",
     "viewerNotReadyForEdit": "Visualiseur non prêt pour l'édition",
     "annotationsSaved": "Annotations enregistrées dans {name}",
@@ -543,6 +544,7 @@
     "restored": "Version restaurée : la version précédente reste dans l'historique.",
     "openFailed": "Euclide n'a pas pu afficher ce document.",
     "openFailedHint": "Il est peut-être protégé ou endommagé. Vous pouvez l'ouvrir avec une autre application.",
+    "passwordProtected": "Ce document est protégé par un mot de passe.",
     "eraser": "Gomme",
     "undo": "Annuler le dernier trait",
     "clearAll": "Tout effacer",

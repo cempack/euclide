@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import {
   Highlighter,
   History,
@@ -16,6 +15,7 @@ import {
   Type,
 } from "lucide-react";
 import { api, fileUrl, versionUrl, type FileVersion } from "../../lib/api";
+import { q } from "../../api/queries";
 import { errorMessage } from "../../lib/errors";
 import { tr } from "../../lib/i18n";
 import { keysOf } from "../../lib/keymap";
@@ -30,12 +30,11 @@ import { tip } from "../../ui/Tooltip";
 import { ColorChoice } from "./ColorChoice";
 import { HIGHLIGHT, INK } from "./palette";
 import { PdfView, type PdfTool, type PdfViewHandle } from "./PdfView";
-import { Thumbnails } from "./Thumbnails";
 import { ImageView } from "./ImageView";
 
 const isImage = (name: string) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
 
-/** A document tab: a PDF (annotated with PDF.js) or an image (drawn over). */
+/** A document tab: a PDF (PDFium, annotated with EmbedPDF) or an image (drawn over). */
 export default function DocumentPane({
   tabId,
   fileId,
@@ -100,7 +99,8 @@ function PdfPane({
   const [tool, setTool] = useState<PdfTool>("select");
   const [ink, setInk] = useState(INK[2].value);
   const [marker, setMarker] = useState(HIGHLIGHT[0].value);
-  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
+  /** The page count, once the document is open. */
+  const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
   const [pageText, setPageText] = useState("1");
   const [scale, setScale] = useState(1);
@@ -113,6 +113,8 @@ function PdfPane({
   /** An older version shown instead of the file (read-only). */
   const [viewing, setViewing] = useState<FileVersion | null>(null);
   const [versionsAnchor, setVersionsAnchor] = useState<HTMLElement | null>(null);
+  // New annotations carry the teacher's name, as in other PDF readers.
+  const author = (useQuery(q.setting("teacher_display_name")).data ?? "").trim();
   const versions = useQuery({
     queryKey: ["library", "versions", fileId],
     queryFn: () => api.getFileVersions(fileId),
@@ -131,7 +133,6 @@ function PdfPane({
       // The file is replaced; what it was becomes a version (write_file_bytes).
       if (bytes) await api.writeFileBytes(fileId, bytes);
       view.markSaved();
-      setDirty(false);
       void queryClient.invalidateQueries({ queryKey: ["library", "versions", fileId] });
       changed("library");
     } catch (err) {
@@ -182,16 +183,16 @@ function PdfPane({
     }
   };
 
-  const source = viewing ? { url: versionUrl(viewing.id) } : { url: current.url };
+  const url = viewing ? versionUrl(viewing.id) : current.url;
   // Each document gets a view of its own (a restored file is a new document).
   const viewKey = viewing ? `version:${viewing.id}` : `file:${current.revision}`;
   // Another document in the view: the last one is closed, forget it.
   const [docFor, setDocFor] = useState(viewKey);
   if (docFor !== viewKey) {
     setDocFor(viewKey);
-    setDoc(null);
+    setPages(0);
   }
-  const count = doc?.numPages ?? 0;
+  const count = pages;
   const color = tool === "highlight" ? marker : ink;
   const versionItems: MenuEntry[] = (versions.data ?? [])
     .slice()
@@ -227,7 +228,7 @@ function PdfPane({
               type="button"
               onClick={() => setTool(t.id)}
               aria-pressed={tool === t.id}
-              disabled={!doc || !!viewing}
+              disabled={!pages || !!viewing}
               aria-label={tr(t.label)}
               className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
               {...tip(tr(t.hint))}
@@ -239,7 +240,7 @@ function PdfPane({
           <button
             type="button"
             onClick={() => viewRef.current?.deleteSelected()}
-            disabled={!doc || !!viewing}
+            disabled={!pages || !!viewing}
             aria-label={tr("pdf.deleteAnnotation")}
             className="eu-btn-quiet eu-btn-icon eu-btn-sm hover:text-danger"
             {...tip(tr("pdf.deleteAnnotationTitle"))}
@@ -366,11 +367,6 @@ function PdfPane({
       )}
 
       <div className="flex-1 min-h-0 flex bg-stage">
-        {showPages && doc && (
-          <div className="w-40 shrink-0 border-r border-stage-line bg-stage-alt">
-            <Thumbnails doc={doc} page={page} onGo={goTo} />
-          </div>
-        )}
         <div className="flex-1 min-w-0 relative">
           {failed ? (
             <div className="h-full grid place-items-center p-6">
@@ -389,7 +385,7 @@ function PdfPane({
             </div>
           ) : (
             <>
-              {!doc && (
+              {!pages && (
                 <div className="absolute inset-0 z-10 grid place-items-center text-stage-muted eu-t-small">
                   {tr("pdf.loading")}
                 </div>
@@ -397,13 +393,15 @@ function PdfPane({
               <PdfView
                 key={viewKey}
                 ref={viewRef}
-                source={source}
+                url={url}
                 tool={viewing ? "select" : tool}
                 color={color}
                 readOnly={!!viewing}
+                author={author}
+                showPages={showPages}
                 active={visible}
-                onReady={(d) => {
-                  setDoc(d);
+                onReady={(info) => {
+                  setPages(info.pages);
                   setFailed(null);
                 }}
                 onPage={(n) => {

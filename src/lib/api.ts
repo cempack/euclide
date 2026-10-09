@@ -80,7 +80,7 @@ export function serveDevFiles(resolve: (kind: DevKind, id: number) => string) {
   devFiles = resolve;
 }
 
-/** URL of a library document for the webview (`<img>`, `fetch`, PDF.js). */
+/** URL of a library document for the webview (`<img>`, `fetch`). */
 export const fileUrl = (id: number) => devFiles?.("file", id) ?? convertFileSrc(`file/${id}`, "eufile");
 /** URL of a saved version of a document. */
 export const versionUrl = (versionId: number) =>

@@ -1,5 +1,5 @@
 //! Small previews of library documents (page 1 of a PDF, an image), shown
-//! in the Documents grid. The page draws them with PDF.js when Euclide is
+//! in the Documents grid. The page draws them with PDFium when Euclide is
 //! idle and hands them over; they live in `Euclide-Data/.cache/thumbs/`,
 //! named after the file and its modification time, so a saved document
 //! gets a new one. A dot-folder: backups skip it, and losing it costs only

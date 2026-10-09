@@ -3,7 +3,6 @@ import { defineConfig } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
-import { pdfjsAssets } from "./scripts/vite-pdfjs-assets";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -11,7 +10,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   // React Compiler: components and hooks memoized at build time, so a state
   // change re-renders only what reads it.
-  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss(), pdfjsAssets()],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
 
   test: {
     environment: "happy-dom",
@@ -22,8 +21,8 @@ export default defineConfig(async () => ({
   clearScreen: false,
 
   build: {
-    // Every screen is its own chunk; the largest, the document viewer (PDF.js
-    // with its polyfills), loads only when a document is opened.
+    // Every screen is its own chunk; the largest, the document viewer (EmbedPDF
+    // and PDFium's engine), loads only when a document is opened.
     chunkSizeWarningLimit: 800,
   },
   server: {

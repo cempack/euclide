@@ -24,20 +24,32 @@ function jpeg(canvas: HTMLCanvasElement): Promise<Blob | null> {
 }
 
 async function drawPdf(id: number): Promise<Blob | null> {
-  const { openPdf } = await import("../pdf/engine");
-  const task = openPdf({ url: fileUrl(id) });
+  const { newDocumentId, pdfium } = await import("../pdf/pdfium");
+  const res = await fetch(fileUrl(id));
+  if (!res.ok) throw new Error((await res.text()) || `${res.status} ${res.statusText}`);
+  const engine = pdfium();
+  const doc = await engine
+    .openDocumentBuffer(
+      { id: newDocumentId("preview"), content: await res.arrayBuffer() },
+      { normalizeRotation: true },
+    )
+    .toPromise();
   try {
-    const doc = await task.promise;
-    const page = await doc.getPage(1);
-    const base = page.getViewport({ scale: 1 });
-    const viewport = page.getViewport({ scale: WIDTH / base.width });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
-    await page.render({ canvas, viewport }).promise;
-    return await jpeg(canvas);
+    const page = doc.pages[0];
+    if (!page) return null;
+    // On white (JPEG has no transparency), with the notes and filled fields.
+    return await engine
+      .renderPage(doc, page, {
+        scaleFactor: WIDTH / page.size.width,
+        dpr: 1,
+        withAnnotations: true,
+        withForms: true,
+        imageType: "image/jpeg",
+        imageQuality: 0.8,
+      })
+      .toPromise();
   } finally {
-    void task.destroy();
+    engine.closeDocument(doc);
   }
 }
 

@@ -1,4 +1,4 @@
-/* Only src/ holds class names: never scan the vendored PDF.js or local clones. */
+/* Only src/ holds class names: never scan vendored code or local clones. */
 @import "tailwindcss" source("../src");
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
@@ -45,6 +45,8 @@
   /* Paper stays paper: the whiteboard and printed previews in both themes. */
   --color-paper: rgb(255 255 255);
   --color-paper-ink: rgb(17 18 19);
+  /* Text selected on a PDF page, multiplied over the paper. */
+  --color-pdf-selection: rgb(179 212 252);
   --color-transparent: transparent;
   --color-current: currentcolor;
 
@@ -852,20 +854,23 @@
   .eu-tab[data-pinned] {
     @apply w-auto min-w-0 basis-auto shrink-0 grow-0;
   }
-  /* Documents: PDF.js pages on the stage, as sheets of paper. */
+  /* Documents: PDF pages on the stage, as sheets of paper. */
   .eu-pdf {
     background: var(--color-stage);
-    --page-margin: 1rem auto;
-    --page-border: none;
   }
   /* Focus lands on the document when it is clicked: no ring around the whole stage. */
   .eu-pdf:focus-visible {
     outline: none;
   }
-  .eu-pdf .pdfViewer .page {
-    border: none;
-    margin: 1rem auto;
+  .eu-pdf-page {
+    background: var(--color-paper);
     box-shadow: var(--shadow-pop);
+  }
+  /* A page is pictures (the page, its tiles, some annotations): dragging one
+     would start the browser's drag and drop and cancel the stroke drawn. */
+  .eu-pdf img {
+    -webkit-user-drag: none;
+    user-select: none;
   }
   .eu-pdf-thumb {
     @apply block w-full rounded-sm border-2 border-transparent overflow-hidden transition-colors duration-fast

@@ -99,8 +99,8 @@ const MainContent = memo(function MainContent({ info }: { info: AppInfo | null }
   const activeId = active?.id;
   useLayoutEffect(tabSwitchEnd, [activeId]);
   // A pane mounts the first time its tab is shown, then stays mounted.
-  // Restoring a session used to start every screen at launch (and a PDF.js
-  // per PDF tab) before the teacher had looked at any of them.
+  // Restoring a session used to start every screen at launch (and a PDF
+  // viewer per PDF tab) before the teacher had looked at any of them.
   const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set());
   const activeMount = active?.mountId;
   if (activeMount && !shown.has(activeMount)) setShown(new Set(shown).add(activeMount));
