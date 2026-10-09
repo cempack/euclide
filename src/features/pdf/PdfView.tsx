@@ -16,7 +16,10 @@ import {
   PdfAnnotationSubtype,
   PdfErrorCode,
   PdfZoomMode,
+  restorePosition,
   Task,
+  transformSize,
+  type Rotation,
   type PdfBookmarkObject,
   type PdfErrorReason,
   type PdfLinkTarget,
@@ -63,11 +66,23 @@ import { RotatePluginPackage, type RotatePlugin } from "@embedpdf/plugin-rotate"
 import { Rotate } from "@embedpdf/plugin-rotate/react";
 import { tr } from "../../lib/i18n";
 import { touches } from "./eraser";
+import { onText } from "./marker";
 import { FreshNotes, freeTextNote } from "./FreeTextNote";
 import { newDocumentId, pdfium, restartPdfium } from "./pdfium";
 
 export type PdfTool =
-  "select" | "pen" | "highlight" | "text" | "line" | "arrow" | "rect" | "ellipse" | "eraser";
+  | "select"
+  | "pen"
+  | "highlight"
+  | "underline"
+  | "strikeout"
+  | "marker"
+  | "text"
+  | "line"
+  | "arrow"
+  | "rect"
+  | "ellipse"
+  | "eraser";
 
 /**
  * EmbedPDF's tool for each of ours. « select » has none (text and
@@ -77,6 +92,9 @@ const TOOLS: Record<PdfTool, string | null> = {
   select: null,
   pen: "ink",
   highlight: "highlight",
+  underline: "underline",
+  strikeout: "strikeout",
+  marker: "inkHighlighter",
   text: "freeText",
   line: "line",
   arrow: "lineArrow",
@@ -90,7 +108,9 @@ const SHAPES = ["line", "lineArrow", "square", "circle"];
 const ERASER = "eraser";
 
 /** The tools that draw: what they draw becomes an annotation a moment after the pen lifts. */
-const DRAWING: PdfTool[] = ["pen"];
+const DRAWING: PdfTool[] = ["pen", "marker"];
+/** Tools on the highlighter's palette (light colours, the text shows through). */
+const MARKERS: PdfTool[] = ["highlight", "marker"];
 /** How long the pen waits for the next stroke of the same word (EmbedPDF's ink tool). */
 const STROKE_DELAY = 800;
 
@@ -309,6 +329,9 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
                   interaction: { exclusive: true, isRotatable: false },
                 },
                 { id: "highlight", interaction: { exclusive: true } },
+                { id: "underline", interaction: { exclusive: true } },
+                { id: "strikeout", interaction: { exclusive: true } },
+                { id: "inkHighlighter", interaction: { exclusive: true, isRotatable: false } },
                 {
                   id: "freeText",
                   defaults: { contents: "", fontSize: 14 },
@@ -522,8 +545,12 @@ function Viewer({
   // Its colour: the pen and notes share it; the highlighter has its own.
   useEffect(() => {
     if (!annotations || readOnly) return;
-    if (tool === "highlight") annotations.setToolDefaults("highlight", { strokeColor: color, color });
-    else {
+    if (MARKERS.includes(tool)) {
+      annotations.setToolDefaults("highlight", { strokeColor: color, color });
+      annotations.setToolDefaults("inkHighlighter", { strokeColor: color, color });
+    } else {
+      annotations.setToolDefaults("underline", { strokeColor: color, color });
+      annotations.setToolDefaults("strikeout", { strokeColor: color, color });
       annotations.setToolDefaults("ink", { strokeColor: color, color, strokeWidth: size });
       annotations.setToolDefaults("freeText", { fontColor: color });
       for (const shape of SHAPES)
@@ -612,15 +639,51 @@ function Viewer({
     },
   }));
 
+  /**
+   * The highlighter away from text (a margin, a figure, a scan) draws
+   * free-hand: for this stroke, EmbedPDF's free-hand highlighter takes over
+   * before the press reaches the page (onText).
+   */
+  const freeHand = useRef(false);
+  const offText = (e: React.PointerEvent) => {
+    const surface = (e.target as Element).closest?.<HTMLElement>("[data-surface]");
+    const doc = state?.document;
+    if (!surface || !doc) return false;
+    const pageIndex = Number(surface.dataset.surface);
+    const page = doc.pages[pageIndex];
+    if (!page) return false;
+    const box = surface.getBoundingClientRect();
+    const scale = state?.scale ?? 1;
+    const rotation = ((page.rotation + (state?.rotation ?? 0)) % 4) as Rotation;
+    const at = restorePosition(
+      transformSize(transformSize(page.size, 0, scale), rotation, 1),
+      { x: e.clientX - box.left, y: e.clientY - box.top },
+      rotation,
+      scale,
+    );
+    return !onText(selection?.forDocument(documentId).getState().geometry[pageIndex], at);
+  };
+
   // A stroke starts with the pen pressed on a page: unsaved from then on.
   const onPointerDown = (e: React.PointerEvent) => {
     if (!isTyping(e.target)) viewer.current?.focus({ preventScroll: true });
-    if (!readOnly && DRAWING.includes(tool) && (e.target as Element).closest?.("[data-page]")) {
+    if (readOnly) return;
+    if (tool === "highlight" && annotations && offText(e)) {
+      freeHand.current = true;
+      annotations.forDocument(documentId).setActiveTool(TOOLS.marker);
+    }
+    if ((DRAWING.includes(tool) || freeHand.current) && (e.target as Element).closest?.("[data-page]")) {
       track.current.strokeEnd = Date.now() + 60_000;
       check();
     }
   };
   const onPointerUp = () => {
+    if (freeHand.current) {
+      freeHand.current = false;
+      // Once the page has the lift too (this runs first, on the way down):
+      // switched back before, the stroke was never finished.
+      window.setTimeout(() => annotations?.forDocument(documentId).setActiveTool(TOOLS.highlight));
+    }
     const t = track.current;
     if (t.strokeEnd <= Date.now()) return;
     t.strokeEnd = Date.now();
@@ -678,6 +741,7 @@ function Viewer({
             className="eu-pdf absolute inset-0"
             onPointerDownCapture={onPointerDown}
             onPointerUpCapture={onPointerUp}
+            onPointerCancelCapture={onPointerUp}
           >
             <Scroller
               documentId={documentId}
@@ -692,6 +756,7 @@ function Viewer({
                     <PagePointerProvider
                       documentId={documentId}
                       pageIndex={pageIndex}
+                      data-surface={pageIndex}
                       style={{ width, height }}
                     >
                       {/* The whole page, small and quick; sharp tiles over it. A
@@ -766,7 +831,10 @@ function PdfViewport({
   elementRef: React.RefObject<HTMLDivElement | null>;
   className: string;
   children: ReactNode;
-} & Pick<React.HTMLAttributes<HTMLDivElement>, "onPointerDownCapture" | "onPointerUpCapture">) {
+} & Pick<
+  React.HTMLAttributes<HTMLDivElement>,
+  "onPointerDownCapture" | "onPointerUpCapture" | "onPointerCancelCapture"
+>) {
   const { plugin } = useViewportPlugin();
   const gated = useIsViewportGated(documentId);
   const gap = plugin?.provides().getViewportGap() ?? 0;
