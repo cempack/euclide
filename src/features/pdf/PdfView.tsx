@@ -270,6 +270,17 @@ function queueFormWrites(registry: PluginRegistry): () => Promise<void> {
 /** Euclide's text notes in EmbedPDF's place (FreeTextNote.tsx). */
 const RENDERERS = [freeTextNote];
 
+/**
+ * Strokes, marks and shapes shown as EmbedPDF draws them (SVG), not as the
+ * picture PDFium makes of their appearance: sharp at any zoom, with no new
+ * picture at each zoom step. And EmbedPDF's picture of an annotation could
+ * vanish: when a second one arrived while the first was loading, the
+ * first's load let go of the second's address (AppearanceImage), and a page
+ * opened at a zoom about to change showed broken images. Paper (print,
+ * copies) still takes the appearances PDFium writes into the file.
+ */
+const DRAWN = { useAppearanceStream: false };
+
 /** What is selected on a page, in the app's accent. */
 const OUTLINE = { color: "var(--color-accent)", style: "solid", width: 1.5, offset: 2 } as const;
 const HANDLES = { color: "var(--color-accent)", size: 10 };
@@ -355,15 +366,21 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
                 // While the pen or the highlighter is on, what the page
                 // already holds (a link, a note) stays out of its way.
                 // No turning handle: a stroke or a note is moved and resized.
+                // What they draw shows as drawn (DRAWN), not as a picture.
                 {
                   id: "ink",
                   defaults: { strokeWidth: 2 },
                   interaction: { exclusive: true, isRotatable: false },
+                  behavior: DRAWN,
                 },
-                { id: "highlight", interaction: { exclusive: true } },
-                { id: "underline", interaction: { exclusive: true } },
-                { id: "strikeout", interaction: { exclusive: true } },
-                { id: "inkHighlighter", interaction: { exclusive: true, isRotatable: false } },
+                { id: "highlight", interaction: { exclusive: true }, behavior: DRAWN },
+                { id: "underline", interaction: { exclusive: true }, behavior: DRAWN },
+                { id: "strikeout", interaction: { exclusive: true }, behavior: DRAWN },
+                {
+                  id: "inkHighlighter",
+                  interaction: { exclusive: true, isRotatable: false },
+                  behavior: DRAWN,
+                },
                 {
                   id: "freeText",
                   defaults: { contents: "", fontSize: 14 },
@@ -379,11 +396,13 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
                   id,
                   interaction: { exclusive: true, isRotatable: false },
                   clickBehavior: { enabled: false, defaultLength: 100 },
+                  behavior: DRAWN,
                 })),
                 ...["square", "circle"].map((id) => ({
                   id,
                   interaction: { exclusive: true, isRotatable: false },
                   clickBehavior: { enabled: false, defaultSize: { width: 100, height: 100 } },
+                  behavior: DRAWN,
                 })),
                 { id: "link", categories: ["link"] },
               ],

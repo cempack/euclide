@@ -476,3 +476,20 @@ test("Ctrl+F finds a word on every page, and the outline goes to a chapter", asy
   await page.getByRole("button", { name: "Suites arithmétiques" }).click();
   await expect(page.getByRole("textbox", { name: "Aller à la page" })).toHaveValue("3");
 });
+
+test("annotations written before 0.6 (pdf.js's ink and highlight) show as drawn", async ({ page }) => {
+  const pdf = fileURLToPath(new URL("./fixtures/pdfjs-annotations.pdf", import.meta.url));
+  await page.route(
+    (url) => url.pathname === "/pdfjs.pdf",
+    (route) => route.fulfill({ path: pdf, contentType: "application/pdf" }),
+  );
+  await page.goto("/?pdf=/pdfjs.pdf");
+  await page.locator(".eu-pdf-page").first().waitFor();
+  // The stroke in its red, 3 points wide, drawn by the viewer (no picture to break).
+  const ink = page.locator(".eu-pdf-page [data-no-interaction] svg path:not([stroke='transparent'])");
+  await expect(ink).toHaveCount(1);
+  await expect(ink).toHaveCSS("stroke", "rgb(191, 38, 45)");
+  await expect(page.locator(".eu-pdf-page [data-no-interaction] img")).toHaveCount(0);
+  // The highlight over « Ligne 1 ».
+  await expect(page.locator(".eu-pdf-page [data-no-interaction] div[style*='background']")).toHaveCount(1);
+});
