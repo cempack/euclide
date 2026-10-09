@@ -473,6 +473,11 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.should-publish.outputs.run == 'true' && needs.version.outputs.tag != ''
     steps:
+      # For CHANGELOG.md: the version's section becomes the release's notes,
+      # and the ones Euclide shows before installing it (latest.json).
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.tag }}
       - uses: actions/setup-node@v6
         with:
           node-version: lts/*
@@ -490,6 +495,11 @@ jobs:
             exit 1
           fi
           mkdir -p /tmp/euclide-updater
+          # A release without its section keeps the notes it has.
+          if ! node scripts/changelog/release-notes.mjs "${TAG#v}" > /tmp/euclide-updater/release-notes.md; then
+            echo "::warning::CHANGELOG.md has no section for ${TAG#v}: the notes stay as they are."
+            rm -f /tmp/euclide-updater/release-notes.md
+          fi
           cd /tmp/euclide-updater
           gh release download "$TAG" --pattern 'Euclide-windows-portable.zip' --repo "$REPO"
           gh release download "$TAG" --pattern 'latest.json' --repo "$REPO"
@@ -498,7 +508,7 @@ jobs:
           test -f latest.json
           npx --yes @tauri-apps/cli@2 signer sign Euclide-windows-portable.zip
           python3 <<'PY'
-          import json, os, pathlib
+          import json, os, pathlib, re
           tag = os.environ["TAG"]
           repo = os.environ["REPO"]
           sig = pathlib.Path("Euclide-windows-portable.zip.sig").read_text().strip()
@@ -525,6 +535,17 @@ jobs:
                       if key in platforms:
                           platforms[key] = dict(entry)
                   print("linux-x86_64 ->", entry["url"])
+          # Euclide shows the notes as plain text before installing: the
+          # section without its title, images, Markdown marks or install note.
+          notes = pathlib.Path("release-notes.md")
+          if notes.exists():
+              section = notes.read_text().split("\n---\n", 1)[0]
+              kept = []
+              for line in section.splitlines():
+                  if line.startswith("## ") or line.lstrip().startswith(("![", "<p>", "</p>", "<img")):
+                      continue
+                  kept.append(re.sub(r"^#+ ", "", line).replace("**", ""))
+              data["notes"] = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
           # What every copy needs before the release goes public.
           if data.get("version") != tag.removeprefix("v"):
               raise SystemExit(f"latest.json is for {data.get('version')}, not {tag}")
@@ -537,5 +558,8 @@ jobs:
           print("windows-x86_64-nsis ->", (platforms.get("windows-x86_64-nsis") or {}).get("url"))
           PY
           gh release upload "$TAG" latest.json --clobber --repo "$REPO"
+          if [ -f release-notes.md ]; then
+            gh release edit "$TAG" --notes-file release-notes.md --repo "$REPO"
+          fi
           gh release edit "$TAG" --draft=false --repo "$REPO"
           echo "Published $TAG"
