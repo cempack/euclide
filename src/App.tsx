@@ -212,7 +212,12 @@ function TabScreen({ info, tab, visible }: { info: AppInfo | null; tab: Tab; vis
       );
     case "pdf":
       return (
-        <PdfViewer tabId={tab.id} fileId={tab.params.fileId!} fileName={tab.params.fileName ?? tab.title} />
+        <PdfViewer
+          tabId={tab.id}
+          fileId={tab.params.fileId!}
+          fileName={tab.params.fileName ?? tab.title}
+          visible={visible}
+        />
       );
     case "note":
       return (
