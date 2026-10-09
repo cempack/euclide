@@ -2,11 +2,11 @@ import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspen
 import { changed, onChanged } from "./api/client";
 import { api, type AppInfo, isTauri } from "./lib/api";
 import { tr } from "./lib/i18n";
-import { minutesRemaining } from "./lib/format";
+import { dayLabel, minutesRemaining } from "./lib/format";
 import { useAppearance } from "./lib/theme";
 import { checkForAppUpdate } from "./lib/updater";
 import { setAvailableUpdate, updateInProgress } from "./stores/update";
-import { takeBootUpdate } from "./lib/boot";
+import { takeBootRestore, takeBootUpdate } from "./lib/boot";
 import { errorMessage } from "./lib/errors";
 import { logged, reportError } from "./lib/report";
 import { chime } from "./lib/sound";
@@ -461,10 +461,16 @@ function Shell() {
     [toast],
   );
 
-  // First launch after an update: say so, once.
+  // First launch after an update or a restore: say so, once.
   useEffect(() => {
     const updated = takeBootUpdate();
     if (updated) toast(tr("updater.updatedTo", { version: updated.to }), "success");
+    const restored = takeBootRestore();
+    if (restored) {
+      const day = dayLabel(restored.name.replace(/\.db$/, ""));
+      if (restored.error) toast(tr("backups.restoreFailed", { day, error: restored.error }), "error");
+      else toast(tr("backups.restored", { day }), "success");
+    }
   }, [toast]);
 
   // Shortly after launch, then every few hours: Euclide may stay open for

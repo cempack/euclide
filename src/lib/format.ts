@@ -1,4 +1,4 @@
-import { fmt, trList } from "./i18n";
+import { fmt, tr, trList } from "./i18n";
 
 export function greeting(date = new Date(), name?: string | null): string {
   // Anonymous greetings until Pronote is connected; named pool once we have an account.
@@ -28,6 +28,19 @@ const MONTHS = [
 
 export function longDate(date = new Date()): string {
   return `${DAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
+/** « aujourd'hui », « hier », or « lundi 5 octobre » for an AAAA-MM-JJ day. */
+export function dayLabel(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const day = new Date(y, m - 1, d);
+  const today = new Date();
+  const diff = Math.round(
+    (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - day.getTime()) / 86_400_000,
+  );
+  if (diff === 0) return tr("backups.today");
+  if (diff === 1) return tr("backups.yesterday");
+  return day.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
 
 export const DAY_LABELS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];

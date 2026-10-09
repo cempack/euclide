@@ -51,8 +51,6 @@ pub(crate) fn write_data_dir_backup(
     src: &std::path::Path,
     db_snapshot: &std::path::Path,
 ) -> AppResult<std::path::PathBuf> {
-    use zip::write::SimpleFileOptions;
-
     if !src.is_dir() {
         return Err(AppError::user("Dossier de données introuvable"));
     }
@@ -66,9 +64,27 @@ pub(crate) fn write_data_dir_backup(
 
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M").to_string();
     let dest = out_dir.join(format!("euclide-{stamp}.zip"));
+    // Written under another name, then renamed: a key pulled out half-way
+    // leaves no archive that looks complete and is not.
+    let partial = out_dir.join(format!(".euclide-{stamp}.zip.en-cours"));
+    let written = write_zip(src, db_snapshot, &partial).and_then(|()| {
+        fs::rename(&partial, &dest).map_err(|err| AppError::user(format!("Archive : {err}")))
+    });
+    if written.is_err() {
+        let _ = fs::remove_file(&partial);
+    }
+    written.map(|()| dest)
+}
 
-    let file = fs::File::create(&dest)
-        .map_err(|err| AppError::user(format!("Écriture archive : {err}")))?;
+fn write_zip(
+    src: &std::path::Path,
+    db_snapshot: &std::path::Path,
+    out: &std::path::Path,
+) -> AppResult<()> {
+    use zip::write::SimpleFileOptions;
+
+    let file =
+        fs::File::create(out).map_err(|err| AppError::user(format!("Écriture archive : {err}")))?;
     let mut zw = zip::ZipWriter::new(std::io::BufWriter::new(file));
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
@@ -113,9 +129,14 @@ pub(crate) fn write_data_dir_backup(
             add(&name, &path)?;
         }
     }
+    let archive_err = |err: &dyn std::fmt::Display| AppError::user(format!("Archive : {err}"));
     zw.finish()
-        .map_err(|err| AppError::user(format!("Archive : {err}")))?;
-    Ok(dest)
+        .map_err(|e| archive_err(&e))?
+        .into_inner()
+        .map_err(|e| archive_err(&e))?
+        .sync_all()
+        .map_err(|e| archive_err(&e))?;
+    Ok(())
 }
 
 /// Zip the whole data folder next to itself, in `Euclide-Sauvegardes/`.
@@ -269,6 +290,16 @@ mod tests {
         let mut buf = String::new();
         db.read_to_string(&mut buf).unwrap();
         assert_eq!(buf, "db-bytes");
+        // Only the finished archive is left.
+        let left: Vec<_> = fs::read_dir(dest.parent().unwrap())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            left,
+            [dest.file_name().unwrap().to_string_lossy().to_string()]
+        );
 
         let _ = fs::remove_dir_all(&tmp);
     }

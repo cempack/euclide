@@ -16,9 +16,13 @@ const CANVAS_LIGHT: Color = Color(250, 249, 248, 255);
 const CANVAS_DARK: Color = Color(19, 19, 19, 255);
 
 /// Every UI setting (null when never saved), the Pronote status, the version
-/// Euclide was just updated from if any, and a nonce that lets the frontend
-/// tell a fresh boot from a reload of the page.
-pub fn state(conn: &Connection, updated_from: Option<&str>) -> Value {
+/// Euclide was just updated from and the restore it just did if any, and a
+/// nonce that lets the frontend tell a fresh boot from a reload of the page.
+pub fn state(
+    conn: &Connection,
+    updated_from: Option<&str>,
+    restored: Option<&crate::jobs::backup::RestoreReport>,
+) -> Value {
     let settings: Map<String, Value> = UI_SETTINGS
         .iter()
         .map(|key| {
@@ -31,6 +35,7 @@ pub fn state(conn: &Connection, updated_from: Option<&str>) -> Value {
         "settings": settings,
         "pronote": crate::commands::pronote::status(conn),
         "updated": updated_from.map(|from| json!({ "from": from, "to": env!("CARGO_PKG_VERSION") })),
+        "restored": restored,
     })
 }
 
@@ -101,7 +106,11 @@ mod tests {
         let conn = crate::db::migrations_for_tests();
         crate::commands::settings::put(&conn, "theme", "dark").unwrap();
         crate::commands::settings::put(&conn, "pronote_password", "secret").unwrap();
-        let boot = state(&conn, Some("0.2.0"));
+        let restored = crate::jobs::backup::RestoreReport {
+            name: "2026-10-05.db".into(),
+            error: None,
+        };
+        let boot = state(&conn, Some("0.2.0"), Some(&restored));
         let settings = boot["settings"].as_object().unwrap();
         assert_eq!(settings.len(), UI_SETTINGS.len());
         assert_eq!(settings["theme"], "dark");
@@ -111,6 +120,9 @@ mod tests {
         assert_eq!(boot["pronote"]["connected"], false);
         assert_eq!(boot["nonce"].as_str().unwrap().len(), 36);
         assert_eq!(boot["updated"]["from"], "0.2.0");
-        assert!(state(&conn, None)["updated"].is_null());
+        assert_eq!(boot["restored"]["name"], "2026-10-05.db");
+        let plain = state(&conn, None, None);
+        assert!(plain["updated"].is_null());
+        assert!(plain["restored"].is_null());
     }
 }

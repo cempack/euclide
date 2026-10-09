@@ -509,6 +509,7 @@ function backupStatus(): BackupStatus {
     last_mirror: backups.external ? `${days[0]} 08:12` : null,
     integrity: "ok",
     restore_pending: backups.restore != null,
+    last_restore: null,
   };
 }
 function localYmdOf(d: Date): string {

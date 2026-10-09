@@ -607,6 +607,15 @@ export interface BackupStatus {
   /** "ok", the integrity problem found at startup, or null before the check ran. */
   integrity: string | null;
   restore_pending: boolean;
+  /** What this launch's restore did, if it followed one. */
+  last_restore: RestoreReport | null;
+}
+
+/** A restore of a daily copy, done at launch: `error` says why it was not. */
+export interface RestoreReport {
+  /** The copy, `AAAA-MM-JJ.db`. */
+  name: string;
+  error: string | null;
 }
 
 /** A saved version of a document, served at `versionUrl(id)`. */
