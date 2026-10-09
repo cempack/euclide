@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CM,
+  boardJson,
   contentBounds,
   distanceTo,
   intersections,
@@ -10,6 +11,7 @@ import {
   onArc,
   parseBoard,
   resizeItem,
+  sheetsOf,
   snap,
   withPicture,
   type Item,
@@ -176,5 +178,50 @@ describe("the selection tool", () => {
       picture,
       formula,
     ]);
+  });
+});
+
+describe("pages", () => {
+  const dot = (id: string): Item => ({ id, kind: "point", p: { x: 0, y: 0 }, label: "A", color: "#000" });
+
+  it("write a board of one page as before", () => {
+    const json = boardJson([{ background: "seyes", items: [dot("a")], view: { x: 1, y: 2, zoom: 1 } }]);
+    expect(JSON.parse(json)).toEqual({
+      version: 3,
+      background: "seyes",
+      items: [dot("a")],
+      view: { x: 1, y: 2, zoom: 1 },
+    });
+  });
+
+  it("keep the first page where format 3 has it, the others after, and the page shown", () => {
+    const sheets = [
+      { background: "plain" as const, items: [dot("a")] },
+      { background: "axes" as const, items: [dot("b")], view: { x: 0, y: 0, zoom: 2 } },
+      { background: "dots" as const, items: [] },
+    ];
+    const raw = boardJson(sheets, 1);
+    const board = parseBoard(raw);
+    // What an older Euclide reads: the first page.
+    expect(board.items).toEqual([dot("a")]);
+    expect(sheetsOf(board)).toEqual(sheets);
+    expect(board.page).toBe(1);
+  });
+
+  it("read past a broken page and a page shown that is not there", () => {
+    const board = parseBoard(
+      JSON.stringify({
+        version: 3,
+        items: [],
+        more: [null, { items: "x" }, { background: "dots" }],
+        page: 9,
+      }),
+    );
+    expect(sheetsOf(board)).toEqual([
+      { background: "plain", items: [] },
+      { background: "plain", items: [] },
+      { background: "dots", items: [] },
+    ]);
+    expect(board.page).toBeUndefined();
   });
 });

@@ -3,11 +3,14 @@ import { changed } from "../../api/client";
 import { createPortal, flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ChevronLeft,
+  ChevronRight,
   Circle as CircleIcon,
   Crosshair,
   DraftingCompass,
   Ellipsis,
   Eraser,
+  FilePlus2,
   Grid3x3,
   Hand,
   Highlighter,
@@ -63,6 +66,7 @@ import {
 } from "./instruments";
 import {
   CM,
+  boardJson,
   boundsOf,
   contentBounds,
   dist,
@@ -75,6 +79,7 @@ import {
   parseBoard,
   resizable,
   resizeItem,
+  sheetsOf,
   snap,
   withPicture,
   type Background,
@@ -82,6 +87,7 @@ import {
   type MathItem,
   type P,
   type Picture,
+  type Sheet,
   type Text,
   type View,
 } from "./model";
@@ -101,9 +107,30 @@ type Tool =
   | "math"
   | "plot";
 
+/** The page on screen. */
 interface Doc {
   items: Item[];
   background: Background;
+}
+
+/**
+ * The board at a moment: every page (the one shown is `doc`), which one,
+ * and how it was shown.
+ */
+interface Step {
+  doc: Doc;
+  pages: Sheet[];
+  page: number;
+  view: View;
+}
+
+/**
+ * What one undo takes back: the board before the change and after it. Undo
+ * shows it as it was, redo as it became, on the page where it happened.
+ */
+interface Change {
+  before: Step;
+  after: Step;
 }
 
 const COLORS = ["#111213", "#1d4ed8", "#d32f2f", "#2e7d32", "#7b1fa2", "#ef6c00"];
@@ -227,7 +254,10 @@ export default function Board({
   const courses = useQuery(q.courses()).data ?? [];
 
   const [doc, setDoc] = useState<Doc>({ items: [], background: "plain" });
-  const [history, setHistory] = useState<{ past: Doc[]; future: Doc[] }>({ past: [], future: [] });
+  // Every page; the one shown is `doc`, its place here may be behind it.
+  const [pages, setPages] = useState<Sheet[]>([{ items: [], background: "plain" }]);
+  const [page, setPage] = useState(0);
+  const [history, setHistory] = useState<{ past: Change[]; future: Change[] }>({ past: [], future: [] });
   const [view, setView] = useState<View>({ x: -3 * CM, y: -2 * CM, zoom: 1 });
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<Tool>("pen");
@@ -256,11 +286,13 @@ export default function Board({
   const [currentFileId, setCurrentFileId] = useState(fileId);
   const [courseId, setCourseId] = useState<number | null>(initialCourseId ?? null);
   const [versions, setVersions] = useState<FileVersion[]>([]);
-  const [printImage, setPrintImage] = useState<string | null>(null);
+  const [printImages, setPrintImages] = useState<string[]>([]);
   const [panning, setPanning] = useState(false);
 
   // The latest values, for pointer handlers and the save that quitting asks for.
   const docRef = useRef(doc);
+  const pagesRef = useRef(pages);
+  const pageRef = useRef(page);
   const viewRef = useRef(view);
   const sizeRef = useRef(size);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -276,38 +308,86 @@ export default function Board({
   const placed = useRef(false);
   useEffect(() => {
     docRef.current = doc;
+    pagesRef.current = pages;
+    pageRef.current = page;
     viewRef.current = view;
     sizeRef.current = size;
   });
 
+  /** The board as it is, for an undo step. */
+  const step = (): Step => ({
+    doc: docRef.current,
+    pages: pagesRef.current,
+    page: pageRef.current,
+    view: viewRef.current,
+  });
+  /** A change made since `before`, as one undo. */
+  const remember = (before: Step) => {
+    const after = step();
+    setHistory((h) => ({ past: [...h.past.slice(-99), { before, after }], future: [] }));
+    setDirty(true);
+  };
   /** A change the teacher can undo. */
   const commit = (next: Doc) => {
-    const prev = docRef.current;
+    const before = step();
     docRef.current = next;
     setDoc(next);
-    setHistory((h) => ({ past: [...h.past.slice(-99), prev], future: [] }));
-    setDirty(true);
+    remember(before);
   };
   /** A change shown while a gesture runs; the gesture commits it at its end. */
   const show = (next: Doc) => {
     docRef.current = next;
     setDoc(next);
   };
-  const undo = () => {
-    const prev = history.past[history.past.length - 1];
-    if (!prev) return;
-    setHistory({ past: history.past.slice(0, -1), future: [docRef.current, ...history.future] });
-    docRef.current = prev;
-    setDoc(prev);
+  /** The board as a step left it, on the page it was on. */
+  const restore = (s: Step) => {
+    docRef.current = s.doc;
+    setDoc(s.doc);
+    pagesRef.current = s.pages;
+    setPages(s.pages);
+    if (s.page !== pageRef.current) {
+      pageRef.current = s.page;
+      setPage(s.page);
+      setSelected(null);
+      changeView(s.view);
+    }
     setDirty(true);
+  };
+  const undo = () => {
+    const last = history.past[history.past.length - 1];
+    if (!last) return;
+    setHistory({ past: history.past.slice(0, -1), future: [last, ...history.future] });
+    restore(last.before);
   };
   const redo = () => {
     const next = history.future[0];
     if (!next) return;
-    setHistory({ past: [...history.past, docRef.current], future: history.future.slice(1) });
-    docRef.current = next;
-    setDoc(next);
-    setDirty(true);
+    setHistory({ past: [...history.past, next], future: history.future.slice(1) });
+    restore(next.after);
+  };
+
+  // ---- pages -------------------------------------------------------------------
+
+  /** Every page, the one shown as it is now (saving, exporting, turning pages). */
+  const allPages = (): Sheet[] =>
+    pagesRef.current.map((s, i) =>
+      i === pageRef.current ? { ...docRef.current, view: viewRef.current } : s,
+    );
+
+  /** `sheets` as the board's pages, page `n` on screen as it was left (else all of it in view). */
+  const showPages = (sheets: Sheet[], n: number) => {
+    const at = Math.max(0, Math.min(n, sheets.length - 1));
+    pagesRef.current = sheets;
+    setPages(sheets);
+    pageRef.current = at;
+    setPage(at);
+    const d = { items: sheets[at].items, background: sheets[at].background };
+    docRef.current = d;
+    setDoc(d);
+    setSelected(null);
+    const v = sheets[at].view;
+    if (v) changeView(v);
+    else fit(d);
   };
 
   /** The selection tool's item, off the board. */
@@ -371,14 +451,21 @@ export default function Board({
       .then((raw) => {
         if (!live) return;
         const b = parseBoard(raw);
-        const d = { items: b.items, background: b.background };
+        const sheets = sheetsOf(b);
+        const at = b.page ?? 0;
+        pagesRef.current = sheets;
+        setPages(sheets);
+        pageRef.current = at;
+        setPage(at);
+        const d = { items: sheets[at].items, background: sheets[at].background };
         docRef.current = d;
         setDoc(d);
         setHistory({ past: [], future: [] });
         setDirty(false);
-        if (b.view) {
+        const v = sheets[at].view;
+        if (v) {
           placed.current = true;
-          changeView(b.view);
+          changeView(v);
         } else if (sizeRef.current.w) {
           placed.current = true;
           fit(d);
@@ -748,53 +835,6 @@ export default function Board({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keys, while this board is the tab in front: Space holds the hand,
-  // Ctrl+Z / Ctrl+Y undo and redo (not while typing a text).
-  useEffect(() => {
-    if (!active || !visible) return;
-    const typing = (t: EventTarget | null) =>
-      t instanceof HTMLElement &&
-      (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
-    const down = (e: KeyboardEvent) => {
-      if (typing(e.target)) return;
-      if (e.code === "Space" && !e.repeat) {
-        spaceDown.current = true;
-        setPanning(true);
-        e.preventDefault();
-      }
-      if (selected && tool === "select" && (e.key === "Delete" || e.key === "Backspace")) {
-        e.preventDefault();
-        removeSelected();
-        return;
-      }
-      if (selected && e.key === "Escape") {
-        setSelected(null);
-        return;
-      }
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && !e.altKey && (e.key === "z" || e.key === "Z")) {
-        e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
-      } else if (mod && !e.altKey && (e.key === "y" || e.key === "Y")) {
-        e.preventDefault();
-        redo();
-      }
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        spaceDown.current = false;
-        setPanning(false);
-      }
-    };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-    };
-  });
-
   // ---- text ------------------------------------------------------------------
 
   const editingOpen = editing != null;
@@ -872,6 +912,101 @@ export default function Board({
       toast(errorMessage(err, tr("messages.genericError")), "error");
     }
   };
+
+  // ---- turning pages -----------------------------------------------------------
+
+  /** Another page, as it was left; a text or a formula being written goes on its own page first. */
+  const goTo = async (n: number) => {
+    if (n < 0 || n >= pagesRef.current.length || n === pageRef.current) return;
+    if (editing) commitText();
+    if (editingMath) await commitMath();
+    showPages(allPages(), n);
+  };
+
+  /** A blank page after this one, on the same paper. */
+  const addPage = () => {
+    if (editing) commitText();
+    const before = step();
+    const sheets = allPages();
+    const at = pageRef.current + 1;
+    showPages(
+      [...sheets.slice(0, at), { items: [], background: docRef.current.background }, ...sheets.slice(at)],
+      at,
+    );
+    remember(before);
+  };
+
+  const deletePage = async () => {
+    if (pagesRef.current.length < 2) return;
+    if (docRef.current.items.length) {
+      const ok = await confirm.ask({
+        title: tr("board.deletePageTitle", { n: pageRef.current + 1 }),
+        message: tr("board.deletePageMessage"),
+        confirmLabel: tr("board.deletePage"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    const before = step();
+    showPages(
+      allPages().filter((_, i) => i !== pageRef.current),
+      pageRef.current,
+    );
+    remember(before);
+  };
+
+  // Keys, while this board is the tab in front: Space holds the hand,
+  // Ctrl+Z / Ctrl+Y undo and redo (not while typing a text).
+  useEffect(() => {
+    if (!active || !visible) return;
+    const typing = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+    const down = (e: KeyboardEvent) => {
+      if (typing(e.target)) return;
+      if (e.code === "Space" && !e.repeat) {
+        spaceDown.current = true;
+        setPanning(true);
+        e.preventDefault();
+      }
+      if (selected && tool === "select" && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        removeSelected();
+        return;
+      }
+      if (selected && e.key === "Escape") {
+        setSelected(null);
+        return;
+      }
+      // A presentation clicker sends these.
+      if (e.key === "PageDown" || e.key === "PageUp") {
+        e.preventDefault();
+        void goTo(pageRef.current + (e.key === "PageDown" ? 1 : -1));
+        return;
+      }
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (mod && !e.altKey && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        spaceDown.current = false;
+        setPanning(false);
+      }
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  });
 
   /** The selected formula, back in its field. */
   const editSelectedMath = () => {
@@ -1029,7 +1164,8 @@ export default function Board({
   const thumbStale = useRef(false);
 
   const refreshThumbnail = (id: number) => {
-    const d = docRef.current;
+    // The first page: the Documents grid shows a board by it.
+    const d = pageRef.current === 0 ? docRef.current : pagesRef.current[0];
     thumbStale.current = false;
     // The Documents grid shows boards by their preview.
     if (!isTauri() || !d.items.length) return;
@@ -1062,7 +1198,7 @@ export default function Board({
       const f = await api.saveBoard({
         file_id: fileIdRef.current ?? null,
         course_id: courseId,
-        json: JSON.stringify({ version: 3, background: d.background, items: d.items, view: viewRef.current }),
+        json: boardJson(allPages(), pageRef.current),
         autosave,
       });
       if (!f?.id) throw new Error(tr("messages.genericError"));
@@ -1136,7 +1272,8 @@ export default function Board({
       const canvas = await renderBoardReady(d.items, d.background, 2);
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error(tr("messages.genericError"));
-      const f = await api.createFileBytes(`${title()}.png`, await blob.arrayBuffer(), { courseId });
+      const name = pagesRef.current.length > 1 ? `${title()} - page ${pageRef.current + 1}` : title();
+      const f = await api.createFileBytes(`${name}.png`, await blob.arrayBuffer(), { courseId });
       changed("library");
       toast(tr("board.exported", { name: f.name }), "success", {
         action: { label: tr("print.open"), run: () => openFile(f) },
@@ -1148,9 +1285,12 @@ export default function Board({
   };
 
   const exportPdf = async () => {
-    const d = docRef.current;
-    const canvas = await renderBoardReady(d.items, d.background, 2.5);
-    flushSync(() => setPrintImage(canvas.toDataURL("image/png")));
+    // One sheet of paper per page with something on it.
+    const sheets = allPages().filter((s, i) => s.items.length || i === pageRef.current);
+    const images: string[] = [];
+    for (const s of sheets)
+      images.push((await renderBoardReady(s.items, s.background, 2.5)).toDataURL("image/png"));
+    flushSync(() => setPrintImages(images));
     try {
       await sheetReady();
       if (!isTauri()) {
@@ -1169,16 +1309,18 @@ export default function Board({
         await printDialog();
       }
     } finally {
-      setPrintImage(null);
+      setPrintImages([]);
     }
   };
 
+  /** Everything on the page shown. */
   const clearAll = async () => {
     if (!docRef.current.items.length) return;
+    const several = pagesRef.current.length > 1;
     const ok = await confirm.ask({
-      title: tr("board.clearTitle"),
+      title: tr(several ? "board.clearPageTitle" : "board.clearTitle"),
       message: tr("board.clearMessage"),
-      confirmLabel: tr("board.clear"),
+      confirmLabel: tr(several ? "board.clearPage" : "board.clear"),
       danger: true,
     });
     if (ok) commit({ ...docRef.current, items: [] });
@@ -1188,7 +1330,9 @@ export default function Board({
     try {
       const res = await fetch(versionUrl(v.id));
       const b = parseBoard(await res.text());
-      commit({ items: b.items, background: b.background });
+      const before = step();
+      showPages(sheetsOf(b), pageRef.current);
+      remember(before);
       toast(tr("pdf.versionLoaded"), "success");
     } catch (err) {
       reportError("board.version", err);
@@ -1208,7 +1352,18 @@ export default function Board({
     { label: tr("board.exportPng"), onSelect: () => void exportPng() },
     { label: tr("board.exportPdf"), onSelect: () => void exportPdf() },
     "separator",
-    { label: tr("board.clear"), danger: true, disabled: !doc.items.length, onSelect: () => void clearAll() },
+    {
+      label: tr(pages.length > 1 ? "board.clearPage" : "board.clear"),
+      danger: true,
+      disabled: !doc.items.length,
+      onSelect: () => void clearAll(),
+    },
+    {
+      label: tr("board.deletePage"),
+      danger: true,
+      disabled: pages.length < 2,
+      onSelect: () => void deletePage(),
+    },
   ];
   const versionItems: MenuEntry[] = versions
     .slice()
@@ -1384,6 +1539,44 @@ export default function Board({
             data-tip={tr("board.fit")}
           >
             <Icon icon={Maximize} size={14} />
+          </button>
+        </ToolGroup>
+        <ToolGroup className="gap-0" label={tr("board.pages")}>
+          {pages.length > 1 && (
+            <>
+              <button
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                onClick={() => void goTo(page - 1)}
+                disabled={page === 0}
+                aria-label={tr("board.prevPage")}
+                {...tip(tr("board.prevPage"), "PageUp")}
+              >
+                <Icon icon={ChevronLeft} size={14} />
+              </button>
+              <span
+                className="eu-t-meta tabular-nums px-1 whitespace-nowrap"
+                aria-label={tr("board.pageOf", { n: page + 1, count: pages.length })}
+              >
+                {page + 1} / {pages.length}
+              </span>
+              <button
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                onClick={() => void goTo(page + 1)}
+                disabled={page === pages.length - 1}
+                aria-label={tr("board.nextPage")}
+                {...tip(tr("board.nextPage"), "PageDown")}
+              >
+                <Icon icon={ChevronRight} size={14} />
+              </button>
+            </>
+          )}
+          <button
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            onClick={addPage}
+            aria-label={tr("board.addPage")}
+            data-tip={tr("board.addPage")}
+          >
+            <Icon icon={FilePlus2} size={14} />
           </button>
         </ToolGroup>
         <ToolGroup className="gap-0" label={tr("board.history")}>
@@ -1649,10 +1842,12 @@ export default function Board({
         </div>
       </div>
 
-      {printImage &&
+      {printImages.length > 0 &&
         createPortal(
           <div className="eu-print" data-theme="light" aria-hidden>
-            <img src={printImage} alt="" className="eu-print-board" />
+            {printImages.map((src, i) => (
+              <img key={i} src={src} alt="" className="eu-print-board" />
+            ))}
           </div>,
           document.body,
         )}

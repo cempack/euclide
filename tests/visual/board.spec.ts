@@ -134,3 +134,67 @@ test("a pasted picture lies under the ink, and only the selection takes it off",
   await expect.poll(async () => (await inkAt(page, x, y - 40)).join()).toBe("207,227,255,255");
   expect(errors).toEqual([]);
 });
+
+test("pages: added, turned, undone where they changed, saved and opened again", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const { box } = await openBoard(page);
+  const inked = () =>
+    page.evaluate(() => {
+      const c = [...document.querySelectorAll<HTMLCanvasElement>(".eu-board canvas")].filter(
+        (x) => x.offsetParent,
+      )[1];
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n++;
+      return n;
+    });
+  const stroke = async (dy: number) => {
+    await page.mouse.move(box.x + 300, box.y + 200 + dy);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 600, box.y + 260 + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+  const indicator = page.getByLabel(/^Page \d+ sur \d+$/);
+
+  await stroke(0);
+  const one = await inked();
+  await page.getByRole("button", { name: "Nouvelle page" }).click();
+  await expect(indicator).toHaveText("2 / 2");
+  expect(await inked()).toBe(0);
+  await stroke(100);
+  const two = await inked();
+
+  // A presentation clicker's keys turn the pages.
+  await page.keyboard.press("PageUp");
+  await expect(indicator).toHaveText("1 / 2");
+  expect(await inked()).toBe(one);
+
+  // Undo from page 1 takes back page 2's stroke, on page 2; redo puts it back there.
+  await page.keyboard.press("Control+z");
+  await expect(indicator).toHaveText("2 / 2");
+  expect(await inked()).toBe(0);
+  await page.keyboard.press("Control+y");
+  await expect(indicator).toHaveText("2 / 2");
+  expect(await inked()).toBe(two);
+  // Undo again: the stroke, then the page itself.
+  await page.keyboard.press("Control+z");
+  await page.keyboard.press("Control+z");
+  await expect(indicator).toHaveCount(0);
+  await page.keyboard.press("Control+y");
+  await page.keyboard.press("Control+y");
+  await expect(indicator).toHaveText("2 / 2");
+
+  // Saved on page 2, opened again on page 2, page 1 there too.
+  await page.keyboard.press("Control+s");
+  await page.waitForTimeout(500);
+  const name = (await page.getByRole("tab", { selected: true }).textContent())!.trim();
+  await page.keyboard.press("Control+w");
+  await nav(page, "Documents");
+  await page.getByText(name).locator("visible=true").first().click();
+  await expect(indicator).toHaveText("2 / 2");
+  await expect.poll(inked).toBe(two);
+  await page.keyboard.press("PageUp");
+  await expect.poll(inked).toBe(one);
+  expect(errors).toEqual([]);
+});

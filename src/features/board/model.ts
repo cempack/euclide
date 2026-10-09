@@ -1,7 +1,9 @@
 /**
  * The whiteboard's document (format 3): drawings in world units on an
  * infinite sheet. One world unit is one CSS pixel at 100 %, so a centimetre
- * is about 38 units, the size a ruler shows on screen.
+ * is about 38 units, the size a ruler shows on screen. A board of several
+ * pages keeps the first one where format 3 always had it and the others in
+ * `more`: a board of one page is written as before.
  *
  * Format 2 kept every coordinate as a fraction of the window's width and
  * height, so a circle stretched with the window; `parseBoard` turns it into
@@ -119,6 +121,17 @@ export interface Board {
   background: Background;
   items: Item[];
   view?: View;
+  /** The pages after the first. */
+  more?: Sheet[];
+  /** The page shown when the board was saved, from 0. */
+  page?: number;
+}
+
+/** One page of a board. */
+export interface Sheet {
+  background: Background;
+  items: Item[];
+  view?: View;
 }
 
 export const emptyBoard = (): Board => ({ version: 3, background: "plain", items: [] });
@@ -191,14 +204,48 @@ export function parseBoard(raw: string | null | undefined): Board {
   if (!d || typeof d !== "object") return emptyBoard();
   const doc = d as Partial<Board> & V2;
   if (doc.version === 3 && Array.isArray(doc.items)) {
+    const first = sheetOf(doc);
+    const more = Array.isArray(doc.more)
+      ? doc.more.filter((m) => m && typeof m === "object").map(sheetOf)
+      : [];
     return {
       version: 3,
-      background: doc.background ?? "plain",
-      items: doc.items.filter((i): i is Item => !!i && typeof i === "object" && "kind" in i),
-      view: doc.view,
+      ...first,
+      ...(more.length ? { more } : {}),
+      ...(Number.isInteger(doc.page) && doc.page! > 0 && doc.page! <= more.length ? { page: doc.page } : {}),
     };
   }
   return fromV2(doc);
+}
+
+function sheetOf(d: Partial<Sheet>): Sheet {
+  return {
+    background: d.background ?? "plain",
+    items: (Array.isArray(d.items) ? d.items : []).filter(
+      (i): i is Item => !!i && typeof i === "object" && "kind" in i,
+    ),
+    ...(d.view ? { view: d.view } : {}),
+  };
+}
+
+/** A board's pages, the first one first. */
+export const sheetsOf = (b: Board): Sheet[] => [
+  { background: b.background, items: b.items, ...(b.view ? { view: b.view } : {}) },
+  ...(b.more ?? []),
+];
+
+/** The file of a board of these pages, `page` the one shown. */
+export function boardJson(sheets: Sheet[], page = 0): string {
+  const [first, ...more] = sheets.length ? sheets : [{ background: "plain" as const, items: [] }];
+  const board: Board = {
+    version: 3,
+    background: first.background,
+    items: first.items,
+    ...(first.view ? { view: first.view } : {}),
+    ...(more.length ? { more } : {}),
+    ...(page > 0 && page < sheets.length ? { page } : {}),
+  };
+  return JSON.stringify(board);
 }
 
 // ---------------------------------------------------------------------------

@@ -2310,6 +2310,10 @@ input[type="radio"] {
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
+/* A board of several pages prints one page per sheet. */
+.eu-print-board + .eu-print-board {
+  break-before: page;
+}
 .eu-print-board {
   display: block;
   max-width: 100%;
