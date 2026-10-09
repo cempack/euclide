@@ -41,12 +41,16 @@ tauri-plugin-single-instance = "2"
 
 [target.'cfg(windows)'.dependencies]
 # DPAPI, to keep Pronote passwords encrypted for the Windows user (already in the tree via Tauri).
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_JobObjects"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_JobObjects", "Win32_System_Threading"] }
 # WebView2's PrintToPdf (note export, print.rs): the versions wry uses.
 webview2-com = "0.39"
 windows = "0.62"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "stream"] }
 futures-util = "0.3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Whether the version an update replaced has quit (relaunch.rs; already in the tree).
+libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # WebKitGTK's print operation (note export, print.rs): the versions wry uses.

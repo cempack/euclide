@@ -162,9 +162,14 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateInfo | 
   return inflight;
 }
 
-export async function installPendingUpdate(
+/**
+ * Downloads the update on offer. A USB copy also puts it in place (its
+ * Python module is staged for the next launch); the other copies install
+ * in `finishPendingUpdate`. Resolves to whether the update is in place.
+ */
+export async function fetchPendingUpdate(
   onProgress?: (progress: UpdateDownloadProgress) => void,
-): Promise<void> {
+): Promise<{ installed: boolean }> {
   if (!pending) {
     throw new Error("Aucune mise à jour en attente.");
   }
@@ -183,35 +188,47 @@ export async function installPendingUpdate(
     onProgress?.(next);
   };
 
-  const portable = await isPortableWindowsUpdate();
-  if (portable) {
+  if (await isPortableWindowsUpdate()) {
     const asset = portableAssetOf(pending.rawJson);
     if (!asset) {
       throw new Error("Archive portable introuvable dans latest.json (windows-x86_64).");
     }
     const onEvent = new Channel<DownloadEvent>();
     onEvent.onmessage = report;
-    try {
-      await invoke("apply_windows_portable_update", {
-        url: asset.url,
-        signature: asset.signature,
-        version: pending.version,
-        onEvent,
-      });
-    } catch (err) {
-      if (!isClosingAfterInstall(err)) throw err;
-    }
+    await invoke("apply_windows_portable_update", {
+      url: asset.url,
+      signature: asset.signature,
+      version: pending.version,
+      onEvent,
+    });
     pending = null;
-    return;
+    return { installed: true };
   }
 
-  await pending.downloadAndInstall(report);
+  await pending.download(report);
+  return { installed: false };
+}
+
+/**
+ * Installs a downloaded update, if `fetchPendingUpdate` did not. The
+ * Windows installer then closes Euclide and opens the new version itself.
+ */
+export async function installFetchedUpdate(): Promise<void> {
+  if (!pending) throw new Error("Aucune mise à jour en attente.");
+  const update = pending;
   pending = null;
-  // AppImage (and macOS): the file is already replaced. Close this window;
-  // do not start a second instance. NSIS usually exits on its own.
+  try {
+    await update.install();
+  } catch (err) {
+    if (!isClosingAfterInstall(err)) throw err;
+  }
+}
+
+/** Starts the version just installed, then quits this one. */
+export async function relaunchAfterUpdate(): Promise<void> {
   try {
     await invoke("relaunch_after_update");
-  } catch {
-    /* window is already going away */
+  } catch (err) {
+    if (!isClosingAfterInstall(err)) throw err;
   }
 }

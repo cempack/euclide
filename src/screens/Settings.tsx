@@ -966,11 +966,13 @@ function AboutSection({ info }: { info: AppInfo | null }) {
               })
             : status === "installing"
               ? tr("updater.installing", { percent })
-              : status === "installed"
-                ? tr("updater.installed")
-                : status === "error"
-                  ? error || tr("updater.error")
-                  : "";
+              : status === "restarting"
+                ? tr("updater.restarting")
+                : status === "installed"
+                  ? tr("updater.installed")
+                  : status === "error"
+                    ? error || tr("updater.error")
+                    : "";
 
   return (
     <Section title={tr("about.title")} id="a-propos">
@@ -991,7 +993,7 @@ function AboutSection({ info }: { info: AppInfo | null }) {
               <button
                 type="button"
                 onClick={runCheck}
-                disabled={status === "checking" || status === "installing"}
+                disabled={status === "checking" || status === "installing" || status === "restarting"}
                 className="eu-btn-ghost eu-btn-sm"
               >
                 {tr("updater.check")}

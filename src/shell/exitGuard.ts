@@ -12,11 +12,11 @@ type Toast = ReturnType<typeof useToast>;
 const dirtyIds = () => Object.keys(editors.dirtyMap());
 
 /**
- * Before the window closes: notes finish their pending autosave without a
- * word; whatever else is unsaved (a whiteboard, a script) is the teacher's
- * call. True when Euclide may quit.
+ * Before the window closes, or Euclide restarts for an update: notes finish
+ * their pending autosave without a word; whatever else is unsaved (a
+ * whiteboard, a script) is the teacher's call. True when Euclide may quit.
  */
-async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
+export async function readyToQuit(confirm: Confirm, toast: Toast, forUpdate = false): Promise<boolean> {
   const kindOf = new Map(tabs.list().map((t) => [t.id, t.kind]));
   await Promise.allSettled(
     dirtyIds()
@@ -29,7 +29,7 @@ async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
   if (!left.length) return true;
   const names = left.map((id) => tabs.list().find((t) => t.id === id)?.title ?? id).join(", ");
   const choice = await confirm.dirty({
-    title: tr("confirm.quitTitle"),
+    title: forUpdate ? tr("confirm.updateTitle") : tr("confirm.quitTitle"),
     message: fmt(left.length === 1 ? tr("confirm.quitMessageOne") : tr("confirm.quitMessage"), { names }),
   });
   if (choice === "cancel") return false;
@@ -38,7 +38,7 @@ async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
   const results = await Promise.allSettled(left.map(editors.flush));
   await afterCommit();
   if (results.some((r) => r.status === "rejected") || dirtyIds().length) {
-    toast(tr("confirm.quitFailed"), "error");
+    toast(forUpdate ? tr("confirm.updateSaveFailed") : tr("confirm.quitFailed"), "error");
     return false;
   }
   return true;
@@ -52,7 +52,7 @@ export function useExitGuard(confirm: Confirm, toast: Toast) {
     let stopped = false;
     let unlisten: (() => void) | undefined;
     const onRequest = async (request: number) => {
-      // Say so at once: past two seconds without an answer, Rust quits anyway.
+      // Say so at once: past five seconds without an answer, Rust quits anyway.
       api.closeAck(request).catch(logged("exit.closeAck"));
       if (handling) return;
       handling = true;

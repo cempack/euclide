@@ -13,8 +13,8 @@
 //!    rename a running exe, not overwrite it). The displaced file is deleted
 //!    immediately when unlocked, otherwise right after this PID exits (helper)
 //!    and again on the next launch. No `*.euclide-old*` leftovers are kept.
-//!    Then this window closes; the user opens Euclide again. Does not start
-//!    the new process.
+//!    Euclide keeps running: the page saves, then `relaunch_after_update`
+//!    starts the new version and quits.
 //! 5. Stages the new sidecar as `euclide-sidecar.next/` beside the current one
 //!    (the archive is unpacked on the key itself, so this is a rename). The
 //!    next launch of the new version swaps the folders before Python starts:
@@ -882,16 +882,9 @@ async fn apply_windows_portable_update_inner(
         install_portable(&handle, &bytes, &signature, &version)
     })
     .await
-    .map_err(|e| e.to_string())??;
-
-    // Return success first so the UI does not treat the dying IPC as a failure.
-    // Then close this window. Do not start the new process.
-    let app2 = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        app2.exit(0);
-    });
-    Ok(())
+    .map_err(|e| e.to_string())?
+    // Euclide keeps running: the page saves what it holds, then calls
+    // relaunch_after_update.
 }
 
 #[cfg(windows)]
