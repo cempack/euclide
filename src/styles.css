@@ -249,6 +249,34 @@
   --eu-line-a-strong: 0.3;
 }
 
+/* A projector washes out hairlines and faint text, and so does a teacher who
+   asks the system for more contrast: lines twice as dark, metadata in the
+   secondary ink. Everything else keeps its colour. */
+[data-projection="on"] {
+  --eu-line-a: 0.26;
+  --eu-line-a-strong: 0.45;
+}
+[data-projection="on"][data-theme="light"] {
+  --eu-ink-faint: 78 82 87;
+}
+[data-projection="on"][data-theme="dark"] {
+  --eu-ink-faint: 182 178 171;
+}
+@media (prefers-contrast: more) {
+  :root,
+  [data-theme] {
+    --eu-line-a: 0.26;
+    --eu-line-a-strong: 0.45;
+  }
+  :root,
+  [data-theme="light"] {
+    --eu-ink-faint: 78 82 87;
+  }
+  [data-theme="dark"] {
+    --eu-ink-faint: 182 178 171;
+  }
+}
+
 /* Density: « confortable » (bureau) vs « compact » (petit portable). Metrics
    are in rem, so projection mode scales controls along with the text.
    Controls come in three heights (28, 32 and 40 px at 100 %) and every
