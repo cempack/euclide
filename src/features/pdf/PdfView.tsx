@@ -166,6 +166,8 @@ type Props = {
   /** Whether there is something to undo or redo. */
   onHistory?: (state: { canUndo: boolean; canRedo: boolean }) => void;
   onFind?: (state: FindState) => void;
+  /** The document waits for its password, asked in the viewer's place. */
+  onLocked?: (locked: boolean) => void;
   onError?: (err: unknown) => void;
 };
 
@@ -457,22 +459,31 @@ function Viewer({
     events.current.onDirty?.(dirty);
   };
 
+  /** Opened only with its password: asked for, then tried (EmbedPDF kept the bytes). */
+  const locked = status === "error" && state?.errorCode === PdfErrorCode.Password;
+  /** A password was tried: if the document comes back locked, it was wrong. */
+  const [tried, setTried] = useState(false);
+  const unlock = (password: string) => {
+    setTried(true);
+    registry
+      ?.getPlugin<DocumentManagerPlugin>("document-manager")
+      ?.provides()
+      .retryDocument(documentId, { password });
+  };
+
   useEffect(() => {
+    events.current.onLocked?.(locked);
     if (status === "loaded") {
       onOpened();
       events.current.onReady?.({ pages: pageCount });
-    } else if (status === "error") {
+    } else if (status === "error" && !locked) {
       onOpened();
       if (state?.errorCode === PdfErrorCode.Initialization) restartPdfium();
-      events.current.onError?.(
-        new Error(
-          state?.errorCode === PdfErrorCode.Password ? tr("pdf.passwordProtected") : (state?.error ?? ""),
-        ),
-      );
+      events.current.onError?.(new Error(state?.error ?? ""));
     }
     // Once per outcome.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, locked]);
 
   useEffect(() => {
     if (!scroll) return;
@@ -722,6 +733,7 @@ function Viewer({
     return () => window.removeEventListener("keydown", down);
   });
 
+  if (locked) return <PasswordPrompt wrong={tried} onSubmit={unlock} />;
   if (!loaded) return null;
   return (
     <FreshNotes.Provider value={fresh}>
@@ -811,6 +823,41 @@ function Viewer({
         </div>
       </div>
     </FreshNotes.Provider>
+  );
+}
+
+/** The document's open password, asked where its pages would be. */
+function PasswordPrompt({ wrong, onSubmit }: { wrong: boolean; onSubmit: (password: string) => void }) {
+  const [password, setPassword] = useState("");
+  return (
+    <div className="eu-pdf absolute inset-0 grid place-items-center p-6">
+      <form
+        className="w-full max-w-[44ch] text-center text-stage-ink"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (password) onSubmit(password);
+        }}
+      >
+        <p className="eu-t-title">{tr("pdf.passwordProtected")}</p>
+        <p className="eu-t-small text-stage-muted mt-1.5">{tr("pdf.passwordHint")}</p>
+        <input
+          type="password"
+          autoFocus
+          aria-label={tr("pdf.password")}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="eu-input mt-4"
+        />
+        {wrong && (
+          <p role="alert" className="eu-t-small text-danger mt-1.5">
+            {tr("pdf.passwordWrong")}
+          </p>
+        )}
+        <button type="submit" disabled={!password} className="eu-btn-primary eu-btn-sm mt-3">
+          {tr("pdf.unlock")}
+        </button>
+      </form>
+    </div>
   );
 }
 

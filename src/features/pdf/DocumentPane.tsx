@@ -165,6 +165,8 @@ function PdfPane({
   const [showPages, setShowPages] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /** The viewer asks for the document's password. */
+  const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   /** The file's address, taken again after a restore (the file changed underneath). */
   const [current, setCurrent] = useState(() => ({ url: fileUrl(fileId), revision: 0 }));
@@ -249,6 +251,7 @@ function PdfPane({
   if (docFor !== viewKey) {
     setDocFor(viewKey);
     setPages(0);
+    setLocked(false);
     setHistory({ canUndo: false, canRedo: false });
     setFinding(false);
     setQuery("");
@@ -675,7 +678,7 @@ function PdfPane({
             </div>
           ) : (
             <>
-              {!pages && (
+              {!pages && !locked && (
                 <div className="absolute inset-0 z-10 grid place-items-center text-stage-muted eu-t-small">
                   {tr("pdf.loading")}
                 </div>
@@ -703,6 +706,7 @@ function PdfPane({
                 onDirty={setDirty}
                 onHistory={setHistory}
                 onFind={setFound}
+                onLocked={setLocked}
                 onError={(err) => {
                   reportError("pdf.open", err);
                   setFailed(errorMessage(err, ""));

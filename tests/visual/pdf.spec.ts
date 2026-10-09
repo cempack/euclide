@@ -253,6 +253,31 @@ test("a line of text is underlined or struck out", async ({ page }) => {
   expect(saved).toContain("/Subtype/StrikeOut");
 });
 
+test("a PDF with a password opens once it is given, and stays protected when saved", async ({ page }) => {
+  // reportlab's one page, encrypted by pypdf (AES-128) with the password « secret ».
+  const pdf = fileURLToPath(new URL("./fixtures/locked.pdf", import.meta.url));
+  await page.route(
+    (url) => url.pathname === "/locked.pdf",
+    (route) => route.fulfill({ path: pdf, contentType: "application/pdf" }),
+  );
+  await page.goto("/?pdf=/locked.pdf");
+  const field = page.getByLabel("Mot de passe");
+  await expect(field).toBeFocused();
+  await field.fill("nope");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toHaveText("Ce n'est pas le bon mot de passe.");
+  await field.fill("secret");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("info")).toHaveText(/pages=1/);
+
+  await page.getByRole("button", { name: "pen", exact: true }).click();
+  await stroke(page);
+  // Encryption hides strings and streams, not the dictionaries' names.
+  const saved = await savedText(page);
+  expect(saved).toContain("/Encrypt");
+  expect(saved).toContain("/Subtype/Ink");
+});
+
 test("Ctrl+F finds a word on every page, and the outline goes to a chapter", async ({ page }) => {
   const pdf = fileURLToPath(new URL("./fixtures/outline.pdf", import.meta.url));
   await page.route(/\/src\/dev\/fixtures\/docs\/\d+\.pdf$/, (route) =>
