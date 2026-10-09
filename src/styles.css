@@ -1563,6 +1563,14 @@ input[type="radio"] {
   }
 }
 
+/* A change of theme, density or projection (lib/theme.tsx) cross-fades the
+   window, a little quicker than the browser's default. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: var(--ease-in-out);
+}
+
 /* Respect the OS « reduce motion » setting: every animation is CSS.
    Transitions get no duration at all: 0.01 ms on every element would turn
    transitions *on* for all their properties (transition-property defaults

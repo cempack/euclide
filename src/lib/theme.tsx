@@ -14,6 +14,22 @@ import { logged } from "./report";
  *     by the inline script in index.html too.
  */
 
+/**
+ * Sets an appearance attribute on <html>. A change while the app is shown
+ * cross-fades (a view transition, 240 ms in styles.css) instead of flipping
+ * the whole window from light to dark in one frame; the first paint, a
+ * system asking for less motion and an engine without view transitions get
+ * the plain change.
+ */
+function morph(name: string, value: string | null) {
+  const root = document.documentElement;
+  if (root.getAttribute(name) === value) return;
+  const apply = () => (value === null ? root.removeAttribute(name) : root.setAttribute(name, value));
+  const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (!document.startViewTransition || calm || document.visibilityState !== "visible") apply();
+  else document.startViewTransition(apply);
+}
+
 export type ThemePref = "auto" | "light" | "dark";
 export type Density = "comfortable" | "compact";
 
@@ -123,11 +139,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Reflect on <html>: one attribute drives every token, including the native
   // form controls (color-scheme is set alongside the tokens in styles.css).
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", resolved);
+    morph("data-theme", resolved);
   }, [resolved]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-density", density);
+    morph("data-density", density);
   }, [density]);
 
   // The native title bar follows the choice ("auto" follows the system). The
@@ -140,8 +156,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [pref]);
 
   useEffect(() => {
-    if (projection) document.documentElement.setAttribute("data-projection", "on");
-    else document.documentElement.removeAttribute("data-projection");
+    morph("data-projection", projection ? "on" : null);
   }, [projection]);
 
   const setPref = useCallback((p: ThemePref) => {
