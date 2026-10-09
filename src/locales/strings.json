@@ -346,6 +346,7 @@
     "importing": "Import…",
     "importError": "Import impossible (sélection annulée ?)",
     "saved": "Enregistré",
+    "notSaved": "Tout n'a pas pu être enregistré.",
     "openUrlError": "Impossible d'ouvrir le lien"
   },
   "recap": {
@@ -429,7 +430,6 @@
     "loading": "Chargement…",
     "deleted": "Note supprimée",
     "saved": "Note enregistrée",
-    "titleRequired": "Le titre est requis",
     "loadError": "Erreur de chargement",
     "saveError": "Erreur lors de l'enregistrement",
     "deleteConfirm": "Supprimer cette note ?",
@@ -611,6 +611,7 @@
     "quitTitle": "Quitter Euclide ?",
     "quitMessage": "Ces onglets ont des modifications non enregistrées : {names}.",
     "quitFailed": "Enregistrement impossible : Euclide reste ouvert.",
+    "closeFailed": "Enregistrement impossible : l'onglet reste ouvert.",
     "quitMessageOne": "Cet onglet a des modifications non enregistrées : {names}.",
     "ok": "Confirmer"
   },

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { api, isTauri } from "../lib/api";
 import { fmt, tr } from "../lib/i18n";
-import { editors } from "../stores/editors";
+import { afterCommit, editors } from "../stores/editors";
 import { saveTabSession, tabs } from "../stores/tabs";
 import { logged } from "../lib/report";
 import type { useConfirm, useToast } from "../components/ui";
@@ -10,13 +10,6 @@ type Confirm = ReturnType<typeof useConfirm>;
 type Toast = ReturnType<typeof useToast>;
 
 const dirtyIds = () => Object.keys(editors.dirtyMap());
-
-/**
- * Editors publish their unsaved flag from an effect, so it changes when React
- * commits, a moment after a save resolves (and a failed save that only shows
- * a toast leaves it set).
- */
-const committed = () => new Promise((resolve) => window.setTimeout(resolve, 50));
 
 /**
  * Before the window closes: notes finish their pending autosave without a
@@ -30,7 +23,7 @@ async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
       .filter((id) => kindOf.get(id) === "note")
       .map(editors.flush),
   );
-  await committed();
+  await afterCommit();
 
   const left = dirtyIds();
   if (!left.length) return true;
@@ -43,7 +36,7 @@ async function readyToQuit(confirm: Confirm, toast: Toast): Promise<boolean> {
   if (choice === "discard") return true;
 
   const results = await Promise.allSettled(left.map(editors.flush));
-  await committed();
+  await afterCommit();
   if (results.some((r) => r.status === "rejected") || dirtyIds().length) {
     toast(tr("confirm.quitFailed"), "error");
     return false;
