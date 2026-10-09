@@ -9,15 +9,18 @@ import {
   PanelLeft,
   PenLine,
   Plus,
+  Redo2,
   RotateCcw,
+  RotateCw,
   ScanLine,
   Trash2,
   Type,
+  Undo2,
 } from "lucide-react";
 import { api, fileUrl, versionUrl, type FileVersion } from "../../lib/api";
 import { q } from "../../api/queries";
 import { errorMessage } from "../../lib/errors";
-import { tr } from "../../lib/i18n";
+import { tr, type StringKey } from "../../lib/i18n";
 import { keysOf } from "../../lib/keymap";
 import { logged, reportError } from "../../lib/report";
 import { editors } from "../../stores/editors";
@@ -69,6 +72,16 @@ function versionDate(v: FileVersion): string {
   });
 }
 
+/** The pen's widths, in points: what « Fin », « Moyen » and « Épais » draw on the page. */
+const SIZES: { value: number; label: StringKey; dot: number }[] = [
+  { value: 1, label: "board.thin", dot: 4 },
+  { value: 2, label: "board.medium", dot: 7 },
+  { value: 4, label: "board.thick", dot: 11 },
+];
+
+/** What the zoom menu offers besides fitting the page. */
+const ZOOM_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
 const TOOLS: {
   id: PdfTool;
   icon: typeof PenLine;
@@ -99,6 +112,9 @@ function PdfPane({
   const [tool, setTool] = useState<PdfTool>("select");
   const [ink, setInk] = useState(INK[2].value);
   const [marker, setMarker] = useState(HIGHLIGHT[0].value);
+  const [size, setSize] = useState(SIZES[1].value);
+  const [history, setHistory] = useState({ canUndo: false, canRedo: false });
+  const [zoomAnchor, setZoomAnchor] = useState<HTMLElement | null>(null);
   /** The page count, once the document is open. */
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
@@ -191,6 +207,7 @@ function PdfPane({
   if (docFor !== viewKey) {
     setDocFor(viewKey);
     setPages(0);
+    setHistory({ canUndo: false, canRedo: false });
   }
   const count = pages;
   const color = tool === "highlight" ? marker : ink;
@@ -198,6 +215,17 @@ function PdfPane({
     .slice()
     .reverse()
     .map((v) => ({ label: versionDate(v), icon: History, onSelect: () => void openVersion(v) }));
+  const zoomItems: MenuEntry[] = [
+    { label: tr("pdf.zoomFit"), icon: ScanLine, onSelect: () => viewRef.current?.zoomTo("width") },
+    { label: tr("pdf.zoomPage"), onSelect: () => viewRef.current?.zoomTo("page") },
+    "separator",
+    ...ZOOM_PRESETS.map((z) => ({
+      label: `${Math.round(z * 100)} %`,
+      onSelect: () => viewRef.current?.zoomTo(z),
+    })),
+    "separator",
+    { label: tr("pdf.rotate"), icon: RotateCw, onSelect: () => viewRef.current?.rotate() },
+  ];
 
   const goTo = (n: number) => {
     const target = Math.min(Math.max(1, n), count || 1);
@@ -247,6 +275,26 @@ function PdfPane({
           >
             <Icon icon={Trash2} />
           </button>
+          <button
+            type="button"
+            onClick={() => viewRef.current?.undo()}
+            disabled={!history.canUndo || !!viewing}
+            aria-label={tr("common.undo")}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            {...tip(tr("common.undo"), "mod+Z")}
+          >
+            <Icon icon={Undo2} />
+          </button>
+          <button
+            type="button"
+            onClick={() => viewRef.current?.redo()}
+            disabled={!history.canRedo || !!viewing}
+            aria-label={tr("common.redo")}
+            className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+            {...tip(tr("common.redo"), "mod+Y")}
+          >
+            <Icon icon={Redo2} />
+          </button>
         </ToolGroup>
         {tool !== "select" && !viewing && (
           <ToolGroup collapse label={tr("pdf.colorsFor")}>
@@ -255,6 +303,24 @@ function PdfPane({
               value={color}
               onChange={tool === "highlight" ? setMarker : setInk}
             />
+          </ToolGroup>
+        )}
+        {tool === "pen" && !viewing && (
+          <ToolGroup collapse label={tr("board.size")}>
+            <div className="eu-segment eu-segment-sm">
+              {SIZES.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={size === o.value}
+                  aria-label={tr(o.label)}
+                  onClick={() => setSize(o.value)}
+                  {...tip(tr(o.label))}
+                >
+                  <span className="block rounded-full bg-current" style={{ width: o.dot, height: o.dot }} />
+                </button>
+              ))}
+            </div>
           </ToolGroup>
         )}
         <ToolSep />
@@ -284,9 +350,23 @@ function PdfPane({
           >
             <Icon icon={Minus} />
           </button>
-          <span className="font-mono text-caption text-ink-muted w-11 text-center">
+          <button
+            type="button"
+            onClick={(e) => setZoomAnchor(e.currentTarget)}
+            disabled={!pages}
+            aria-haspopup="menu"
+            className="eu-btn-quiet eu-btn-sm font-mono text-caption text-ink-muted w-14 justify-center px-0"
+            {...tip(tr("pdf.zoom"))}
+          >
             {Math.round(scale * 100)} %
-          </span>
+          </button>
+          <Menu
+            open={!!zoomAnchor}
+            anchor={zoomAnchor}
+            items={zoomItems}
+            label={tr("pdf.zoom")}
+            onClose={() => setZoomAnchor(null)}
+          />
           <button
             type="button"
             onClick={() => viewRef.current?.zoom(1)}
@@ -396,6 +476,7 @@ function PdfPane({
                 url={url}
                 tool={viewing ? "select" : tool}
                 color={color}
+                size={size}
                 readOnly={!!viewing}
                 author={author}
                 showPages={showPages}
@@ -410,6 +491,7 @@ function PdfPane({
                 }}
                 onScale={setScale}
                 onDirty={setDirty}
+                onHistory={setHistory}
                 onError={(err) => {
                   reportError("pdf.open", err);
                   setFailed(errorMessage(err, ""));

@@ -40,6 +40,8 @@ import type { FormCapability, FormPlugin } from "@embedpdf/plugin-form";
 import { FormPluginPackage } from "@embedpdf/plugin-form/react";
 import { ThumbnailPluginPackage } from "@embedpdf/plugin-thumbnail";
 import { ThumbnailsPane } from "@embedpdf/plugin-thumbnail/react";
+import { RotatePluginPackage, type RotatePlugin } from "@embedpdf/plugin-rotate";
+import { Rotate } from "@embedpdf/plugin-rotate/react";
 import { tr } from "../../lib/i18n";
 import { newDocumentId, pdfium, restartPdfium } from "./pdfium";
 
@@ -67,9 +69,15 @@ export type PdfViewHandle = {
   /** After a successful save: what was saved is what the file holds (`onDirty` says so). */
   markSaved(): void;
   zoom(dir: 1 | -1 | 0): void;
+  /** A zoom (1 is 100 %), or the page's width or the whole page in view. */
+  zoomTo(level: number | "width" | "page"): void;
+  /** Turns the pages a quarter to the right, on screen only. */
+  rotate(): void;
   goTo(page: number): void;
   /** Removes the selected drawings, highlights and notes. */
   deleteSelected(): void;
+  undo(): void;
+  redo(): void;
 };
 
 type Props = {
@@ -77,6 +85,8 @@ type Props = {
   url: string;
   tool: PdfTool;
   color: string;
+  /** The pen's width, in points. */
+  size?: number;
   /** Read-only (an old version): annotations drawn into the pages, no tools, no form editing. */
   readOnly?: boolean;
   /** Written as the author of new annotations. */
@@ -90,6 +100,8 @@ type Props = {
   onScale?: (scale: number) => void;
   /** Whether the document now differs from what the file holds. */
   onDirty?: (dirty: boolean) => void;
+  /** Whether there is something to undo or redo. */
+  onHistory?: (state: { canUndo: boolean; canRedo: boolean }) => void;
   onError?: (err: unknown) => void;
 };
 
@@ -227,6 +239,7 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
       createPluginRegistration(InteractionManagerPluginPackage),
       createPluginRegistration(SelectionPluginPackage, { marquee: { enabled: !readOnly } }),
       createPluginRegistration(ThumbnailPluginPackage, { width: 120, gap: 8, labelHeight: 22, paddingY: 8 }),
+      createPluginRegistration(RotatePluginPackage),
       ...(readOnly
         ? []
         : [
@@ -298,6 +311,7 @@ function Viewer({
   formsWritten,
   tool,
   color,
+  size = 2,
   readOnly = false,
   showPages = false,
   active = true,
@@ -395,6 +409,7 @@ function Viewer({
       if (e.documentId !== documentId) return;
       track.current.changed = true;
       check();
+      events.current.onHistory?.(history.forDocument(documentId).getHistoryState().global);
     });
     // check reads the latest track; the subscription is per history.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -411,10 +426,10 @@ function Viewer({
     if (!annotations || readOnly) return;
     if (tool === "highlight") annotations.setToolDefaults("highlight", { strokeColor: color, color });
     else {
-      annotations.setToolDefaults("ink", { strokeColor: color, color });
+      annotations.setToolDefaults("ink", { strokeColor: color, color, strokeWidth: size });
       annotations.setToolDefaults("freeText", { fontColor: color });
     }
-  }, [annotations, readOnly, tool, color]);
+  }, [annotations, readOnly, tool, color, size]);
 
   const deleteSelected = () => {
     const scope = annotations?.forDocument(documentId);
@@ -454,6 +469,20 @@ function Viewer({
       if (!scope) return;
       if (dir === 0) scope.requestZoom(ZoomMode.FitWidth);
       else scope.requestZoom(nextZoom(scope.getState().currentZoomLevel, dir));
+    },
+    zoomTo(level) {
+      zoom
+        ?.forDocument(documentId)
+        .requestZoom(level === "width" ? ZoomMode.FitWidth : level === "page" ? ZoomMode.FitPage : level);
+    },
+    rotate() {
+      registry?.getPlugin<RotatePlugin>("rotate")?.provides().forDocument(documentId).rotateForward();
+    },
+    undo() {
+      history?.forDocument(documentId).undo();
+    },
+    redo() {
+      history?.forDocument(documentId).redo();
     },
     goTo(page) {
       scroll?.forDocument(documentId).scrollToPage({ pageNumber: page, behavior: "instant" });
@@ -522,43 +551,50 @@ function Viewer({
         >
           <Scroller
             documentId={documentId}
-            renderPage={({ pageIndex, width, height }) => (
-              <PagePointerProvider
-                documentId={documentId}
-                pageIndex={pageIndex}
-                className="eu-pdf-page"
+            renderPage={({ pageIndex, width, height, rotatedWidth, rotatedHeight }) => (
+              // The sheet stays upright; what is on it turns with the view (Rotate).
+              <div
+                className="eu-pdf-page relative"
                 data-page={pageIndex + 1}
-                style={{ width, height }}
+                style={{ width: rotatedWidth, height: rotatedHeight }}
               >
-                {/* The whole page, small and quick; sharp tiles over it. A
-                    press goes through them to the page (EmbedPDF's tools). */}
-                <RenderLayer
-                  documentId={documentId}
-                  pageIndex={pageIndex}
-                  scale={1}
-                  draggable={false}
-                  style={{ position: "absolute", inset: 0, width, height, pointerEvents: "none" }}
-                />
-                <TilingLayer
-                  documentId={documentId}
-                  pageIndex={pageIndex}
-                  style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
-                />
-                <SelectionLayer
-                  documentId={documentId}
-                  pageIndex={pageIndex}
-                  background="var(--color-pdf-selection)"
-                />
-                {!readOnly && (
-                  <AnnotationLayer
+                <Rotate documentId={documentId} pageIndex={pageIndex}>
+                  <PagePointerProvider
                     documentId={documentId}
                     pageIndex={pageIndex}
-                    selectionOutline={OUTLINE}
-                    resizeUI={HANDLES}
-                    vertexUI={HANDLES}
-                  />
-                )}
-              </PagePointerProvider>
+                    style={{ width, height }}
+                  >
+                    {/* The whole page, small and quick; sharp tiles over it. A
+                        press goes through them to the page (EmbedPDF's tools). */}
+                    <RenderLayer
+                      documentId={documentId}
+                      pageIndex={pageIndex}
+                      scale={1}
+                      draggable={false}
+                      style={{ position: "absolute", inset: 0, width, height, pointerEvents: "none" }}
+                    />
+                    <TilingLayer
+                      documentId={documentId}
+                      pageIndex={pageIndex}
+                      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+                    />
+                    <SelectionLayer
+                      documentId={documentId}
+                      pageIndex={pageIndex}
+                      background="var(--color-pdf-selection)"
+                    />
+                    {!readOnly && (
+                      <AnnotationLayer
+                        documentId={documentId}
+                        pageIndex={pageIndex}
+                        selectionOutline={OUTLINE}
+                        resizeUI={HANDLES}
+                        vertexUI={HANDLES}
+                      />
+                    )}
+                  </PagePointerProvider>
+                </Rotate>
+              </div>
             )}
           />
         </PdfViewport>

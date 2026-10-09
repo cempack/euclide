@@ -45,7 +45,8 @@
     "enable": "Activer",
     "more": "Plus d'outils",
     "searchEllipsis": "Rechercher…",
-    "undo": "Annuler"
+    "undo": "Annuler",
+    "redo": "Rétablir"
   },
   "dashboard": {
     "noClassesToday": "Pas de cours aujourd’hui.",
@@ -537,7 +538,10 @@
     "pageInput": "Aller à la page",
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
+    "zoom": "Zoom",
     "zoomFit": "Ajuster à la largeur",
+    "zoomPage": "Page entière",
+    "rotate": "Faire pivoter à droite",
     "viewingVersion": "Version du {date} : lecture seule.",
     "restore": "Restaurer cette version",
     "backToCurrent": "Revenir à l'actuelle",
