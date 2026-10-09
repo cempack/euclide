@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { changed } from "../../api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Circle,
+  Eraser,
   Highlighter,
   History,
   Minus,
   MousePointer2,
+  MoveUpRight,
   PanelLeft,
   PenLine,
   Plus,
@@ -13,6 +16,9 @@ import {
   RotateCcw,
   RotateCw,
   ScanLine,
+  Shapes,
+  Slash,
+  Square,
   Trash2,
   Type,
   Undo2,
@@ -28,6 +34,7 @@ import { useConfirm, useToast } from "../../components/ui";
 import { OpenWithButton } from "../../components/OpenWithButton";
 import { Toolbar, ToolGroup, ToolSep, ToolSpacer } from "../../components/layout";
 import { Icon } from "../../ui/Icon";
+import type { LucideIcon } from "lucide-react";
 import { Menu, type MenuEntry } from "../../ui/Menu";
 import { tip } from "../../ui/Tooltip";
 import { ColorChoice } from "./ColorChoice";
@@ -82,17 +89,21 @@ const SIZES: { value: number; label: StringKey; dot: number }[] = [
 /** What the zoom menu offers besides fitting the page. */
 const ZOOM_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
-const TOOLS: {
-  id: PdfTool;
-  icon: typeof PenLine;
-  label: "pdf.select" | "pdf.pen" | "pdf.highlight" | "pdf.text";
-  hint: "pdf.selectTitle" | "pdf.penTitle" | "pdf.highlightTitle" | "pdf.textTitle";
-}[] = [
+const TOOLS: { id: PdfTool; icon: LucideIcon; label: StringKey; hint: StringKey }[] = [
   { id: "select", icon: MousePointer2, label: "pdf.select", hint: "pdf.selectTitle" },
   { id: "pen", icon: PenLine, label: "pdf.pen", hint: "pdf.penTitle" },
   { id: "highlight", icon: Highlighter, label: "pdf.highlight", hint: "pdf.highlightTitle" },
   { id: "text", icon: Type, label: "pdf.text", hint: "pdf.textTitle" },
 ];
+
+/** Drawn by dragging, in the pen's colour and width. */
+const SHAPE_TOOLS: { id: PdfTool; icon: LucideIcon; label: StringKey }[] = [
+  { id: "line", icon: Slash, label: "pdf.line" },
+  { id: "arrow", icon: MoveUpRight, label: "pdf.arrow" },
+  { id: "rect", icon: Square, label: "pdf.rect" },
+  { id: "ellipse", icon: Circle, label: "pdf.ellipse" },
+];
+const isShape = (tool: PdfTool) => SHAPE_TOOLS.some((s) => s.id === tool);
 
 function PdfPane({
   tabId,
@@ -115,6 +126,9 @@ function PdfPane({
   const [size, setSize] = useState(SIZES[1].value);
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
   const [zoomAnchor, setZoomAnchor] = useState<HTMLElement | null>(null);
+  const [shapesAnchor, setShapesAnchor] = useState<HTMLElement | null>(null);
+  /** The shape the « Formes » button shows: the last one picked. */
+  const [shape, setShape] = useState<PdfTool>("line");
   /** The page count, once the document is open. */
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
@@ -215,6 +229,15 @@ function PdfPane({
     .slice()
     .reverse()
     .map((v) => ({ label: versionDate(v), icon: History, onSelect: () => void openVersion(v) }));
+  const shapeItems: MenuEntry[] = SHAPE_TOOLS.map((s) => ({
+    label: tr(s.label),
+    icon: s.icon,
+    onSelect: () => {
+      setShape(s.id);
+      setTool(s.id);
+    },
+  }));
+  const shapeIcon = SHAPE_TOOLS.find((s) => s.id === shape)?.icon ?? Shapes;
   const zoomItems: MenuEntry[] = [
     { label: tr("pdf.zoomFit"), icon: ScanLine, onSelect: () => viewRef.current?.zoomTo("width") },
     { label: tr("pdf.zoomPage"), onSelect: () => viewRef.current?.zoomTo("page") },
@@ -262,9 +285,41 @@ function PdfPane({
               {...tip(tr(t.hint))}
             >
               <Icon icon={t.icon} size={14} />
-              <span className="hidden @4xl:inline">{tr(t.label)}</span>
+              <span className="hidden @7xl:inline">{tr(t.label)}</span>
             </button>
           ))}
+          <button
+            type="button"
+            onClick={(e) => setShapesAnchor(e.currentTarget)}
+            aria-pressed={isShape(tool)}
+            aria-haspopup="menu"
+            disabled={!pages || !!viewing}
+            aria-label={tr("pdf.shapes")}
+            className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
+            {...tip(tr("pdf.shapesTitle"))}
+          >
+            <Icon icon={shapeIcon} size={14} />
+            <span className="hidden @7xl:inline">{tr("pdf.shapes")}</span>
+          </button>
+          <Menu
+            open={!!shapesAnchor}
+            anchor={shapesAnchor}
+            items={shapeItems}
+            label={tr("pdf.shapes")}
+            onClose={() => setShapesAnchor(null)}
+          />
+          <button
+            type="button"
+            onClick={() => setTool("eraser")}
+            aria-pressed={tool === "eraser"}
+            disabled={!pages || !!viewing}
+            aria-label={tr("pdf.eraser")}
+            className="eu-btn-quiet eu-btn-sm eu-btn-toggle"
+            {...tip(tr("pdf.eraserTitle"))}
+          >
+            <Icon icon={Eraser} size={14} />
+            <span className="hidden @7xl:inline">{tr("pdf.eraser")}</span>
+          </button>
           <button
             type="button"
             onClick={() => viewRef.current?.deleteSelected()}
@@ -296,7 +351,7 @@ function PdfPane({
             <Icon icon={Redo2} />
           </button>
         </ToolGroup>
-        {tool !== "select" && !viewing && (
+        {tool !== "select" && tool !== "eraser" && !viewing && (
           <ToolGroup collapse label={tr("pdf.colorsFor")}>
             <ColorChoice
               colors={tool === "highlight" ? HIGHLIGHT : INK}
@@ -305,7 +360,7 @@ function PdfPane({
             />
           </ToolGroup>
         )}
-        {tool === "pen" && !viewing && (
+        {(tool === "pen" || isShape(tool)) && !viewing && (
           <ToolGroup collapse label={tr("board.size")}>
             <div className="eu-segment eu-segment-sm">
               {SIZES.map((o) => (

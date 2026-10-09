@@ -10,7 +10,7 @@ import {
 } from "react";
 import { createPluginRegistration, type PluginRegistry } from "@embedpdf/core";
 import { EmbedPDF, useDocumentState, useRegistry } from "@embedpdf/core/react";
-import { ignore, PdfErrorCode, Task, type PdfErrorReason } from "@embedpdf/models";
+import { ignore, PdfErrorCode, Task, type PdfErrorReason, type Position } from "@embedpdf/models";
 import { DocumentManagerPluginPackage, type DocumentManagerPlugin } from "@embedpdf/plugin-document-manager";
 import { ViewportPluginPackage } from "@embedpdf/plugin-viewport";
 import {
@@ -27,7 +27,10 @@ import { TilingLayer } from "@embedpdf/plugin-tiling/react";
 import { ZoomMode, ZoomPluginPackage } from "@embedpdf/plugin-zoom";
 import { useZoomCapability } from "@embedpdf/plugin-zoom/react";
 import { InteractionManagerPluginPackage } from "@embedpdf/plugin-interaction-manager";
-import { PagePointerProvider } from "@embedpdf/plugin-interaction-manager/react";
+import {
+  PagePointerProvider,
+  useInteractionManagerCapability,
+} from "@embedpdf/plugin-interaction-manager/react";
 import {
   SelectionLayer,
   SelectionPluginPackage,
@@ -43,17 +46,31 @@ import { ThumbnailsPane } from "@embedpdf/plugin-thumbnail/react";
 import { RotatePluginPackage, type RotatePlugin } from "@embedpdf/plugin-rotate";
 import { Rotate } from "@embedpdf/plugin-rotate/react";
 import { tr } from "../../lib/i18n";
+import { touches } from "./eraser";
 import { newDocumentId, pdfium, restartPdfium } from "./pdfium";
 
-export type PdfTool = "select" | "pen" | "highlight" | "text";
+export type PdfTool =
+  "select" | "pen" | "highlight" | "text" | "line" | "arrow" | "rect" | "ellipse" | "eraser";
 
-/** EmbedPDF's tool for each of ours; « select » is none (text and annotations are picked). */
+/**
+ * EmbedPDF's tool for each of ours. « select » has none (text and
+ * annotations are picked), nor the eraser, which is Euclide's (ERASER).
+ */
 const TOOLS: Record<PdfTool, string | null> = {
   select: null,
   pen: "ink",
   highlight: "highlight",
   text: "freeText",
+  line: "line",
+  arrow: "lineArrow",
+  rect: "square",
+  ellipse: "circle",
+  eraser: null,
 };
+/** The shapes take the pen's colour and width. */
+const SHAPES = ["line", "lineArrow", "square", "circle"];
+/** The eraser's interaction mode: what it passes over goes (EraserOnPage). */
+const ERASER = "eraser";
 
 /** The tools that draw: what they draw becomes an annotation a moment after the pen lifts. */
 const DRAWING: PdfTool[] = ["pen"];
@@ -270,6 +287,17 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView(props, 
                     defaultContent: "",
                   },
                 },
+                // A shape is drawn by dragging: a click alone draws nothing.
+                ...["line", "lineArrow"].map((id) => ({
+                  id,
+                  interaction: { exclusive: true, isRotatable: false },
+                  clickBehavior: { enabled: false, defaultLength: 100 },
+                })),
+                ...["square", "circle"].map((id) => ({
+                  id,
+                  interaction: { exclusive: true, isRotatable: false },
+                  clickBehavior: { enabled: false, defaultSize: { width: 100, height: 100 } },
+                })),
                 { id: "link", categories: ["link"] },
               ],
             }),
@@ -337,6 +365,7 @@ function Viewer({
   );
   const forms = useMemo(() => registry?.getPlugin<FormPlugin>("form")?.provides() ?? null, [registry]);
   const { provides: selection } = useSelectionCapability();
+  const { provides: interaction } = useInteractionManagerCapability();
   const events = useRef(callbacks);
   useEffect(() => {
     events.current = callbacks;
@@ -415,11 +444,19 @@ function Viewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [history, registry, documentId]);
 
-  // The tool, once the document is there.
   useEffect(() => {
-    if (!annotations || !loaded || readOnly) return;
+    interaction?.registerMode({ id: ERASER, scope: "page", exclusive: true, cursor: "crosshair" });
+  }, [interaction]);
+
+  // The tool, once the document is there. The eraser is a mode of the
+  // pointer, the others EmbedPDF's tools.
+  useEffect(() => {
+    if (!annotations || !interaction || !loaded || readOnly) return;
     annotations.forDocument(documentId).setActiveTool(TOOLS[tool]);
-  }, [annotations, loaded, readOnly, tool, documentId]);
+    const modes = interaction.forDocument(documentId);
+    if (tool === "eraser") modes.activate(ERASER);
+    else if (tool === "select") modes.activateDefaultMode();
+  }, [annotations, interaction, loaded, readOnly, tool, documentId]);
 
   // Its colour: the pen and notes share it; the highlighter has its own.
   useEffect(() => {
@@ -428,6 +465,8 @@ function Viewer({
     else {
       annotations.setToolDefaults("ink", { strokeColor: color, color, strokeWidth: size });
       annotations.setToolDefaults("freeText", { fontColor: color });
+      for (const shape of SHAPES)
+        annotations.setToolDefaults(shape, { strokeColor: color, strokeWidth: size });
     }
   }, [annotations, readOnly, tool, color, size]);
 
@@ -583,6 +622,9 @@ function Viewer({
                       pageIndex={pageIndex}
                       background="var(--color-pdf-selection)"
                     />
+                    {!readOnly && (
+                      <EraserOnPage documentId={documentId} pageIndex={pageIndex} annotations={annotations} />
+                    )}
                     {!readOnly && (
                       <AnnotationLayer
                         documentId={documentId}
@@ -774,6 +816,61 @@ function PagesPanel({
       }}
     </ThumbnailsPane>
   );
+}
+
+/**
+ * The eraser on one page: a stroke, a shape, a highlight or a note it
+ * passes over goes (each one an undo step). Reaches 6 pixels around the
+ * pointer, whatever the zoom.
+ */
+function EraserOnPage({
+  documentId,
+  pageIndex,
+  annotations,
+}: {
+  documentId: string;
+  pageIndex: number;
+  annotations: AnnotationCapability | null;
+}) {
+  const { provides: interaction } = useInteractionManagerCapability();
+  const scale = useDocumentState(documentId)?.scale ?? 1;
+  useEffect(() => {
+    if (!interaction || !annotations) return;
+    const scope = annotations.forDocument(documentId);
+    let erasing = false;
+    const gone = new Set<string>();
+    const erase = (at: Position) => {
+      for (const { object } of scope.getAnnotations({ pageIndex })) {
+        if (gone.has(object.id) || !touches(object, at, 6 / scale)) continue;
+        gone.add(object.id);
+        scope.deleteAnnotation(pageIndex, object.id);
+      }
+    };
+    return interaction.registerHandlers({
+      documentId,
+      modeId: ERASER,
+      pageIndex,
+      handlers: {
+        onPointerDown: (at, e) => {
+          erasing = true;
+          gone.clear();
+          e.setPointerCapture?.();
+          erase(at);
+        },
+        onPointerMove: (at) => {
+          if (erasing) erase(at);
+        },
+        onPointerUp: (_, e) => {
+          erasing = false;
+          e.releasePointerCapture?.();
+        },
+        onPointerCancel: () => {
+          erasing = false;
+        },
+      },
+    });
+  }, [interaction, annotations, documentId, pageIndex, scale]);
+  return null;
 }
 
 /** A page, `width` pixels wide, as the file would print it; `drawn` draws it again. */
