@@ -27,7 +27,7 @@ export default function PdfSpike() {
         </button>
         <button
           className="eu-btn-primary eu-btn-sm"
-          onClick={async () => setSaved((await ref.current!.save()).byteLength)}
+          onClick={async () => setSaved((await ref.current!.save())?.byteLength ?? 0)}
         >
           save
         </button>

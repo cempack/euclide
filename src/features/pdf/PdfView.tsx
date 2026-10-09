@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import {
   AnnotationEditorParamsType,
   AnnotationEditorType,
+  AnnotationMode,
   type PDFDocumentProxy,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { EventBus, LinkTarget, PDFLinkService, PDFViewer } from "pdfjs-dist/legacy/web/pdf_viewer.mjs";
@@ -18,9 +19,12 @@ const MODES: Record<PdfTool, number> = {
 };
 
 export type PdfViewHandle = {
-  /** The document with its annotations written in (pending strokes included). */
-  save(): Promise<Uint8Array>;
-  /** After a successful save: the next change counts as unsaved again. */
+  /**
+   * The document with its annotations written in (pending strokes included),
+   * or null when they are what the file already holds.
+   */
+  save(): Promise<Uint8Array | null>;
+  /** After a successful save: what was saved is what the file holds. */
   markSaved(): void;
   zoom(dir: 1 | -1 | 0): void;
   goTo(page: number): void;
@@ -29,6 +33,21 @@ export type PdfViewHandle = {
 };
 
 type Source = { url: string } | { data: Uint8Array };
+
+/** Whether what is shown differs from what the file holds (see `check`). */
+type Tracking = {
+  /** The annotations' hash in the file: when opened, or at the last save. */
+  saved: string;
+  /** The hash `save()` wrote, which `markSaved()` makes the file's. */
+  saving: string | null;
+  /** Strokes or a note PDF.js has not stored yet: it does when the tool changes. */
+  pending: boolean;
+  /** What `onDirty` last said. */
+  dirty: boolean;
+  timer: number;
+};
+
+const untracked = (): Tracking => ({ saved: "", saving: null, pending: false, dirty: false, timer: 0 });
 
 /**
  * A PDF, drawn by PDF.js's own viewer components inside the page (no iframe):
@@ -42,14 +61,15 @@ export const PdfView = forwardRef<
     source: Source;
     tool: PdfTool;
     color: string;
-    /** Read-only (an old version): no tools. */
+    /** Read-only (an old version): no tools, and its form fields stay as they are. */
     readOnly?: boolean;
     /** The tab is in front. Out of sight, no tool is on (see the tool's effect). */
     active?: boolean;
     onReady?: (doc: PDFDocumentProxy) => void;
     onPage?: (page: number) => void;
     onScale?: (scale: number) => void;
-    onDirty?: () => void;
+    /** Whether the annotations now differ from what the file holds. */
+    onDirty?: (dirty: boolean) => void;
     onError?: (err: unknown) => void;
   }
 >(function PdfView(
@@ -61,6 +81,8 @@ export const PdfView = forwardRef<
   const busRef = useRef<EventBus | null>(null);
   const docRef = useRef<PDFDocumentProxy | null>(null);
   const modeRef = useRef(MODES.select);
+  const trackRef = useRef<Tracking>(untracked());
+  const checkRef = useRef(() => {});
   // Bumped when a document's pages are ready: the tool and colour apply then.
   const [ready, setReady] = useState(0);
   const callbacks = useRef({ onReady, onPage, onScale, onDirty, onError });
@@ -93,18 +115,27 @@ export const PdfView = forwardRef<
     async save() {
       const doc = docRef.current;
       if (!doc) throw new Error("Le document n'est pas encore ouvert.");
-      // A stroke still being drawn is only written once PDF.js commits it,
+      // Strokes still being drawn are only stored once PDF.js commits them,
       // which it does when the tool changes: pass through « Sélection ».
       const mode = modeRef.current;
       if (mode !== AnnotationEditorType.NONE) await setMode(AnnotationEditorType.NONE);
       try {
+        const track = trackRef.current;
+        track.saving = doc.annotationStorage.serializable.hash;
+        // Nothing new (a click that drew nothing): no copy of the same file.
+        if (track.saving === track.saved) return null;
         return await doc.saveDocument();
       } finally {
         if (mode !== AnnotationEditorType.NONE) await setMode(mode);
       }
     },
     markSaved() {
+      const track = trackRef.current;
+      track.saved = track.saving ?? track.saved;
+      track.dirty = false;
       docRef.current?.annotationStorage.resetModified();
+      // Drawn while the file was being written: unsaved again.
+      checkRef.current();
     },
     zoom(dir) {
       const viewer = viewerRef.current;
@@ -118,6 +149,7 @@ export const PdfView = forwardRef<
     },
     deleteSelected() {
       busRef.current?.dispatch("editingaction", { source: null, name: "delete" });
+      checkRef.current();
     },
   }));
 
@@ -137,12 +169,33 @@ export const PdfView = forwardRef<
       container,
       eventBus: bus,
       linkService: link,
+      annotationMode: readOnly ? AnnotationMode.ENABLE : AnnotationMode.ENABLE_FORMS,
       annotationEditorMode: readOnly ? AnnotationEditorType.DISABLE : AnnotationEditorType.NONE,
     });
     link.setViewer(viewer);
     viewerRef.current = viewer;
     busRef.current = bus;
     modeRef.current = AnnotationEditorType.NONE;
+    const track = untracked();
+    trackRef.current = track;
+
+    /**
+     * Unsaved: the annotations' hash is not the file's, or strokes await
+     * PDF.js's commit. Deleting or undoing back to the file's state is saved
+     * again; a click that changed nothing is not unsaved.
+     */
+    const check = () => {
+      window.clearTimeout(track.timer);
+      track.timer = window.setTimeout(() => {
+        const doc = docRef.current;
+        if (!doc || readOnly) return;
+        const dirty = track.pending || doc.annotationStorage.serializable.hash !== track.saved;
+        if (dirty === track.dirty) return;
+        track.dirty = dirty;
+        callbacks.current.onDirty?.(dirty);
+      }, 150);
+    };
+    checkRef.current = check;
 
     bus.on("pagesinit", () => {
       viewer.currentScaleValue = "page-width";
@@ -151,18 +204,24 @@ export const PdfView = forwardRef<
     });
     bus.on("pagechanging", (e: { pageNumber: number }) => callbacks.current.onPage?.(e.pageNumber));
     bus.on("scalechanging", (e: { scale: number }) => callbacks.current.onScale?.(e.scale));
-    bus.on("annotationeditormodechanged", (e: { mode: number }) => (modeRef.current = e.mode));
-    // From the first stroke, highlight or note, closing must ask before
-    // losing it. PDF.js reports a drawing only when it commits it (a tool
-    // change), so a pointer released while a tool is on counts already;
-    // deletions and the like come as undoable steps.
-    bus.on("annotationeditorstateschanged", (e: { details: { hasSomethingToUndo?: boolean } }) => {
-      if (e.details.hasSomethingToUndo) callbacks.current.onDirty?.();
+    bus.on("annotationeditormodechanged", (e: { mode: number }) => {
+      modeRef.current = e.mode;
+      // Changing tools stores what was drawn: the hash tells from now on.
+      track.pending = false;
+      check();
     });
-    const onPointerUp = () => {
-      if (modeRef.current !== AnnotationEditorType.NONE) callbacks.current.onDirty?.();
+    bus.on("editingstateschanged", check);
+    // A stroke, a highlight or a note starts with a pointer pressed on a page
+    // while a tool is on. PDF.js stores strokes only when the tool changes:
+    // until then, they count as unsaved.
+    const onPointerDown = (e: PointerEvent) => {
+      const onPage = e.target instanceof Element && e.target.closest(".page");
+      if (onPage && modeRef.current !== AnnotationEditorType.NONE) track.pending = true;
     };
-    container.addEventListener("pointerup", onPointerUp);
+    container.addEventListener("pointerdown", onPointerDown, true);
+    // The end of a stroke or a move, typing in a note or a form, Suppr, Ctrl+Z.
+    const events = ["pointerup", "keyup", "input", "focusout"] as const;
+    for (const name of events) container.addEventListener(name, check);
 
     // Ctrl + wheel zooms the document, not the whole window.
     const onWheel = (e: WheelEvent) => {
@@ -181,9 +240,9 @@ export const PdfView = forwardRef<
         docRef.current = doc;
         viewer.setDocument(doc);
         link.setDocument(doc);
+        track.saved = doc.annotationStorage.serializable.hash;
         // The typings declare it null; PDF.js calls it when an annotation changes.
-        (doc.annotationStorage as unknown as { onSetModified: () => void }).onSetModified = () =>
-          callbacks.current.onDirty?.();
+        (doc.annotationStorage as unknown as { onSetModified: () => void }).onSetModified = check;
       },
       (err) => {
         if (!cancelled) callbacks.current.onError?.(err);
@@ -191,8 +250,10 @@ export const PdfView = forwardRef<
     );
     return () => {
       cancelled = true;
+      window.clearTimeout(track.timer);
       container.removeEventListener("wheel", onWheel);
-      container.removeEventListener("pointerup", onPointerUp);
+      container.removeEventListener("pointerdown", onPointerDown, true);
+      for (const name of events) container.removeEventListener(name, check);
       // Only setDocument() takes down PDF.js's editor manager, with the
       // keyboard listeners it puts on the whole window: a closed PDF kept
       // taking Backspace, Ctrl+Z… from every other tab.
