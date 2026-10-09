@@ -44,13 +44,18 @@ export const PdfView = forwardRef<
     color: string;
     /** Read-only (an old version): no tools. */
     readOnly?: boolean;
+    /** The tab is in front. Out of sight, no tool is on (see the tool's effect). */
+    active?: boolean;
     onReady?: (doc: PDFDocumentProxy) => void;
     onPage?: (page: number) => void;
     onScale?: (scale: number) => void;
     onDirty?: () => void;
     onError?: (err: unknown) => void;
   }
->(function PdfView({ source, tool, color, readOnly, onReady, onPage, onScale, onDirty, onError }, ref) {
+>(function PdfView(
+  { source, tool, color, readOnly, active = true, onReady, onPage, onScale, onDirty, onError },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<PDFViewer | null>(null);
   const busRef = useRef<EventBus | null>(null);
@@ -188,7 +193,11 @@ export const PdfView = forwardRef<
       cancelled = true;
       container.removeEventListener("wheel", onWheel);
       container.removeEventListener("pointerup", onPointerUp);
-      viewer.cleanup();
+      // Only setDocument() takes down PDF.js's editor manager, with the
+      // keyboard listeners it puts on the whole window: a closed PDF kept
+      // taking Backspace, Ctrl+Z… from every other tab.
+      viewer.setDocument(null);
+      link.setDocument(null);
       void task.destroy();
       docRef.current = null;
       viewerRef.current = null;
@@ -198,10 +207,12 @@ export const PdfView = forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, readOnly]);
 
-  // The tool, once the pages are there (PDF.js refuses it before).
+  // The tool, once the pages are there (PDF.js refuses it before). Out of
+  // sight, none: while a tool is on, PDF.js takes Backspace, Ctrl+A, Ctrl+Z…
+  // from the whole window, whatever tab is in front.
   useEffect(() => {
-    if (!readOnly && ready) void setMode(MODES[tool]);
-  }, [tool, readOnly, ready]);
+    if (!readOnly && ready) void setMode(active ? MODES[tool] : MODES.select);
+  }, [tool, readOnly, ready, active]);
 
   // Its colour: the pen and notes share it; the highlighter has its own.
   useEffect(() => {

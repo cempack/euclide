@@ -40,15 +40,18 @@ export default function DocumentPane({
   tabId,
   fileId,
   fileName,
+  visible = true,
 }: {
   tabId: string;
   fileId: number;
   fileName: string;
+  /** The tab is in front. */
+  visible?: boolean;
 }) {
   return isImage(fileName) ? (
     <ImageView tabId={tabId} fileId={fileId} fileName={fileName} />
   ) : (
-    <PdfPane tabId={tabId} fileId={fileId} fileName={fileName} />
+    <PdfPane tabId={tabId} fileId={fileId} fileName={fileName} visible={visible} />
   );
 }
 
@@ -79,7 +82,17 @@ const TOOLS: {
   { id: "text", icon: Type, label: "pdf.text", hint: "pdf.textTitle" },
 ];
 
-function PdfPane({ tabId, fileId, fileName }: { tabId: string; fileId: number; fileName: string }) {
+function PdfPane({
+  tabId,
+  fileId,
+  fileName,
+  visible,
+}: {
+  tabId: string;
+  fileId: number;
+  fileName: string;
+  visible: boolean;
+}) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const viewRef = useRef<PdfViewHandle>(null);
@@ -367,6 +380,7 @@ function PdfPane({ tabId, fileId, fileName }: { tabId: string; fileId: number; f
                 tool={viewing ? "select" : tool}
                 color={color}
                 readOnly={!!viewing}
+                active={visible}
                 onReady={(d) => {
                   setDoc(d);
                   setFailed(null);
