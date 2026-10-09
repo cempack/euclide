@@ -4,7 +4,7 @@ import {
   AnnotationEditorType,
   type PDFDocumentProxy,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { EventBus, PDFLinkService, PDFViewer } from "pdfjs-dist/legacy/web/pdf_viewer.mjs";
+import { EventBus, LinkTarget, PDFLinkService, PDFViewer } from "pdfjs-dist/legacy/web/pdf_viewer.mjs";
 import "pdfjs-dist/legacy/web/pdf_viewer.css";
 import { openPdf } from "./engine";
 
@@ -120,7 +120,14 @@ export const PdfView = forwardRef<
   useEffect(() => {
     const container = containerRef.current!;
     const bus = new EventBus();
-    const link = new PDFLinkService({ eventBus: bus });
+    // A link to a website asks for a new window, which Euclide opens in the
+    // browser (src-tauri/src/boot.rs): in its own window, the site took
+    // Euclide's place with no way back.
+    const link = new PDFLinkService({
+      eventBus: bus,
+      externalLinkTarget: LinkTarget.BLANK,
+      externalLinkRel: "noopener noreferrer nofollow",
+    });
     const viewer = new PDFViewer({
       container,
       eventBus: bus,

@@ -44,7 +44,15 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             boot::focus_main_window(app);
         }))
-        .plugin(tauri_plugin_opener::init())
+        // Its script would catch clicks on links that open a new window (a
+        // note's, a PDF's) and ask for a permission the page does not have:
+        // nothing opened. They reach boot.rs instead, which opens them as the
+        // quick links are.
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         // Before any window exists: its close button goes through the gate.
         .manage(exit::ExitGate::default())

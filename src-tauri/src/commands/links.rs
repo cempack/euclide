@@ -124,7 +124,12 @@ fn open_url_host_browser(url: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn open_url(app: AppHandle, url: String) -> AppResult<()> {
-    let url = normalize_external_url(&url)?;
+    open_external(&app, &url)
+}
+
+/// Opens a web address (or mailto:, tel:) in the system's browser or app.
+pub(crate) fn open_external(app: &AppHandle, url: &str) -> AppResult<()> {
+    let url = normalize_external_url(url)?;
     #[cfg(target_os = "linux")]
     {
         if open_url_host_browser(&url).is_ok() {
