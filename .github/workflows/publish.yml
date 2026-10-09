@@ -473,8 +473,9 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.should-publish.outputs.run == 'true' && needs.version.outputs.tag != ''
     steps:
-      # For CHANGELOG.md: the version's section becomes the release's notes,
-      # and the ones Euclide shows before installing it (latest.json).
+      # For CHANGELOG.md: the news since the last release becomes the
+      # release's notes, and the ones Euclide shows before installing it
+      # (latest.json).
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.version.outputs.tag }}
@@ -495,9 +496,18 @@ jobs:
             exit 1
           fi
           mkdir -p /tmp/euclide-updater
+          # Every version since the last release published: an update that
+          # skips one (0.5.0 came out inside 0.6.0) tells all of them. The
+          # list holds this tag too; the one before it in version order is it.
+          version="${TAG#v}"
+          since="$( { gh api "repos/$REPO/releases?per_page=100" --jq '.[] | select(.draft | not) | .tag_name' || true; echo "v$version"; } \
+            | sed 's/^v//' | sort -uV | grep -x -B1 -F "$version" | sed -n 1p )"
+          echo "News since $since"
           # A release without its section keeps the notes it has.
-          if ! node scripts/changelog/release-notes.mjs "${TAG#v}" > /tmp/euclide-updater/release-notes.md; then
-            echo "::warning::CHANGELOG.md has no section for ${TAG#v}: the notes stay as they are."
+          if node scripts/changelog/release-notes.mjs "$version" --since "$since" > /tmp/euclide-updater/release-notes.md; then
+            node scripts/changelog/release-notes.mjs "$version" --since "$since" --text > /tmp/euclide-updater/release-notes.txt
+          else
+            echo "::warning::CHANGELOG.md has no section for $version: the notes stay as they are."
             rm -f /tmp/euclide-updater/release-notes.md
           fi
           cd /tmp/euclide-updater
@@ -508,7 +518,7 @@ jobs:
           test -f latest.json
           npx --yes @tauri-apps/cli@2 signer sign Euclide-windows-portable.zip
           python3 <<'PY'
-          import json, os, pathlib, re
+          import json, os, pathlib
           tag = os.environ["TAG"]
           repo = os.environ["REPO"]
           sig = pathlib.Path("Euclide-windows-portable.zip.sig").read_text().strip()
@@ -535,17 +545,11 @@ jobs:
                       if key in platforms:
                           platforms[key] = dict(entry)
                   print("linux-x86_64 ->", entry["url"])
-          # Euclide shows the notes as plain text before installing: the
-          # section without its title, images, Markdown marks or install note.
-          notes = pathlib.Path("release-notes.md")
+          # Euclide shows the notes as plain text before installing
+          # (release-notes.mjs --text): the news without pictures or marks.
+          notes = pathlib.Path("release-notes.txt")
           if notes.exists():
-              section = notes.read_text().split("\n---\n", 1)[0]
-              kept = []
-              for line in section.splitlines():
-                  if line.startswith("## ") or line.lstrip().startswith(("![", "<p>", "</p>", "<img")):
-                      continue
-                  kept.append(re.sub(r"^#+ ", "", line).replace("**", ""))
-              data["notes"] = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
+              data["notes"] = notes.read_text().strip()
           # What every copy needs before the release goes public.
           if data.get("version") != tag.removeprefix("v"):
               raise SystemExit(f"latest.json is for {data.get('version')}, not {tag}")
