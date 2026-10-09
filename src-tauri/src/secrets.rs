@@ -4,9 +4,14 @@
 //! for Pronote's rotating token, as the mobile app does (`commands::pronote`).
 //! Where an establishment hands out no token, the password is sealed
 //! (ChaCha20-Poly1305) with a key kept in a file of the data folder, outside
-//! the database. The key travels with the data, so every PC reads it back,
-//! on Windows, Linux and macOS alike: a copy of the database alone does not
-//! give the password away; the whole data folder does.
+//! the database; so is the token, which opens the account as well. The key
+//! travels with the data, so every PC reads it back, on Windows, Linux and
+//! macOS alike: a copy of the database alone does not give the password
+//! away; the whole data folder does.
+//!
+//! Backups leave the key out (the mirror and the archive, `jobs::backup` and
+//! `commands::storage`): one found on a PC or in a synced folder opens
+//! nothing. Restoring one only means connecting to Pronote again.
 //!
 //! Euclide 0.3 encrypted it for one Windows user on one PC (DPAPI) instead,
 //! so that every other PC asked for it again: such a value is still read on
@@ -25,7 +30,8 @@ static KEY_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
 /// Creating the key is check-then-write: one at a time.
 static KEY_LOCK: Mutex<()> = Mutex::new(());
 
-const KEY_FILE: &str = "euclide.key";
+/// In the data folder; backups leave it out (see the module docs).
+pub(crate) const KEY_FILE: &str = "euclide.key";
 const SEALED: &str = "v1:";
 
 /// Where the key lives from now on (the data folder).

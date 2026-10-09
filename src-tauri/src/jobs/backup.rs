@@ -113,8 +113,9 @@ fn prune_snapshots(dir: &Path) -> AppResult<()> {
 }
 
 /// Copy the data folder into `dest/Euclide-Miroir/`: new or changed files
-/// only, the database as a consistent snapshot. Nothing is ever deleted from
-/// the mirror. Returns the number of files copied.
+/// only, the database as a consistent snapshot, never the Pronote key
+/// (`secrets`). Nothing else is ever deleted from the mirror. Returns the
+/// number of files copied.
 pub fn mirror(db: &Db, dest: &Path) -> AppResult<usize> {
     if !dest.is_dir() {
         return Err(AppError::user(
@@ -124,6 +125,9 @@ pub fn mirror(db: &Db, dest: &Path) -> AppResult<usize> {
     let src = crate::paths::data_dir();
     let out = dest.join("Euclide-Miroir");
     fs::create_dir_all(&out)?;
+    // Euclide 0.4.1 and older copied it there.
+    let key = Path::new(crate::secrets::KEY_FILE);
+    let _ = fs::remove_file(out.join(key));
     let mut copied = 0;
     let mut stack = vec![src.clone()];
     while let Some(dir) = stack.pop() {
@@ -133,7 +137,11 @@ pub fn mirror(db: &Db, dest: &Path) -> AppResult<usize> {
                 continue;
             };
             let name = rel.to_string_lossy();
-            if name.starts_with('.') || name.starts_with("euclide.db") || name.starts_with("logs") {
+            if name.starts_with('.')
+                || name.starts_with("euclide.db")
+                || name.starts_with("logs")
+                || rel == key
+            {
                 continue;
             }
             let Ok(meta) = entry.metadata() else { continue };
@@ -582,6 +590,28 @@ mod tests {
         assert!(swap_in(&db_path, &copy, &aside).is_err());
         assert_eq!(notes_in(&db_path), ["aujourd'hui"]);
         assert!(!aside.join("euclide.db").exists());
+    }
+
+    #[test]
+    fn the_mirror_leaves_the_pronote_key_out() {
+        let _env = crate::paths::temp_data_dir("mirror-key");
+        let data = crate::paths::data_dir();
+        let key = crate::secrets::KEY_FILE;
+        fs::write(data.join(key), [7u8; 32]).unwrap();
+        fs::create_dir_all(data.join("documents")).unwrap();
+        fs::write(data.join("documents/cours.pdf"), b"%PDF").unwrap();
+        let db = Db::open(&crate::paths::db_path()).unwrap();
+        // A folder outside the key, where Euclide 0.4.1 had copied it.
+        let dest = data.parent().unwrap().join("Sauvegarde");
+        let out = dest.join("Euclide-Miroir");
+        fs::create_dir_all(&out).unwrap();
+        fs::write(out.join(key), [7u8; 32]).unwrap();
+
+        mirror(&db, &dest).unwrap();
+        assert_eq!(fs::read(out.join("documents/cours.pdf")).unwrap(), b"%PDF");
+        assert!(out.join("euclide.db").exists());
+        assert!(!out.join(key).exists());
+        assert!(data.join(key).exists(), "the data folder keeps its key");
     }
 
     #[test]
