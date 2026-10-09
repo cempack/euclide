@@ -100,7 +100,7 @@
     "keepAwakeOn": "Écran allumé",
     "keepAwakeOff": "Veille normale",
     "timerTitle": "Minuteur de classe",
-    "timerHint": "Compte à rebours visible dans la barre d'onglets.",
+    "timerHint": "Compte à rebours ou chronomètre, visibles dans la barre d'onglets.",
     "unsavedTitle": "Script non enregistré",
     "unsavedSwitch": "Les modifications en cours seront perdues. Continuer ?",
     "quickLinks": "Liens",
@@ -670,7 +670,10 @@
     "pause": "Pause",
     "resume": "Reprendre",
     "addMinute": "+1 minute",
-    "stop": "Arrêter"
+    "stop": "Arrêter",
+    "stopwatch": "Chronomètre",
+    "lap": "Tour",
+    "lapN": "Tour {n}"
   },
   "appearance": {
     "auto": "Auto",
@@ -942,7 +945,7 @@
     "plus": "Une minute de plus",
     "restart": "Recommencer",
     "close": "Fermer",
-    "keys": "Espace : pause · R : recommencer · + / − : une minute · 1…9 : minutes · Échap : fermer",
+    "keys": "Espace : pause · R : recommencer · + / − : une minute · 1…9 : minutes · C : chronomètre · T : un tour · Échap : fermer",
     "fullscreen": "Plein écran",
     "modes": "Ce qui s'affiche",
     "modeClock": "Horloge",
@@ -981,7 +984,8 @@
     "face": "Face",
     "dieOf": "Dé à {faces} faces",
     "numberBetween": "Entre {min} et {max}",
-    "keysChance": "Espace : relancer · Échap : fermer"
+    "keysChance": "Espace : relancer · Échap : fermer",
+    "stopwatch": "Chronomètre"
   },
   "print": {
     "menu": "Exporter ou imprimer",

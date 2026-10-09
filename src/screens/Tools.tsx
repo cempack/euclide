@@ -11,13 +11,25 @@ import { Field, Panel, Section, PageHeader, MetaDot, Segmented } from "../compon
 import { useSetting } from "../api/hooks";
 import { useAppearance } from "../lib/theme";
 import { tabs } from "../stores/tabs";
-import { timer } from "../stores/timer";
+import { stopwatch, timer, useStopwatchElapsed } from "../stores/timer";
 import { coin, randomInt, rollDie } from "../features/classroom/picker";
 import { scene } from "../stores/scene";
 import { keysOf } from "../lib/keymap";
 import { tip } from "../ui/Tooltip";
 import { Maximize2 as MaximizeIcon } from "lucide-react";
-import { CodeXml, Coffee, Dices, Link, PenLine, Plus, Projector, Shuffle, Trash2, Users } from "lucide-react";
+import {
+  CodeXml,
+  Coffee,
+  Dices,
+  Link,
+  PenLine,
+  Plus,
+  Projector,
+  Shuffle,
+  Timer as TimerIcon,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { Favicon, remoteFaviconsEnabled } from "../components/Favicon";
 
@@ -143,6 +155,7 @@ function ClassroomSection() {
 /** Class timer: presets plus a free duration. */
 function TimerSection() {
   const [custom, setCustom] = useState("20");
+  const watching = useStopwatchElapsed() != null;
   const start = (minutes: number) => {
     timer.start(minutes);
   };
@@ -194,6 +207,16 @@ function TimerSection() {
               </button>
             </div>
           </Field>
+          <span className="w-px h-7 bg-line hidden @lg:block" />
+          <button
+            type="button"
+            className="eu-btn-ghost eu-btn-sm"
+            aria-pressed={watching}
+            onClick={() => (watching ? stopwatch.stop() : stopwatch.start())}
+          >
+            <Icon icon={TimerIcon} size={14} />
+            {watching ? `${tr("timer.stopwatch")} — ${tr("timer.stop")}` : tr("timer.stopwatch")}
+          </button>
         </div>
       </Panel>
     </Section>

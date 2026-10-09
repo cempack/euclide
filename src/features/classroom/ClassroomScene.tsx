@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Dices, Minus, Pause, Play, Plus, RotateCcw, Shuffle, Square, Users, X } from "lucide-react";
+import {
+  Dices,
+  Flag,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Shuffle,
+  Square,
+  Timer as TimerIcon,
+  Users,
+  X,
+} from "lucide-react";
 import { q } from "../../api/queries";
 import { isTauri, type Course, type CourseClass, type ScheduleEntry, type StudentList } from "../../lib/api";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../../lib/format";
@@ -8,7 +21,17 @@ import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
 import { picker, useDrawn, useGroups, useGroupsBy } from "../../stores/picker";
 import { scene, useSceneClass, useSceneMode, type SceneMode } from "../../stores/scene";
-import { formatTimer, timer, useTimerRunning, useTimerSec, useTimerTotal } from "../../stores/timer";
+import {
+  formatTimer,
+  stopwatch,
+  timer,
+  useStopwatchElapsed,
+  useStopwatchLaps,
+  useStopwatchRunning,
+  useTimerRunning,
+  useTimerSec,
+  useTimerTotal,
+} from "../../stores/timer";
 import { Icon } from "../../ui/Icon";
 import { groupOf, placeEntry } from "./lesson";
 import { coin, randomInt, rollDie, type GroupsBy } from "./picker";
@@ -82,6 +105,9 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
   const sec = useTimerSec();
   const total = useTimerTotal();
   const running = useTimerRunning();
+  const elapsed = useStopwatchElapsed();
+  const watching = useStopwatchRunning();
+  const laps = useStopwatchLaps();
   const mode = useSceneMode();
   const classes = useQuery(q.todayClasses()).data ?? NONE;
   const courses = useQuery(q.courses()).data ?? NO_COURSES;
@@ -182,7 +208,10 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
     if (mode === "clock") {
       if (k === " ") {
         if (timing) timer.toggle();
-      } else if (k === "r" || k === "R") timer.restart();
+        else if (elapsed != null) stopwatch.toggle();
+      } else if (k === "c" || k === "C") stopwatch.toggle();
+      else if (k === "t" || k === "T") stopwatch.lap();
+      else if (k === "r" || k === "R") timer.restart();
       else if (k === "+" || k === "=") {
         if (timing) timer.add(1);
         else timer.start(1);
@@ -263,18 +292,45 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
     >
       <div className="eu-scene-top">
         <span className="eu-scene-banner">{banner}</span>
-        {(timing || mode !== "clock") && <span className="eu-scene-clock-small">{clock}</span>}
+        {(timing || elapsed != null || mode !== "clock") && (
+          <span className="eu-scene-clock-small">{clock}</span>
+        )}
       </div>
 
       <div className="eu-scene-center">
         {mode === "clock" &&
           (timing ? (
-            <div className={`eu-scene-timer ${done ? "eu-scene-timer-done" : ""}`}>
-              <Ring fraction={total ? (sec ?? 0) / total : 0} done={done} />
-              <span className="eu-scene-digits" role="timer" aria-live="off">
-                {formatTimer(sec ?? 0)}
+            <div className="eu-scene-pick">
+              <div className={`eu-scene-timer ${done ? "eu-scene-timer-done" : ""}`}>
+                <Ring fraction={total ? (sec ?? 0) / total : 0} done={done} />
+                <span className="eu-scene-digits" role="timer" aria-live="off">
+                  {formatTimer(sec ?? 0)}
+                </span>
+                {!running && !done && <span className="eu-scene-paused">{tr("scene.paused")}</span>}
+              </div>
+              {elapsed != null && (
+                <span className="eu-scene-count">
+                  {tr("scene.stopwatch")} · {formatTimer(elapsed)}
+                </span>
+              )}
+            </div>
+          ) : elapsed != null ? (
+            <div className="eu-scene-pick">
+              <span className="eu-scene-clock" role="timer" aria-live="off">
+                {formatTimer(elapsed)}
               </span>
-              {!running && !done && <span className="eu-scene-paused">{tr("scene.paused")}</span>}
+              <span className="eu-scene-count">
+                {watching ? tr("scene.stopwatch") : `${tr("scene.stopwatch")} · ${tr("scene.paused")}`}
+              </span>
+              {laps.length > 0 && (
+                <ol className="eu-scene-laps">
+                  {laps.slice(-6).map((lap, i, shown) => (
+                    <li key={laps.length - shown.length + i}>
+                      {tr("timer.lapN", { n: laps.length - shown.length + i + 1 })} · {formatTimer(lap)}
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           ) : (
             <span className="eu-scene-clock" role="timer">
@@ -369,6 +425,31 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
                   {tr("tools.timerMinutes", { count: m })}
                 </button>
               ))}
+              <button
+                type="button"
+                className="eu-scene-btn eu-scene-tab"
+                aria-pressed={watching}
+                onClick={() => stopwatch.toggle()}
+              >
+                <Icon icon={elapsed != null && watching ? Pause : TimerIcon} size={16} />
+                {tr("scene.stopwatch")}
+              </button>
+              {elapsed != null && (
+                <>
+                  <button type="button" className="eu-scene-btn" onClick={() => stopwatch.lap()}>
+                    <Icon icon={Flag} size={16} />
+                    {tr("timer.lap")}
+                  </button>
+                  <button
+                    type="button"
+                    className="eu-scene-btn"
+                    onClick={() => stopwatch.stop()}
+                    aria-label={`${tr("scene.stopwatch")} — ${tr("timer.stop")}`}
+                  >
+                    <Icon icon={Square} size={16} />
+                  </button>
+                </>
+              )}
             </div>
             {timing && (
               <div className="flex items-center gap-1.5">

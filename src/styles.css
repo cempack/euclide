@@ -2631,6 +2631,16 @@ input[type="radio"] {
   font-size: max(1rem, 3vh);
   color: var(--color-stage-muted);
 }
+.eu-scene-laps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6vh 2vw;
+  font-family: var(--font-mono);
+  font-size: max(0.95rem, 2.6vh);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-stage-muted);
+}
 .eu-scene-note {
   max-width: 40ch;
   text-align: center;

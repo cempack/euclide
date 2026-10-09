@@ -1,14 +1,48 @@
-import { Clock, Pause, Play, X } from "lucide-react";
+import { Clock, Flag, Pause, Play, Timer as TimerIcon, X } from "lucide-react";
 import { tr } from "../lib/i18n";
-import { formatTimer, timer, useTimerRunning, useTimerSec } from "../stores/timer";
+import {
+  formatTimer,
+  stopwatch,
+  timer,
+  useStopwatchElapsed,
+  useStopwatchRunning,
+  useTimerRunning,
+  useTimerSec,
+} from "../stores/timer";
 import { Icon } from "../ui/Icon";
 import { tip } from "../ui/Tooltip";
 
-/** The class timer in the tab strip, while one runs. */
+/** The class timer and the stopwatch in the tab strip, while they run. */
 export function TimerSlot() {
   const sec = useTimerSec();
-  if (sec == null) return null;
-  return <TimerControl sec={sec} />;
+  const elapsed = useStopwatchElapsed();
+  return (
+    <>
+      {sec != null && <TimerControl sec={sec} />}
+      {elapsed != null && <StopwatchControl elapsed={elapsed} />}
+    </>
+  );
+}
+
+function StopwatchControl({ elapsed }: { elapsed: number }) {
+  const running = useStopwatchRunning();
+  const toggleLabel = `${tr("timer.stopwatch")} — ${running ? tr("timer.pause") : tr("timer.resume")}`;
+  const lapLabel = tr("timer.lap");
+  const stopLabel = tr("timer.stop");
+  return (
+    <div className="eu-timer">
+      <button type="button" onClick={stopwatch.toggle} aria-label={toggleLabel} {...tip(toggleLabel)}>
+        <Icon icon={running ? TimerIcon : Play} size={14} />
+        <span className="eu-t-num">{formatTimer(elapsed)}</span>
+      </button>
+      <button type="button" onClick={stopwatch.lap} aria-label={lapLabel} {...tip(lapLabel)}>
+        <Icon icon={Flag} size={14} />
+      </button>
+      <button type="button" onClick={stopwatch.stop} aria-label={stopLabel} {...tip(stopLabel)}>
+        <Icon icon={X} size={14} />
+      </button>
+    </div>
+  );
 }
 
 function TimerControl({ sec }: { sec: number }) {
@@ -33,15 +67,25 @@ function TimerControl({ sec }: { sec: number }) {
   );
 }
 
-/** The timer's remaining time, in the status bar. */
+/** The timer's remaining time and the stopwatch's, in the status bar. */
 export function StatusTimerChip() {
   const sec = useTimerSec();
-  if (sec == null) return null;
+  const elapsed = useStopwatchElapsed();
   return (
-    <span className="eu-status-item">
-      <Icon icon={Clock} size={14} />
-      {formatTimer(sec)}
-    </span>
+    <>
+      {sec != null && (
+        <span className="eu-status-item">
+          <Icon icon={Clock} size={14} />
+          {formatTimer(sec)}
+        </span>
+      )}
+      {elapsed != null && (
+        <span className="eu-status-item">
+          <Icon icon={TimerIcon} size={14} />
+          {formatTimer(elapsed)}
+        </span>
+      )}
+    </>
   );
 }
 

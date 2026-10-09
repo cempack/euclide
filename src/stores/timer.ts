@@ -106,3 +106,85 @@ export function formatTimer(sec: number) {
   const s = Math.max(0, sec) % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
+
+/**
+ * The stopwatch: counts up from when it started, by the clock (as the
+ * timer counts down to a deadline), with laps. It runs beside the timer.
+ */
+type StopwatchState = {
+  /** Whole seconds counted; null when no stopwatch is set. */
+  elapsed: number | null;
+  running: boolean;
+  /** The seconds at each « Tour », first first. */
+  laps: number[];
+};
+
+const useStopwatchStore = create<StopwatchState>()(() => ({ elapsed: null, running: false, laps: [] }));
+const watch = useStopwatchStore.getState;
+const setWatch = useStopwatchStore.setState;
+
+/** When the count started, less the time it was paused. */
+let origin = 0;
+/** Milliseconds counted when paused. */
+let pausedMs = 0;
+let watchTicker = 0;
+
+const countedMs = () => (watch().running ? Date.now() - origin : pausedMs);
+
+function watchTick() {
+  const elapsed = Math.floor(countedMs() / 1000);
+  if (elapsed !== watch().elapsed) setWatch({ elapsed });
+}
+
+function watchRun(fromMs: number) {
+  origin = Date.now() - fromMs;
+  window.clearInterval(watchTicker);
+  watchTicker = window.setInterval(watchTick, 250);
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (watchTicker) watchTick();
+  });
+}
+
+export const stopwatch = {
+  /** From zero. */
+  start() {
+    pausedMs = 0;
+    setWatch({ elapsed: 0, running: true, laps: [] });
+    watchRun(0);
+  },
+
+  /** Pause or resume; with none set, start one. */
+  toggle() {
+    const { elapsed, running } = watch();
+    if (elapsed == null) return stopwatch.start();
+    if (running) {
+      pausedMs = Date.now() - origin;
+      window.clearInterval(watchTicker);
+      watchTicker = 0;
+      setWatch({ running: false, elapsed: Math.floor(pausedMs / 1000) });
+    } else {
+      setWatch({ running: true });
+      watchRun(pausedMs);
+    }
+  },
+
+  /** Note the time, the stopwatch going on. */
+  lap() {
+    if (watch().elapsed == null) return;
+    setWatch({ laps: [...watch().laps, Math.floor(countedMs() / 1000)] });
+  },
+
+  stop() {
+    window.clearInterval(watchTicker);
+    watchTicker = 0;
+    pausedMs = 0;
+    setWatch({ elapsed: null, running: false, laps: [] });
+  },
+};
+
+export const useStopwatchElapsed = () => useStopwatchStore((s) => s.elapsed);
+export const useStopwatchRunning = () => useStopwatchStore((s) => s.running);
+export const useStopwatchLaps = () => useStopwatchStore((s) => s.laps);
