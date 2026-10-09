@@ -28,6 +28,11 @@ Ce qui change d'une version d'Euclide à l'autre.
   <img src="docs/changelog/0.6.0/pages.jpg" alt="Le menu Pages : tourner, insérer, ajouter un PDF, extraire, supprimer" width="49%">
 </p>
 
+### Images
+
+- **Une image** (une photo du tableau, un scan) s'annote avec les mêmes outils qu'un PDF, se présente (F5) et s'imprime. L'image elle-même ne change jamais : ce qui est dessiné est gardé à part. « Exporter une copie » en fait une nouvelle image, avec les annotations dessus.
+- Ce qui avait été dessiné sur une image avant cette version s'ouvre avec les nouveaux outils : chaque trait se déplace et s'efface.
+
 ### Recherche
 
 - **Un mot trouvé dans un PDF dit sa page**, et ouvre le PDF sur ce mot, surligné.
