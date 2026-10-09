@@ -3,25 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { q } from "../api/queries";
 import type { RecapData } from "../lib/api";
 import { get, tr, trn } from "../lib/i18n";
-import {
-  Bell,
-  BookOpen,
-  Check,
-  Clock,
-  CodeXml,
-  File,
-  FileText,
-  House,
-  PenLine,
-  Play,
-  Settings,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
+import { BookOpen, Check, Clock, File, FileText, Play, Sparkles, Wrench } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { EmptyState, Loading } from "../components/ui";
 import { MetaDot, PageHeader, Panel, Segmented, StatTile } from "../components/layout";
 import { humanMinutes } from "../lib/format";
+import { KIND_ICONS } from "../shell/nav";
+import type { TabKind } from "../stores/tabs";
 
 // Bilan (ex-Recap) of time spent in the app + most used documents/tools (based on activity events). Only detailed activity stats live here.
 type Period = "today" | "week" | "month";
@@ -82,7 +70,7 @@ export default function Recap() {
           label: tr("recap.stats.filesOpened"),
         },
         {
-          icon: <Icon icon={PenLine} size={20} />,
+          icon: <Icon icon={KIND_ICONS.note} size={20} />,
           value: data.notes_written,
           label: tr("recap.stats.notesWritten"),
         },
@@ -101,28 +89,14 @@ export default function Recap() {
 
   const totalMin = data?.active_minutes ?? 0;
 
-  // Where the time went, by screen (tab kinds, plus « app » for the rest).
-  const AREA_ICONS: Record<string, React.ReactNode> = {
-    dashboard: <Icon icon={House} size={16} />,
-    courses: <Icon icon={BookOpen} size={16} />,
-    course: <Icon icon={BookOpen} size={16} />,
-    "class-content": <Icon icon={BookOpen} size={16} />,
-    documents: <Icon icon={FileText} size={16} />,
-    tools: <Icon icon={Wrench} size={16} />,
-    recap: <Icon icon={Sparkles} size={16} />,
-    python: <Icon icon={CodeXml} size={16} />,
-    whiteboard: <Icon icon={PenLine} size={16} />,
-    pdf: <Icon icon={FileText} size={16} />,
-    note: <Icon icon={PenLine} size={16} />,
-    reminders: <Icon icon={Bell} size={16} />,
-    settings: <Icon icon={Settings} size={16} />,
-  };
+  // Where the time went, by screen (tab kinds, plus « app » for the rest),
+  // each with the icon it has in the sidebar and the tabs.
   const timeByArea = (data?.time_by_area || []).map((a) => ({
     key: a.name,
     label:
-      a.name in AREA_ICONS || a.name === "app" ? (get(`recap.areas.${a.name}`, a.name) as string) : a.name,
+      a.name in KIND_ICONS || a.name === "app" ? (get(`recap.areas.${a.name}`, a.name) as string) : a.name,
     minutes: a.count,
-    icon: AREA_ICONS[a.name] ?? <Icon icon={Clock} size={16} />,
+    icon: <Icon icon={KIND_ICONS[a.name as TabKind] ?? Clock} size={16} />,
   }));
   const totalAreaMinutes =
     timeByArea.reduce((sum: number, a: { minutes: number }) => sum + a.minutes, 0) || 1;
@@ -160,7 +134,7 @@ export default function Recap() {
     <>
       <PageHeader
         title={tr("nav.recap")}
-        icon={<Icon icon={Sparkles} size={20} />}
+        icon={<Icon icon={KIND_ICONS.recap} size={20} />}
         meta={
           <>
             <span>{PERIOD_LABELS[period]}</span>
