@@ -24,6 +24,7 @@ import { useExitGuard } from "./shell/exitGuard";
 import { closeTab, saveActiveTab } from "./shell/closeTab";
 import { PaneBoundary } from "./shell/PaneBoundary";
 import { useImportFiles } from "./shell/useImportFiles";
+import { dropTargetAt, type DropTarget } from "./shell/drop";
 import { useShortcut } from "./lib/keymap";
 import { scene, useSceneOpen } from "./stores/scene";
 import { TooltipLayer } from "./ui/Tooltip";
@@ -357,7 +358,8 @@ function Shell() {
   const helpUsed = useLatch(help);
 
   useEffect(prefetchScreens, []);
-  const [dragging, setDragging] = useState(false);
+  // Files dragged over the window: into the library, or into the pane under them.
+  const [dragging, setDragging] = useState<DropTarget | "library" | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -509,19 +511,28 @@ function Shell() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let active = true;
+    let draggedPaths: string[] = [];
     import("@tauri-apps/api/webview")
       .then(({ getCurrentWebview }) =>
         getCurrentWebview().onDragDropEvent(async (event) => {
-          const p = event.payload as { type: string; paths?: string[] };
+          const p = event.payload as {
+            type: string;
+            paths?: string[];
+            position?: { x: number; y: number };
+          };
+          // Only « enter » and « drop » carry the paths.
+          if (p.type === "enter") draggedPaths = p.paths ?? [];
           if (p.type === "enter" || p.type === "over") {
-            setDragging(true);
+            setDragging(dropTargetAt(p.position, draggedPaths) ?? "library");
           } else if (p.type === "drop") {
-            setDragging(false);
+            setDragging(null);
             const paths = p.paths ?? [];
             if (!paths.length) return;
-            await importDropped(paths);
+            const target = dropTargetAt(p.position, paths);
+            if (target) target.drop(paths);
+            else await importDropped(paths);
           } else {
-            setDragging(false);
+            setDragging(null);
           }
         }),
       )
@@ -674,8 +685,12 @@ function Shell() {
           <div className="eu-panel shadow-pop px-7 py-5 border-dashed border-accent flex items-center gap-3.5">
             <Icon icon={FileText} size={20} className="w-7 h-7 text-accent shrink-0" />
             <div>
-              <p className="eu-t-section text-ink">{tr("dragDrop.drop")}</p>
-              <p className="eu-t-meta mt-0.5">{tr("dragDrop.hint")}</p>
+              <p className="eu-t-section text-ink">
+                {dragging === "library" ? tr("dragDrop.drop") : dragging.title}
+              </p>
+              <p className="eu-t-meta mt-0.5">
+                {dragging === "library" ? tr("dragDrop.hint") : dragging.hint}
+              </p>
             </div>
           </div>
         </div>

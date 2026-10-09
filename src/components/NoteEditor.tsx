@@ -12,7 +12,7 @@ import { tabs } from "../stores/tabs";
 import { editors } from "../stores/editors";
 import { api, isTauri, type Course, type Note } from "../lib/api";
 import { useFailure, useToast, useConfirm, Loading } from "./ui";
-import { CodeXml, Link as LinkGlyph, Trash2 } from "lucide-react";
+import { CodeXml, ImagePlus, Link as LinkGlyph, Table2, Trash2 } from "lucide-react";
 import { tr } from "../lib/i18n";
 import { Segmented, Toolbar, ToolGroup, ToolSep, ToolSpacer } from "./layout";
 import { useSetting } from "../api/hooks";
@@ -26,6 +26,9 @@ import { Markdown } from "../features/notes/Markdown";
 import { PrintSheet, printDialog, sheetReady, type PrintJob } from "../features/notes/PrintSheet";
 import { TemplateMenu, TemplateStrip } from "../features/notes/TemplatePicker";
 import { fillTemplate, type NoteTemplate } from "../features/notes/templates";
+import { asBlock, fileStem, imageExtension, imageMarkdown, isImageName } from "../features/notes/images";
+import { emptyTable, markdownTable, parseCells, tableFromClipboard } from "../features/notes/tables";
+import { addDropTarget } from "../shell/drop";
 
 interface NoteEditorProps {
   tabId: string;
@@ -38,11 +41,16 @@ type NoteView = "edit" | "split" | "preview";
 
 const Slides = lazy(() => import("../features/notes/SlideShow"));
 
+/** The pictures a note takes: those the webview shows on every system. */
+const PICTURE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"];
+
 export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: NoteEditorProps) {
   const toast = useToast();
   const failed = useFailure();
   const confirm = useConfirm();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLInputElement>(null);
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [draft, setDraft] = useState<Partial<Note> & { id?: number }>({
@@ -317,6 +325,123 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const insertTitle = () => insertAtLinePrefixes("# ");
   const insertList = () => insertAtLinePrefixes("- ");
 
+  /**
+   * `text` at the caret, as if typed: Ctrl+Z takes it back. Without the
+   * source on screen (« Aperçu »), at the end of the note.
+   */
+  const typeText = (text: string) => {
+    const ta = textareaRef.current;
+    if (ta) {
+      ta.focus();
+      // The textarea's own insertion keeps its undo history.
+      if (document.execCommand?.("insertText", false, text)) return;
+    }
+    const body = draftRef.current.body || "";
+    const start = ta ? ta.selectionStart : body.length;
+    const end = ta ? ta.selectionEnd : body.length;
+    markDirty({ body: body.slice(0, start) + text + body.slice(end) });
+    window.setTimeout(() => ta?.setSelectionRange(start + text.length, start + text.length), 0);
+  };
+
+  /** A picture or a table at the caret, on lines of its own. */
+  const insertBlock = (block: string) => {
+    const ta = textareaRef.current;
+    const body = draftRef.current.body || "";
+    const start = ta ? ta.selectionStart : body.length;
+    const end = ta ? ta.selectionEnd : body.length;
+    typeText(asBlock(body.slice(0, start), block, body.slice(end)));
+  };
+
+  /**
+   * A table: the selected cells if they came from a spreadsheet (tabs
+   * between them), else an empty one to fill in.
+   */
+  const insertTable = () => {
+    const ta = textareaRef.current;
+    const selected = ta ? (draftRef.current.body || "").slice(ta.selectionStart, ta.selectionEnd) : "";
+    const rows = selected.includes("\t") ? parseCells(selected) : [];
+    if (rows.length) return insertBlock(markdownTable(rows));
+    if (ta) ta.setSelectionRange(ta.selectionEnd, ta.selectionEnd);
+    insertBlock(emptyTable([1, 2, 3].map((n) => tr("notes.tableColumn", { n }))));
+  };
+
+  /**
+   * Pictures go to the documents (with the note's course), then into the
+   * note at the caret. A pasted screenshot is named after the note.
+   */
+  const addImages = async (files: File[]) => {
+    const pictures = files.filter((f) => PICTURE_TYPES.includes(f.type));
+    if (!pictures.length) return;
+    const stem = fileStem(draftRef.current.title || tr("notes.newTitle"));
+    const lines: string[] = [];
+    try {
+      for (const file of pictures) {
+        const named = isImageName(file.name) && file.name !== "image.png";
+        const name = named ? file.name : `${stem} - image.${imageExtension(file.type)}`;
+        const saved = await api.createFileBytes(name, await file.arrayBuffer(), {
+          courseId: draftRef.current.course_id ?? null,
+        });
+        lines.push(imageMarkdown(saved.id, named ? file.name.replace(/\.[^.]+$/, "") : ""));
+      }
+    } catch (err) {
+      failed("note.image", err);
+    }
+    // Those saved before a failure still go in the note: none is left aside.
+    if (!lines.length) return;
+    changed("library");
+    insertBlock(lines.join("\n\n"));
+  };
+
+  /** Pictures dropped from the file explorer: copied into the documents, then shown in the note. */
+  const addImagePaths = async (paths: string[]) => {
+    try {
+      const added = await api.importPaths(paths, draftRef.current.course_id ?? null);
+      if (!added.length) return;
+      changed("library");
+      insertBlock(added.map((f) => imageMarkdown(f.id, f.name.replace(/\.[^.]+$/, ""))).join("\n\n"));
+    } catch (err) {
+      failed("note.dropImage", err);
+    }
+  };
+
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const data = e.clipboardData;
+    const text = data.getData("text/plain");
+    const table = tableFromClipboard(text, data.getData("text/html"));
+    if (table) {
+      e.preventDefault();
+      insertBlock(table);
+      return;
+    }
+    // Text copied from Word or a page may come with a picture of itself:
+    // the text is what was meant.
+    if (text) return;
+    // `files` in Chromium (Windows); some WebKit builds (Linux) fill only `items`.
+    const files = data.files.length
+      ? Array.from(data.files)
+      : Array.from(data.items, (item) => item.getAsFile()).filter((f): f is File => f != null);
+    if (!files.some((f) => PICTURE_TYPES.includes(f.type))) return;
+    e.preventDefault();
+    void addImages(files);
+  };
+
+  // Pictures dropped on the note, from the file explorer, go into it.
+  const dropImages = useRef(addImagePaths);
+  useEffect(() => {
+    dropImages.current = addImagePaths;
+  });
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    return addDropTarget({
+      el,
+      takes: (paths) => paths.every(isImageName),
+      drop: (paths) => void dropImages.current(paths),
+      title: tr("dragDrop.noteTitle"),
+      hint: tr("dragDrop.noteHint"),
+    });
+  }, [loading]);
+
   // Link popup
   const openLinkPopup = () => {
     const ta = textareaRef.current;
@@ -491,7 +616,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const selectedCourse = courses.find((c) => c.id === draft.course_id);
 
   return (
-    <div className="h-full flex flex-col min-h-0 bg-canvas">
+    <div ref={rootRef} className="h-full flex flex-col min-h-0 bg-canvas">
       {/* Title + destination + actions */}
       <Toolbar className="h-11 py-0 gap-2">
         <input
@@ -625,6 +750,34 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               >
                 <Icon icon={LinkGlyph} size={16} />
               </button>
+              <button
+                onClick={insertTable}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={tr("notes.tableTip")}
+                aria-label={tr("notes.table")}
+              >
+                <Icon icon={Table2} size={16} />
+              </button>
+              <button
+                onClick={() => pickerRef.current?.click()}
+                className="eu-btn-quiet eu-btn-icon eu-btn-sm"
+                data-tip={tr("notes.imageTip")}
+                aria-label={tr("notes.image")}
+              >
+                <Icon icon={ImagePlus} size={16} />
+              </button>
+              <input
+                ref={pickerRef}
+                type="file"
+                accept={PICTURE_TYPES.join(",")}
+                multiple
+                hidden
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = "";
+                  void addImages(files);
+                }}
+              />
             </ToolGroup>
           )}
           <TemplateMenu
@@ -699,6 +852,7 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
               ref={textareaRef}
               value={draft.body || ""}
               onChange={(e) => markDirty({ body: e.target.value })}
+              onPaste={onPaste}
               onKeyDown={(e) => {
                 const mod = isMac ? e.metaKey : e.ctrlKey;
                 if (!mod || e.shiftKey || e.altKey) return;

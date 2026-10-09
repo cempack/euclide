@@ -487,6 +487,15 @@
     "list": "Liste",
     "code": "Code",
     "link": "Lien",
+    "table": "Tableau",
+    "tableTip": "Tableau (ou cellules collées depuis un tableur)",
+    "tableColumn": "Colonne {n}",
+    "image": "Image",
+    "imageTip": "Image (ou collez-en une, ou glissez-la ici)",
+    "imageMissing": "Image introuvable",
+    "imageMissingNamed": "Image introuvable : {name}",
+    "footnotes": "Notes",
+    "footnoteBack": "Revenir au texte",
     "markdownHint": "Markdown · formules LaTeX entre $…$",
     "bodyPlaceholder": "Écrivez ici…",
     "savedAt": "enregistré {when}",
@@ -627,7 +636,9 @@
   },
   "dragDrop": {
     "drop": "Déposez vos fichiers",
-    "hint": "Ils rejoindront votre bibliothèque de documents."
+    "hint": "Ils rejoindront votre bibliothèque de documents.",
+    "noteTitle": "Déposez dans la note",
+    "noteHint": "Les images s'ajoutent à l'endroit du curseur, et à vos documents."
   },
   "shortcuts": {
     "groupNavigation": "Navigation",

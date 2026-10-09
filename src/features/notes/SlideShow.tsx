@@ -52,6 +52,8 @@ export default function Slides({
   const bodyRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [fontsReady, setFontsReady] = useState(false);
+  // Pictures loaded (or failed) so far: each one changes the slide's height.
+  const [pictures, setPictures] = useState(0);
 
   const go = (to: number) => {
     setBlank(null);
@@ -73,6 +75,21 @@ export default function Slides({
       window.clearInterval(tick);
       ro.disconnect();
       void fullscreen(false, dialog).catch(logged("slides.fullscreen"));
+    };
+  }, []);
+
+  // A picture that loads, or fails and leaves a notice in its place, changes
+  // the slide's height: fit again. Neither event bubbles, but both are seen
+  // on their way down; listening before the first paint misses none.
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const changed = () => setPictures((n) => n + 1);
+    body.addEventListener("load", changed, true);
+    body.addEventListener("error", changed, true);
+    return () => {
+      body.removeEventListener("load", changed, true);
+      body.removeEventListener("error", changed, true);
     };
   }, []);
 
@@ -101,7 +118,7 @@ export default function Slides({
     }
     // slides is derived from markdown, which does not change while presenting.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, size, fontsReady]);
+  }, [index, size, fontsReady, pictures]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const k = e.key;

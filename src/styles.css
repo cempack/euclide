@@ -1630,9 +1630,49 @@ input[type="radio"] {
   background: rgb(var(--eu-panel-alt));
   font-weight: 600;
 }
+/* An empty row keeps a line's height, ready to fill in. */
+.eu-prose :is(th, td):empty::after {
+  content: "\00a0";
+}
 .eu-prose img {
   max-width: 100%;
   border-radius: 4px;
+}
+/* A wide table scrolls by itself (features/notes/Markdown.tsx). */
+.eu-prose-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+/* A picture whose document was deleted. */
+.eu-prose-missing {
+  display: inline-block;
+  padding: 0.3em 0.7em;
+  border: 1px dashed rgb(var(--eu-line) / var(--eu-line-a-strong));
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: rgb(var(--eu-ink-muted));
+}
+.eu-prose .contains-task-list {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.eu-prose .contains-task-list .contains-task-list {
+  padding-left: 1.35em;
+}
+.eu-prose .task-list-item input {
+  margin: 0 0.45em 0 0;
+  vertical-align: -0.1em;
+}
+.eu-prose .footnotes {
+  margin-top: 1.6em;
+  padding-top: 0.6em;
+  border-top: 1px solid rgb(var(--eu-line) / var(--eu-line-a));
+  font-size: 0.9em;
+  color: rgb(var(--eu-ink-muted));
+}
+.eu-prose-footnotes-label {
+  font-weight: 600;
+  color: rgb(var(--eu-ink));
 }
 .eu-prose strong {
   font-weight: 600;
@@ -1688,6 +1728,22 @@ input[type="radio"] {
 .eu-slide-body .eu-prose pre code {
   background: none;
   border: 0;
+}
+/* Tables and pictures on paper, whatever the app's theme; a picture leaves
+   room for its slide's text. */
+.eu-slide-body .eu-prose :is(th, td) {
+  border-color: rgb(17 18 19 / 0.25);
+}
+.eu-slide-body .eu-prose th {
+  background: rgb(17 18 19 / 0.05);
+}
+.eu-slide-body .eu-prose img {
+  max-height: 62vh;
+  object-fit: contain;
+}
+.eu-slide-body .eu-prose :is(.eu-prose-missing, .footnotes) {
+  color: rgb(17 18 19 / 0.6);
+  border-color: rgb(17 18 19 / 0.25);
 }
 .eu-slide-title {
   align-items: center;
@@ -2382,6 +2438,12 @@ input[type="radio"] {
 }
 .eu-print .eu-prose :is(code, pre, th) {
   background: rgb(17 18 19 / 0.04);
+}
+.eu-print .eu-prose :is(th, td) {
+  border-color: rgb(17 18 19 / 0.35);
+}
+.eu-print .eu-prose-table {
+  overflow: visible;
 }
 .eu-print .eu-prose a {
   color: inherit;

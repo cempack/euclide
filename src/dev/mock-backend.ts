@@ -1170,16 +1170,23 @@ function handle(cmd: string, args: Args): unknown {
       const headers = (args?.headers ?? {}) as Record<string, string>;
       const name = decodeURIComponent(headers["x-eu-name"] ?? "export");
       const course = headers["x-eu-course-id"] ? Number(headers["x-eu-course-id"]) : null;
+      const image = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.exec(name)?.[1].toLowerCase();
       const f: FileItem = {
         id: newId(),
         course_id: course,
         name,
         rel_path: `documents/${name}`,
-        kind: name.endsWith(".pdf") ? "pdf" : name.endsWith(".png") ? "image" : "file",
+        kind: name.endsWith(".pdf") ? "pdf" : image ? "image" : "file",
         size: Number(args?.size ?? 0),
         added_at: sqlUtc(new Date()),
       };
       files.push(f);
+      // Its bytes stay in memory, so a picture pasted in a note shows.
+      const data = args?.bytes as Uint8Array | ArrayBuffer | undefined;
+      const type = image
+        ? `image/${image === "jpg" ? "jpeg" : image === "svg" ? "svg+xml" : image}`
+        : "application/pdf";
+      if (data) fileUrls.set(f.id, URL.createObjectURL(new Blob([data as BlobPart], { type })));
       return f;
     }
     case "write_file_bytes": {
