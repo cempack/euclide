@@ -2261,6 +2261,11 @@ input[type="radio"] {
   padding-top: 0.25rem;
   border-top: 1px solid var(--color-line);
 }
+/* Folded (Board.tsx): each group's tools two by two. */
+.eu-board-palette[data-fold] .eu-board-palette-group {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+}
 /* An instrument out on the board: a dot beside its glyph. The raised look
    belongs to the one tool in hand. */
 .eu-board-out {

@@ -508,6 +508,27 @@ export default function Board({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A short board (a small window, a projector of 768 lines) folds the tool
+  // palette into two columns, rather than hiding its last tools under a
+  // scroll nobody sees. Its height in one column is measured while it is in
+  // one column, and kept for the way back.
+  const paletteRef = useRef<HTMLDivElement>(null);
+  const [fold, setFold] = useState(false);
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const palette = paletteRef.current;
+    if (!wrap || !palette) return;
+    let tall = 0;
+    const ro = new ResizeObserver(() => {
+      if (palette.dataset.fold === undefined)
+        tall = palette.scrollHeight + palette.offsetHeight - palette.clientHeight;
+      if (tall) setFold(tall > wrap.clientHeight - 2 * palette.offsetTop);
+    });
+    ro.observe(wrap);
+    ro.observe(palette);
+    return () => ro.disconnect();
+  }, []);
+
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   useEffect(() => {
     const { w, h } = size;
@@ -1769,7 +1790,9 @@ export default function Board({
         )}
 
         <div
+          ref={paletteRef}
           className="eu-board-palette"
+          data-fold={fold || undefined}
           role="toolbar"
           aria-orientation="vertical"
           aria-label={tr("board.tools")}
