@@ -107,12 +107,25 @@ function progressFromEvent(
   }
 }
 
-function windowsPortableAsset(update: Update): { url: string; signature: string } | null {
-  const platforms = (update.rawJson as { platforms?: Record<string, { url?: string; signature?: string }> })
+function isZipUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.pathname.toLowerCase().endsWith(".zip");
+  } catch {
+    return false;
+  }
+}
+
+/** The signed USB archive a manifest offers, or null. An installer under
+ * windows-x86_64 (a release caught half-built) cannot unpack over a USB copy. */
+export function portableAssetOf(rawJson: unknown): { url: string; signature: string } | null {
+  const platforms = (rawJson as { platforms?: Record<string, { url?: unknown; signature?: unknown }> } | null)
     ?.platforms;
   const p = platforms?.[WINDOWS_PORTABLE_TARGET];
-  if (p?.url && p?.signature) return { url: p.url, signature: p.signature };
-  return null;
+  const url = typeof p?.url === "string" ? p.url : "";
+  const signature = typeof p?.signature === "string" ? p.signature : "";
+  if (!signature || !isZipUrl(url)) return null;
+  return { url, signature };
 }
 
 export async function checkForAppUpdate(force = false): Promise<AppUpdateInfo | null> {
@@ -135,6 +148,11 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateInfo | 
       ...(portable ? { target: WINDOWS_PORTABLE_TARGET } : {}),
     });
     if (!update) return null;
+    if (portable && !portableAssetOf(update.rawJson)) {
+      // Nothing this copy can install yet: the next check sees the archive.
+      await update.close().catch(() => {});
+      return null;
+    }
     pending = update;
     return metadataOf(update);
   })().finally(() => {
@@ -167,7 +185,7 @@ export async function installPendingUpdate(
 
   const portable = await isPortableWindowsUpdate();
   if (portable) {
-    const asset = windowsPortableAsset(pending);
+    const asset = portableAssetOf(pending.rawJson);
     if (!asset) {
       throw new Error("Archive portable introuvable dans latest.json (windows-x86_64).");
     }

@@ -1,19 +1,22 @@
 name: "check"
 
 # Lint, typecheck, test and build every branch and pull request. Never
-# publishes anything.
+# publishes anything. publish.yml runs it too, before releasing main or a tag.
 on:
-  # Branches only: a release tag points at a commit main already checked.
+  # main and tags are checked by publish.yml, on the commit it releases.
   push:
-    branches: ["**"]
+    branches-ignore: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
+# Called from publish.yml, github.workflow is "publish": its own group, so
+# neither run cancels the other.
 concurrency:
-  group: check-${{ github.ref }}
+  group: check-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

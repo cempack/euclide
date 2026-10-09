@@ -14,7 +14,9 @@ on:
         default: true
         type: boolean
 
-# tauri-action creates/updates the GitHub Release from the matrix (including latest.json).
+# The version job drafts the GitHub release; every matrix leg uploads into it
+# (tauri-action merges latest.json); windows-portable-manifest makes it public
+# once complete.
 permissions:
   contents: write
 
@@ -102,14 +104,22 @@ jobs:
           echo "No app/packaging source changes; skip rebuild."
           out false
 
+  # Lint, typecheck and tests of the commit about to be released: a red main
+  # never reaches the teacher.
+  check:
+    needs: should-publish
+    if: needs.should-publish.outputs.run == 'true'
+    uses: ./.github/workflows/check.yml
+
   version:
     name: Next v* release
-    needs: should-publish
+    needs: [should-publish, check]
     if: needs.should-publish.outputs.run == 'true'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.cut.outputs.tag }}
       version: ${{ steps.cut.outputs.version }}
+      release_id: ${{ steps.draft.outputs.id }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -136,6 +146,13 @@ jobs:
             exit 0
           fi
 
+          # check passed for this run's commit only. When main has moved on
+          # since, the run of the newer push releases everything.
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "::notice::main has moved on since $GITHUB_SHA: the newer run releases it."
+            exit 0
+          fi
+
           git config user.name "Elliot Moreau"
           git config user.email "73651345+cempack@users.noreply.github.com"
           git checkout -B main origin/main
@@ -153,9 +170,36 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # One draft for every leg to upload into (legs creating it themselves
+      # could make one each). /releases/latest, which every copy reads,
+      # keeps serving the previous release until this one is complete.
+      - name: Draft the release
+        id: draft
+        if: steps.cut.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.cut.outputs.tag }}
+          REPO: ${{ github.repository }}
+          BODY: |
+            Installateurs et archives USB portables.
+
+            L’application vérifie `latest.json` sur GitHub Releases. Windows portable met à jour `Euclide-windows-portable.zip` **dans le dossier courant** (Euclide-Data intact). Les copies NSIS utilisent l’installateur.
+        run: |
+          set -euo pipefail
+          # Drafts are only found in the list, not by tag.
+          ids="$(gh api "repos/$REPO/releases" --paginate --jq ".[] | select(.tag_name == \"$TAG\") | .id")"
+          id="${ids%%$'\n'*}"
+          if [ -z "$id" ]; then
+            id="$(gh api "repos/$REPO/releases" -f tag_name="$TAG" -f name="Euclide $TAG" -f body="$BODY" -F draft=true --jq .id)"
+            echo "Drafted release $id for $TAG"
+          else
+            echo "Release $id already exists for $TAG"
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   publish-tauri:
     needs: [should-publish, version]
-    if: needs.should-publish.outputs.run == 'true'
+    if: needs.should-publish.outputs.run == 'true' && needs.version.outputs.tag != ''
     strategy:
       fail-fast: false
       matrix:
@@ -274,9 +318,6 @@ jobs:
         shell: bash
         run: |
           echo "tag=${{ needs.version.outputs.tag }}" >> "$GITHUB_OUTPUT"
-          echo "name=Euclide ${{ needs.version.outputs.tag }}" >> "$GITHUB_OUTPUT"
-          echo "draft=false" >> "$GITHUB_OUTPUT"
-          echo "prerelease=false" >> "$GITHUB_OUTPUT"
           echo "upload=true" >> "$GITHUB_OUTPUT"
 
       - name: Require updater signing key
@@ -291,7 +332,9 @@ jobs:
           fi
 
       # Official Tauri publish path: build, sign updater artifacts, merge latest.json across the matrix.
-      # Sidecar must already be in src-tauri/resources (steps above). Do not delete the release between jobs.
+      # Sidecar must already be in src-tauri/resources (steps above). Uploads go
+      # to the version job's draft; latest.json links assets by id, which
+      # publishing keeps.
       - uses: tauri-apps/tauri-action@v1
         if: steps.rel.outputs.upload == 'true'
         env:
@@ -299,14 +342,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ steps.rel.outputs.tag }}
-          releaseName: ${{ steps.rel.outputs.name }}
+          releaseId: ${{ needs.version.outputs.release_id }}
+          # The notes of latest.json.
           releaseBody: |
             Installateurs et archives USB portables.
 
             L’application vérifie `latest.json` sur GitHub Releases. Windows portable met à jour `Euclide-windows-portable.zip` **dans le dossier courant** (Euclide-Data intact). Les copies NSIS utilisent l’installateur.
-          releaseDraft: ${{ steps.rel.outputs.draft == 'true' }}
-          prerelease: ${{ steps.rel.outputs.prerelease == 'true' }}
           args: ${{ matrix.args }}
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
@@ -424,11 +465,13 @@ jobs:
   # After every matrix leg has merged latest.json, point windows-x86_64 at the
   # signed USB zip. Keep the NSIS installer under windows-x86_64-nsis so installed
   # copies still update via the plugin. Must run last so tauri-action cannot overwrite it.
+  # Then, and only then, the draft goes public. A failed leg leaves it a
+  # draft: re-run the failed jobs.
   windows-portable-manifest:
     name: Point Windows updater at portable zip
     needs: [should-publish, version, publish-tauri]
     runs-on: ubuntu-latest
-    if: needs.should-publish.outputs.run == 'true'
+    if: needs.should-publish.outputs.run == 'true' && needs.version.outputs.tag != ''
     steps:
       - uses: actions/setup-node@v6
         with:
@@ -482,8 +525,17 @@ jobs:
                       if key in platforms:
                           platforms[key] = dict(entry)
                   print("linux-x86_64 ->", entry["url"])
+          # What every copy needs before the release goes public.
+          if data.get("version") != tag.removeprefix("v"):
+              raise SystemExit(f"latest.json is for {data.get('version')}, not {tag}")
+          for key in ("windows-x86_64", "windows-x86_64-nsis", "linux-x86_64", "darwin-aarch64"):
+              entry = platforms.get(key) or {}
+              if not entry.get("url") or not entry.get("signature"):
+                  raise SystemExit(f"latest.json has no {key} entry")
           pathlib.Path("latest.json").write_text(json.dumps(data, indent=2) + "\n")
           print("windows-x86_64 ->", portable_url)
           print("windows-x86_64-nsis ->", (platforms.get("windows-x86_64-nsis") or {}).get("url"))
           PY
           gh release upload "$TAG" latest.json --clobber --repo "$REPO"
+          gh release edit "$TAG" --draft=false --repo "$REPO"
+          echo "Published $TAG"

@@ -713,12 +713,17 @@ fn release_manifest_url(endpoint: &str, version: &str) -> Option<String> {
     Some(format!("{repo}/releases/download/v{version}/latest.json"))
 }
 
+/// An HTTPS link to a .zip: the only thing a USB copy can unpack over itself
+/// (not the installer a half-built release may list).
+fn is_usb_archive_url(url: &str) -> bool {
+    let path = url.split(['?', '#']).next().unwrap_or_default();
+    url.starts_with("https://") && path.to_ascii_lowercase().ends_with(".zip")
+}
+
 /// The signed USB archive a `latest.json` points Windows portable copies at.
 fn portable_asset(manifest: &serde_json::Value) -> Option<(String, String)> {
     let entry = &manifest["platforms"]["windows-x86_64"];
-    let url = entry["url"]
-        .as_str()
-        .filter(|u| u.starts_with("https://"))?;
+    let url = entry["url"].as_str().filter(|u| is_usb_archive_url(u))?;
     let signature = entry["signature"].as_str().filter(|s| !s.is_empty())?;
     Some((url.to_string(), signature.to_string()))
 }
@@ -866,8 +871,8 @@ async fn apply_windows_portable_update_inner(
     if !is_windows_portable() {
         return Err("Cette copie n'est pas la version portable Windows.".into());
     }
-    if !(url.starts_with("https://") || url.starts_with("HTTPS://")) {
-        return Err("L'URL de mise à jour doit être en HTTPS.".into());
+    if !is_usb_archive_url(&url) {
+        return Err("La mise à jour proposée n'est pas l'archive USB (.zip en HTTPS).".into());
     }
 
     let bytes = download_update(&url, Some(&on_event)).await?;
@@ -1501,6 +1506,12 @@ mod tests {
         assert_eq!(signature, "c2ln");
         let plain_http = serde_json::json!({ "platforms": { "windows-x86_64": { "signature": "s", "url": "http://x/a.zip" } } });
         assert_eq!(portable_asset(&plain_http), None);
+        // A release caught half-built lists the installer there.
+        let installer = serde_json::json!({ "platforms": { "windows-x86_64": { "signature": "s", "url": "https://github.com/cempack/euclide/releases/download/v0.4.2/Euclide_0.4.2_x64-setup.exe" } } });
+        assert_eq!(portable_asset(&installer), None);
+        assert!(is_usb_archive_url(
+            "https://x/Euclide-windows-portable.ZIP?download=1"
+        ));
         assert_eq!(
             portable_asset(&serde_json::json!({ "platforms": {} })),
             None
