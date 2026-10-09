@@ -161,6 +161,8 @@ try {
   await check("page 3 shows after typing it", async () => {
     // The box, not the group around it, which has the same name.
     const box = toolbar().getByRole("textbox", { name: "Aller à la page" });
+    // A narrow pane folds it under « … », as it does for the teacher.
+    if (!(await box.isVisible())) await toolbar().getByRole("button", { name: "Plus d'outils" }).click();
     await box.fill("3");
     await box.press("Enter");
     await page.waitForFunction(
