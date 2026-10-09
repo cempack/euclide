@@ -64,9 +64,16 @@ export function takeBootPronote(): PronoteStatus | undefined {
 
 /** The update this launch follows, if any: told once. */
 export function takeBootUpdate(): { from: string; to: string } | null {
-  const updated = boot?.updated ?? null;
+  const updated = boot?.updated ?? devUpdate();
   if (boot) boot.updated = null;
   return updated;
+}
+
+/** Development only: `?updated=0.4.2` plays the first launch after an update from that version. */
+function devUpdate(): { from: string; to: string } | null {
+  if (!import.meta.env.DEV || typeof location === "undefined") return null;
+  const from = new URLSearchParams(location.search).get("updated");
+  return from ? { from, to: "dev" } : null;
 }
 
 /** The restore this launch did or refused, if any: told once. */
