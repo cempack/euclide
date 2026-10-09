@@ -1,0 +1,16 @@
+{
+  "name": "embedpdf-no-fonts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stands in for @embedpdf/fonts-*: Euclide's PDF engine runs with no fallback fonts (offline, no CDN), so their 157 MB of fonts are never downloaded. The engine only reads each package's list of font files.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    }
+  },
+  "main": "./index.cjs"
+}

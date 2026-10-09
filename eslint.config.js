@@ -15,6 +15,9 @@ export default tseslint.config(
       ".shots",
       "test-results",
       "playwright-report",
+      // Stand-ins for third-party packages (see vendor/*/package.json).
+      "vendor",
+      ".spike",
     ],
   },
   js.configs.recommended,
