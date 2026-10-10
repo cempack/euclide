@@ -1,0 +1,13 @@
+{
+  "name": "euclide-site",
+  "private": true,
+  "description": "euclide.elliotmoreau.fr: landing page, downloads, changelog, usage statistics and their dashboard.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
