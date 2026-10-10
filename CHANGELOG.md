@@ -30,7 +30,9 @@ Ce qui change d'une version d'Euclide à l'autre.
 
 - **Nouveautés** : après une mise à jour, Euclide montre tout ce qui a changé depuis la version d'avant. On les retrouve dans Réglages, À propos.
 - La recherche d'Euclide donne la page où se trouve le mot, et ouvre le PDF dessus.
-- En mode projection, les traits fins et les textes pâles sont plus foncés.
+- En mode projection, les traits fins, les textes pâles et le bouton qu'on presse se voient mieux.
+- **Les diapositives** d'une note ont une barre pour avancer, reculer et quitter, comme un PDF présenté : un écran tactile n'a pas de clavier.
+- Au tableau blanc, la main posée sur l'écran pendant qu'on écrit au stylet ne zoome plus et ne coupe plus le trait.
 
 ### À savoir
 
