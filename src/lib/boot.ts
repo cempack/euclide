@@ -17,6 +17,8 @@ type BootState = {
   updated?: { from: string; to: string } | null;
   /** Set on the launch that restored a snapshot (or failed to). */
   restored?: RestoreReport | null;
+  /** False when the engine must not cross-fade the window (see canCrossFade). */
+  crossFade?: boolean;
 };
 
 declare global {
@@ -74,6 +76,16 @@ function devUpdate(): { from: string; to: string } | null {
   if (!import.meta.env.DEV || typeof location === "undefined") return null;
   const from = new URLSearchParams(location.search).get("updated");
   return from ? { from, to: "dev" } : null;
+}
+
+/**
+ * Whether the window may cross-fade a change of theme or projection (a view
+ * transition). Not on WebKitGTK without its GPU compositor, the AppImage's
+ * case: a view transition crashes it. Read from the injected state itself,
+ * not from this launch's copy, so a reload of the page keeps it.
+ */
+export function canCrossFade(): boolean {
+  return typeof window === "undefined" || window.__EUCLIDE_BOOT__?.crossFade !== false;
 }
 
 /** The restore this launch did or refused, if any: told once. */

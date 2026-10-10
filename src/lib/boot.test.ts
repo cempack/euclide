@@ -27,6 +27,16 @@ describe("boot state", () => {
     expect(reloaded.bootSetting("theme")).toBeUndefined();
   });
 
+  it("never cross-fades where the engine says it cannot, even after a reload", async () => {
+    window.__EUCLIDE_BOOT__ = { ...structuredClone(BOOT), crossFade: false };
+    await import("./boot");
+    vi.resetModules();
+    const reloaded = await import("./boot");
+    expect(reloaded.canCrossFade()).toBe(false);
+    window.__EUCLIDE_BOOT__ = structuredClone(BOOT);
+    expect(reloaded.canCrossFade()).toBe(true);
+  });
+
   it("hands the Pronote status out once and forgets settings on demand", async () => {
     const boot = await import("./boot");
     expect(boot.takeBootPronote()?.account_name).toBe("M. Martin");

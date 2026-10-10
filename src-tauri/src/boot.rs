@@ -17,8 +17,9 @@ const CANVAS_LIGHT: Color = Color(250, 249, 248, 255);
 const CANVAS_DARK: Color = Color(19, 19, 19, 255);
 
 /// Every UI setting (null when never saved), the Pronote status, the version
-/// Euclide was just updated from and the restore it just did if any, and a
-/// nonce that lets the frontend tell a fresh boot from a reload of the page.
+/// Euclide was just updated from and the restore it just did if any, whether
+/// the engine can cross-fade the window (`crossFade`), and a nonce that lets
+/// the frontend tell a fresh boot from a reload of the page.
 pub fn state(
     conn: &Connection,
     updated_from: Option<&str>,
@@ -37,6 +38,7 @@ pub fn state(
         "pronote": crate::commands::pronote::status(conn),
         "updated": updated_from.map(|from| json!({ "from": from, "to": env!("CARGO_PKG_VERSION") })),
         "restored": restored,
+        "crossFade": !crate::linux_env::compositing_off(),
     })
 }
 

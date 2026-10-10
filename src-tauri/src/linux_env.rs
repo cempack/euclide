@@ -10,6 +10,15 @@ pub fn apply() {
     apply_linux();
 }
 
+/// Whether WebKitGTK draws without its GPU compositor (the AppImage's copy,
+/// or a teacher who set the variable). A view transition then crashes the
+/// window's process (WebKitGTK 2.52 and the AppImage's alike, a null
+/// pointer in the UI process): the page must not start one.
+pub fn compositing_off() -> bool {
+    cfg!(target_os = "linux")
+        && std::env::var("WEBKIT_DISABLE_COMPOSITING_MODE").is_ok_and(|v| v != "0")
+}
+
 #[cfg(target_os = "linux")]
 fn apply_linux() {
     let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some()
@@ -103,6 +112,10 @@ mod tests {
                 .as_deref(),
             Some("1")
         );
+        // The page is told: no view transition without the compositor.
+        assert!(compositing_off());
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "0");
+        assert!(!compositing_off());
 
         restore("APPIMAGE", prev_app);
         restore("WEBKIT_DISABLE_DMABUF_RENDERER", prev_dma);

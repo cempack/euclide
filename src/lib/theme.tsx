@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, isTauri } from "./api";
-import { bootSetting } from "./boot";
+import { bootSetting, canCrossFade } from "./boot";
 import { logged } from "./report";
 
 /**
@@ -19,15 +19,17 @@ import { logged } from "./report";
  * cross-fades (a view transition, 240 ms in styles.css) instead of flipping
  * the whole window from light to dark in one frame; the first paint, a
  * system asking for less motion and an engine without view transitions get
- * the plain change.
+ * the plain change. So does WebKitGTK without its compositor (the Linux
+ * AppImage), where a view transition crashes the window (canCrossFade).
  */
 function morph(name: string, value: string | null) {
   const root = document.documentElement;
   if (root.getAttribute(name) === value) return;
   const apply = () => (value === null ? root.removeAttribute(name) : root.setAttribute(name, value));
   const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  if (!document.startViewTransition || calm || document.visibilityState !== "visible") apply();
-  else document.startViewTransition(apply);
+  const fade = canCrossFade() && !calm && document.visibilityState === "visible";
+  if (fade && document.startViewTransition) document.startViewTransition(apply);
+  else apply();
 }
 
 export type ThemePref = "auto" | "light" | "dark";
