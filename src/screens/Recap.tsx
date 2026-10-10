@@ -6,7 +6,7 @@ import { get, tr, trn } from "../lib/i18n";
 import { BookOpen, Check, Clock, File, FileText, Play, Sparkles, Wrench } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { EmptyState, Loading } from "../components/ui";
-import { MetaDot, PageHeader, Panel, Segmented, StatTile } from "../components/layout";
+import { Duration, MetaDot, PageHeader, Panel, Segmented, StatTile } from "../components/layout";
 import { humanMinutes } from "../lib/format";
 import { KIND_ICONS } from "../shell/nav";
 import type { TabKind } from "../stores/tabs";
@@ -169,7 +169,9 @@ export default function Recap() {
                 <Icon icon={Clock} size={14} />
                 {tr("recap.activityTime")}
               </span>
-              <span className="eu-recap-time">{humanMinutes(totalMin)}</span>
+              <span className="eu-recap-time">
+                <Duration minutes={totalMin} />
+              </span>
               <span className="eu-t-meta">{PERIOD_LABELS[period]}</span>
             </div>
             {stats.map((s) => (

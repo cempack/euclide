@@ -1053,7 +1053,7 @@
     @apply bg-accent-soft text-ink rounded-xs px-px font-medium;
   }
   /* A colour to pick: the chosen one is ringed. */
-  /* A colour (features/pdf/ColorChoice.tsx): a dot inside its button, and
+  /* A colour (the PDF viewer's ColorChoice, the board's pens): a dot inside its button, and
      the chosen one's ring on the button's own edge, so neither the ring nor
      a dot grown under the pointer reaches the next colour. The hairline
      keeps black visible on the dark theme. */
@@ -1069,7 +1069,8 @@
   .eu-swatch:hover::before {
     transform: scale(1.12);
   }
-  .eu-swatch[aria-checked="true"] {
+  .eu-swatch[aria-checked="true"],
+  .eu-swatch[aria-pressed="true"] {
     box-shadow: inset 0 0 0 2px rgb(var(--eu-accent));
   }
 
@@ -2080,6 +2081,19 @@ input[type="radio"] {
   gap: 0.5rem;
   padding: 1rem 1.25rem;
 }
+/* A duration as a big number (components/layout.tsx, Duration). */
+.eu-duration {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.08em;
+}
+.eu-duration-unit {
+  margin-inline: 0.06em;
+  font-size: 0.45em;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: rgb(var(--eu-ink-faint));
+}
 .eu-recap-time {
   font-family: var(--font-mono);
   font-size: 2.5rem;
@@ -2413,33 +2427,6 @@ input[type="radio"] {
 /* Ink swatches: a faint inner edge defines a light colour on paper and a
    dark one on dark chrome without dulling either; the chosen one is ringed,
    within the room the gap between swatches leaves it. */
-.eu-board-swatch {
-  width: 1.25rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.16);
-  transition: transform var(--transition-duration-fast) var(--ease-out);
-}
-[data-theme="dark"] .eu-board-swatch {
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
-}
-.eu-board-swatch:hover {
-  transform: scale(1.1);
-}
-.eu-board-swatch[aria-pressed="true"],
-[data-theme="dark"] .eu-board-swatch[aria-pressed="true"] {
-  box-shadow:
-    inset 0 0 0 1px rgb(0 0 0 / 0.16),
-    0 0 0 2px var(--color-panel),
-    0 0 0 3.5px var(--color-ink);
-}
-[data-theme="dark"] .eu-board-swatch[aria-pressed="true"] {
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 0.24),
-    0 0 0 2px var(--color-panel),
-    0 0 0 3.5px var(--color-ink);
-}
 .eu-board-text {
   position: absolute;
   min-width: 6rem;

@@ -1395,13 +1395,13 @@ export default function Board({
     }));
 
   const swatches = (list: string[], value: string, set: (c: string) => void) => (
-    <ToolGroup className="gap-2" label={tr("board.color")}>
+    <ToolGroup className="gap-1" label={tr("board.color")}>
       {list.map((c) => (
         <button
           key={c}
           type="button"
-          className="eu-board-swatch"
-          style={{ background: c }}
+          className="eu-swatch"
+          style={{ "--swatch": c } as React.CSSProperties}
           aria-pressed={value === c}
           aria-label={tr(COLOR_NAMES[c])}
           {...tip(tr(COLOR_NAMES[c]))}

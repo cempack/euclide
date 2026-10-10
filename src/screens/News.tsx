@@ -13,14 +13,15 @@ const ALL = releases(log);
 const REMARK = [remarkGfm];
 
 const COMPONENTS: Components = {
-  // A screenshot framed like one, loaded when it comes into view.
+  // A screenshot framed like one, loaded when it comes into view. Its place
+  // is kept before it loads (every capture is 16:10): the page does not jump.
   img: ({ src, alt }) => (
     <img
       src={typeof src === "string" ? src : undefined}
       alt={alt ?? ""}
       loading="lazy"
       decoding="async"
-      className="block w-full border border-line rounded-md"
+      className="block w-full aspect-[16/10] object-contain bg-panel border border-line rounded-md"
     />
   ),
   a: ({ node: _node, href = "", ...props }) => (

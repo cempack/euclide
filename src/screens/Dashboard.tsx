@@ -20,7 +20,7 @@ import {
 import { courseVisual } from "../lib/color";
 import { useAppearance } from "../lib/theme";
 import { EmptyState, useToast } from "../components/ui";
-import { MetaDot, PageHeader, Panel, StatStrip, StatTile } from "../components/layout";
+import { Duration, MetaDot, PageHeader, Panel, StatStrip, StatTile } from "../components/layout";
 import {
   Bell,
   BookOpen,
@@ -498,13 +498,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
         />
         <StatTile
           icon={<Icon icon={Clock} size={16} />}
-          value={
-            <span className="flex items-baseline gap-0.5">
-              {Math.floor((recap?.active_minutes ?? 0) / 60)}
-              <span className="text-[1rem] text-ink-faint font-normal">h</span>
-              {String((recap?.active_minutes ?? 0) % 60).padStart(2, "0")}
-            </span>
-          }
+          value={<Duration minutes={recap?.active_minutes ?? 0} />}
           label={tr("dashboard.activeToday")}
           hint={
             <>

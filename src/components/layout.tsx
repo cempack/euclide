@@ -358,6 +358,29 @@ export function StatStrip({ children }: { children: ReactNode }) {
   return <div className="eu-panel flex flex-wrap">{children}</div>;
 }
 
+/**
+ * A duration shown as a big number (« 5 h 12 », « 22 min »): the figures
+ * at the number's size, the unit smaller and quieter, the same wherever
+ * Euclide counts time.
+ */
+export function Duration({ minutes }: { minutes: number }) {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60)
+    return (
+      <span className="eu-duration">
+        {m}
+        <span className="eu-duration-unit">min</span>
+      </span>
+    );
+  return (
+    <span className="eu-duration">
+      {Math.floor(m / 60)}
+      <span className="eu-duration-unit">h</span>
+      {String(m % 60).padStart(2, "0")}
+    </span>
+  );
+}
+
 export function StatTile({
   icon,
   value,
