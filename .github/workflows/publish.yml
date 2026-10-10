@@ -425,10 +425,10 @@ jobs:
             # Copy the whole onedir folder (euclide-sidecar/ with .exe + support files for fast startup, no console)
             cp -r sidecar/dist/euclide-sidecar Euclide-portable/ 2>/dev/null || cp -r src-tauri/resources/euclide-sidecar Euclide-portable/ 2>/dev/null || true
             : > Euclide-portable/euclide.portable
-            echo "Portable Euclide for Windows. Extract the folder and run euclide.exe (or Euclide.exe)." > Euclide-portable/README.txt
-            echo "Keep euclide.exe and the euclide-sidecar/ folder together. Do not delete the sidecar." >> Euclide-portable/README.txt
-            echo "Data folder (Euclide-Data) is created next to the exe (USB / flash drive)." >> Euclide-portable/README.txt
-            echo "In-app updates overlay new program files in THIS folder only. Euclide-Data and other files are never deleted." >> Euclide-portable/README.txt
+            # The note for the teacher, in French, as Windows' Notepad reads
+            # it: UTF-8 with its byte order mark, CRLF line ends. Named
+            # README.txt: every Euclide's updater copies that one onto the key.
+            { printf '\xEF\xBB\xBF'; sed 's/$/\r/' packaging/README.txt; } > Euclide-portable/README.txt
             # 7-Zip (on the runner) does in seconds what Compress-Archive took
             # two minutes for. Deflate, as every Euclide since 0.1 unpacks it.
             7z a -tzip -mm=Deflate -mx=5 dist-portable/Euclide-windows-portable.zip "./Euclide-portable/*" >/dev/null
@@ -436,6 +436,7 @@ jobs:
             7z l -ba dist-portable/Euclide-windows-portable.zip | tr -d '\r' > zip-list.txt
             grep -Eq '[[:space:]]euclide\.exe$' zip-list.txt
             grep -Eq '[[:space:]]euclide-sidecar[\\/]euclide-sidecar\.exe$' zip-list.txt
+            grep -Eq '[[:space:]]README\.txt$' zip-list.txt
             rm zip-list.txt
           fi
         shell: bash

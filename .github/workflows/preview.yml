@@ -117,7 +117,11 @@ jobs:
             cp "src-tauri/target/${{ matrix.target }}/release/euclide.exe" Euclide-portable/
             cp -r sidecar/dist/euclide-sidecar Euclide-portable/
             : > Euclide-portable/euclide.portable
-            echo "Build de test Euclide (${GITHUB_REF_NAME}@${GITHUB_SHA::7}). Ne pas utiliser sur la clé de production sans sauvegarde." > Euclide-portable/LISEZMOI.txt
+            {
+              printf '\xEF\xBB\xBF'
+              printf 'Build de test Euclide (%s@%s). Ne pas utiliser sur la clé de production sans sauvegarde.\r\n\r\n' "${GITHUB_REF_NAME}" "${GITHUB_SHA::7}"
+              sed 's/$/\r/' packaging/README.txt
+            } > Euclide-portable/README.txt
             7z a -tzip -mm=Deflate -mx=5 preview/Euclide-windows-preview.zip "./Euclide-portable/*" >/dev/null
           else
             cp src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage preview/Euclide-linux-preview.AppImage

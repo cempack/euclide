@@ -5,6 +5,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 ## 0.6.1
 
 - Sous Linux, passer en mode projection, ou changer de thème ou de densité, ne ferme plus Euclide.
+- L'installateur Windows et le fichier README.txt de la version portable sont en français.
 
 ## 0.6.0
 

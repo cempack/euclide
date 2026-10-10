@@ -45,6 +45,10 @@
   },
   "bundle": {
     "active": true,
+    "shortDescription": "Le bureau d'enseignement",
+    "longDescription": "Cours et progression, documents et PDF annotés, tableau blanc, Python et Pronote, depuis une clé USB, même sans connexion.",
+    "category": "Education",
+    "publisher": "Elliot Moreau",
     "createUpdaterArtifacts": true,
     "targets": [
       "app",
@@ -64,6 +68,12 @@
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "languages": [
+          "French"
+        ],
+        "displayLanguageSelector": false
       }
     }
   },
