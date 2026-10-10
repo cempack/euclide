@@ -10,6 +10,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { api } from "../../lib/api";
 import { fullscreen } from "../../lib/fullscreen";
 import { tr, type StringKey } from "../../lib/i18n";
 import { typingIn, useShortcut } from "../../lib/keymap";
@@ -88,6 +89,8 @@ export function Presentation({
     const el = stage.current;
     if (!el) return;
     void fullscreen(true, el).catch(logged("pdf.present"));
+    // Counted for the statistics (jobs/stats.rs), like any action.
+    api.logEvent("pdf_present", "", null).catch(() => {});
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     // The window growing to the screen moves the page: centred again.
     const ro = new ResizeObserver(() => view.current?.goTo(shownRef.current, true));

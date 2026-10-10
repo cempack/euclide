@@ -5,6 +5,7 @@ Ce qui change d'une version d'Euclide à l'autre.
 ## 0.6.1
 
 - Sous Linux, passer en mode projection, ou changer de thème ou de densité, ne ferme plus Euclide.
+- **Statistiques d'utilisation** : une fois par jour, Euclide envoie à son auteur le temps passé dans chaque partie de l'application et le nombre de notes, d'imports ou de scripts lancés. Jamais de nom, de titre ni de document. Dans Réglages, Données, on voit ce qui part, et on peut le couper.
 - L'installateur Windows et le fichier README.txt de la version portable sont en français.
 
 ## 0.6.0

@@ -144,6 +144,7 @@ pub fn run() {
             runner::start_reaper(app.handle().clone());
             jobs::backup::spawn(app.handle().clone());
             jobs::indexer::spawn(app.handle().clone());
+            jobs::stats::spawn(app.handle().clone());
 
             // Housekeeping that the first screen doesn't wait for.
             let after_update = updated_from.is_some();
@@ -292,6 +293,7 @@ pub fn run() {
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::recap::log_event,
+            jobs::stats::stats_preview,
             commands::recap::get_recap,
             commands::pronote::pronote_status,
             commands::pronote::pronote_qr_login,

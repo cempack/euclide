@@ -286,6 +286,21 @@ export interface StudentList {
   count: number;
 }
 
+/** The next daily statistics report, as it would go (src-tauri/src/jobs/stats.rs). */
+export interface StatsPreview {
+  enabled: boolean;
+  endpoint: string;
+  report: {
+    v: number;
+    install: string;
+    app: string;
+    os: string;
+    arch: string;
+    portable: boolean;
+    days: { day: string; minutes: number; areas: Record<string, number>; events: Record<string, number> }[];
+  } | null;
+}
+
 export interface QuickLink {
   id: number;
   label: string;
@@ -473,6 +488,7 @@ export const api = {
 
   // Quick links
   listLinks: () => invoke<QuickLink[]>("list_links").then(asList<QuickLink>),
+  statsPreview: () => invoke<StatsPreview>("stats_preview"),
   createLink: (label: string, url: string, icon: string) =>
     invoke<QuickLink>("create_link", { label, url, icon }),
   deleteLink: (id: number) => invoke<void>("delete_link", { id }),

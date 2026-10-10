@@ -1322,5 +1322,14 @@
     },
     "clearAllMessage": "Effacer les listes d'élèves de toutes les classes ? Les noms ne restent nulle part dans Euclide.",
     "clearedAll": "Listes effacées"
+  },
+  "stats": {
+    "title": "Statistiques d'utilisation",
+    "hint": "Une fois par jour, Euclide envoie à son auteur le temps passé dans chaque partie de l'application et le nombre de notes, d'imports ou de scripts lancés, pour savoir ce qui sert. Jamais de nom, de titre ni de document.",
+    "show": "Voir ce qui est envoyé",
+    "previewTitle": "Ce qui est envoyé",
+    "previewHint": "Le prochain envoi, tel quel, vers {url} : un identifiant tiré au hasard pour cette copie d'Euclide, sa version et son système, puis, jour par jour, des minutes et des nombres.",
+    "previewEmpty": "Rien à envoyer pour le moment.",
+    "previewOff": "Les statistiques sont coupées : rien n'est envoyé."
   }
 }

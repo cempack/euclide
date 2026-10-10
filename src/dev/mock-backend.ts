@@ -913,6 +913,27 @@ function handle(cmd: string, args: Args): unknown {
       return null;
     case "log_event":
       return null;
+    case "stats_preview":
+      return {
+        enabled: settings.get("usage_stats") !== "0",
+        endpoint: "https://euclide.elliotmoreau.fr/api/usage",
+        report: {
+          v: 1,
+          install: "3f2b8c1e-9a4d-4c2b-8e1f-0a1b2c3d4e5f",
+          app: "0.6.1",
+          os: "windows",
+          arch: "x86_64",
+          portable: true,
+          days: [
+            {
+              day: new Date().toISOString().slice(0, 10),
+              minutes: 42,
+              areas: { dashboard: 6, pdf: 24, board: 12 },
+              events: { note_write: 3, pdf_present: 1 },
+            },
+          ],
+        },
+      };
     case "keep_awake_status":
       return keepAwake;
     case "set_keep_awake":

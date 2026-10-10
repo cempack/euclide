@@ -26,6 +26,7 @@ pub(crate) const UI_SETTINGS: &[&str] = &[
     "keep_awake_mode",
     "note_templates",
     "python_templates",
+    "usage_stats",
 ];
 
 fn ui_key(key: &str) -> AppResult<&str> {

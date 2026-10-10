@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { q } from "../../api/queries";
 import type { Course, CourseClass, ScheduleEntry, StudentList } from "../../lib/api";
+import { api } from "../../lib/api";
 import { fullscreen } from "../../lib/fullscreen";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../../lib/format";
 import { tr } from "../../lib/i18n";
@@ -118,6 +119,8 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
     dialog.showModal();
     // The keys are the scene's, not the first button's.
     dialog.focus();
+    // Counted for the statistics (jobs/stats.rs), like any action.
+    api.logEvent("scene_open", "", null).catch(() => {});
     void fullscreen(true, dialog).catch(logged("scene.fullscreen"));
     const tick = window.setInterval(() => setNow(new Date()), 1000);
     return () => {

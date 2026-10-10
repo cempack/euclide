@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { api } from "../../lib/api";
 import { fullscreen } from "../../lib/fullscreen";
 import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
@@ -56,6 +57,8 @@ export default function Slides({
     dialog.showModal();
     // The keys are the slides', not the bar's first button.
     dialog.focus();
+    // Counted for the statistics (jobs/stats.rs), like any action.
+    api.logEvent("slides_present", "", null).catch(() => {});
     void fullscreen(true, dialog).catch(logged("slides.fullscreen"));
     void document.fonts.ready.then(() => setFontsReady(true));
     const tick = window.setInterval(() => setNow(Date.now()), 1000);

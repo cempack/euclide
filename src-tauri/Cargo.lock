@@ -1027,6 +1027,7 @@ dependencies = [
  "rfd",
  "ring",
  "rusqlite",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",

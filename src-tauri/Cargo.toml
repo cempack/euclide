@@ -48,6 +48,12 @@ windows = "0.62"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "stream"] }
 futures-util = "0.3"
 
+# The daily statistics (jobs/stats.rs) on Linux and macOS: the reqwest and
+# rustls the updater already builds there, with its ring provider.
+[target.'cfg(not(windows))'.dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Whether the version an update replaced has quit (relaunch.rs; already in the tree).
 libc = "0.2"

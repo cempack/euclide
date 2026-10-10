@@ -2,3 +2,4 @@
 
 pub mod backup;
 pub mod indexer;
+pub mod stats;

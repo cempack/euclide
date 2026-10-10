@@ -7,6 +7,7 @@ import {
   type Course,
   type PronoteStatus,
   type ScheduleEntry,
+  type StatsPreview,
   type StudentList,
 } from "../lib/api";
 import { tr, trList, trn } from "../lib/i18n";
@@ -312,8 +313,60 @@ function DataStorageSection({ info }: { info: AppInfo | null }) {
           </button>
         </SettingRow>
         <StudentListsRow />
+        <UsageStatsRow />
       </Panel>
     </Section>
+  );
+}
+
+/**
+ * The daily statistics (src-tauri/src/jobs/stats.rs): on unless turned off,
+ * and the next report itself, word for word, for whoever wants to check.
+ */
+function UsageStatsRow() {
+  const failed = useFailure();
+  const [saved, save] = useSetting("usage_stats");
+  const [preview, setPreview] = useState<StatsPreview | null>(null);
+  const show = async () => {
+    try {
+      setPreview(await api.statsPreview());
+    } catch (err) {
+      failed("settings.statsPreview", err);
+    }
+  };
+  return (
+    <>
+      <SettingRow title={tr("stats.title")} hint={tr("stats.hint")}>
+        <button className="eu-btn-quiet eu-btn-sm" onClick={() => void show()}>
+          {tr("stats.show")}
+        </button>
+        <Switch checked={saved !== "0"} label={tr("stats.title")} onChange={(on) => save(on ? "1" : "0")} />
+      </SettingRow>
+      <Modal
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        title={tr("stats.previewTitle")}
+        width="max-w-2xl"
+      >
+        <p className="eu-t-body text-ink-muted">
+          {!preview?.enabled
+            ? tr("stats.previewOff")
+            : preview.report
+              ? tr("stats.previewHint", { url: preview.endpoint })
+              : tr("stats.previewEmpty")}
+        </p>
+        {preview?.enabled && preview.report && (
+          <pre className="mt-3 max-h-[50vh] overflow-auto rounded border border-line bg-panel-alt p-3 font-mono text-caption text-ink selectable">
+            {JSON.stringify(preview.report, null, 2)}
+          </pre>
+        )}
+        <div className="flex justify-end mt-4">
+          <button className="eu-btn-ghost" onClick={() => setPreview(null)}>
+            {tr("common.close")}
+          </button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
