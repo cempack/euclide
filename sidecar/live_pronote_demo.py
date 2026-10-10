@@ -6,6 +6,8 @@ Tests:
 - Broad fetch for 3D (prof) + detailed "what are the contents" dump
 - Subject filter specifically with GREC (plus ANGLAIS intercultural title check)
 - Eleve view
+- The students of 3D, then of every class (a teacher account has no
+  current_period: the period today falls in is asked for)
 
 Run:
   sidecar/.venv/bin/python sidecar/live_pronote_demo.py
@@ -17,7 +19,7 @@ from pathlib import Path
 
 def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from euclide_sidecar.pronote import pronote_contents
+    from euclide_sidecar.pronote import pronote_all_students, pronote_contents, pronote_students
 
     print("=== LIVE TEST: pronote_contents with class=3D on PROFESSEUR demo ===")
     payload = {
@@ -279,6 +281,25 @@ def main():
         len([c for c in contents if c.get("documents")]) > 0
         or len([c for c in subj_contents if c.get("documents")]) > 0
     )
+    print("\n=== Students: 3D, then every class, on PROF ===")
+    prof = {
+        "mode": "password",
+        "url": "https://demo.index-education.net/pronote/professeur.html?login=true",
+        "username": "demonstration",
+        "password": "pronotevs",
+    }
+    res_3d = pronote_students(dict(prof, **{"class": "3D"}))
+    names_3d = res_3d.get("names", [])
+    print("3D:", res_3d.get("ok"), res_3d.get("error"), len(names_3d), "students, e.g.", names_3d[:3])
+    res_all = pronote_all_students(dict(prof))
+    lists = res_all.get("classes", [])
+    print("every class:", res_all.get("ok"), res_all.get("error"), len(lists), "classes")
+    for c in lists:
+        print("  ", c["class"], len(c["names"]))
+    print("refused:", res_all.get("failed"))
+    students_ok = res_3d.get("ok") and len(names_3d) > 10
+    all_students_ok = res_all.get("ok") and len(lists) > 5 and not res_all.get("failed")
+
     print("\n=== VERIFICATION SUMMARY ===")
     print(
         "Prof 3D returned substantial contents:",
@@ -292,7 +313,15 @@ def main():
         "Attached documents (ListePieceJointe) are retrieved (e.g. 'Test Doc CDT.txt' with URL):",
         "PASS" if docs_ok else "FAIL",
     )
-    all_pass = prof_ok and inter_ok and subj_ok and eleve_ok and docs_ok
+    print(
+        "The students of 3D come back:", "PASS" if students_ok else "FAIL", "(count={})".format(len(names_3d))
+    )
+    print(
+        "Every class's students come back, none refused:",
+        "PASS" if all_students_ok else "FAIL",
+        "(classes={})".format(len(lists)),
+    )
+    all_pass = prof_ok and inter_ok and subj_ok and eleve_ok and docs_ok and students_ok and all_students_ok
     print(
         "\nOVERALL:",
         "ALL CHECKS PASSED - real lesson contents + attached documents are found for 3D in prof view."

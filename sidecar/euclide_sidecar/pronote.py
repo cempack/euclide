@@ -5,6 +5,7 @@ Every handler takes the request payload (credentials plus parameters) and
 returns a plain dict; the server wraps it in the protocol envelope.
 """
 
+import datetime
 import json
 import os
 
@@ -951,7 +952,17 @@ def _main_classes(client):
 
 
 def _period(client):
-    return getattr(client, "current_period", None) or client.periods[0]
+    """The period a class's students are asked for. pronotepy's
+    current_period reads a key only student accounts have (a teacher's
+    raises KeyError): then the first period today falls in, from the list
+    every account has, else the year's first, as StudentClass.students()."""
+    try:
+        return client.current_period
+    except Exception:  # noqa: BLE001
+        pass
+    periods = client.periods
+    now = datetime.datetime.now()
+    return next((p for p in periods if p.start <= now <= p.end), periods[0])
 
 
 def _class_students(client, entry, period):
