@@ -47,10 +47,13 @@ pub fn recap(conn: &Connection, period: &str, since: &str) -> AppResult<RecapDat
         |r| r.get(0),
     )?;
 
+    // Minutes spent on each course: its active ticks (one a minute), as
+    // `active_minutes` counts them, not every event that names it.
     let top_courses = {
         let mut stmt = conn.prepare_cached(
             "SELECT c.name, c.emoji, COUNT(*) AS cnt FROM usage_events u \
-             JOIN courses c ON u.course_id = c.id WHERE u.created_at >= ?1 \
+             JOIN courses c ON u.course_id = c.id \
+             WHERE u.kind = 'active_tick' AND u.created_at >= ?1 \
              GROUP BY c.id ORDER BY cnt DESC LIMIT 5",
         )?;
         let rows = stmt.query_map([since], |r| {
@@ -159,6 +162,30 @@ mod tests {
         assert_eq!(r.top_documents[0].name, "cours.pdf");
         assert_eq!(r.top_documents[0].count, 2);
         assert_eq!(r.time_by_area.len(), 1);
+    }
+
+    #[test]
+    fn a_course_counts_its_active_minutes_only() {
+        let conn = mem();
+        conn.execute_batch(
+            "INSERT INTO courses (id, name) VALUES (1, 'Mathématiques'), (2, 'NSI'); \
+             INSERT INTO usage_events (kind, label, course_id, created_at) VALUES \
+               ('active_tick', 'Notes', 1, '2026-10-06 10:00:00'), \
+               ('active_tick', 'Notes', 1, '2026-10-06 10:01:00'), \
+               ('file_open', 'cours.pdf', 2, '2026-10-06 10:02:00'), \
+               ('file_open', 'td.pdf', 2, '2026-10-06 10:03:00'), \
+               ('file_open', 'tp.pdf', 2, '2026-10-06 10:04:00'), \
+               ('active_tick', 'Python', 2, '2026-10-06 10:05:00');",
+        )
+        .unwrap();
+        let r = recap(&conn, "today", "2026-10-06 00:00:00").unwrap();
+        let minutes: Vec<(&str, i64)> = r
+            .top_courses
+            .iter()
+            .map(|c| (c.name.as_str(), c.count))
+            .collect();
+        // Three files opened in NSI are not three minutes.
+        assert_eq!(minutes, vec![("Mathématiques", 2), ("NSI", 1)]);
     }
 
     #[test]
