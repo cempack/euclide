@@ -255,18 +255,25 @@
 [data-projection="on"] {
   --eu-line-a: 0.26;
   --eu-line-a-strong: 0.45;
+  /* A 4 % hover vanishes on a beamer: the room has to see what is pressed. */
+  --eu-hover-a: 0.08;
+  --eu-pressed-a: 0.14;
 }
 [data-projection="on"][data-theme="light"] {
   --eu-ink-faint: 78 82 87;
 }
 [data-projection="on"][data-theme="dark"] {
   --eu-ink-faint: 182 178 171;
+  --eu-hover-a: 0.1;
+  --eu-pressed-a: 0.18;
 }
 @media (prefers-contrast: more) {
   :root,
   [data-theme] {
     --eu-line-a: 0.26;
     --eu-line-a-strong: 0.45;
+    --eu-hover-a: 0.08;
+    --eu-pressed-a: 0.14;
   }
   :root,
   [data-theme="light"] {
@@ -489,9 +496,6 @@
   .eu-panel-alt {
     @apply rounded-md bg-panel-alt border border-line;
   }
-  .eu-raised {
-    @apply bg-panel border-line text-ink shadow-raised;
-  }
 
   /* -------------------------------------------------------------------------
      Buttons. `eu-btn` is the base; add one variant. Hover and press are ink
@@ -606,6 +610,9 @@
   .eu-switch[aria-checked="true"] .eu-switch-thumb {
     transform: translateX(0.875rem);
   }
+  [data-theme="dark"] .eu-switch-thumb {
+    @apply bg-ink;
+  }
 
   /* -------------------------------------------------------------------------
      Chips, keys, segmented control. The chosen segment is raised paper.
@@ -687,7 +694,6 @@
   .eu-row-hover {
     @apply hover:bg-hover;
   }
-  .eu-row-cursor,
   .eu-row[aria-selected="true"],
   .eu-row-hover[aria-selected="true"] {
     @apply bg-pressed;
@@ -722,13 +728,6 @@
   }
   .eu-gauge > i {
     @apply block h-full rounded-sm bg-ink transition-[width] duration-slow;
-  }
-
-  /* Overlay scrim. No backdrop-filter on purpose: it costs a full-screen
-     repaint on the low-end laptops Euclide runs on, and older WebKitGTK
-     composites it incorrectly. A plain scrim reads better in both themes. */
-  .eu-scrim {
-    @apply absolute inset-0 bg-scrim;
   }
 
   /* -------------------------------------------------------------------------
@@ -945,14 +944,15 @@
   }
   /* The side panel's « Pages » and « Sommaire ». */
   .eu-pdf-tab {
-    @apply flex-1 rounded-sm px-2 py-1 text-caption text-stage-muted transition-colors duration-fast
-      hover:bg-stage-hover hover:text-stage-ink;
+    @apply flex-1 rounded-sm px-2 py-1 text-small font-medium text-stage-muted transition-colors duration-fast
+      hover:bg-stage-hover hover:text-stage-ink active:bg-stage-pressed;
   }
   .eu-pdf-tab-current {
     @apply bg-stage-pressed text-stage-ink;
   }
   .eu-pdf-outline-entry {
-    @apply block w-full text-left pr-2 py-1 text-small text-stage-ink rounded-sm hover:bg-stage-hover;
+    @apply block w-full text-left pr-2 py-1 text-small text-stage-ink rounded-sm hover:bg-stage-hover
+      active:bg-stage-pressed;
   }
   /* A PDF presented (features/pdf/Presentation.tsx): the viewer's stage over
      the whole window, one page in view, a bar at the bottom that goes, with
@@ -974,14 +974,17 @@
   }
   .eu-pdf-present-bar {
     @apply absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full
-      bg-stage p-1 text-stage-ink shadow-pop transition-opacity duration-300;
+      bg-stage p-1 text-stage-ink shadow-pop transition-opacity duration-fast;
   }
-  .eu-pdf-presenting[data-idle] .eu-pdf-present-bar {
+  .eu-pdf-presenting[data-idle] .eu-pdf-present-bar,
+  .eu-pdf-present-bar[data-idle] {
     @apply pointer-events-none opacity-0;
+    transition-duration: 400ms;
   }
   .eu-pdf-present-btn {
     @apply inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full px-2 text-small
-      transition-colors duration-fast hover:bg-stage-hover disabled:opacity-40 disabled:hover:bg-transparent;
+      transition-colors duration-fast hover:bg-stage-hover active:bg-stage-pressed disabled:opacity-40
+      disabled:hover:bg-transparent;
   }
   .eu-pdf-present-btn[aria-pressed="true"] {
     @apply bg-stage-hover text-stage-accent;
@@ -1020,7 +1023,7 @@
   }
   .eu-doc-card {
     @apply flex flex-col min-w-0 rounded-md border border-line bg-panel overflow-hidden cursor-pointer
-      transition-[box-shadow,border-color] duration-fast hover:border-line-strong hover:shadow-raised;
+      transition-[box-shadow,border-color,scale] duration-fast hover:border-line-strong hover:shadow-raised;
   }
   /* A card's tools sit over its preview, shown on hover or focus. */
   .eu-doc-card-tools {
@@ -1050,9 +1053,23 @@
 
   /* A searched word inside a snippet. */
   .eu-mark {
-    @apply bg-accent-soft text-ink rounded-xs px-px font-medium;
+    @apply text-ink rounded-xs px-px font-medium;
+    background-color: rgb(var(--eu-accent) / 0.24);
   }
-  /* A colour to pick: the chosen one is ringed. */
+  /* A reminder's « done » box (Rappels, the dashboard): it gives under the
+     press, and fills when ticked. */
+  .eu-tick {
+    @apply shrink-0 w-5 h-5 grid place-items-center rounded-sm border border-line-strong
+      transition-[background-color,border-color,scale] duration-fast hover:border-ok hover:bg-ok-soft;
+  }
+  .eu-tick:active {
+    scale: 0.9;
+    transition-duration: 60ms;
+  }
+  .eu-tick[aria-pressed="true"] {
+    @apply bg-ok-solid border-ok-solid text-panel;
+  }
+
   /* A colour (the PDF viewer's ColorChoice, the board's pens): a dot inside its button, and
      the chosen one's ring on the button's own edge, so neither the ring nor
      a dot grown under the pointer reaches the next colour. The hairline
@@ -1068,6 +1085,9 @@
   }
   .eu-swatch:hover::before {
     transform: scale(1.12);
+  }
+  .eu-swatch:active::before {
+    transform: scale(0.88);
   }
   .eu-swatch[aria-checked="true"],
   .eu-swatch[aria-pressed="true"] {
@@ -1206,6 +1226,7 @@
   .eu-toast[data-leaving] {
     opacity: 0;
     translate: 0 4px;
+    pointer-events: none;
   }
   .eu-toast-icon {
     @apply shrink-0 text-ink-faint;
@@ -1239,6 +1260,7 @@
     opacity: 0;
     translate: 0 4px;
     scale: 0.98;
+    pointer-events: none;
   }
   /* With nothing to focus inside, the browser focuses the dialog itself. */
   .eu-dialog:focus-visible {
@@ -1259,6 +1281,10 @@
   .eu-dialog.eu-dialog-top {
     margin-top: 18vh;
   }
+  /* A plain scrim, no backdrop-filter: blur costs a full-screen repaint on
+     the low-end laptops Euclide runs on, and older WebKitGTK composites it
+     wrongly. The fallback is for engines whose ::backdrop inherits no
+     custom property. */
   .eu-dialog::backdrop {
     background: var(--color-scrim, rgb(10 8 6 / 0.34));
     transition:
@@ -1287,6 +1313,7 @@
     top: 0;
     transition:
       opacity 100ms var(--ease-in),
+      transform 100ms var(--ease-in),
       overlay 100ms allow-discrete,
       display 100ms allow-discrete;
   }
@@ -1308,9 +1335,11 @@
   .eu-menu:not(:popover-open) {
     display: none;
     opacity: 0;
+    transform: var(--eu-menu-from, translateY(-4px)) scale(0.98);
+    pointer-events: none;
   }
   .eu-menu-item {
-    @apply w-full flex items-center gap-2.5 px-2.5 rounded text-left text-body text-ink outline-none;
+    @apply w-full flex items-center gap-2.5 px-2.5 rounded-sm text-left text-body text-ink outline-none;
     height: var(--eu-control);
   }
   .eu-menu-item:hover,
@@ -1391,7 +1420,7 @@
   /* The empty editor's way into the catalogue: a tile per level. */
   .eu-level-tile {
     @apply flex flex-col gap-1 p-3 text-left rounded-lg border border-line bg-panel shadow-raised
-      transition-colors duration-fast hover:border-line-strong;
+      transition-[border-color,scale] duration-fast hover:border-line-strong;
   }
   /* The Python output (python/OutputPanel.tsx): a desk in the app's theme
      under the editor, tabs underlined in the accent, the run's state as a
@@ -1488,6 +1517,8 @@
      wider than it shows; it turns accent to say it moves (pointer or arrows). */
   .eu-split {
     @apply relative shrink-0 h-px bg-line z-1 cursor-row-resize outline-none transition-colors duration-fast;
+    /* A finger drags the bar rather than scrolling the page. */
+    touch-action: none;
   }
   .eu-split::before {
     content: "";
@@ -1532,6 +1563,48 @@
   }
   .eu-tooltip-keys > kbd {
     @apply px-1 py-0.5 rounded-sm bg-panel/15 font-mono text-[0.625rem] leading-none text-panel/80;
+  }
+  [data-theme="dark"] .eu-tooltip {
+    @apply bg-panel-alt text-ink border border-line-strong;
+  }
+  [data-theme="dark"] .eu-tooltip-keys > kbd {
+    @apply bg-ink/10 text-ink-muted;
+  }
+
+  /* Pressed: whatever answers a click darkens under the press, at once,
+     before the click lands; the hover's tint, a step deeper. */
+  .eu-row-hover:active,
+  .eu-filter:not([aria-pressed="true"]):active,
+  .eu-status-button:active,
+  .eu-timer > button:active,
+  .eu-toast-close:active,
+  .eu-gallery-level:not([aria-selected="true"]):active,
+  .eu-template-card:has(> .eu-template-card-main:active),
+  .eu-tab:not([data-active]):active {
+    @apply bg-pressed;
+  }
+  .eu-segment
+    > button:not([aria-selected="true"], [aria-pressed="true"], [aria-checked="true"], .active):active {
+    @apply bg-hover text-ink;
+  }
+  .eu-search-button:active {
+    background-image: linear-gradient(var(--color-pressed), var(--color-pressed));
+  }
+  .eu-doc-card:active:not(:has(button:active)),
+  .eu-level-tile:active {
+    scale: 0.985;
+    transition-duration: 60ms;
+  }
+  /* Rows in a list that clips its overflow: the ring inside, or it is cut. */
+  :is(
+    .eu-row-hover,
+    .eu-picker-row,
+    .eu-gallery-level,
+    .eu-template-card-main,
+    .eu-pdf-outline-entry,
+    .eu-tab-main
+  ):focus-visible {
+    outline-offset: -2px;
   }
 }
 
@@ -1601,6 +1674,9 @@ input[type="radio"] {
   animation-duration: 240ms;
   animation-timing-function: var(--ease-in-out);
 }
+::view-transition {
+  pointer-events: none;
+}
 
 /* Respect the OS « reduce motion » setting: every animation is CSS.
    Transitions get no duration at all: 0.01 ms on every element would turn
@@ -1618,94 +1694,6 @@ input[type="radio"] {
   }
 }
 
-/* Hide scrollbar on scrollable toolbar containers */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Python syntax colouring for the CodeEditor overlay (pre + transparent textarea).
-   NOTE: no font-weight changes on tokens — varying weight shifts character
-   widths and breaks the overlay alignment with the textarea underneath.
-   Bound to [data-theme], not to prefers-color-scheme: the previous media query
-   flipped tokens to dark-theme colours while the editor stayed white. */
-.tok-keyword {
-  color: #6f42c1;
-}
-.tok-builtin {
-  color: #0550ae;
-}
-.tok-string {
-  color: #0a6b34;
-}
-.tok-comment {
-  color: #6a737d;
-  font-style: italic;
-}
-.tok-number {
-  color: #b3510a;
-}
-.tok-plain {
-  color: inherit;
-}
-
-[data-theme="dark"] .tok-keyword {
-  color: #c792ea;
-}
-[data-theme="dark"] .tok-builtin {
-  color: #82aaff;
-}
-[data-theme="dark"] .tok-string {
-  color: #c3e88d;
-}
-[data-theme="dark"] .tok-comment {
-  color: #7c8b94;
-}
-[data-theme="dark"] .tok-number {
-  color: #f78c6c;
-}
-
-/* Force identical text metrics for the syntax overlay (pre under transparent textarea) to prevent visual shift/ghosting */
-.code-editor {
-  font-family:
-    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
-  font-size: 12.5px;
-  line-height: 1.55;
-  letter-spacing: 0;
-  font-feature-settings:
-    "liga" 0,
-    "clig" 0,
-    "calt" 0; /* disable ligatures that can alter widths */
-}
-.code-editor pre,
-.code-editor textarea {
-  font-family: inherit !important;
-  font-size: inherit !important;
-  line-height: inherit !important;
-  letter-spacing: inherit !important;
-  font-feature-settings: inherit !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-.code-editor .gutter-line {
-  line-height: 1.55;
-  height: 1.55em;
-}
-
-/* Selection tint must be visible while textarea text stays transparent so the colored pre shows */
-.code-editor textarea::selection {
-  background: rgb(var(--eu-accent) / 0.28);
-  color: transparent;
-}
-.code-editor textarea::-moz-selection {
-  background: rgb(var(--eu-accent) / 0.28);
-  color: transparent;
-}
-
 /* ---------------------------------------------------------------------------
    Markdown preview (note editor). Prose needs its own rhythm; the surrounding
    UI type roles are too tight for reading.
@@ -1715,6 +1703,15 @@ input[type="radio"] {
   font-size: var(--text-body);
   line-height: 1.65;
   color: rgb(var(--eu-ink));
+  /* Figures in a sentence read best proportional; tables keep them aligned. */
+  font-variant-numeric: normal;
+}
+.eu-prose :is(h1, h2, h3) {
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.eu-prose :is(th, td) {
+  font-variant-numeric: tabular-nums;
 }
 .eu-prose > * + * {
   margin-top: 0.7em;
@@ -1943,6 +1940,8 @@ input[type="radio"] {
 }
 .eu-slide-title .eu-prose h1 {
   font-size: 2.1em;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 .eu-slide-title .eu-prose h1 + * {
@@ -1956,15 +1955,6 @@ input[type="radio"] {
   height: 4px;
   background: rgb(var(--eu-accent));
   transition: width 180ms var(--ease-out);
-}
-.eu-slides-chip {
-  position: absolute;
-  right: 1rem;
-  bottom: 0.9rem;
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  color: rgb(17 18 19 / 0.45);
-  transition: opacity 300ms;
 }
 .eu-slides-blank {
   position: absolute;
@@ -2006,6 +1996,11 @@ input[type="radio"] {
 .eu-resource-open:hover,
 .eu-resource-remove:hover {
   background: var(--color-hover);
+}
+.eu-resource-open:active,
+.eu-resource-remove:active,
+.eu-resource-add:active {
+  background: var(--color-pressed);
 }
 .eu-resource-remove {
   display: grid;
@@ -2587,6 +2582,9 @@ input[type="radio"] {
 .eu-picker-row:hover {
   background: var(--color-hover);
 }
+.eu-picker-row:active {
+  background: var(--color-pressed);
+}
 .eu-picker-row:disabled {
   opacity: 0.6;
 }
@@ -2875,7 +2873,14 @@ input[type="radio"] {
   align-items: center;
   gap: 1.2vh;
   padding: 1vh 4vw 3vh;
-  transition: opacity 300ms;
+  transition: opacity 120ms var(--ease-out);
+}
+/* Gone while the pointer rests: it fades slowly, comes back at once, and
+   takes no tap while hidden (the tap wakes it instead). */
+.eu-scene-controls[data-idle] {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 400ms;
 }
 .eu-scene-btn {
   display: inline-flex;
@@ -2910,6 +2915,10 @@ input[type="radio"] {
 .eu-scene-close:hover {
   background: var(--color-stage-hover);
   color: var(--color-stage-ink);
+}
+.eu-scene-btn:active,
+.eu-scene-close:active {
+  background: var(--color-stage-pressed);
 }
 .eu-scene-btn:disabled {
   opacity: 0.45;
@@ -3078,4 +3087,41 @@ input[type="radio"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A screen worked by touch alone has no hover: what hover reveals (a tab's
+   ×, a row's tools, a chip's ×) stays in sight there. Unlayered, so it wins
+   over the opacity utilities that hide them. */
+@media (hover: none) {
+  .eu-tab-close,
+  .eu-row-actions,
+  .eu-resource-remove,
+  .eu-template-card-remove,
+  .eu-doc-card-tools,
+  .eu-reveal,
+  .eu-sidebar:not([data-rail]) .eu-sidebar-fold {
+    opacity: 1;
+  }
+}
+
+/* Windows' contrast themes repaint every background and drop shadows: the
+   chosen segment, filter, colour or tab gets an outline instead, and a
+   colour's dot keeps its colour. */
+@media (forced-colors: active) {
+  .eu-swatch::before {
+    forced-color-adjust: none;
+  }
+  :is(.eu-swatch, .eu-segment > button, .eu-filter, .eu-btn-toggle, .eu-gallery-level, .eu-tick):is(
+    [aria-checked="true"],
+    [aria-pressed="true"],
+    [aria-selected="true"]
+  ),
+  .eu-nav-item[aria-current="page"],
+  .eu-tab[data-active] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .eu-switch-thumb {
+    background: ButtonText;
+  }
 }

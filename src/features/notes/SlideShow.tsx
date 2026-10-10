@@ -1,7 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { fullscreen } from "../../lib/fullscreen";
 import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
+import { useIdle } from "../../lib/useIdle";
+import { Icon } from "../../ui/Icon";
+import { tip } from "../../ui/Tooltip";
 import { Markdown } from "./Markdown";
 import { isTitleSlide, splitSlides } from "./slides";
 
@@ -14,7 +18,8 @@ const clock = (ms: number) => {
  * A note presented as slides, full screen, on paper. Keys: → Espace PgSuiv
  * (a presentation clicker) forward; ← PgPréc back; Début / Fin; B or N a
  * black screen, W or Blanc a white one; Échap to leave. A click goes
- * forward, a right click back.
+ * forward, a right click back. The bar at the bottom (gone while the
+ * pointer rests) does the same for a touch screen, and leaves.
  */
 export default function Slides({
   markdown,
@@ -31,7 +36,8 @@ export default function Slides({
   const [blank, setBlank] = useState<null | "black" | "white">(null);
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(startedAt);
-  const [idle, setIdle] = useState(false);
+  // The pointer and the bar go when the pointer rests, as in a slideshow.
+  const { idle, wake, hold } = useIdle(2000);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -48,6 +54,8 @@ export default function Slides({
   useEffect(() => {
     const dialog = dialogRef.current!;
     dialog.showModal();
+    // The keys are the slides', not the bar's first button.
+    dialog.focus();
     void fullscreen(true, dialog).catch(logged("slides.fullscreen"));
     void document.fonts.ready.then(() => setFontsReady(true));
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
@@ -77,13 +85,6 @@ export default function Slides({
       body.removeEventListener("error", changed, true);
     };
   }, []);
-
-  // The pointer disappears when it stops moving, like in a slideshow.
-  useEffect(() => {
-    if (idle) return;
-    const t = window.setTimeout(() => setIdle(true), 2000);
-    return () => window.clearTimeout(t);
-  }, [idle, index]);
 
   // The largest text that fits: start big, shrink until nothing overflows.
   useLayoutEffect(() => {
@@ -128,6 +129,7 @@ export default function Slides({
   return (
     <dialog
       ref={dialogRef}
+      tabIndex={-1}
       className={`eu-slides ${idle ? "cursor-none" : ""}`}
       aria-label={tr("slides.label", { title })}
       onCancel={(e) => {
@@ -135,7 +137,8 @@ export default function Slides({
         onClose();
       }}
       onKeyDown={onKeyDown}
-      onMouseMove={() => setIdle(false)}
+      onPointerMove={wake}
+      onPointerDown={wake}
       onClick={() => (blank ? setBlank(null) : go(index + 1))}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -148,8 +151,56 @@ export default function Slides({
         </div>
       </div>
       <div className="eu-slides-progress" style={{ width: `${((index + 1) / count) * 100}%` }} />
-      <div className={`eu-slides-chip ${idle ? "opacity-0" : ""}`}>
-        {index + 1} / {count} · {clock(now - startedAt)}
+      {/* A click on the bar is the bar's, not the next slide; it leaves the
+          focus on the slides, which take the keys. */}
+      <div
+        role="toolbar"
+        aria-label={tr("slides.present")}
+        className="eu-pdf-present-bar"
+        data-idle={idle || undefined}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onMouseDown={(e) => e.preventDefault()}
+        onPointerEnter={() => hold(true)}
+        onPointerLeave={() => hold(false)}
+      >
+        <button
+          type="button"
+          onClick={() => go(index - 1)}
+          disabled={index <= 0}
+          aria-label={tr("slides.prev")}
+          className="eu-pdf-present-btn"
+          {...tip(tr("slides.prev"), "←")}
+        >
+          <Icon icon={ChevronLeft} />
+        </button>
+        <span className="eu-pdf-present-count">
+          {index + 1} / {count}
+        </span>
+        <button
+          type="button"
+          onClick={() => go(index + 1)}
+          disabled={index >= count - 1}
+          aria-label={tr("slides.next")}
+          className="eu-pdf-present-btn"
+          {...tip(tr("slides.next"), "→")}
+        >
+          <Icon icon={ChevronRight} />
+        </button>
+        <span className="eu-pdf-present-clock">{clock(now - startedAt)}</span>
+        <span className="eu-pdf-present-sep" />
+        <button
+          type="button"
+          onClick={onClose}
+          className="eu-pdf-present-btn"
+          {...tip(tr("pdf.presentExit"), "esc")}
+        >
+          <Icon icon={X} />
+          {tr("pdf.presentExit")}
+        </button>
       </div>
       {blank && (
         <div className={`eu-slides-blank ${blank === "white" ? "bg-paper" : "eu-slides-blank-black"}`} />

@@ -11,7 +11,7 @@ import {
 } from "react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Ellipsis } from "lucide-react";
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { placePopover } from "../ui/Menu";
 import { tr } from "../lib/i18n";
@@ -50,7 +50,7 @@ export function PageHeader({
     <header className="flex flex-col">
       {onBack && (
         <button type="button" onClick={onBack} className="eu-btn-quiet eu-btn-sm self-start -ml-2.5 mb-2">
-          <Icon icon={ArrowRight} size={14} className="rotate-180" />
+          <Icon icon={ArrowLeft} size={14} />
           {backLabel}
         </button>
       )}

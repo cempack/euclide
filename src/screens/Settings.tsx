@@ -21,7 +21,8 @@ import {
 import { DAY_LABELS, isoDayOfWeek } from "../lib/format";
 
 import { EmptyState, Modal, useFailure, useToast, useConfirm } from "../components/ui";
-import { PageHeader, Panel, Section, Segmented } from "../components/layout";
+import { Field, PageHeader, Panel, Section, Segmented } from "../components/layout";
+import { Switch } from "../ui/Switch";
 import { BackupsSection } from "../features/settings/BackupsSection";
 import { SettingRow, SettingsNav, type NavSection } from "../features/settings/SettingRow";
 import { Check, Moon, Plus, QrCode, Sun, Trash2 } from "lucide-react";
@@ -216,21 +217,20 @@ function AppearanceSection() {
             </div>
           </div>
 
-          <label className="flex items-start gap-2.5 border-t border-line pt-4 cursor-pointer">
-            <input
-              type="checkbox"
-              className="accent-accent mt-0.5"
+          <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
+            <div className="min-w-0">
+              <p className="eu-t-body font-medium text-ink">{tr("appearance.remoteIcons")}</p>
+              <p className="eu-t-meta">{tr("appearance.remoteIconsHint")}</p>
+            </div>
+            <Switch
               checked={remoteIcons}
-              onChange={(e) => {
-                setFavicons(e.target.checked ? "1" : "0");
+              label={tr("appearance.remoteIcons")}
+              onChange={(on) => {
+                setFavicons(on ? "1" : "0");
                 changed("links");
               }}
             />
-            <span className="min-w-0">
-              <span className="eu-t-body font-medium text-ink block">{tr("appearance.remoteIcons")}</span>
-              <span className="eu-t-meta block">{tr("appearance.remoteIconsHint")}</span>
-            </span>
-          </label>
+          </div>
         </div>
       </Panel>
     </Section>
@@ -367,6 +367,7 @@ function StudentListsRow() {
 type LoginMethod = "qr" | "direct";
 
 function PronoteSection() {
+  const confirmLogout = useConfirm();
   const toast = useToast();
   const failed = useFailure();
   const queryClient = useQueryClient();
@@ -460,7 +461,7 @@ function PronoteSection() {
 
   const finishConnect = async (s: PronoteStatus | null) => {
     if (!s) {
-      toast(tr("settings.toastConnectFailed"), "error");
+      toast(tr("settings.toastConnectFail"), "error");
       return;
     }
     setStatus(s);
@@ -494,7 +495,7 @@ function PronoteSection() {
       }
       refresh();
     } else {
-      toast(tr("settings.toastConnectFailed"), "error");
+      toast(tr("settings.toastConnectFail"), "error");
     }
   };
 
@@ -543,10 +544,17 @@ function PronoteSection() {
           {status?.connected ? (
             <div className="flex gap-2 shrink-0">
               <button onClick={sync} disabled={busy} className="eu-btn-ghost eu-btn-sm">
-                {busy ? "…" : tr("settings.sync")}
+                {busy ? tr("settings.toastSyncing") : tr("settings.sync")}
               </button>
               <button
                 onClick={async () => {
+                  // Coming back takes a new QR code and its PIN: ask first.
+                  const ok = await confirmLogout.ask({
+                    title: tr("settings.disconnectTitle"),
+                    message: tr("settings.disconnectMessage"),
+                    confirmLabel: tr("settings.disconnect"),
+                  });
+                  if (!ok) return;
                   try {
                     await api.pronoteLogout();
                   } catch (err) {
@@ -619,33 +627,57 @@ function PronoteSection() {
                 <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
                   {tr("common.cancel")}
                 </button>
-                <button className="eu-btn-primary" onClick={connectQr} disabled={busy}>
+                <button
+                  className="eu-btn-primary"
+                  onClick={connectQr}
+                  disabled={busy || !qrJson.trim() || pin.length < 4}
+                >
                   {busy ? tr("settings.connecting") : tr("common.connect")}
                 </button>
               </div>
             </>
           ) : (
-            <>
+            // A form: Entrée in any field connects.
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void connectDirect();
+              }}
+            >
               <p className="eu-t-body text-ink-muted">{tr("settings.directHelp")}</p>
-              <input
-                className="eu-input"
-                placeholder={tr("settings.urlPlaceholder")}
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-              <input
-                className="eu-input"
-                placeholder={tr("settings.username")}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <input
-                className="eu-input"
-                type="password"
-                placeholder={tr("settings.password")}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <Field label={tr("settings.urlLabel")} htmlFor="pronote-url">
+                <input
+                  id="pronote-url"
+                  className="eu-input"
+                  type="url"
+                  autoComplete="url"
+                  placeholder={tr("settings.urlPlaceholder")}
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={tr("settings.username")} htmlFor="pronote-username">
+                  <input
+                    id="pronote-username"
+                    className="eu-input"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </Field>
+                <Field label={tr("settings.password")} htmlFor="pronote-password">
+                  <input
+                    id="pronote-password"
+                    className="eu-input"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
+              </div>
               {/* PIN field: shown when the account requires it (auto-detected) or expandable */}
               {needsPin ? (
                 <div className="border border-accent/30 rounded p-3 bg-panel-alt/50">
@@ -671,14 +703,18 @@ function PronoteSection() {
                 </button>
               )}
               <div className="flex justify-end gap-2">
-                <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
+                <button type="button" className="eu-btn-ghost" onClick={() => setOpen(false)}>
                   {tr("common.cancel")}
                 </button>
-                <button className="eu-btn-primary" onClick={connectDirect} disabled={busy}>
+                <button
+                  type="submit"
+                  className="eu-btn-primary"
+                  disabled={busy || !url.trim() || !username.trim() || !password}
+                >
                   {busy ? tr("settings.connecting") : tr("common.connect")}
                 </button>
               </div>
-            </>
+            </form>
           )}
         </div>
       </Modal>
@@ -705,8 +741,12 @@ function ScheduleSection() {
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["schedule"] });
 
+  // "08:00" < "09:30" as text too: both are HH:MM.
+  const endsBeforeStart = !!form.start_time && !!form.end_time && form.end_time <= form.start_time;
+  const canSave = !!form.subject?.trim() && !endsBeforeStart;
+
   const save = async () => {
-    if (!form.subject?.trim()) return;
+    if (!canSave) return;
     try {
       const saved = await api.saveScheduleEntry({ ...form, source: "manual" });
       if (!saved?.id) {
@@ -730,15 +770,30 @@ function ScheduleSection() {
   const days = [1, 2, 3, 4, 5, 6].filter((d) => d !== 6 || byDay(6).length > 0);
   const todayIso = isoDayOfWeek();
 
-  const remove = async (id: number) => {
+  /** A slot deleted at once, with « Annuler » to put it back. */
+  const remove = async (entry: ScheduleEntry) => {
     try {
-      await api.deleteScheduleEntry(id);
+      await api.deleteScheduleEntry(entry.id);
     } catch (err) {
       failed("settings.removeSchedule", err);
       return;
     }
     changed("schedule");
     refresh();
+    const { id: _id, ...again } = entry;
+    toast(tr("settings.toastScheduleRemoved"), "success", {
+      action: {
+        label: tr("common.undo"),
+        run: () =>
+          void api
+            .saveScheduleEntry(again)
+            .then(() => {
+              changed("schedule");
+              refresh();
+            })
+            .catch((err) => failed("settings.restoreSchedule", err)),
+      },
+    });
   };
 
   return (
@@ -803,12 +858,12 @@ function ScheduleSection() {
                             </span>
                           ) : (
                             <button
-                              onClick={() => void remove(e.id)}
+                              onClick={() => void remove(e)}
                               aria-label={`${tr("common.delete")} — ${e.subject}`}
                               data-tip={tr("common.delete")}
-                              className="absolute top-0.5 right-0.5 w-6 h-6 grid place-items-center rounded-sm text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger-soft transition-opacity duration-fast"
+                              className="eu-reveal absolute top-0.5 right-0.5 w-6 h-6 grid place-items-center rounded-sm text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger-soft transition-opacity duration-fast"
                             >
-                              <Icon icon={Trash2} size={20} className="w-3 h-3" />
+                              <Icon icon={Trash2} size={14} />
                             </button>
                           )}
                         </div>
@@ -823,70 +878,98 @@ function ScheduleSection() {
       )}
 
       <Modal open={open} onClose={() => setOpen(false)} title={tr("settings.addCourseModalTitle")}>
-        <div className="flex flex-col gap-3">
-          <input
-            autoFocus
-            className="eu-input"
-            placeholder={tr("settings.subjectPlaceholder")}
-            value={form.subject ?? ""}
-            onChange={(e) => setForm({ ...form, subject: e.target.value })}
-          />
+        {/* A form: Entrée adds the slot. */}
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSave) void save();
+          }}
+        >
+          <Field label={tr("settings.subjectPlaceholder")} htmlFor="slot-subject">
+            <input
+              id="slot-subject"
+              autoFocus
+              className="eu-input"
+              value={form.subject ?? ""}
+              onChange={(e) => setForm({ ...form, subject: e.target.value })}
+            />
+          </Field>
           <div className="grid grid-cols-3 gap-2">
-            <select
-              className="eu-select"
-              value={form.day_of_week}
-              onChange={(e) => setForm({ ...form, day_of_week: Number(e.target.value) })}
+            <Field label={tr("settings.slotDay")} htmlFor="slot-day">
+              <select
+                id="slot-day"
+                className="eu-select"
+                value={form.day_of_week}
+                onChange={(e) => setForm({ ...form, day_of_week: Number(e.target.value) })}
+              >
+                {DAY_LABELS.slice(0, 6).map((label, i) => (
+                  <option key={label} value={i + 1}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={tr("settings.slotStart")} htmlFor="slot-start">
+              <input
+                id="slot-start"
+                type="time"
+                className="eu-input"
+                value={form.start_time}
+                onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+              />
+            </Field>
+            <Field
+              label={tr("settings.slotEnd")}
+              htmlFor="slot-end"
+              error={endsBeforeStart ? tr("settings.slotEndBeforeStart") : null}
             >
-              {DAY_LABELS.slice(0, 6).map((label, i) => (
-                <option key={label} value={i + 1}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="time"
-              className="eu-input"
-              value={form.start_time}
-              onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-            />
-            <input
-              type="time"
-              className="eu-input"
-              value={form.end_time}
-              onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-            />
+              <input
+                id="slot-end"
+                type="time"
+                className="eu-input"
+                aria-invalid={endsBeforeStart || undefined}
+                value={form.end_time}
+                onChange={(e) => setForm({ ...form, end_time: e.target.value })}
+              />
+            </Field>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <input
-              className="eu-input"
-              placeholder={tr("settings.roomOptional")}
-              value={form.room ?? ""}
-              onChange={(e) => setForm({ ...form, room: e.target.value })}
-            />
-            <select
-              className="eu-select"
-              value={form.course_id ?? ""}
-              onChange={(e) =>
-                setForm({ ...form, course_id: e.target.value ? Number(e.target.value) : null })
-              }
-            >
-              <option value="">{tr("settings.scheduleCourse")}</option>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <Field label={tr("settings.roomOptional")} htmlFor="slot-room">
+              <input
+                id="slot-room"
+                className="eu-input"
+                value={form.room ?? ""}
+                onChange={(e) => setForm({ ...form, room: e.target.value })}
+              />
+            </Field>
+            <Field label={tr("reminders.course")} htmlFor="slot-course">
+              <select
+                id="slot-course"
+                className="eu-select"
+                value={form.course_id ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, course_id: e.target.value ? Number(e.target.value) : null })
+                }
+              >
+                <option value="">{tr("settings.scheduleCourse")}</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
           <div className="flex justify-end gap-2 mt-1">
-            <button className="eu-btn-ghost" onClick={() => setOpen(false)}>
+            <button type="button" className="eu-btn-ghost" onClick={() => setOpen(false)}>
               {tr("common.cancel")}
             </button>
-            <button className="eu-btn-primary" onClick={save} disabled={!form.subject?.trim()}>
+            <button type="submit" className="eu-btn-primary" disabled={!canSave}>
               {tr("common.add")}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
     </Section>
   );

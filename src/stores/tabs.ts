@@ -99,7 +99,7 @@ const DEFAULT_TITLES: Record<TabKind, string> = {
   tools: "Outils",
   python: "Python",
   settings: "Réglages",
-  whiteboard: "Tableau",
+  whiteboard: "Tableau blanc",
   pdf: "Document",
   reminders: "Rappels",
   note: "Note",

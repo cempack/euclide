@@ -219,7 +219,7 @@ const SNAPPING: Tool[] = ["segment", "circle", "rect", "point"];
 type Gesture =
   | { type: "pan"; x: number; y: number; from: View }
   | { type: "ink"; pts: number[]; edge: [P, P] | null; start: P }
-  | { type: "erase"; removed: Set<string> }
+  | { type: "erase"; removed: Set<string>; last?: P }
   | { type: "shape"; tool: "segment" | "circle" | "rect"; a: P; b: P }
   | { type: "point"; p: P }
   | { type: "pinch"; d0: number; mid0: P; from: View }
@@ -304,6 +304,8 @@ export default function Board({
   const pickerRef = useRef<HTMLInputElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const pointers = useRef(new Map<number, P>());
+  // The pen on the screen: a palm resting meanwhile is no finger.
+  const penDown = useRef<number | null>(null);
   const spaceDown = useRef(false);
   const placed = useRef(false);
   useEffect(() => {
@@ -593,6 +595,17 @@ export default function Board({
   const strokeColor = () => (tool === "highlighter" ? highlight : color);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch" && penDown.current != null) return;
+    if (e.pointerType === "pen") {
+      penDown.current = e.pointerId;
+      // A palm that landed first gives way: what it began is dropped.
+      if (pointers.current.size) {
+        pointers.current.clear();
+        if (gesture.current?.type === "pan") setPanning(false);
+        gesture.current = null;
+        drawLive(null, null);
+      }
+    }
     if (editing) {
       commitText();
       return;
@@ -683,15 +696,26 @@ export default function Board({
     const g = gesture.current;
     if (g?.type !== "erase") return;
     const reach = 8 / viewRef.current.zoom;
+    // A quick sweep jumps between two events: what it passed over goes too,
+    // tested at points no further apart than the eraser is wide.
+    const from = g.last ?? p;
+    g.last = p;
+    const steps = Math.max(1, Math.ceil(dist(from, p) / (2 * reach)));
+    const along = Array.from({ length: steps }, (_, i) => {
+      const t = (i + 1) / steps;
+      return { x: from.x + (p.x - from.x) * t, y: from.y + (p.y - from.y) * t };
+    });
+    const before = g.removed.size;
     for (const item of docRef.current.items) {
       // A picture goes with the selection tool: erasing the ink over it leaves it.
       if (g.removed.has(item.id) || (item.kind === "ink" && item.erase) || item.kind === "image") continue;
       const pad = "width" in item ? item.width / 2 : 0;
       const f = item.kind === "plot" ? (plotFunction(item.expr) ?? undefined) : undefined;
-      if (distanceTo(item, p, f) <= reach + pad) g.removed.add(item.id);
+      if (along.some((q) => distanceTo(item, q, f) <= reach + pad)) g.removed.add(item.id);
     }
+    // The board is drawn again only when something went.
     const ink = inkRef.current?.getContext("2d");
-    if (ink && g.removed.size)
+    if (ink && g.removed.size > before)
       drawItems(
         ink,
         docRef.current.items.filter((i) => !g.removed.has(i.id)),
@@ -715,6 +739,8 @@ export default function Board({
       }
       return;
     }
+    // Another pointer than the gesture's (a palm under the pen) moves nothing.
+    if (!pointers.current.has(e.pointerId)) return;
     if (g.type === "pinch") {
       const pts = [...pointers.current.values()];
       if (pts.length < 2) return;
@@ -802,7 +828,9 @@ export default function Board({
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    pointers.current.delete(e.pointerId);
+    if (e.pointerId === penDown.current) penDown.current = null;
+    // A pointer the board did not take (a palm under the pen) ends nothing.
+    if (!pointers.current.delete(e.pointerId)) return;
     const g = gesture.current;
     if (g?.type === "pinch") {
       if (pointers.current.size === 0) gesture.current = null;

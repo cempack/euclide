@@ -285,6 +285,11 @@ export default function Documents({
   const courses = useQuery({ ...q.courses(), ...live }).data ?? NO_COURSES;
   const [filter, setFilter] = useState<Filter>(() => filterFromHint(filterHint));
   const [search, setSearch] = useState("");
+  const filtering = !!search.trim() || filter.kind !== "all";
+  const clearFilters = () => {
+    setSearch("");
+    setFilter({ kind: "all" });
+  };
   const [savedView, setView] = useSetting("documents_view");
   const view: View = savedView === "grid" ? "grid" : "list";
   const [cursor, setCursor] = useState(0);
@@ -307,8 +312,9 @@ export default function Documents({
     async (it: DocItem) => {
       const name = itemTitle(it);
       const ok = await confirm.ask({
-        title: it.t === "file" ? tr("documents.deleteFileTitle") : tr("notes.deleteConfirm"),
-        message: tr("documents.deleteMessage", { name }),
+        title:
+          it.t === "file" ? tr("documents.deleteFileTitle", { name }) : tr("notes.deleteConfirm", { name }),
+        message: it.t === "file" ? tr("documents.deleteMessage") : tr("notes.deleteMessage"),
         confirmLabel: tr("common.delete"),
         danger: true,
       });
@@ -547,7 +553,7 @@ export default function Documents({
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
             <input
-              className="eu-input pl-8"
+              className="eu-input pl-8 pr-20"
               placeholder={tr("documents.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -555,6 +561,11 @@ export default function Documents({
                 if (e.key === "ArrowDown" && count) {
                   e.preventDefault();
                   move(0);
+                } else if (e.key === "Escape" && search) {
+                  // Échap empties the field before it does anything else.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSearch("");
                 }
               }}
               aria-label={tr("common.search")}
@@ -564,12 +575,10 @@ export default function Documents({
               size={14}
               className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
             />
-            {(search.trim() || filter.kind !== "all") && (
+            {filtering && (
               <button
-                onClick={() => {
-                  setSearch("");
-                  setFilter({ kind: "all" });
-                }}
+                type="button"
+                onClick={clearFilters}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 eu-btn-quiet eu-btn-sm"
               >
                 {tr("common.clear")}
@@ -676,18 +685,18 @@ export default function Documents({
         <Panel>
           <EmptyState
             icon={<Icon icon={FileText} size={16} />}
-            title={
-              search.trim() || filter.kind !== "all" ? tr("documents.noResult") : tr("documents.nothingHere")
-            }
-            hint={
-              search.trim() || filter.kind !== "all"
-                ? tr("documents.noResultHint")
-                : tr("documents.nothingHint")
-            }
+            title={filtering ? tr("documents.noResult") : tr("documents.nothingHere")}
+            hint={filtering ? tr("documents.noResultHint") : tr("documents.nothingHint")}
             action={
-              <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
-                <Icon icon={Plus} size={14} /> {tr("common.importFiles")}
-              </button>
+              filtering ? (
+                <button type="button" onClick={clearFilters} className="eu-btn-ghost eu-btn-sm">
+                  {tr("common.clear")}
+                </button>
+              ) : (
+                <button onClick={importDocs} className="eu-btn-primary eu-btn-sm">
+                  <Icon icon={Plus} size={14} /> {tr("common.importFiles")}
+                </button>
+              )
             }
           />
         </Panel>

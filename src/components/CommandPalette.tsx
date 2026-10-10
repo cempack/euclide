@@ -514,7 +514,7 @@ function CommandPalette({
       </div>
       <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">
         {filtered.length === 0 ? (
-          <p className="px-3 py-6 text-center eu-t-body text-ink-muted">{tr("documents.nothingHere")}</p>
+          <p className="px-3 py-6 text-center eu-t-body text-ink-muted">{tr("documents.noResult")}</p>
         ) : (
           filtered.map((a, i) => {
             const prev = filtered[i - 1];
@@ -526,7 +526,7 @@ function CommandPalette({
                   data-sel={i}
                   onClick={a.run}
                   onMouseEnter={() => setSel(i)}
-                  className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded text-left text-ink transition-colors duration-fast ${
+                  className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-sm text-left text-ink transition-colors duration-fast ${
                     i === sel ? "bg-pressed" : ""
                   }`}
                 >

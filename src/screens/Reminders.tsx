@@ -95,13 +95,9 @@ const ReminderRow = memo(function ReminderRow({
         aria-pressed={isDone}
         aria-label={`${isDone ? tr("reminders.markTodo") : tr("reminders.markDone")} — ${r.title}`}
         data-tip={isDone ? tr("reminders.markTodo") : tr("reminders.markDone")}
-        className={`shrink-0 w-5 h-5 grid place-items-center rounded-sm border transition-colors duration-fast ${
-          isDone
-            ? "bg-ok-solid border-ok-solid text-panel"
-            : "border-line-strong hover:border-ok hover:bg-ok-soft"
-        }`}
+        className="eu-tick"
       >
-        {isDone && <Icon icon={Check} size={20} className="w-3 h-3" />}
+        {isDone && <Icon icon={Check} size={14} />}
       </button>
 
       <div className="flex-1 min-w-0">
@@ -124,7 +120,7 @@ const ReminderRow = memo(function ReminderRow({
             )}
             {r.repeat_rule !== "none" && (
               <span className="flex items-center gap-1">
-                <Icon icon={Repeat} size={20} className="w-3 h-3" />
+                <Icon icon={Repeat} size={14} />
                 {REPEAT_LABELS[r.repeat_rule]}
               </span>
             )}
@@ -287,7 +283,6 @@ export default function Reminders() {
     <>
       <PageHeader
         title={tr("nav.reminders")}
-        icon={<Icon icon={Bell} size={20} />}
         meta={
           <>
             <span>{tr("reminders.metaPending", { count: pendingCount })}</span>

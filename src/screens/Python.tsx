@@ -128,16 +128,80 @@ export default function Python({ request }: { request?: { script: string; at: nu
     setOpenScript(first ? { name: first.name, code: first.code, path: first.path, isDirty: false } : null);
   }
 
-  const select = async (d: PythonDemo) => {
-    if (openScript?.isDirty) {
-      const ok = await confirm.ask({
-        title: tr("tools.unsavedTitle"),
-        message: tr("tools.unsavedSwitch"),
-        confirmLabel: tr("common.open"),
-        danger: true,
-      });
-      if (!ok) return;
+  /**
+   * Saves the open script; `quiet` when Ctrl+S or quitting asks (they say
+   * so themselves). False when it could not be saved.
+   */
+  const save = async (quiet = false): Promise<boolean> => {
+    if (!openScript) return false;
+
+    try {
+      if (!openScript.path) {
+        // New/unsaved buffer visible in the file tree: create it now using its current tree name.
+        // (Backend will unique the filename if needed; we adopt the returned display name.)
+        // This makes "Enregistrer" on a new entry actually persist it, just like the other saved scripts.
+        const created = await api.createScript(openScript.name, openScript.code);
+        if (!created?.path) {
+          toast(tr("tools.toastScriptSaveError"), "error");
+          return false;
+        }
+
+        // Immediately promote the open buffer to a real persisted script (no more temp row / "*").
+        // Optimistically update the list so the new file appears among the other ones right away.
+        setDemos((prev) => {
+          const without = prev.filter((d) => d.path !== created.path);
+          return [...without, created].sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        setOpenScript({
+          name: created.name,
+          code: created.code,
+          path: created.path,
+          isDirty: false,
+        });
+
+        // Still refresh in background to fully reconcile list + ensure selection (in case of races or external changes).
+        refresh(created.path).catch(logged("python.refresh"));
+
+        if (!quiet) toast(tr("tools.toastScriptSaved"), "success");
+        return true;
+      } else {
+        const pathToUse = openScript.path!;
+        const nameToUse = openScript.name;
+        await api.saveScript(pathToUse, openScript.code);
+        setDemos((prev) =>
+          prev.map((d) => (d.path === pathToUse ? { ...d, code: openScript.code, name: nameToUse } : d)),
+        );
+
+        setOpenScript({
+          name: nameToUse,
+          code: openScript.code,
+          path: pathToUse,
+          isDirty: false,
+        });
+        if (!quiet) toast(tr("tools.toastScriptSaved"), "success");
+        return true;
+      }
+    } catch (err) {
+      reportError("python.save", err);
+      toast(errorMessage(err, tr("tools.toastScriptSaveError")), "error");
+      return false;
     }
+  };
+
+  /** Leaving the open script with changes: save them, drop them, or stay. */
+  const leaveOpen = async () => {
+    if (!openScript?.isDirty) return true;
+    const choice = await confirm.dirty({
+      title: tr("tools.unsavedTitle"),
+      message: tr("tools.unsavedSwitch"),
+    });
+    if (choice === "cancel") return false;
+    return choice === "discard" || (await save());
+  };
+
+  const select = async (d: PythonDemo) => {
+    if (!(await leaveOpen())) return;
     setOpenScript({
       name: d.name,
       code: d.code,
@@ -167,15 +231,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
   const [lastLevel, setLastLevel] = useState<LevelId>("bases");
   /** A new script from a template: an unsaved buffer, saved under the template's name. */
   const create = async (t: ScriptTemplate) => {
-    if (openScript?.isDirty) {
-      const ok = await confirm.ask({
-        title: tr("tools.unsavedTitle"),
-        message: tr("tools.unsavedSwitch"),
-        confirmLabel: tr("common.open"),
-        danger: true,
-      });
-      if (!ok) return;
-    }
+    if (!(await leaveOpen())) return;
     // Create a temporary / unsaved script buffer that immediately appears in the file tree.
     // Clicking Enregistrer on it will persist it (using the name shown in the tree).
     setOpenScript({
@@ -186,15 +242,7 @@ export default function Python({ request }: { request?: { script: string; at: nu
   };
 
   const importScript = async () => {
-    if (openScript?.isDirty) {
-      const ok = await confirm.ask({
-        title: tr("tools.unsavedTitle"),
-        message: tr("tools.unsavedSwitch"),
-        confirmLabel: tr("common.open"),
-        danger: true,
-      });
-      if (!ok) return;
-    }
+    if (!(await leaveOpen())) return;
     let d: PythonDemo | null;
     try {
       d = await api.importScript();
@@ -214,68 +262,12 @@ export default function Python({ request }: { request?: { script: string; at: nu
     }
   };
 
-  /** Saves the open script; `quiet` when Ctrl+S or quitting asks (they say so themselves). */
-  const save = async (quiet = false) => {
-    if (!openScript) return;
-
-    try {
-      if (!openScript.path) {
-        // New/unsaved buffer visible in the file tree: create it now using its current tree name.
-        // (Backend will unique the filename if needed; we adopt the returned display name.)
-        // This makes "Enregistrer" on a new entry actually persist it, just like the other saved scripts.
-        const created = await api.createScript(openScript.name, openScript.code);
-        if (!created?.path) {
-          toast(tr("tools.toastScriptSaveError"), "error");
-          return;
-        }
-
-        // Immediately promote the open buffer to a real persisted script (no more temp row / "*").
-        // Optimistically update the list so the new file appears among the other ones right away.
-        setDemos((prev) => {
-          const without = prev.filter((d) => d.path !== created.path);
-          return [...without, created].sort((a, b) => a.name.localeCompare(b.name));
-        });
-
-        setOpenScript({
-          name: created.name,
-          code: created.code,
-          path: created.path,
-          isDirty: false,
-        });
-
-        // Still refresh in background to fully reconcile list + ensure selection (in case of races or external changes).
-        refresh(created.path).catch(logged("python.refresh"));
-
-        if (!quiet) toast(tr("tools.toastScriptSaved"), "success");
-        return; // we already promoted the openScript + list; don't fall through to the old common set
-      } else {
-        const pathToUse = openScript.path!;
-        const nameToUse = openScript.name;
-        await api.saveScript(pathToUse, openScript.code);
-        setDemos((prev) =>
-          prev.map((d) => (d.path === pathToUse ? { ...d, code: openScript.code, name: nameToUse } : d)),
-        );
-
-        setOpenScript({
-          name: nameToUse,
-          code: openScript.code,
-          path: pathToUse,
-          isDirty: false,
-        });
-        if (!quiet) toast(tr("tools.toastScriptSaved"), "success");
-      }
-    } catch (err) {
-      reportError("python.save", err);
-      toast(errorMessage(err, tr("tools.toastScriptSaveError")), "error");
-    }
-  };
-
   // Quitting with « Enregistrer » saves what is on screen now.
   const saveRef = useRef(save);
   useEffect(() => {
     saveRef.current = save;
   });
-  useEffect(() => editors.registerFlush("python", () => saveRef.current(true)), []);
+  useEffect(() => editors.registerFlush("python", () => saveRef.current(true).then(() => {})), []);
 
   const run = async (withChecks: boolean) => {
     if (!openScript) return;
@@ -312,19 +304,23 @@ export default function Python({ request }: { request?: { script: string; at: nu
     if (!box) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setDragging(true);
+    // The bar stays where it was taken, not centred under the pointer.
+    const grab = box.bottom - e.clientY - height;
     let last: number | null = null;
     const move = (ev: PointerEvent) => {
-      last = clampHeight(box.bottom - ev.clientY);
+      last = clampHeight(box.bottom - ev.clientY - grab);
       setOutputHeight(last);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       setDragging(false);
       if (last != null) setSavedHeight(String(last));
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   };
 
   const deleteCurrent = async () => {

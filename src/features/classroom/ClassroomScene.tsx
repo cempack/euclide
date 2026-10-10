@@ -20,6 +20,7 @@ import { fullscreen } from "../../lib/fullscreen";
 import { focusClass, humanMinutes, minutesRemaining, minutesUntil } from "../../lib/format";
 import { tr } from "../../lib/i18n";
 import { logged } from "../../lib/report";
+import { useIdle } from "../../lib/useIdle";
 import { picker, useDrawn, useGroups, useGroupsBy } from "../../stores/picker";
 import { scene, useSceneClass, useSceneMode, useSceneQrText, type SceneMode } from "../../stores/scene";
 import {
@@ -109,7 +110,8 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
   const courseClasses = useQuery(q.allCourseClasses()).data ?? NO_CLASSES;
   const lists = useQuery(q.studentLists()).data ?? NO_LISTS;
   const [now, setNow] = useState(() => new Date());
-  const [idle, setIdle] = useState(false);
+  // The pointer and the controls go while the pointer rests.
+  const { idle, wake, hold } = useIdle(3000);
 
   useEffect(() => {
     const dialog = dialogRef.current!;
@@ -123,12 +125,6 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
       void fullscreen(false, dialog).catch(logged("scene.fullscreen"));
     };
   }, []);
-
-  useEffect(() => {
-    if (idle) return;
-    const t = window.setTimeout(() => setIdle(true), 3000);
-    return () => window.clearTimeout(t);
-  }, [idle]);
 
   const focus = useMemo(() => focusClass(classes, now), [classes, now]);
   // The class drawn from: the one chosen, else the one in progress (or next).
@@ -158,16 +154,18 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
 
   const drawn = useDrawn(className ?? "");
   const [rolling, setRolling] = useState<string | null>(null);
+  const roll = useRef(0);
+  useEffect(() => () => window.clearInterval(roll.current), []);
   const drawNext = () => {
     if (!className || !names.length || rolling) return;
     const name = picker.draw(className, names);
     if (!name || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // A short shuffle before the name settles: the class watches it.
     let n = 0;
-    const roll = window.setInterval(() => {
+    roll.current = window.setInterval(() => {
       n += 1;
       if (n >= 9) {
-        window.clearInterval(roll);
+        window.clearInterval(roll.current);
         setRolling(null);
       } else setRolling(names[(n * 7 + names.length) % names.length]);
     }, 70);
@@ -203,8 +201,10 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // Tab moves through the controls, and typing goes into them: they show.
+    if (e.key === "Tab") wake();
     // Typing in a field of the screen (a number, the class) is typing.
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return wake();
     const k = e.key;
     const go = k === " " || k === "Enter" || k === "ArrowRight" || k === "PageDown";
     if (mode === "clock") {
@@ -290,7 +290,8 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
         onClose();
       }}
       onKeyDown={onKeyDown}
-      onMouseMove={() => setIdle(false)}
+      onPointerMove={wake}
+      onPointerDown={wake}
     >
       <div className="eu-scene-top">
         <span className="eu-scene-banner">{banner}</span>
@@ -422,7 +423,12 @@ export default function ClassroomScene({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      <div className={`eu-scene-controls ${idle ? "opacity-0" : ""}`}>
+      <div
+        className="eu-scene-controls"
+        data-idle={idle || undefined}
+        onPointerEnter={() => hold(true)}
+        onPointerLeave={() => hold(false)}
+      >
         <div className="eu-scene-modes" role="group" aria-label={tr("scene.modes")}>
           {MODES.map((m) => (
             <button

@@ -14,6 +14,7 @@ import { fullscreen } from "../../lib/fullscreen";
 import { tr, type StringKey } from "../../lib/i18n";
 import { typingIn, useShortcut } from "../../lib/keymap";
 import { logged } from "../../lib/report";
+import { useIdle } from "../../lib/useIdle";
 import { Icon } from "../../ui/Icon";
 import { tip } from "../../ui/Tooltip";
 import type { PdfTool, PdfViewHandle } from "./PdfView";
@@ -74,7 +75,7 @@ export function Presentation({
   const [blank, setBlank] = useState<null | "black" | "white">(null);
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(startedAt);
-  const [idle, setIdle] = useState(false);
+  const { idle, wake, hold } = useIdle(2500);
 
   const go = (to: number) => {
     setBlank(null);
@@ -108,19 +109,13 @@ export function Presentation({
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
-    const wake = () => setIdle(false);
     el.addEventListener("pointermove", wake);
     el.addEventListener("pointerdown", wake);
     return () => {
       el.removeEventListener("pointermove", wake);
       el.removeEventListener("pointerdown", wake);
     };
-  }, [stage]);
-  useEffect(() => {
-    if (idle) return;
-    const t = window.setTimeout(() => setIdle(true), 2500);
-    return () => window.clearTimeout(t);
-  }, [idle, shown]);
+  }, [stage, wake]);
 
   // What the stage shows of the pointer: none at rest, a red dot to point with.
   useEffect(() => {
@@ -195,7 +190,13 @@ export function Presentation({
           onPointerDown={() => setBlank(null)}
         />
       )}
-      <div role="toolbar" aria-label={tr("pdf.present")} className="eu-pdf-present-bar">
+      <div
+        role="toolbar"
+        aria-label={tr("pdf.present")}
+        className="eu-pdf-present-bar"
+        onPointerEnter={() => hold(true)}
+        onPointerLeave={() => hold(false)}
+      >
         <button
           type="button"
           onClick={() => go(shown - 1)}

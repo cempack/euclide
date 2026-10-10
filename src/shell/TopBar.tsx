@@ -206,6 +206,8 @@ export const TopBar = memo(function TopBar({
                 data-dragging={(dropAt && dropAt.from === index) || undefined}
                 onPointerDown={(e) => {
                   if (e.button !== 0 || (e.target as HTMLElement).closest(".eu-tab-close")) return;
+                  // A tab shows on the press, as in a browser, not on the release.
+                  if (!active) tabs.setActive(tab.id);
                   const strip = stripRef.current;
                   if (!strip) return;
                   const mids = Array.from(strip.querySelectorAll(".eu-tab"), (el) => {
@@ -217,6 +219,11 @@ export const TopBar = memo(function TopBar({
                 onPointerMove={(e) => {
                   const d = drag.current;
                   if (!d) return;
+                  // Released outside the tab before the drag began: no drag.
+                  if (!(e.buttons & 1)) {
+                    drag.current = null;
+                    return;
+                  }
                   if (!d.started) {
                     if (Math.abs(e.clientX - d.x) < 6) return;
                     d.started = true;

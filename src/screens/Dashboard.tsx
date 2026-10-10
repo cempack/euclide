@@ -303,7 +303,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                 }
               >
                 {tr("dashboard.schedule")}
-                <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
+                <Icon icon={ChevronRight} size={14} />
               </button>
             }
           >
@@ -330,7 +330,7 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "documents" })}>
                 {tr("nav.documents")}
-                <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
+                <Icon icon={ChevronRight} size={14} />
               </button>
             }
           >
@@ -369,12 +369,9 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             title={tr("nav.reminders")}
             icon={<Icon icon={Bell} size={14} />}
             action={
-              <button
-                className="eu-btn-quiet eu-btn-sm"
-                onClick={() => tabs.open({ kind: "reminders" })}
-                aria-label={tr("common.add")}
-              >
-                <Icon icon={Plus} size={14} />
+              <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "reminders" })}>
+                {tr("nav.reminders")}
+                <Icon icon={ChevronRight} size={14} />
               </button>
             }
           >
@@ -389,9 +386,10 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     <div key={r.id} className="eu-row-hover group">
                       <button
                         onClick={() => toggle(r)}
+                        aria-pressed={false}
                         aria-label={`${tr("reminders.markDone")} — ${r.title}`}
                         data-tip={tr("reminders.markDone")}
-                        className="w-4 h-4 shrink-0 rounded-sm border border-line-strong hover:border-ok hover:bg-ok-soft transition-colors duration-fast"
+                        className="eu-tick"
                       />
                       <span className="eu-t-body text-ink truncate flex-1">{r.title}</span>
                       {course && (
@@ -428,6 +426,15 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
                     </div>
                   );
                 })}
+                {pending.length > 6 && (
+                  <button
+                    type="button"
+                    className="eu-row-hover w-full text-left eu-t-meta"
+                    onClick={() => tabs.open({ kind: "reminders" })}
+                  >
+                    {trn("dashboard.moreReminders", pending.length - 6)}
+                  </button>
+                )}
               </div>
             )}
           </Panel>
@@ -437,8 +444,8 @@ export default function Dashboard({ visible = true }: { visible?: boolean }) {
             icon={<Icon icon={Link} size={14} />}
             action={
               <button className="eu-btn-quiet eu-btn-sm" onClick={() => tabs.open({ kind: "tools" })}>
-                {tr("common.manage")}
-                <Icon icon={ChevronRight} size={20} className="w-3 h-3" />
+                {tr("nav.tools")}
+                <Icon icon={ChevronRight} size={14} />
               </button>
             }
           >

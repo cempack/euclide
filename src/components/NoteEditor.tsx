@@ -497,8 +497,8 @@ export default function NoteEditor({ tabId, noteId, isNew, initialCourseId }: No
   const doDelete = async () => {
     if (!draft.id) return;
     const ok = await confirm.ask({
-      title: tr("notes.deleteConfirm"),
-      message: tr("notes.deleteConfirm"),
+      title: tr("notes.deleteConfirm", { name: draft.title?.trim() || tr("documents.noteFallbackTitle") }),
+      message: tr("notes.deleteMessage"),
       confirmLabel: tr("common.delete"),
       danger: true,
     });

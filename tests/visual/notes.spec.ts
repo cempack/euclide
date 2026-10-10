@@ -4,7 +4,8 @@ import { settle } from "./app";
 /**
  * Tables and pictures in a note, in the browser build: the toolbar's
  * table, cells pasted from a spreadsheet, a pasted screenshot that Ctrl+Z
- * takes back, a picture's width, one whose document is gone. No screenshots.
+ * takes back, a picture's width, one whose document is gone. Then the note
+ * as slides, turned from their bar. No screenshots.
  */
 
 async function openNote(page: Page) {
@@ -93,4 +94,27 @@ test("a pasted screenshot, its width, and a picture whose document is gone", asy
   await expect(preview.locator('img[alt="Parabole"]')).toHaveCSS("width", "120px");
   await expect(preview.getByText("Image introuvable : Vieille figure")).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("slides turn from their bar, which a touch screen needs, and Quitter leaves", async ({ page }) => {
+  await openNote(page);
+  await page.keyboard.type("\n\n---\n\n## Deuxième diapositive\n");
+  await page.getByRole("button", { name: "Présenter", exact: true }).click();
+  const slides = page.getByRole("dialog", { name: /^Présentation/ });
+  await expect(slides).toBeVisible();
+  // The bar shows with the pointer; it stays while the pointer is on it.
+  await page.mouse.move(640, 500);
+  await page.mouse.move(640, 520);
+  const bar = slides.getByRole("toolbar", { name: "Présenter" });
+  await expect(bar.getByText("1 / 2")).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Diapositive précédente" })).toBeDisabled();
+  await bar.getByRole("button", { name: "Diapositive suivante" }).click();
+  await expect(bar.getByText("2 / 2")).toBeVisible();
+  await expect(slides.getByRole("heading", { name: "Deuxième diapositive" })).toBeVisible();
+  await bar.getByRole("button", { name: "Diapositive précédente" }).click();
+  await expect(bar.getByText("1 / 2")).toBeVisible();
+  // The bar's click turns no slide by itself: still the first.
+  await expect(slides.getByRole("heading", { name: "Définition" })).toBeVisible();
+  await bar.getByRole("button", { name: "Quitter" }).click();
+  await expect(slides).toHaveCount(0);
 });

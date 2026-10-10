@@ -1366,10 +1366,21 @@ function EraserOnPage({
     if (!interaction || !annotations) return;
     const scope = annotations.forDocument(documentId);
     let erasing = false;
+    let last: Position | null = null;
     const gone = new Set<string>();
     const erase = (at: Position) => {
+      const reach = 6 / scale;
+      // A quick sweep jumps between two events: what it passed over goes
+      // too, tested at points no further apart than the eraser is wide.
+      const from = last ?? at;
+      last = at;
+      const steps = Math.max(1, Math.ceil(Math.hypot(at.x - from.x, at.y - from.y) / (2 * reach)));
+      const along = Array.from({ length: steps }, (_, i) => {
+        const t = (i + 1) / steps;
+        return { x: from.x + (at.x - from.x) * t, y: from.y + (at.y - from.y) * t };
+      });
       for (const { object } of scope.getAnnotations({ pageIndex })) {
-        if (gone.has(object.id) || !touches(object, at, 6 / scale)) continue;
+        if (gone.has(object.id) || !along.some((q) => touches(object, q, reach))) continue;
         gone.add(object.id);
         scope.deleteAnnotation(pageIndex, object.id);
       }
@@ -1381,6 +1392,7 @@ function EraserOnPage({
       handlers: {
         onPointerDown: (at, e) => {
           erasing = true;
+          last = null;
           gone.clear();
           e.setPointerCapture?.();
           erase(at);

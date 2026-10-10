@@ -3,9 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { log, pictures } from "virtual:changelog";
 import { tr } from "../lib/i18n";
-import { Icon } from "../ui/Icon";
 import { PageHeader } from "../components/layout";
-import { KIND_ICONS } from "../shell/nav";
 import { releases, releasesSince, withPictures } from "../features/news/changelog";
 
 /** The changelog this build of Euclide carries, read once. */
@@ -42,7 +40,6 @@ export default function News({ since }: { since?: string }) {
     <>
       <PageHeader
         title={tr("news.title")}
-        icon={<Icon icon={KIND_ICONS.news} size={20} />}
         meta={since && newer.length ? tr("news.since", { version: since }) : tr("news.all")}
       />
       {/* Focusable: with nothing else to tab to, the keyboard scrolls it. */}

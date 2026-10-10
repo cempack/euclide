@@ -134,7 +134,6 @@ export default function Recap() {
     <>
       <PageHeader
         title={tr("nav.recap")}
-        icon={<Icon icon={KIND_ICONS.recap} size={20} />}
         meta={
           <>
             <span>{PERIOD_LABELS[period]}</span>

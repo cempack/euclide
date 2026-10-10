@@ -231,6 +231,12 @@ function DrawSection() {
   const [min, setMin] = useState(1);
   const [max, setMax] = useState(100);
   const [result, setResult] = useState<string | null>(null);
+  // Each throw lands anew, even on the same number as the last.
+  const [throws, setThrows] = useState(0);
+  const show = (r: string) => {
+    setResult(r);
+    setThrows((n) => n + 1);
+  };
 
   return (
     <Section
@@ -356,7 +362,7 @@ function DrawSection() {
             <button
               type="button"
               className="eu-btn-ghost eu-btn-sm"
-              onClick={() => setResult(String(rollDie(faces)))}
+              onClick={() => show(String(rollDie(faces)))}
             >
               {tr("scene.chanceDie")}
             </button>
@@ -379,7 +385,7 @@ function DrawSection() {
               <button
                 type="button"
                 className="eu-btn-ghost eu-btn-sm"
-                onClick={() => setResult(String(randomInt(min, max)))}
+                onClick={() => show(String(randomInt(min, max)))}
               >
                 {tr("scene.chanceNumber")}
               </button>
@@ -387,16 +393,18 @@ function DrawSection() {
             <button
               type="button"
               className="eu-btn-ghost eu-btn-sm"
-              onClick={() => setResult(tr(coin() === "pile" ? "scene.pile" : "scene.face"))}
+              onClick={() => show(tr(coin() === "pile" ? "scene.pile" : "scene.face"))}
             >
               {tr("scene.chanceCoin")}
             </button>
             <output
-              className="min-w-12 text-center eu-t-title font-mono tabular-nums text-ink"
+              className="ml-auto min-w-16 h-10 px-3 grid place-items-center rounded-md border border-line bg-panel-alt eu-t-metric text-ink"
               aria-label={tr("tools.chanceResult")}
               aria-live="polite"
             >
-              {result ?? "—"}
+              <span key={throws} className={result ? "eu-scene-landed" : "text-ink-faint"}>
+                {result ?? "—"}
+              </span>
             </output>
           </div>
         </div>
@@ -490,10 +498,8 @@ function LinksSection() {
                 <button
                   onClick={async () => {
                     const ok = await confirmDlg.ask({
-                      title: tr("common.delete"),
-                      message: tr("tools.confirmDeleteLink", {
-                        name: l.label,
-                      }),
+                      title: tr("tools.confirmDeleteLink", { name: l.label }),
+                      message: tr("tools.confirmDeleteLinkMessage"),
                       confirmLabel: tr("common.delete"),
                       danger: true,
                     });

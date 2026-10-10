@@ -14,12 +14,11 @@ import { MetaDot, PageHeader, Panel, Segmented } from "../components/layout";
 import { courseVisual } from "../lib/color";
 import { Progression } from "../features/classroom/Progression";
 import { useAppearance } from "../lib/theme";
-import { BookOpen, File, Layers, PenLine, Plus, Trash2, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, File, Layers, PenLine, Plus, Trash2, Users } from "lucide-react";
 import { Icon } from "../ui/Icon";
 import { FileKindIcon } from "../ui/FileKindIcon";
 
-// TTL cache for pronoteClasses (avoids sidecar + login on every open)
-// on every single course tab open; the list changes rarely).
+/** Stable empty lists while a query loads, so memos hold. */
 const NO_NOTES: Note[] = [];
 const NO_FILES: FileItem[] = [];
 const NO_CLASSES: CourseClass[] = [];
@@ -140,8 +139,8 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
   const detachClass = async (cc: CourseClass) => {
     const ok = await confirmDlg.ask({
       title: tr("courseDetail.confirmDetach", { name: cc.class_name }),
-      message: tr("courseDetail.confirmDetach", { name: cc.class_name }),
-      confirmLabel: tr("common.delete"),
+      message: tr("courseDetail.confirmDetachMessage"),
+      confirmLabel: tr("courseDetail.detachTitle"),
       danger: true,
     });
     if (!ok) return;
@@ -207,21 +206,26 @@ export default function CourseDetail({ courseId, visible = true }: { courseId: n
     }
   };
 
-  if (loading) {
+  // Loading, or gone: the way back to the courses stays where it always is.
+  if (loading || !course) {
     return (
-      <div className="py-10">
-        <div className="eu-panel">
-          <Loading label="Chargement du cours…" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!course) {
-    return (
-      <div className="py-20">
-        <EmptyState title={tr("courseDetail.notFoundTitle")} hint={tr("courseDetail.notFoundHint")} />
-      </div>
+      <>
+        <button
+          type="button"
+          onClick={() => tabs.open({ kind: "courses" })}
+          className="eu-btn-quiet eu-btn-sm self-start -ml-2.5"
+        >
+          <Icon icon={ArrowLeft} size={14} />
+          {tr("nav.courses")}
+        </button>
+        <Panel>
+          {loading ? (
+            <Loading label={tr("common.loading")} />
+          ) : (
+            <EmptyState title={tr("courseDetail.notFoundTitle")} hint={tr("courseDetail.notFoundHint")} />
+          )}
+        </Panel>
+      </>
     );
   }
 
@@ -581,10 +585,8 @@ function FilesPane({
           <button
             onClick={async () => {
               const ok = await confirmDlg.ask({
-                title: tr("common.delete"),
-                message: tr("courseDetail.confirmDeleteFile", {
-                  name: f.name,
-                }),
+                title: tr("courseDetail.confirmDeleteFile", { name: f.name }),
+                message: tr("documents.deleteMessage"),
                 confirmLabel: tr("common.delete"),
                 danger: true,
               });
