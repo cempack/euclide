@@ -1,0 +1,93 @@
+# Shows Coolify deployments on GitHub (Deployments tab, commits and pull requests).
+# Coolify deploys by itself through its GitHub App. This workflow only waits for
+# the Coolify deployment of the pushed commit and mirrors its status and URL.
+# Pull requests get a preview at https://pr-<number>-euclide.elliotmoreau.fr.
+name: Coolify
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**']
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths: ['site/**']
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: coolify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  COOLIFY_URL: https://apps.elliotmoreau.fr
+
+jobs:
+  deployment:
+    # previews only exist for branches of this repo, not forks
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: site
+            app: l5mdqqvd17pmhn2pur4tdgor
+            url: https://euclide.elliotmoreau.fr
+            preview_host: "euclide.elliotmoreau.fr"
+    steps:
+      - name: Wait for Coolify and report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_READ_TOKEN }}
+          APP_UUID: ${{ matrix.app }}
+          PRODUCTION_URL: ${{ matrix.url }}
+          PREVIEW_HOST: ${{ matrix.preview_host }}
+          NAME: ${{ matrix.name }}
+          MULTI: "false"
+          PR: ${{ github.event.pull_request.number || 0 }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${COOLIFY_TOKEN:-}" ]; then echo "::notice::COOLIFY_READ_TOKEN is not set, nothing to report"; exit 0; fi
+          if [ "$PR" = 0 ]; then
+            env_name=production; url=$PRODUCTION_URL; prod=true; transient=false
+          else
+            env_name="preview/pr-$PR"; url="https://pr-$PR-$PREVIEW_HOST"; prod=false; transient=true
+          fi
+          [ "$MULTI" = true ] && env_name="$env_name/$NAME"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          id=$(jq -n --arg ref "$SHA" --arg env "$env_name" --argjson prod "$prod" --argjson tr "$transient" \
+                 '{ref: $ref, environment: $env, auto_merge: false, required_contexts: [], production_environment: $prod, transient_environment: $tr, description: "Coolify"}' \
+               | gh api "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id)
+          report() { gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" -f state="$1" -f description="$2" -f environment_url="$url" -f log_url="$run_url" > /dev/null; }
+          report in_progress "Waiting for Coolify"
+          for _ in $(seq 1 260); do
+            status=$(curl -fsS -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_URL/api/v1/deployments/applications/$APP_UUID?skip=0&take=30" \
+                       | jq -r --arg sha "$SHA" --argjson pr "$PR" \
+                           '[(.deployments // .)[] | select(.commit == $sha and .pull_request_id == $pr)][0].status // ""' || true)
+            case "$status" in
+              finished) report success "Deployed by Coolify"; echo "Live at $url"; exit 0 ;;
+              failed|cancelled*) report failure "Coolify deployment $status"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          report error "No finished Coolify deployment after 43 minutes"
+          exit 1
+
+  preview-closed:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark the preview inactive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=preview/pr-$PR" --jq '.[].id'); do
+            gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" -f state=inactive > /dev/null
+          done
