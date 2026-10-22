@@ -7,10 +7,10 @@ name: Coolify
 on:
   push:
     branches: [main]
-    paths: ['site/**']
+    paths: ["site/**"]
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    paths: ['site/**']
+    paths: ["site/**"]
 
 permissions:
   contents: read
