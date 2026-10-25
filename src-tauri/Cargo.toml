@@ -33,7 +33,7 @@ tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macr
 # reqwest also depends on flate2 with default-features = false, so the unified
 # graph has no rust_backend/zlib-rs and MSVC CI dies with
 # "You need to choose a zlib backend". zlib-rs is pure Rust (no system zlib).
-zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 minisign-verify = "0.2"
 # Already built for TLS: seals the Pronote password (src/secrets.rs).
 ring = "0.17"
