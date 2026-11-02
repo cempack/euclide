@@ -26,7 +26,7 @@ runs:
         echo "key=apt-$(lsb_release -rs)-${{ runner.arch }}-$hash" >> "$GITHUB_OUTPUT"
         echo "prefix=apt-$(lsb_release -rs)-${{ runner.arch }}-" >> "$GITHUB_OUTPUT"
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@v6
       with:
         path: ~/apt-archives
         key: ${{ steps.plan.outputs.key }}
