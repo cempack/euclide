@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "description": "gtk 0.19 links gtk-3 through gtk-sys 0.19, but Tauri (wry, webkit2gtk) and rfd are still on gtk-sys 0.18; only one may link gtk-3. Lift once wry moves to gtk 0.19.",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["gtk"],
+      "allowedVersions": "<0.19"
+    }
+  ]
+}

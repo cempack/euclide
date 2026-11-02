@@ -9,6 +9,12 @@ ignore = [
     # proc-macro-error (unmaintained): a build-time macro of glib-macros 0.18,
     # the GTK 3 bindings Tauri needs on Linux. No newer gtk-rs for GTK 3.
     { id = "RUSTSEC-2024-0370", reason = "build-time only, via gtk-rs 0.18 (Tauri on Linux); no upgrade exists" },
+    # zbus 5's helper crates (unmaintained: merged into zbus 6). They come with
+    # keepawake, tauri-plugin-opener and tauri-plugin-single-instance, none of
+    # which has moved to zbus 6 yet. Drop these once they have.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant, via zbus 5 (keepawake, Tauri plugins); no release on zbus 6 yet" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names, via zbus 5 (keepawake, Tauri plugins); no release on zbus 6 yet" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive, via zbus 5 (keepawake, Tauri plugins); no release on zbus 6 yet" },
 ]
 
 [licenses]
