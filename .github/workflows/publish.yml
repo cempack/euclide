@@ -25,9 +25,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Skip the matrix on main when the push is docs/CI-only. Tags and manual
-  # runs always publish. Do not use workflow-level paths-ignore: that would
-  # also filter v* tag pushes.
+  # Skip the matrix on main when the push is docs/CI-only or only Renovate
+  # commits. Tags and manual runs always publish. Do not use workflow-level
+  # paths-ignore: that would also filter v* tag pushes.
   should-publish:
     name: Should rebuild portables
     runs-on: ubuntu-latest
@@ -69,6 +69,15 @@ jobs:
 
           if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             git fetch --no-tags origin "$BEFORE" || { out true; exit 0; }
+          fi
+
+          # Renovate merges dependency updates on its own; they ship with the
+          # next real release instead of each one auto-updating the teacher.
+          if authors="$(git log --format=%ae "$BEFORE..$SHA")" && [ -n "$authors" ] \
+             && ! grep -qvx 'bot@renovateapp.com' <<< "$authors"; then
+            echo "Only Renovate commits; they ship with the next release."
+            out false
+            exit 0
           fi
 
           if ! changed="$(git diff --name-only "$BEFORE" "$SHA")"; then
@@ -246,7 +255,7 @@ jobs:
       - name: setup python for sidecar
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.15"
           cache: pip
           cache-dependency-path: sidecar/requirements.txt
 
@@ -264,10 +273,10 @@ jobs:
 
       - name: Restore sidecar bundle
         id: sidecar-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: sidecar/dist/euclide-sidecar
-          key: sidecar-${{ matrix.platform }}-py3.12-${{ hashFiles('sidecar/requirements.txt', 'sidecar/euclide_sidecar/**', 'sidecar/run_sidecar.py', 'sidecar/build.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
+          key: sidecar-${{ matrix.platform }}-py3.15-${{ hashFiles('sidecar/requirements.txt', 'sidecar/euclide_sidecar/**', 'sidecar/run_sidecar.py', 'sidecar/build.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
 
       - name: build sidecar binary (non-Windows)
         if: matrix.platform != 'windows-latest' && steps.sidecar-cache.outputs.cache-hit != 'true'

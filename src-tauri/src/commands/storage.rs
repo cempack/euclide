@@ -282,7 +282,7 @@ mod tests {
         let mut archive = zip::ZipArchive::new(fs::File::open(&dest).unwrap()).unwrap();
         let mut names = Vec::new();
         for i in 0..archive.len() {
-            names.push(archive.by_index(i).unwrap().name().to_string());
+            names.push(archive.by_index(i).unwrap().name().unwrap().to_string());
         }
         names.sort();
         assert_eq!(names.iter().filter(|n| *n == "euclide.db").count(), 1);

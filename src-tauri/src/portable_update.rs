@@ -293,8 +293,9 @@ fn extract_overlay(bytes: &[u8], dest: &Path, sidecar: bool) -> Result<usize, St
         if file.is_dir() {
             continue;
         }
-        let Some(rel) = normalize_zip_entry(file.name()) else {
-            return Err(format!("Chemin zip refusé: {}", file.name()));
+        let name = file.name().map_err(|e| format!("Entrée zip {i}: {e}"))?;
+        let Some(rel) = normalize_zip_entry(&name) else {
+            return Err(format!("Chemin zip refusé: {name}"));
         };
         names.push((i, rel));
     }
@@ -346,7 +347,7 @@ fn archive_fingerprint(bytes: &[u8]) -> Option<String> {
     let suffix = format!("{SIDECAR_DIR}/{FINGERPRINT}");
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).ok()?;
-        let name = file.name().replace('\\', "/").to_ascii_lowercase();
+        let name = file.name().ok()?.replace('\\', "/").to_ascii_lowercase();
         if name == suffix || name.ends_with(&format!("/{suffix}")) {
             let mut text = String::new();
             file.read_to_string(&mut text).ok()?;

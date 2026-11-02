@@ -50,7 +50,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.15"
           cache: pip
           cache-dependency-path: sidecar/requirements.txt
 
@@ -64,10 +64,10 @@ jobs:
 
       - name: Restore sidecar bundle
         id: sidecar-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: sidecar/dist/euclide-sidecar
-          key: sidecar-${{ matrix.platform }}-py3.12-${{ hashFiles('sidecar/requirements.txt', 'sidecar/euclide_sidecar/**', 'sidecar/run_sidecar.py', 'sidecar/build.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
+          key: sidecar-${{ matrix.platform }}-py3.15-${{ hashFiles('sidecar/requirements.txt', 'sidecar/euclide_sidecar/**', 'sidecar/run_sidecar.py', 'sidecar/build.py', 'sidecar/build_sidecar.sh', 'sidecar/build_sidecar.ps1') }}
 
       - name: build sidecar (Linux)
         if: runner.os == 'Linux' && steps.sidecar-cache.outputs.cache-hit != 'true'

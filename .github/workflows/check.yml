@@ -120,7 +120,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.15"
           cache: pip
           cache-dependency-path: sidecar/requirements.txt
       # The sidecar's own libraries too: a test reads a PDF with pypdf.
@@ -130,3 +130,30 @@ jobs:
       - name: unit tests
         working-directory: sidecar
         run: python -m unittest discover -s tests -t .
+
+  # The website (site/), as Coolify builds it: the same Dockerfile and
+  # context, then the container must answer /healthz. The base image is the
+  # one dependency Renovate bumps there.
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm test
+      - run: docker build -t euclide-site:ci .
+      - name: boot and answer /healthz
+        run: |
+          docker run -d --name site -p 3000:3000 euclide-site:ci
+          for _ in $(seq 60); do
+            if curl -fsS http://localhost:3000/healthz; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::the site did not answer /healthz within 60 s"
+          docker logs site
+          exit 1
