@@ -25,7 +25,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Skip the matrix on main when the push is docs/CI-only. Tags and manual
+  # Skip the matrix on main when the push is docs/CI-only or only Renovate
+  # commits. Tags and manual
   # runs always publish. Do not use workflow-level paths-ignore: that would
   # also filter v* tag pushes.
   should-publish:
@@ -69,6 +70,15 @@ jobs:
 
           if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             git fetch --no-tags origin "$BEFORE" || { out true; exit 0; }
+          fi
+
+          # Renovate merges dependency updates on its own; they ship with the
+          # next real release instead of each one auto-updating the teacher.
+          if authors="$(git log --format=%ae "$BEFORE..$SHA")" && [ -n "$authors" ] \
+             && ! grep -qvx 'bot@renovateapp.com' <<< "$authors"; then
+            echo "Only Renovate commits; they ship with the next release."
+            out false
+            exit 0
           fi
 
           if ! changed="$(git diff --name-only "$BEFORE" "$SHA")"; then
