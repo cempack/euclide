@@ -26,9 +26,8 @@ concurrency:
 
 jobs:
   # Skip the matrix on main when the push is docs/CI-only or only Renovate
-  # commits. Tags and manual
-  # runs always publish. Do not use workflow-level paths-ignore: that would
-  # also filter v* tag pushes.
+  # commits. Tags and manual runs always publish. Do not use workflow-level
+  # paths-ignore: that would also filter v* tag pushes.
   should-publish:
     name: Should rebuild portables
     runs-on: ubuntu-latest
