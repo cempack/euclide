@@ -120,7 +120,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.15"
           cache: pip
           cache-dependency-path: sidecar/requirements.txt
       # The sidecar's own libraries too: a test reads a PDF with pypdf.
