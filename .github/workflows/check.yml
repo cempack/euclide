@@ -23,7 +23,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: lts/*
@@ -52,7 +52,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - if: runner.os == 'Linux'
         uses: ./.github/actions/linux-deps
         with:
@@ -99,7 +99,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - if: runner.os == 'Linux'
         uses: ./.github/actions/linux-deps
         with:
@@ -117,7 +117,7 @@ jobs:
   sidecar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.15"
@@ -141,7 +141,7 @@ jobs:
       run:
         working-directory: site
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 24

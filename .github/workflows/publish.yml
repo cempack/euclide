@@ -34,7 +34,7 @@ jobs:
     outputs:
       run: ${{ steps.decide.outputs.run }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           fetch-depth: 0
@@ -130,7 +130,7 @@ jobs:
       version: ${{ steps.cut.outputs.version }}
       release_id: ${{ steps.draft.outputs.id }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ startsWith(github.ref, 'refs/tags/') && github.ref || 'main' }}
@@ -233,7 +233,7 @@ jobs:
       RUSTFLAGS: ${{ matrix.platform == 'ubuntu-22.04' && '-C link-arg=-fuse-ld=lld' || '' }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.tag }}
 
@@ -486,7 +486,7 @@ jobs:
       # For CHANGELOG.md: the news since the last release becomes the
       # release's notes, and the ones Euclide shows before installing it
       # (latest.json).
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.tag }}
       - uses: actions/setup-node@v6
