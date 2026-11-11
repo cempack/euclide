@@ -38,7 +38,7 @@ jobs:
           New-Item -ItemType Directory -Force e2e-app | Out-Null
           Copy-Item src-tauri\target\debug\euclide.exe e2e-app\
           node scripts/e2e/windows.mjs "$PWD\e2e-app\euclide.exe" e2e-out
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-windows
